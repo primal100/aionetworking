@@ -5,7 +5,7 @@ from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
 from lib.run import start
 import os
 
-
+APP_NAME = 'pymessagemanager'
 message_manager = MessageManager
 batch_message_manager = BatchMessageManager
 
@@ -26,5 +26,5 @@ interfaces = {
 config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "message_manager.cfg")
 
 if __name__ == '__main__':
-    start(message_manager, batch_message_manager, receivers, actions, interfaces, config)
+    start(APP_NAME, message_manager, batch_message_manager, receivers, actions, interfaces, config)
 

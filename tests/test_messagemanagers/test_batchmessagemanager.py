@@ -1,5 +1,5 @@
 from lib.basetestcase import BaseTestCase
-from lib.messagemanagers import MessageManager, MessageFromNotAuthorizedHost
+from lib.messagemanagers import BatchMessageManager, MessageFromNotAuthorizedHost
 from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
 from lib.actions import binary, decode, prettify, summarise
 from lib import utils
@@ -40,7 +40,7 @@ class TestMessageManager(BaseTestCase):
             self.sender: 'Primary'
         }
         self.msgs = [binascii.unhexlify(encoded_hex) for encoded_hex in self.multiple_encoded_hex]
-        self.manager = MessageManager('PyMessageTest', self.interface, action_modules, print_modules, config,
+        self.manager = BatchMessageManager('PyMessageTest', self.interface, action_modules, print_modules, config,
                                       {}, action_config, aliases=aliases, loop=self.loop)
 
     def test_01_allowed_sender(self):
@@ -51,7 +51,7 @@ class TestMessageManager(BaseTestCase):
         self.assertRaises(MessageFromNotAuthorizedHost, self.manager.check_sender, '10.10.10.11')
 
     def test_03_manage_message(self):
-        self.loop.run_until_complete(self.manager.manage_message('10.10.10.10', self.msgs[0]))
+        self.loop.run_until_complete(utils.run_wait_close(self.manager.manage_message, self.manager, '10.10.10.10', self.msgs[0]))
         expected_file = os.path.join(self.base_home, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
@@ -66,8 +66,8 @@ class TestMessageManager(BaseTestCase):
         self.assertPathExists(expected_file)
 
     def test_04_manage_multiple_messages(self):
-        for msg in self.msgs:
-            self.loop.run_until_complete(self.manager.manage_message('10.10.10.10', msg))
+        self.loop.run_until_complete(
+            utils.run_wait_close_multiple(self.manager.manage_message, self.manager, '10.10.10.10', self.msgs))
         expected_file = os.path.join(self.base_home, 'Encoded', 'TCAP_MAP', 'Primary_00000000.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file, binascii.unhexlify(self.multiple_encoded_hex[3]))
         expected_file = os.path.join(self.base_home, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')

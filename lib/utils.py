@@ -7,15 +7,15 @@ import re
 import asyncio
 
 
-def data_directory(APPNAME):
+def data_directory(APP_NAME):
     if sys.platform == 'win32':
-        home = os.path.join(os.environ['APPDATA'], APPNAME)
-    else:
-        home = os.path.expanduser(os.path.join("~", "." + APPNAME))
-    return home
+        return os.path.join(os.environ['APPDATA'], APP_NAME)
+    return os.path.expanduser(os.path.join("~", "." + APP_NAME))
+
 
 def timestamp_to_utc_string(timestamp):
     return ''.join(timestamp)
+
 
 def timestamp_to_string(timestamp):
     return ''.join(timestamp)
@@ -97,6 +97,7 @@ def write_to_unique_filename(basepath, basefilename, extension, content, mode='w
     with open(filepath, mode) as f:
         f.write(content)
 
+
 def pack_binary(content):
     return struct.pack("I", len(content)) + content
 
@@ -175,3 +176,19 @@ def print_dicts(dicts):
             text += "%s: %s\n" % (bold(k.capitalize()), v)
         text += '\n'
     return text
+
+
+async def run_and_wait(method, *args, interval=7, **kwargs):
+    await method(*args, **kwargs)
+    await asyncio.sleep(interval)
+
+
+async def run_wait_close(method, message_manager, *args, interval=12, **kwargs):
+    await run_and_wait(method, *args, interval=interval, **kwargs)
+    message_manager.close()
+
+
+async def run_wait_close_multiple(method, message_manager, sender, msgs, interval=5, **kwargs):
+    for message in msgs:
+        await run_and_wait(method, sender, message, interval=interval, **kwargs)
+    message_manager.close()

@@ -8,6 +8,7 @@ class Action(BaseStoreAction):
     To store or display prettified versions of received data
     """
 
+    action_name = 'Prettify'
     default_data_dir = "Prettified"
     store_write_mode = 'w+'
 

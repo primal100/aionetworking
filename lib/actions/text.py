@@ -6,6 +6,8 @@ class Action(BaseAction):
     """
     To store or display ascii/unicode data in the format it was received.
     """
+
+    action_name = 'Text'
     default_data_dir = "Encoded"
 
     def get_content(self, msg):

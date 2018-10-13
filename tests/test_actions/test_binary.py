@@ -55,7 +55,7 @@ class TestBinaryActionTCAPMAP(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Encoded/TCAP_MAP', '10.10.10.10_00000001.TCAPMAP')
+        expected_file = os.path.join(self.base_home, 'Encoded', 'TCAP_MAP', '10.10.10.10_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
         msg = self.interface.from_file(self.sender, expected_file)

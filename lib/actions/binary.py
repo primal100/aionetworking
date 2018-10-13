@@ -7,6 +7,7 @@ class Action(BaseAction):
     """
     To store or display binary data in the format it was received.
     """
+    action_name = 'Binary'
     default_data_dir = "Encoded"
     store_write_mode = 'wb+'
     store_many_write_mode = 'ab+'

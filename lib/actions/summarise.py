@@ -7,6 +7,7 @@ class Action(BaseStoreAction):
     """
     To store or display summaries of all data received each day
     """
+    action_name = 'Summarise'
     default_data_dir = "Summaries"
     single_extension = "csv"
     multi_extension = "csv"

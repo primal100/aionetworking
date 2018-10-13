@@ -4,15 +4,20 @@ from lib.utils import underline
 
 
 class BaseAction:
+    action_name = ''
+    default_home = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests", "data")
     default_data_dir = ""
     store_write_mode = 'w+'
     store_many_write_mode = 'a'
     single_extension = "txt"
     multi_extension = "txt"
 
-    def __init__(self, home, data_dir=''):
-        data_dir = data_dir or self.default_data_dir
-        if data_dir:
+    def __init__(self, app_name, config, storage=True):
+
+        self.APP_NAME = app_name
+        if storage:
+            home = config.get('home', utils.data_directory(self.APP_NAME))
+            data_dir = config.get('%s_data_dir' % self.action_name) or self.default_data_dir
             self.base_path = os.path.join(home, data_dir)
             os.makedirs(self.base_path, exist_ok=True)
 
@@ -56,10 +61,7 @@ class BaseAction:
         writes = self.writes_for_store_many(msgs)
         utils.write_to_files(self.base_path, self.store_many_write_mode, writes)
 
-    def do_multiple(self, msgs, queue=None):
-        try:
-            self.store_many(msgs)
-        finally:
-            for i in range(0, len(msgs)):
-                if queue:
-                    queue.task_done()
+    def do_multiple(self, msgs):
+        print(self.action_name)
+        self.store_many(msgs)
+
