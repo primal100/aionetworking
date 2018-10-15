@@ -1,3 +1,7 @@
+class ConfigurationException(Exception):
+    pass
+
+
 class BaseConfigClass:
 
     def __init__(self, config_meta):
@@ -23,5 +27,5 @@ class BaseConfigClass:
     def interface_config(self):
         raise NotImplementedError
 
-    def action_config(self, action_name, storage=False):
+    def action_config(self, app_name, action_name, storage=False):
         raise NotImplementedError

@@ -18,7 +18,7 @@ def raise_message_from_not_authorized_host(sender, allowed_senders):
 class BaseMessageManager:
 
     def __init__(self, app_name, message_cls, actions, config, loop=None):
-        self.APP_NAME = app_name
+        self.app_name = app_name
         self.loop = loop or asyncio.get_event_loop()
         self.message_cls = message_cls
         self.config = config.message_manager_config
@@ -35,27 +35,31 @@ class BaseMessageManager:
         pass
 
     def get_alias(self, sender):
-        return self.aliases.get(sender, sender)
+        alias = self.aliases.get(sender, sender)
+        if alias != sender:
+            logger.debug('Alias found for %s: %s' % (sender, alias))
+        return alias
 
     def check_sender(self, sender):
         if self.allowed_senders and sender not in self.allowed_senders:
             raise_message_from_not_authorized_host(sender, self.allowed_senders)
+        if self.allowed_senders:
+            logger.debug('Sender is in allowed senders.')
         return self.get_alias(sender)
 
     def make_message(self, sender, encoded, timestamp):
         return self.message_cls(sender, encoded, timestamp=timestamp, config=self.msg_config)
 
     async def manage_message(self, sender, encoded):
+        logger.debug('Managing message from ' + sender)
         host = self.check_sender(sender)
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
+            logger.debug('Generated timestamp %s' % timestamp)
         else:
             timestamp = None
         if self.actions:
             await self.decode_run(host, encoded, timestamp)
-
-    async def done(self):
-        raise NotImplementedError
 
     def do_actions(self, msg):
         raise NotImplementedError

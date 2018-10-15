@@ -1,6 +1,10 @@
 import os
 import datetime
-from lib.utils import cached_property, unpack_binary
+import logging
+from lib.utils import cached_property, unpack_variable_len_strings
+
+
+logger = logging.getLogger()
 
 
 class BaseMessage:
@@ -13,6 +17,7 @@ class BaseMessage:
 
     @classmethod
     def from_file(cls, sender, file_path, config=None):
+        logger.debug('Creating new %s message from %s' % (cls.interface_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             encoded = f.read()
@@ -20,11 +25,12 @@ class BaseMessage:
 
     @classmethod
     def from_file_multi(cls, sender, file_path, config=None):
+        logger.debug('Creating new %s messages from %s' % (cls.interface_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             contents = f.read()
         if cls.binary:
-            return [cls(sender, encoded, config=config) for encoded in unpack_binary(contents)]
+            return [cls(sender, encoded, config=config) for encoded in unpack_variable_len_strings(contents)]
         return [cls(sender, encoded, config=config) for encoded in contents.split('\n') if encoded]
 
     def __init__(self, sender, encoded=None, decoded=None, timestamp=None, config=None):
@@ -76,6 +82,7 @@ class BaseMessage:
         file_path = "%s.%s" % (base_file_path, extension)
         i = 1
         while os.path.exists(file_path):
+            logger.debug('File %s exists. Creating alternative name' % (file_path))
             file_path = "%s_%s.%s" % (base_file_path, i, extension)
             i += 1
         return file_path

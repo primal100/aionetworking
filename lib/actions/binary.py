@@ -16,7 +16,7 @@ class Action(BaseAction):
         return msg.encoded
 
     def get_content_multi(self, msg):
-        return utils.pack_binary(self.get_content(msg))
+        return utils.pack_variable_len_string(self.get_content(msg))
 
     def get_file_extension(self, msg):
         return msg.file_extension

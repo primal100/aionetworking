@@ -7,10 +7,10 @@ import re
 import asyncio
 
 
-def data_directory(APP_NAME):
+def data_directory(app_name):
     if sys.platform == 'win32':
-        return os.path.join(os.environ['APPDATA'], APP_NAME)
-    return os.path.expanduser(os.path.join("~", "." + APP_NAME))
+        return os.path.join(os.environ['appdata'], app_name)
+    return os.path.expanduser(os.path.join("~", "." + app_name))
 
 
 def timestamp_to_utc_string(timestamp):
@@ -98,21 +98,43 @@ def write_to_unique_filename(base_path, base_file_name, extension, content, mode
         f.write(content)
 
 
-def pack_binary(content):
+def pack_variable_len_string(content):
     return struct.pack("I", len(content)) + content
 
 
-def unpack_binary(content):
+def unpack_variable_len_string(pos, content):
     int_size = struct.calcsize("I")
+    length = struct.unpack("I", content[pos:pos + int_size])[0]
+    pos += int_size
+    end_byte = pos + length
+    data = content[pos:end_byte]
+    return end_byte, data
+
+
+def unpack_variable_len_strings(content):
     pos = 0
     bytes_list = []
     while pos < len(content):
-        length = struct.unpack("I", content[pos:pos+int_size])[0]
-        pos += int_size
-        end_byte = pos + length
-        bytes_list.append(content[pos:end_byte])
-        pos = end_byte
+        pos, string = unpack_variable_len_string(pos, content)
+        bytes_list.append(string)
     return bytes_list
+
+
+def pack_recorded_packet(seconds, sender, msg):
+    return struct.pack('I', seconds) + utils.pack_variable_len_string(
+            sender) + utils.pack_variable_len_string(msg)
+
+
+def unpack_recorded_packets(content):
+    int_size = struct.calcsize("I")
+    pos = 0
+    packets = []
+    while pos < len(content):
+        seconds = struct.unpack("I", content[pos:pos+int_size])[0]
+        pos, sender = unpack_variable_len_string(pos, content)
+        pos, packet_data = unpack_variable_len_string(pos, content)
+        packets.append((seconds, sender, packet_data))
+    return packets
 
 
 def camel_case_to_title(string):
@@ -198,11 +220,11 @@ async def run_and_wait(method, *args, interval=7, **kwargs):
 
 async def run_wait_close(method, message_manager, *args, interval=12, **kwargs):
     await run_and_wait(method, *args, interval=interval, **kwargs)
-    message_manager.close()
+    await message_manager.close()
 
 
 async def run_wait_close_multiple(method, message_manager, sender, msgs, interval=2, final_interval=5, **kwargs):
     for message in msgs:
         await run_and_wait(method, sender, message, interval=interval, **kwargs)
     await asyncio.sleep(final_interval)
-    message_manager.close()
+    await message_manager.close()

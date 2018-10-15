@@ -4,7 +4,6 @@ import datetime
 from lib.basetestcase import BaseTestCase
 from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
 
-
 class TCAP_MAP_Testcase(BaseTestCase):
     interface_cls = TCAP_MAP_ASNInterface
     sender = "10.10.10.10"
