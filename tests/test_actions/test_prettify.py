@@ -26,7 +26,8 @@ class TestPrettifyActionTCAPMAP(BaseTestCase):
         except OSError:
             pass
         timestamp = datetime(2018, 1, 1, 1, 1, 0)
-        self.action = self.action_module.Action(self.base_home)
+        config = self.prepare_config()
+        self.action = self.action_module.Action(self.base_home, config)
         self.msg = self.interface(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
         self.msgs = [self.interface(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
                      for encoded_hex in self.multiple_encoded_hex]
@@ -34,12 +35,12 @@ class TestPrettifyActionTCAPMAP(BaseTestCase):
     def test_00_content(self):
         content = self.action.get_content(self.msg)
         self.assertEqual(content,
-                         'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\n')
+                         'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\n')
 
     def test_01_print_msg(self):
         content = self.action.print_msg(self.msg)
         self.assertEqual(content,
-                         '\033[1mEvent_type\033[0m: begin\n\033[1mOtid\033[0m: 00000001\n\033[1mDirect-reference\033[0m: 0.0.17.773.1.1.1\n\033[1mTimestamp\033[0m: 2018-01-01 01:01:00\n\n')
+                         '\033[1mEvent_type\033[0m: begin\n\033[1mOtid\033[0m: 00000001\n\033[1mDirect-reference\033[0m: 0.0.17.773.1.1.1\n\n')
 
     def test_02_print(self):
         self.action.print(self.msg)
@@ -56,19 +57,19 @@ class TestPrettifyActionTCAPMAP(BaseTestCase):
         result = self.action.writes_for_store_many(self.msgs)
         self.assertDictEqual(result,
                              {
-                                 '10.10.10.10_TCAP_MAP.txt': 'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: continue\nOtid: 840001ff\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: continue\nOtid: a5050001\nDirect-reference: \nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: end\nOtid: 00000000\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\n'}
+                                 '10.10.10.10_TCAP_MAP.txt': 'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: 840001ff\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: a5050001\nDirect-reference: \n\nEvent_type: end\nOtid: 00000000\nDirect-reference: 0.0.17.773.1.1.1\n\n'}
                              )
 
     def test_06_do(self):
         self.action.do(self.msg)
         expected_file = os.path.join(self.base_home, 'Prettified', 'TCAP_MAP', '10.10.10.10_00000001.txt')
         self.assertFileContentsEqual(expected_file,
-                                     'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\n')
+                                     'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\n')
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
         expected_file = os.path.join(self.base_home, 'Prettified', '10.10.10.10_TCAP_MAP.txt')
         self.assertFileContentsEqual(expected_file,
-                                     'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: continue\nOtid: 840001ff\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: continue\nOtid: a5050001\nDirect-reference: \nTimestamp: 2018-01-01 01:01:00\n\nEvent_type: end\nOtid: 00000000\nDirect-reference: 0.0.17.773.1.1.1\nTimestamp: 2018-01-01 01:01:00\n\n'
+                                     'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: 840001ff\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: a5050001\nDirect-reference: \n\nEvent_type: end\nOtid: 00000000\nDirect-reference: 0.0.17.773.1.1.1\n\n'
                                      )
 

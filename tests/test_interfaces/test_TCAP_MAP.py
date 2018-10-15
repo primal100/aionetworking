@@ -32,9 +32,7 @@ class TCAP_MAP_Testcase(BaseTestCase):
 
     def test_02_prettified(self):
         self.assertListEqual(self.interface.prettified,
-                             [{'event_type': 'begin', 'otid': '00000001', 'direct-reference': '0.0.17.773.1.1.1',
-                               'timestamp': self.interface.timestamp}])
-        self.assertIsInstance(self.interface.prettified[0]['timestamp'], datetime.datetime)
+                             [{'event_type': 'begin', 'otid': '00000001', 'direct-reference': '0.0.17.773.1.1.1'}])
 
     def test_03_interface_name(self):
         result = self.interface.get_interface_name()

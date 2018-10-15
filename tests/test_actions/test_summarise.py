@@ -27,7 +27,8 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
         except OSError:
             pass
         timestamp = datetime.datetime(2018, 1, 1, 1, 1, 0)
-        self.action = self.action_module.Action(self.base_home)
+        config = self.prepare_config()
+        self.action = self.action_module.Action(self.base_home, config)
         self.msg = self.interface(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
         self.msgs = [self.interface(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
                      for encoded_hex in self.multiple_encoded_hex]

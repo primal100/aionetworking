@@ -41,7 +41,6 @@ class TCAP_MAP_ASNInterface(BasePyCrateAsnInterface):
             'event_type': self.get_event_type(),
             'otid': self.uid,
             'direct-reference': self.domain,
-            'timestamp': self.timestamp
         }]
 
     @cached_property

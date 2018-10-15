@@ -26,22 +26,19 @@ class TestMessageManager(BaseTestCase):
         except OSError:
             pass
 
-        action_modules = [binary, decode, prettify, summarise]
-        print_modules = [summarise]
+        action_modules = {
+            'binary': binary,
+            'decode': decode,
+            'prettify': prettify,
+            'summarise': summarise
+        }
+
         self.loop = asyncio.get_event_loop()
 
-        config = {
-            'allowed_senders': (self.sender,),
-        }
-        action_config = {
-            'home': self.base_home
-        }
-        aliases = {
-            self.sender: 'Primary'
-        }
+        config = self.prepare_config()
+        config.config.set('Aliases', self.sender, 'Primary')
         self.msgs = [binascii.unhexlify(encoded_hex) for encoded_hex in self.multiple_encoded_hex]
-        self.manager = MessageManager('PyMessageTest', self.interface, action_modules, print_modules, config,
-                                      {}, action_config, aliases=aliases, loop=self.loop)
+        self.manager = MessageManager('PyMessageTest', self.interface, action_modules, config, loop=self.loop)
 
     def test_01_allowed_sender(self):
         host = self.manager.check_sender('10.10.10.10')

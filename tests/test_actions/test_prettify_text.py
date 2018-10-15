@@ -21,7 +21,8 @@ class TestPrettifyActionJSON(BaseTestCase):
             shutil.rmtree(os.path.join(self.base_home, 'Prettified'))
         except OSError:
             pass
-        self.action = self.action_module.Action(self.base_home)
+        config = self.prepare_config()
+        self.action = self.action_module.Action(self.base_home, config)
         self.msg = self.interface(self.sender, self.encoded_json)
         self.msgs = [self.interface(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 

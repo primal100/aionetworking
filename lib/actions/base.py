@@ -14,10 +14,11 @@ class BaseAction:
 
     def __init__(self, app_name, config, storage=True):
 
-        self.APP_NAME = app_name
+        self.app_name = app_name
+        self.action_config = config.action_config(self.action_name, storage=storage)
         if storage:
-            home = config.get('home', utils.data_directory(self.APP_NAME))
-            data_dir = config.get('%s_data_dir' % self.action_name) or self.default_data_dir
+            home = self.action_config.get('home', utils.data_directory(self.app_name))
+            data_dir = self.action_config.get('data_dir') or self.default_data_dir
             self.base_path = os.path.join(home, data_dir)
             os.makedirs(self.base_path, exist_ok=True)
 
@@ -31,15 +32,17 @@ class BaseAction:
         return self.get_content(msg)
 
     def print(self, msg):
-        print(underline("Message received from %s:" % msg.sender))
-        print(self.print_msg(msg))
-        print("")
+        if not msg.filter_by_action(self, True):
+            print(underline("Message received from %s:" % msg.sender))
+            print(self.print_msg(msg))
+            print("")
 
     def do(self, msg):
-        path = os.path.join(self.base_path, msg.storage_path_single)
-        file_path = msg.unique_filename(path, self.get_file_extension(msg))
-        with open(file_path, self.store_write_mode) as f:
-            f.write(self.get_content(msg))
+        if not msg.filter_by_action(self, False):
+            path = os.path.join(self.base_path, msg.storage_path_single)
+            file_path = msg.unique_filename(path, self.get_file_extension(msg))
+            with open(file_path, self.store_write_mode) as f:
+                f.write(self.get_content(msg))
 
     def get_file_extension(self, msg):
         return self.single_extension
@@ -50,11 +53,12 @@ class BaseAction:
     def writes_for_store_many(self, msgs):
         writes = {}
         for msg in msgs:
-            file_name = msg.storage_filename_multiple + "." + self.get_multi_file_extension(msg)
-            if file_name in writes:
-                writes[file_name] += self.get_content_multi(msg)
-            else:
-                writes[file_name] = self.get_content_multi(msg)
+            if not msg.filter_by_action(self, False):
+                file_name = msg.storage_filename_multiple + "." + self.get_multi_file_extension(msg)
+                if file_name in writes:
+                    writes[file_name] += self.get_content_multi(msg)
+                else:
+                    writes[file_name] = self.get_content_multi(msg)
         return writes
 
     def store_many(self, msgs):
@@ -62,6 +66,5 @@ class BaseAction:
         utils.write_to_files(self.base_path, self.store_many_write_mode, writes)
 
     def do_multiple(self, msgs):
-        print(self.action_name)
         self.store_many(msgs)
 

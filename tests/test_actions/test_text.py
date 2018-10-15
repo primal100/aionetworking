@@ -23,7 +23,8 @@ class TestTextActionJSON(BaseTestCase):
             shutil.rmtree(os.path.join(self.base_home, 'Encoded'))
         except OSError:
             pass
-        self.action = self.action_module.Action(self.base_home)
+        config = self.prepare_config()
+        self.action = self.action_module.Action(self.base_home, config)
         self.msg = self.interface(self.sender, self.encoded_json)
         self.msgs = [self.interface(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 
@@ -80,4 +81,7 @@ class TestTextActionJSON(BaseTestCase):
 """{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}
 {"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}
 """
-                                           )
+                                     )
+        msgs = self.interface.from_file_multi(self.sender, expected_file)
+        self.assertSequenceEqual(self.encoded_jsons, [msg.encoded for msg in msgs])
+        self.assertSequenceEqual([msg.decoded for msg in self.msgs], [msg.decoded for msg in msgs])

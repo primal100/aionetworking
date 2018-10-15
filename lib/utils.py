@@ -79,27 +79,40 @@ def write_to_files(base_path, write_mode, file_writes):
             f.write(file_writes[file_name])
 
 
-def unique_filename(basefilepath, filename, extension):
+def unique_filename(base_file_path, filename, extension):
     filename_no_extension = filename.split('.%s' % extension)[0]
-    filepath = basefilepath + "." + extension
+    file_path = base_file_path + "." + extension
     i = 1
-    while os.path.exists(filepath):
-        filepath = "%s_%s.%s" % (filename_no_extension, i, extension)
+    while os.path.exists(file_path):
+        file_path = "%s_%s.%s" % (filename_no_extension, i, extension)
         i += 1
-    return filepath
+    return file_path
 
 
-def write_to_unique_filename(basepath, basefilename, extension, content, mode='w'):
-    if not os.path.exists(basepath):
-        os.makedirs(basepath)
-    basefilepath = os.path.join(basepath, basefilename)
-    filepath = unique_filename(basefilepath, basefilename, extension)
-    with open(filepath, mode) as f:
+def write_to_unique_filename(base_path, base_file_name, extension, content, mode='w'):
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+    base_file_path = os.path.join(base_path, base_file_name)
+    file_path = unique_filename(base_file_path, base_file_name, extension)
+    with open(file_path, mode) as f:
         f.write(content)
 
 
 def pack_binary(content):
     return struct.pack("I", len(content)) + content
+
+
+def unpack_binary(content):
+    int_size = struct.calcsize("I")
+    pos = 0
+    bytes_list = []
+    while pos < len(content):
+        length = struct.unpack("I", content[pos:pos+int_size])[0]
+        pos += int_size
+        end_byte = pos + length
+        bytes_list.append(content[pos:end_byte])
+        pos = end_byte
+    return bytes_list
 
 
 def camel_case_to_title(string):
@@ -188,7 +201,8 @@ async def run_wait_close(method, message_manager, *args, interval=12, **kwargs):
     message_manager.close()
 
 
-async def run_wait_close_multiple(method, message_manager, sender, msgs, interval=5, **kwargs):
+async def run_wait_close_multiple(method, message_manager, sender, msgs, interval=2, final_interval=5, **kwargs):
     for message in msgs:
         await run_and_wait(method, sender, message, interval=interval, **kwargs)
+    await asyncio.sleep(final_interval)
     message_manager.close()

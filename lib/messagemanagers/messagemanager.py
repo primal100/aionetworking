@@ -12,6 +12,7 @@ class MessageManager(BaseMessageManager):
         for action in self.print_actions:
             action.print(msg)
 
-    async def decode_run(self, host, encoded, timestamp):
-        msg = self.message_cls(host, encoded, self.interface_config, timestamp=timestamp)
-        self.do_actions(msg)
+    async def decode_run(self, sender, encoded, timestamp):
+        msg = self.make_message(sender, encoded, timestamp)
+        if not msg.filter():
+            self.do_actions(msg)

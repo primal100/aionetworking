@@ -36,10 +36,11 @@ class BatchMessageManager(BaseMessageManager):
         msgs = []
         try:
             while not self.queue.empty():
-                print(self.queue.qsize())
                 item = self.queue.get_nowait()
                 sender, encoded, timestamp = item
-                msgs.append(self.message_cls(sender, encoded, timestamp=timestamp))
+                msg = self.make_message(sender, encoded, timestamp)
+                if not msg.filter():
+                    msgs.append(msg)
             self.do_actions(msgs)
         finally:
             for msg in msgs:

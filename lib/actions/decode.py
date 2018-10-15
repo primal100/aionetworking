@@ -15,5 +15,5 @@ class Action(BaseAction):
         return pformat(msg.decoded)
 
     def get_content_multi(self, msg):
-        return self.get_content(msg) + '\n'
+        return self.get_content(msg) + '\n\n'
 

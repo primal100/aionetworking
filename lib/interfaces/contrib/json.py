@@ -4,7 +4,7 @@ from lib.interfaces.base import BaseMessage
 
 class BaseJSONInterface(BaseMessage):
     interface_name = "json"
-    read_mode = 'r'
+    binary = False
 
     """
     Manage JSON messages
