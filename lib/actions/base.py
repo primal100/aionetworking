@@ -3,7 +3,7 @@ import logging
 from lib import utils
 from lib.utils import underline
 
-logger = logging.getLogger()
+logger = logging.getLogger('sender')
 
 
 class BaseAction:

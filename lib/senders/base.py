@@ -4,8 +4,14 @@ logger = logging.getLogger()
 
 
 class BaseSender:
+
+    @classmethod
+    def from_config(cls, config):
+        raise NotImplementedError
+
     @property
-    async def source(self):
+    def source(self):
+        ###Todo
         return '127.0.0.1'
 
     async def send_msg(self, msg_encoded):
@@ -34,6 +40,10 @@ class BaseSender:
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(config['host'], config['port'], config['ssl'])
 
     def __init__(self, host='127.0.0.1', port=4000, ssl=False):
         self.host = host

@@ -19,7 +19,7 @@ async def main(app_name, receivers, actions, protocols, config, log_config_path)
     logger.info('Starting %s' % app_name)
     logger.debug('Using logging config file %s' % log_config_path)
 
-    receiver_cls = receivers[config.receiver]
+    receiver_cls = receivers[config.receiver]['receiver']
     message_manager_cls = config.message_manager
     protocol = protocols[config.protocol]
     manager = message_manager_cls(app_name, protocol, actions, config)

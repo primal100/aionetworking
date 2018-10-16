@@ -4,18 +4,6 @@ from unittest import TestCase
 
 from lib.configuration.parser import ConfigParserConfig
 import definitions
-from logging.config import fileConfig
-
-log_config_path = os.path.join(definitions.TEST_CONF_DIR, 'logging.ini')
-
-logging_setup = False
-while not logging_setup:
-    try:
-        fileConfig(log_config_path)
-        logging_setup = True
-    except FileNotFoundError as e:
-        log_directory = os.path.dirname(e.filename)
-        os.makedirs(log_directory, exist_ok=True)
 
 
 class BaseTestCase(TestCase):

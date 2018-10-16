@@ -14,7 +14,7 @@ import shutil
 
 class TestUDPServer(BaseTestCase):
     config_path = os.path.join(definitions.TEST_CONF_DIR, 'udp_server')
-    script_path = 'python run_binary.py'
+    script_path = 'python app.py'
     host = '127.0.0.1'
     port = 8888
 

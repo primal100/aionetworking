@@ -3,7 +3,7 @@ import os
 from lib import utils
 import logging
 
-logger = logging.getLogger()
+logger = logging.getLogger('sender')
 
 
 class Action(BaseStoreAction):
