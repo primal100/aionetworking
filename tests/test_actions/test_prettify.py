@@ -5,7 +5,7 @@ import os
 import shutil
 
 from lib.actions import prettify
-from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 
 
 class TestPrettifyActionTCAPMAP(BaseTestCase):
@@ -17,19 +17,19 @@ class TestPrettifyActionTCAPMAP(BaseTestCase):
         '643c4904571800006b2a2828060700118605010101a01d611b80020780a109060704000001000503a203020100a305a1030201006c08a30602010102010b'
     )
     action_module = prettify
-    interface = TCAP_MAP_ASNInterface
+    protocol = TCAP_MAP_ASNProtocol
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_home, 'Prettified'))
+            shutil.rmtree(os.path.join(self.base_data_dir, 'Prettified'))
         except OSError:
             pass
         timestamp = datetime(2018, 1, 1, 1, 1, 0)
         config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_home, config)
-        self.msg = self.interface(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
-        self.msgs = [self.interface(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
+        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.msg = self.protocol(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
+        self.msgs = [self.protocol(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
                      for encoded_hex in self.multiple_encoded_hex]
 
     def test_00_content(self):
@@ -62,13 +62,13 @@ class TestPrettifyActionTCAPMAP(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Prettified', 'TCAP_MAP', '10.10.10.10_00000001.txt')
+        expected_file = os.path.join(self.base_data_dir, 'Prettified', 'TCAP_MAP', '10.10.10.10_00000001.txt')
         self.assertFileContentsEqual(expected_file,
                                      'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\n')
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_home, 'Prettified', '10.10.10.10_TCAP_MAP.txt')
+        expected_file = os.path.join(self.base_data_dir, 'Prettified', '10.10.10.10_TCAP_MAP.txt')
         self.assertFileContentsEqual(expected_file,
                                      'Event_type: begin\nOtid: 00000001\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: 840001ff\nDirect-reference: 0.0.17.773.1.1.1\n\nEvent_type: continue\nOtid: a5050001\nDirect-reference: \n\nEvent_type: end\nOtid: 00000000\nDirect-reference: 0.0.17.773.1.1.1\n\n'
                                      )

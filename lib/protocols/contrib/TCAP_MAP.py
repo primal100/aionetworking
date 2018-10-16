@@ -1,20 +1,18 @@
 from pycrate_asn1dir import TCAP_MAP
-from lib.interfaces.contrib.asn1 import BasePyCrateAsnInterface
+from lib.protocols.contrib.asn1 import BasePyCrateAsnProtocol
 from lib.utils import cached_property
 
-import uuid
 import binascii
 
 
-class TCAP_MAP_ASNInterface(BasePyCrateAsnInterface):
+class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
+
     pycrate_asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
-    interface_name = "TCAP_MAP"
+    protocol_name = "TCAP_MAP"
 
     """
     Sample implementation of interface for ASN.1 messages via pycrate library
     """
-
-    pycrate_asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
 
     def get_event_type(self):
         return self.decoded[0]

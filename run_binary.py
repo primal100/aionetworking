@@ -1,18 +1,22 @@
-from lib.receivers.asyncio_servers import TCPServer, UDPServer
+from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
 from lib.actions import binary, decode, prettify, summarise
-from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.configuration.parser import ConfigParserFile
-from lib.run import start
+from lib.run import main
+import asyncio
 import definitions
 
 import argparse
 import os
 
+loop = asyncio.ProactorEventLoop()
+asyncio.set_event_loop(loop)
+
 app_name = 'binarymessagemanager'
 
 receivers = {
-    'TCPServer': TCPServer,
-    'UDPServer': UDPServer
+    'TCPServer': TCPServerReceiver,
+    'UDPServer': UDPServerReceiver
 }
 
 actions = {
@@ -22,11 +26,9 @@ actions = {
     'summarise': summarise
 }
 
-interfaces = {
-    'TCAP': TCAP_MAP_ASNInterface
+protocols = {
+    'TCAP': TCAP_MAP_ASNProtocol
 }
-
-default_conf_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "conf")
 
 
 def process_args():
@@ -50,5 +52,7 @@ def process_args():
 
 if __name__ == '__main__':
     config, log_config_path = process_args()
-    start(app_name, receivers, actions, interfaces, config, log_config_path)
-
+    try:
+        asyncio.run(main(app_name, receivers, actions, protocols, config, log_config_path))
+    except KeyboardInterrupt:
+        pass

@@ -20,11 +20,11 @@ class BaseConfigClass:
         raise NotImplementedError
 
     @property
-    def interface(self):
+    def protocol(self):
         raise NotImplementedError
 
     @property
-    def interface_config(self):
+    def protocol_config(self):
         raise NotImplementedError
 
     def action_config(self, app_name, action_name, storage=False):

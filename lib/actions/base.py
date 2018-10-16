@@ -1,5 +1,4 @@
 import os
-import definitions
 import logging
 from lib import utils
 from lib.utils import underline

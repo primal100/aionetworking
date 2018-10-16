@@ -1,14 +1,14 @@
 from lib.basetestcase import BaseTestCase
-from lib.interfaces.contrib.json_sample import JsonSampleInterface
+from lib.protocols.contrib.json_sample import JsonSampleProtocol
 
 
 class JsonSampleInterfaceTestcase(BaseTestCase):
-    interface_cls = JsonSampleInterface
+    protocol = JsonSampleProtocol
     sender = "192.168.1.2"
     encoded_json = '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}'
 
     def setUp(self):
-        self.interface = self.interface_cls(self.sender, self.encoded_json)
+        self.interface = self.protocol(self.sender, self.encoded_json)
 
     def test_00_decoded(self):
         self.assertDictEqual(self.interface.decoded, {'id': 0, 'actions': [
@@ -29,7 +29,7 @@ class JsonSampleInterfaceTestcase(BaseTestCase):
         )
 
     def test_03_interface_name(self):
-        result = self.interface.get_interface_name()
+        result = self.interface.get_protocol_name()
         self.assertEqual(result, 'JsonLogHandler')
 
     def test_04_storage_path(self):

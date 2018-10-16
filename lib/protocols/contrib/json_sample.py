@@ -1,10 +1,10 @@
 from lib.utils import cached_property
-from .json import BaseJSONInterface
+from .json import BaseJSONProtocol
 from datetime import datetime
 
 
-class JsonSampleInterface(BaseJSONInterface):
-    interface_name = "JsonLogHandler"
+class JsonSampleProtocol(BaseJSONProtocol):
+    protocol_name = "JsonLogHandler"
 
     @cached_property
     def uid(self):

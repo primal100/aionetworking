@@ -1,10 +1,10 @@
-from lib.interfaces.base import BaseMessage
+from lib.protocols.base import BaseProtocol
 from lib import utils
 from lib.utils import cached_property
 
 import datetime
 
-class BasePyCrateAsnInterface(BaseMessage):
+class BasePyCrateAsnProtocol(BaseProtocol):
 
     """
     Manage ASN.1 messages via pycrate library
@@ -22,9 +22,7 @@ class BasePyCrateAsnInterface(BaseMessage):
         return decoded
 
     def encode(self):
-        self.pycrate_asn_class.to_ber(self.decoded)
-        encoded = self.pycrate_asn_class()
-        return encoded
+        return self.pycrate_asn_class.to_ber(self.decoded)
 
     @cached_property
     def domain(self):

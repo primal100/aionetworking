@@ -4,7 +4,7 @@ import shutil
 
 from lib.actions import summarise
 from lib import utils
-from lib.interfaces.contrib.json_sample import JsonSampleInterface
+from lib.protocols.contrib.json_sample import JsonSampleProtocol
 
 
 class TestSummariseActionJSON(BaseTestCase):
@@ -15,18 +15,18 @@ class TestSummariseActionJSON(BaseTestCase):
     ]
 
     action_module = summarise
-    interface = JsonSampleInterface
+    protocol = JsonSampleProtocol
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_home, 'Summaries'))
+            shutil.rmtree(os.path.join(self.base_data_dir, 'Summaries'))
         except OSError:
             pass
         config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_home, config)
-        self.msg = self.interface(self.sender, self.encoded_json)
-        self.msgs = [self.interface(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
+        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.msg = self.protocol(self.sender, self.encoded_json)
+        self.msgs = [self.protocol(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 
     def test_00_content(self):
         content = self.action.get_content(self.msg)
@@ -66,7 +66,7 @@ class TestSummariseActionJSON(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
 """2018-09-15 11:09:31.033925	1234	Modify
 2018-09-15 11:09:42.641033	2222	Add
@@ -76,7 +76,7 @@ class TestSummariseActionJSON(BaseTestCase):
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_home, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      """2018-09-15 11:09:31.033925	1234	Modify
 2018-09-15 11:09:42.641033	2222	Add

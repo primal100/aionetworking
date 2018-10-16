@@ -7,17 +7,17 @@ from lib.utils import cached_property, unpack_variable_len_strings
 logger = logging.getLogger()
 
 
-class BaseMessage:
+class BaseProtocol:
     asn_class = None
-    interface_type = None
+    protocol_type = None
     domain_id_name = None
-    interface_name = ""
+    protocol_name = ""
     supported_actions = ()
     binary = True
 
     @classmethod
     def from_file(cls, sender, file_path, config=None):
-        logger.debug('Creating new %s message from %s' % (cls.interface_name, file_path))
+        logger.debug('Creating new %s message from %s' % (cls.protocol_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             encoded = f.read()
@@ -25,7 +25,7 @@ class BaseMessage:
 
     @classmethod
     def from_file_multi(cls, sender, file_path, config=None):
-        logger.debug('Creating new %s messages from %s' % (cls.interface_name, file_path))
+        logger.debug('Creating new %s messages from %s' % (cls.protocol_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             contents = f.read()
@@ -44,12 +44,12 @@ class BaseMessage:
             self.decoded = decoded
             self.encoded = self.encode()
 
-    def get_interface_name(self):
-        return self.interface_name
+    def get_protocol_name(self):
+        return self.protocol_name
 
     @property
     def storage_path(self):
-        return self.get_interface_name()
+        return self.get_protocol_name()
 
     @property
     def storage_path_single(self):
@@ -69,12 +69,12 @@ class BaseMessage:
 
     @cached_property
     def file_extension(self):
-        return self.interface_name.replace('_', '').replace('-', '') or self.interface_name.replace('_', '').replace('-',
+        return self.protocol_name.replace('_', '').replace('-', '') or self.protocol_name.replace('_', '').replace('-',
                                                                                                                    '')
 
     @property
     def storage_filename_multiple(self):
-        return '%s_%s' % (self.prefix, self.interface_name)
+        return '%s_%s' % (self.prefix, self.protocol_name)
 
     def unique_filename(self, base_path, extension):
         os.makedirs(base_path, exist_ok=True)

@@ -20,22 +20,21 @@ while not logging_setup:
 
 class BaseTestCase(TestCase):
     maxDiff = None
-    base_home = definitions.TEST_DATA_DIR
-
+    base_data_dir = definitions.TEST_DATA_DIR
 
     def prepare_config(self):
         config = configparser.ConfigParser()
         config.add_section('Receiver')
         config.add_section('MessageManager')
-        config.add_section('Interface')
+        config.add_section('Protocol')
         config.add_section('Actions')
         config.add_section('Print')
         config.add_section('Aliases')
         config.set('MessageManager', 'Batch', 'False')
         config.set('MessageManager', 'AllowedSenders', '10.10.10.10')
         config.set('MessageManager', 'GenerateTimestamp', 'False')
-        config.set('Interface', 'Name', 'TCAP')
-        config.set('Actions', 'Home', self.base_home)
+        config.set('Protocol', 'Name', 'TCAP')
+        config.set('Actions', 'Home', self.base_data_dir)
         config.set('Actions', 'Types', 'binary,decode,prettify,summarise')
         config.set('Print', 'Types', 'binary,decode,prettify,summarise')
         return ConfigParserConfig({'config': config})

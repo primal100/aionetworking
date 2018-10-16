@@ -2,16 +2,17 @@ import binascii
 import datetime
 
 from lib.basetestcase import BaseTestCase
-from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
+
 
 class TCAP_MAP_Testcase(BaseTestCase):
-    interface_cls = TCAP_MAP_ASNInterface
+    protocol = TCAP_MAP_ASNProtocol
     sender = "10.10.10.10"
     encoded_hex = '62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f0'
 
     def setUp(self):
         encoded = binascii.unhexlify(self.encoded_hex)
-        self.interface = self.interface_cls(self.sender, encoded)
+        self.interface = self.protocol(self.sender, encoded)
 
     def test_00_decoded(self):
         self.assertTupleEqual(self.interface.decoded, ('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
@@ -34,7 +35,7 @@ class TCAP_MAP_Testcase(BaseTestCase):
                              [{'event_type': 'begin', 'otid': '00000001', 'direct-reference': '0.0.17.773.1.1.1'}])
 
     def test_03_interface_name(self):
-        result = self.interface.get_interface_name()
+        result = self.interface.get_protocol_name()
         self.assertEqual(result, 'TCAP_MAP')
 
     def test_04_storage_path(self):

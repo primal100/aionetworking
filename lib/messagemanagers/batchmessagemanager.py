@@ -10,7 +10,7 @@ class BatchMessageManager(BaseMessageManager):
         super(BatchMessageManager, self).__init__(*args, **kwargs)
         self.interval = kwargs.get('config', {}).get('interval', 5)
         self.queue = asyncio.Queue()
-        self.process_queue_task = self.loop.create_task(self.process_queue_later())
+        self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
 
     async def decode_run(self, host, encoded, timestamp):
         logger.debug('Adding message from %s to asyncio queue' % host)

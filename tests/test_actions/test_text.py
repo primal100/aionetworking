@@ -4,11 +4,11 @@ import shutil
 import binascii
 
 from lib.actions import text
-from lib.interfaces.contrib.json_sample import JsonSampleInterface
+from lib.protocols.contrib.json_sample import JsonSampleProtocol
 
 
 class TestTextActionJSON(BaseTestCase):
-    interface = JsonSampleInterface
+    protocol = JsonSampleProtocol
     encoded_json = '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}'
     encoded_jsons = [
         '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}',
@@ -20,13 +20,13 @@ class TestTextActionJSON(BaseTestCase):
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_home, 'Encoded'))
+            shutil.rmtree(os.path.join(self.base_data_dir, 'Encoded'))
         except OSError:
             pass
         config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_home, config)
-        self.msg = self.interface(self.sender, self.encoded_json)
-        self.msgs = [self.interface(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
+        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.msg = self.protocol(self.sender, self.encoded_json)
+        self.msgs = [self.protocol(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 
     def test_00_content(self):
         content = self.action.get_content(self.msg)
@@ -62,11 +62,11 @@ class TestTextActionJSON(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Encoded', 'JsonLogHandler', '10.10.10.10_0.json')
+        expected_file = os.path.join(self.base_data_dir, 'Encoded', 'JsonLogHandler', '10.10.10.10_0.json')
         self.assertFileContentsEqual(expected_file,
                                      '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}'
                                      )
-        msg = self.interface.from_file(self.sender, expected_file)
+        msg = self.protocol.from_file(self.sender, expected_file)
         self.assertDictEqual(msg.decoded,
                              {'id': 0,
                               'actions': [{'timestamp': 1537006771.033925, 'operation': 'modify', 'object_id': 1234},
@@ -76,12 +76,12 @@ class TestTextActionJSON(BaseTestCase):
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_home, 'Encoded', '10.10.10.10_JsonLogHandler.json')
+        expected_file = os.path.join(self.base_data_dir, 'Encoded', '10.10.10.10_JsonLogHandler.json')
         self.assertFileContentsEqual(expected_file,
 """{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}
 {"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}
 """
                                      )
-        msgs = self.interface.from_file_multi(self.sender, expected_file)
+        msgs = self.protocol.from_file_multi(self.sender, expected_file)
         self.assertSequenceEqual(self.encoded_jsons, [msg.encoded for msg in msgs])
         self.assertSequenceEqual([msg.decoded for msg in self.msgs], [msg.decoded for msg in msgs])

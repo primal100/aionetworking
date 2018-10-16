@@ -17,12 +17,11 @@ def raise_message_from_not_authorized_host(sender, allowed_senders):
 
 class BaseMessageManager:
 
-    def __init__(self, app_name, message_cls, actions, config, loop=None):
+    def __init__(self, app_name, protocol, actions, config):
         self.app_name = app_name
-        self.loop = loop or asyncio.get_event_loop()
-        self.message_cls = message_cls
+        self.protocol = protocol
         self.config = config.message_manager_config
-        self.msg_config = config.interface_config
+        self.protocol_config = config.protocol_config
         self.allowed_senders = self.config['allowed_senders']
         self.generate_timestamp = self.config['generate_timestamp']
         action_modules = [actions[a] for a in self.config['actions']]
@@ -48,7 +47,7 @@ class BaseMessageManager:
         return self.get_alias(sender)
 
     def make_message(self, sender, encoded, timestamp):
-        return self.message_cls(sender, encoded, timestamp=timestamp, config=self.msg_config)
+        return self.protocol(sender, encoded, timestamp=timestamp, config=self.protocol_config)
 
     async def manage_message(self, sender, encoded):
         logger.debug('Managing message from ' + sender)

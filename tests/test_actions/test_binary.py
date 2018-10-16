@@ -4,7 +4,7 @@ import shutil
 import binascii
 
 from lib.actions import binary
-from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 
 
 class TestBinaryActionTCAPMAP(BaseTestCase):
@@ -16,19 +16,19 @@ class TestBinaryActionTCAPMAP(BaseTestCase):
         b'643c4904571800006b2a2828060700118605010101a01d611b80020780a109060704000001000503a203020100a305a1030201006c08a30602010102010b'
     )
     action_module = binary
-    interface = TCAP_MAP_ASNInterface
+    protocol = TCAP_MAP_ASNProtocol
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_home, 'Encoded'))
+            shutil.rmtree(os.path.join(self.base_data_dir, 'Encoded'))
         except OSError:
             pass
         self.config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_home, self.config)
-        self.print_action = self.action_module.Action(self.base_home, self.config, storage=False)
-        self.msg = self.interface(self.sender, binascii.unhexlify(self.encoded_hex))
-        self.msgs = [self.interface(self.sender, binascii.unhexlify(encoded_hex)) for encoded_hex in
+        self.action = self.action_module.Action(self.base_data_dir, self.config)
+        self.print_action = self.action_module.Action(self.base_data_dir, self.config, storage=False)
+        self.msg = self.protocol(self.sender, binascii.unhexlify(self.encoded_hex))
+        self.msgs = [self.protocol(self.sender, binascii.unhexlify(encoded_hex)) for encoded_hex in
                      self.multiple_encoded_hex]
 
     def test_00_content(self):
@@ -57,10 +57,10 @@ class TestBinaryActionTCAPMAP(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Encoded', 'TCAP_MAP', '10.10.10.10_00000001.TCAPMAP')
+        expected_file = os.path.join(self.base_data_dir, 'Encoded', 'TCAP_MAP', '10.10.10.10_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
-        msg = self.interface.from_file(self.sender, expected_file)
+        msg = self.protocol.from_file(self.sender, expected_file)
         self.assertTupleEqual(msg.decoded, ('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
             'direct-reference': (0, 0, 17, 773, 1, 1, 1), 'encoding': ('single-ASN1-type', ('DialoguePDU', (
             'dialogueRequest', {'protocol-version': (1, 1), 'application-context-name': (0, 4, 0, 0, 1, 0, 20, 2)})))},
@@ -74,9 +74,9 @@ class TestBinaryActionTCAPMAP(BaseTestCase):
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_home, 'Encoded', '10.10.10.10_TCAP_MAP.TCAPMAPMULTI')
+        expected_file = os.path.join(self.base_data_dir, 'Encoded', '10.10.10.10_TCAP_MAP.TCAPMAPMULTI')
         self.assertBinaryFileContentsEqual(expected_file,
                                            b"I\x00\x00\x00bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0\xad\x00\x00\x00e\x81\xaaH\x04\x84\x00\x01\xffI\x04\xa5\x05\x00\x01k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x0e\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x80\xa2l\x02\x01\x010g\x02\x018\xa3\x80\xa1\x800Z\x04\x10K\x9da\x91\x10u6e\x8c\xfeY\x88\x0c\xd2\xac'\x04\x10K\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8\x04\x10\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x04\x10C\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x8c\x04\x10\xa2U\x1a\x05\x8c\xdb\x00\x00K\x8dy\xf7\xca\xffP\x12\x00\x00\x00\x00\x00\x00\x18\x00\x00\x00e\x16H\x04\xa5\x05\x00\x01I\x04\x84\x00\x01\xffl\x08\xa1\x06\x02\x01\x02\x02\x018>\x00\x00\x00d<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b")
-        msgs = self.interface.from_file_multi(self.sender, expected_file)
+        msgs = self.protocol.from_file_multi(self.sender, expected_file)
         self.assertSequenceEqual(self.multiple_encoded_hex, [binascii.hexlify(msg.encoded) for msg in msgs])
         self.assertSequenceEqual([msg.decoded for msg in self.msgs], [msg.decoded for msg in msgs])

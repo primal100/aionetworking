@@ -1,56 +1,67 @@
 import asyncio
 import logging
+from .base import BaseNetworkClient
 
 logger = logging.getLogger()
 
 
-class TCPClient:
-    writer = None
-
-    def __init__(self, msg_cls, host='127.0.0.1', port=4001, loop=None):
-        self.msg_cls = msg_cls
-        self.loop = loop or asyncio.get_event_loop()
-        self.host = '10.166.1.71'
-        self.port = port
-        self.loop.create_task(self.start())
-
-    async def start(self):
-        logger.info("Opening TCP client connection to %s:%s" % (self.host, self.port))
-        reader, self.writer = await asyncio.open_connection(self.host, self.port, loop=self.loop)
-        logger.info('Connected')
-
-    async def send_msg(self, msg_encoded):
-        logger.debug("Sending message to %s:%s" % (self.host, self.port))
-        logger.debug(msg_encoded)
-        self.writer.write(msg_encoded)
-
-    async def encode_and_send_msg(self, msg_decoded):
-        msg = self.msg_cls('127.0.0.1', decoded=msg_decoded)
-        await self.send_msg(msg.encoded)
-
-    def close(self):
-        logger.debug("Closing connection to %s:%s" % (self.host, self.port))
-        self.writer.close()
-
-
-class UDPClientProtocol:
-    pass
-
-
-class UDPClient(TCPClient):
+class ClientProtocolMixin:
+    name = ''
     transport = None
 
-    async def start(self):
-        logger.debug("Opening UDP connection to %s:%s" % (self.host, self.port))
-        self.transport, protocol = await self.loop.create_datagram_endpoint(
-            lambda: UDPClientProtocol(),
-            remote_addr=(self.host, self.port))
+    def __init__(self, client):
+        self.client = client
 
-    async def send_msg(self, msg_encoded):
-        logger.debug("Sending message to %s:%s" % (self.host, self.port))
-        logger.debug(msg.encoded)
-        self.transport.sendto(msg_encoded)
+    def connection_made(self, transport):
+        self.transport = transport
+        logger.info('%s connected to %s' % (self.name, self.client.dst))
 
-    def close(self):
-        logger.debug("Closing connection to %s:%s" % (self.host, self.port))
+    def connection_lost(self, exc):
+        error = '{} {}'.format(exc, self.client.dst)
+        print(error)
+        logger.error(error)
+
+
+class TCPClientProtocol(ClientProtocolMixin, asyncio.Protocol):
+    name = 'TCP Client'
+
+
+class UDPClientProtocol(ClientProtocolMixin, asyncio.DatagramProtocol):
+    name = 'UDP Client'
+
+    def error_received(self, exc):
+        error = '{} {}'.format(exc, self.client.dst)
+        print(error)
+        logger.error(error)
+
+
+class TCPClient(BaseNetworkClient):
+    sender_type = "TCP Client"
+    transport = None
+    protocol = None
+
+    async def open_connection(self):
+        self.transport, self.protocol = await asyncio.get_event_loop().create_connection(
+            lambda: TCPClientProtocol(self), self.host, self.port, ssl=self.ssl)
+
+    async def close_connection(self):
         self.transport.close()
+
+    async def send_data(self, encoded_data):
+        self.transport.write(encoded_data)
+
+
+class UDPClient(BaseNetworkClient):
+    sender_type = "UDP Client"
+    transport = None
+    protocol = None
+
+    async def open_connection(self):
+        self.transport, self.protocol = await asyncio.get_event_loop().create_datagram_endpoint(
+            lambda: UDPClientProtocol(self), remote_addr=(self.host, self.port))
+
+    async def close_connection(self):
+        self.transport.close()
+
+    async def send_data(self, encoded_data):
+        self.transport.sendto(encoded_data)

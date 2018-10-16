@@ -1,6 +1,7 @@
 from .base import BaseConfigClass
 from lib.messagemanagers import MessageManager, BatchMessageManager
 from lib import utils
+import os
 
 import configparser
 
@@ -17,6 +18,12 @@ class ConfigParserConfig(BaseConfigClass):
             return tuple(value.split(','))
         return ()
 
+    def get_path(self, section, option, fallback=''):
+        path = self.config.get(section, option, fallback=fallback)
+        if os.name == 'nt':
+            path = path.replace('/', '\\')
+        return path
+
     @property
     def receiver(self):
         return self.config.get('Receiver', 'Type')
@@ -28,24 +35,24 @@ class ConfigParserConfig(BaseConfigClass):
         return MessageManager
 
     @property
-    def interface(self):
-        return self.config.get('Interface', 'Name')
+    def protocol(self):
+        return self.config.get('Protocol', 'Name')
 
     @property
     def receiver_config(self):
         return {
-            'host': self.config.get('Receiver', 'Host'),
-            'port': self.config.getint('Receiver', 'Port'),
-            'ssl': self.config.getboolean('Receiver', 'SSL'),
-            'ssl_cert': self.config.get('Receiver', 'SSLCert'),
-            'ssl_key': self.config.get('Receiver', 'SSLKey'),
-            'record': self.config.getboolean('Receiver', 'Record'),
-            'record_file': self.config.get('Receiver', 'RecordFile')
+            'host': self.config.get('Receiver', 'Host', fallback='127.0.0.1'),
+            'port': self.config.getint('Receiver', 'Port', fallback=4000),
+            'ssl': self.config.getboolean('Receiver', 'SSL', fallback=False),
+            'ssl_cert': self.config.get('Receiver', 'SSLCert', fallback=''),
+            'ssl_key': self.config.get('Receiver', 'SSLKey', fallback=''),
+            'record': self.config.getboolean('Receiver', 'Record', fallback=False),
+            'record_file': self.config.get('Receiver', 'RecordFile', fallback=''),
         }
 
     @property
-    def interface_config(self):
-        return self.config['Interface']
+    def protocol_config(self):
+        return self.config['Protocol']
 
     @property
     def message_manager_config(self):
@@ -60,7 +67,7 @@ class ConfigParserConfig(BaseConfigClass):
     def action_config(self, app_name, action_name, storage=True):
         section_name = 'Actions' if storage else 'Print'
         return {
-            'home': self.config.get(section_name, 'Home', fallback=utils.data_directory(app_name)),
+            'home': self.get_path(section_name, 'Home', fallback=utils.data_directory(app_name)),
             'data_dir': self.config.get(section_name, '%s_data_dir' % action_name, fallback=''),
         }
 

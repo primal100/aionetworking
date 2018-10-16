@@ -1,9 +1,10 @@
 import json
 
-from lib.interfaces.base import BaseMessage
+from lib.protocols.base import BaseProtocol
 
-class BaseJSONInterface(BaseMessage):
-    interface_name = "json"
+
+class BaseJSONProtocol(BaseProtocol):
+    protocol_name = "json"
     binary = False
 
     """

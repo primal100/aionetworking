@@ -1,19 +1,10 @@
 import asyncio
-import atexit
 import logging
 import os
 from logging.config import fileConfig
 
 
-def stop(app_name, loop, manager, receiver):
-    logger.info('Stopping %s' % app_name)
-    loop.run_until_complete(receiver.close())
-    loop.run_until_complete(manager.close())
-    loop.close()
-    logger.info('%s stopped' % app_name)
-
-
-def start(app_name, receivers, actions, interfaces, config, log_config_path):
+async def main(app_name, receivers, actions, protocols, config, log_config_path):
 
     logging_setup = False
     while not logging_setup:
@@ -25,18 +16,27 @@ def start(app_name, receivers, actions, interfaces, config, log_config_path):
             os.makedirs(log_directory, exist_ok=True)
 
     logger = logging.getLogger()
-
     logger.info('Starting %s' % app_name)
     logger.debug('Using logging config file %s' % log_config_path)
 
     receiver_cls = receivers[config.receiver]
     message_manager_cls = config.message_manager
-    interface_cls = interfaces[config.interface]
-    loop = asyncio.get_event_loop()
-    manager = message_manager_cls(app_name, interface_cls, actions, config, loop=loop)
-    receiver = receiver_cls(manager, config, loop=loop)
-    atexit.register(stop, app_name, loop, manager, receiver)
+    protocol = protocols[config.protocol]
+    manager = message_manager_cls(app_name, protocol, actions, config)
+    receiver = receiver_cls(manager, config)
+
+    if os.name == 'nt':
+        #Following two lines can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+        """Workaround for windows:
+        https://stackoverflow.com/questions/24774980/why-cant-i-catch-sigint-when-asyncio-event-loop-is-running/24775107#24775107
+        """
+        def wakeup():
+            asyncio.get_event_loop().call_later(0.1, wakeup)
+        wakeup()
 
     logger.debug('Starting event loop')
 
-    loop.run_forever()
+    async with receiver:
+        await receiver.run()

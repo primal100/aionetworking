@@ -6,7 +6,7 @@ import shutil
 
 from lib.actions import summarise
 from lib import utils
-from lib.interfaces.contrib.TCAP_MAP import TCAP_MAP_ASNInterface
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 
 
 class TestSummariseActionTCAPMAP(BaseTestCase):
@@ -18,19 +18,19 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
         '643c4904571800006b2a2828060700118605010101a01d611b80020780a109060704000001000503a203020100a305a1030201006c08a30602010102010b'
     )
     action_module = summarise
-    interface = TCAP_MAP_ASNInterface
+    protocol = TCAP_MAP_ASNProtocol
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_home, 'Summaries'))
+            shutil.rmtree(os.path.join(self.base_data_dir, 'Summaries'))
         except OSError:
             pass
         timestamp = datetime.datetime(2018, 1, 1, 1, 1, 0)
         config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_home, config)
-        self.msg = self.interface(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
-        self.msgs = [self.interface(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
+        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.msg = self.protocol(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
+        self.msgs = [self.protocol(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
                      for encoded_hex in self.multiple_encoded_hex]
 
     def test_00_content(self):
@@ -69,14 +69,14 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_home, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      'begin\t00000001\t2018-01-01 01:01:00\n'
                                      )
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_home, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      """begin	00000001	2018-01-01 01:01:00
 continue	840001ff	2018-01-01 01:01:00
