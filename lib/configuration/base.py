@@ -1,4 +1,3 @@
-from lib import utils
 from lib.utils import cached_property
 from logging.config import dictConfig
 import pathlib
@@ -11,10 +10,19 @@ class ConfigurationException(Exception):
 
 
 class BaseConfigClass:
+    defaults = {
+        'Testdir': definitions.TESTS_DIR,
+        'Develdir': definitions.ROOT_DIR,
+        'Userhome': definitions.USER_HOME,
+        "~": definitions.USER_HOME,
+        'Osdatadir': definitions.OSDATA_DIR,
+    }
 
     def __init__(self, app_name, postfix='receiver'):
-        self.app_name = app_name
-        self.postfix = postfix
+        self.defaults.update({
+            'appname': app_name.replace(' ', '').lower(),
+            'postfix': postfix.replace(' ', '').lower()
+        })
 
     @cached_property
     def receiver(self):
@@ -22,6 +30,10 @@ class BaseConfigClass:
 
     @cached_property
     def receiver_config(self):
+        raise NotImplementedError
+
+    @cached_property
+    def client_config(self):
         raise NotImplementedError
 
     @cached_property
@@ -45,10 +57,10 @@ class BaseConfigClass:
             'home': self.path_for_action(action_name),
         }
 
-    def get_home(self, fallback=None):
+    def get_home(self):
         raise NotImplementedError
 
-    def get_data_home(self, fallback=None):
+    def get_data_home(self):
         raise NotImplementedError
 
     def get_action_home(self, action_name):
@@ -58,53 +70,20 @@ class BaseConfigClass:
         raise NotImplementedError
 
     @cached_property
-    def format_dict(self):
-        return {
-            'testdir': definitions.TESTS_DIR,
-            'develdir': definitions.ROOT_DIR,
-            'userhome': definitions.USER_HOME,
-            "~": definitions.USER_HOME,
-            'osdatadir': definitions.OSDATA_DIR,
-            'appname': self.app_name.replace(' ', '').lower(),
-            'postfix': self.postfix.replace(' ', '').lower()
-        }
-
-    @cached_property
-    def format_dict_with_home(self):
-        format_dict = self.format_dict.copy()
-        format_dict['home'] = str(self.home)
-        return format_dict
-
-    @cached_property
     def home(self):
-        return pathlib.PurePath(self.get_home(fallback='%(userhome)s/%(appname)s') % self.format_dict)
+        return pathlib.PurePath(self.get_home())
 
     @cached_property
     def data_home(self):
-        path = pathlib.PurePath(self.get_data_home(fallback='%(home)s/data') % self.format_dict_with_home)
-        os.makedirs(path, exist_ok=True)
-        return path
-
-    def get_full_path(self, path):
-        path = pathlib.PurePath(path % self.format_dict_with_home)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        path = pathlib.PurePath(self.get_data_home())
+        os.makedirs(str(path), exist_ok=True)
         return path
 
     def path_for_action(self, action_name):
-        format_dict = self.format_dict_with_home.copy()
-        format_dict['datahome'] = str(self.data_home)
-        format_dict['actionname'] = action_name
-        path = pathlib.PurePath(self.get_action_home(action_name) % format_dict)
-        os.makedirs(path, exist_ok=True)
+        path = pathlib.PurePath(self.get_action_home(action_name))
+        os.makedirs(str(path), exist_ok=True)
         return path
 
     def configure_logging(self):
         config = self.log_config()
-        logging_setup = False
-        while not logging_setup:
-            try:
-                dictConfig(config)
-                logging_setup = True
-            except (FileNotFoundError, ValueError) as e:
-                log_directory = os.path.dirname(e.filename)
-                os.makedirs(log_directory, exist_ok=True)
+        dictConfig(config)

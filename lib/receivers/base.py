@@ -14,9 +14,11 @@ class ServerException(Exception):
 class BaseReceiver:
     receiver_type = ""
 
-    def __init__(self, manager, config):
+    def __init__(self, manager, config, started_event=None, stopped_event=None):
         self.manager = manager
         self.config = config.receiver_config
+        self.started_event = started_event
+        self.stopped_event = stopped_event
         self.record = self.config.get('record', False)
         self.record_file = self.config.get('record_file', False)
         if self.record and not self.record_file:
@@ -65,10 +67,16 @@ class BaseReceiver:
         pass
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        logger.info('Stopping %s' % self.receiver_type)
+        await self.stop()
+
+    async def stop(self):
+        logger.info('Stopping %s application' % self.receiver_type)
         await self.close()
         await self.manager.close()
-        logging.info('%s stopped' % self.receiver_type)
+        logging.info('%s application stopped' % self.receiver_type)
+        if self.stopped_event:
+            self.stopped_event.set()
+            logger.debug('Stopped event has been set')
 
     async def close(self):
         raise NotImplementedError
@@ -82,8 +90,8 @@ class BaseServer(BaseReceiver):
     default_host = '0.0.0.0'
     default_port = 4000
 
-    def __init__(self, manager, config):
-        super(BaseServer, self).__init__(manager, config)
+    def __init__(self, manager, config, **kwargs):
+        super(BaseServer, self).__init__(manager, config, **kwargs)
         self.host = self.config.get('host', self.default_host)
         self.port = self.config.get('port', self.default_port)
 

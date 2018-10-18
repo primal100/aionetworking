@@ -12,28 +12,36 @@ import multiprocessing
 
 
 class TestTCPServer(BaseTestCase):
+    started_event = multiprocessing.Event()
+    stop_event = multiprocessing.Event()
+    stopped_event = multiprocessing.Event()
     config_file = os.path.join(definitions.TEST_CONF_DIR, 'tcp_server_test_setup.ini')
     client = get_sender(app_name, receivers, protocols, config_file)
 
     @staticmethod
-    def start_server(config_file):
+    def start_server(config_file, started_event, stop_event, stopped_event):
         from lib.run_receiver import main
-        from app import app_name, receivers, actions, protocols
-        asyncio.run(main(app_name, receivers, actions, protocols, config_file))
+        from app import app_name, receivers, actions, protocols, set_loop
+        set_loop()
+        asyncio.run(main(app_name, receivers, actions, protocols, config_file, started_event=started_event,
+                         stop_event=stop_event, stopped_event=stopped_event))
 
     def start_server_process(self):
-        self.process = multiprocessing.Process(target=self.start_server, args=(self.config_file,))
+        self.process = multiprocessing.Process(target=self.start_server,
+                                               args=(self.config_file, self.started_event, self.stop_event, self.stopped_event))
         self.process.start()
+        self.started_event.wait()
+        print('Waiting done')
 
     def setUp(self):
-        print(self.base_data_dir)
         if os.path.exists(self.base_data_dir):
             shutil.rmtree(self.base_data_dir)
         self.start_server_process()
-        time.sleep(3)
 
     def tearDown(self):
-        time.sleep(2)
+        self.stop_event.set()
+        if os.name == 'nt':
+            self.stopped_event.wait()
         self.process.terminate()
         self.process.join()
 

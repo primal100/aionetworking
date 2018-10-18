@@ -1,16 +1,18 @@
 from .base import BaseConfigClass
 from lib.messagemanagers import MessageManager, BatchMessageManager
 
-import configparser
+from configparser import ConfigParser, ExtendedInterpolation
+import os
+import pathlib
 
 
 class INIFileConfig(BaseConfigClass):
 
     def __init__(self, app_name, filename, postfix='receiver'):
-        self.config = configparser.RawConfigParser()
+        super(INIFileConfig, self).__init__(app_name, postfix=postfix)
+        self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
         self.config.optionxform = str
         self.config.read(filename)
-        super(INIFileConfig, self).__init__(app_name, postfix=postfix)
 
     def get_tuple(self, section, option):
         value = self.config.get(section, option, fallback='')
@@ -41,7 +43,14 @@ class INIFileConfig(BaseConfigClass):
             'ssl_cert': self.config.get('Receiver', 'SSLCert', fallback=''),
             'ssl_key': self.config.get('Receiver', 'SSLKey', fallback=''),
             'record': self.config.getboolean('Receiver', 'Record', fallback=False),
-            'record_file': self.get_full_path(self.config.get('Receiver', 'RecordFile', fallback='')),
+            'record_file': pathlib.PurePath(self.config.get('Receiver', 'RecordFile', fallback='')),
+        }
+
+    @property
+    def client_config(self):
+        return {
+            'src_ip': self.config.get('Sender', 'SrcIP', fallback=''),
+            'src_port': self.config.getint('Sender', 'SrcPort', fallback=0),
         }
 
     @property
@@ -59,18 +68,24 @@ class INIFileConfig(BaseConfigClass):
         }
 
     def log_config(self):
-        config = dict(self.config.items('Logging', raw=True))
         formatter_dict = {}
         handler_dict = {'formatter': 'standard'}
-        for k, v in config.items():
-            if k == 'format':
+        config = self.config.items('Logging', raw=True)
+        level = dict(config)['level']
+        default_keys = dict(self.config.items('DEFAULT')).keys()
+        for k, v in config:
+            if k in default_keys:
+                pass
+            elif k == 'format':
                 formatter_dict['format'] = v
             elif k == 'datefmt':
                 formatter_dict['datafmt'] = v
             elif k == 'handler':
                 handler_dict['class'] = "logging." + v
             elif k == 'filename':
-                handler_dict['filename'] = self.get_full_path(v)
+                handler_dict[k] = self.config.get('Logging', 'filename')
+                log_directory = os.path.dirname(handler_dict[k])
+                os.makedirs(log_directory, exist_ok=True)
             else:
                 try:
                     handler_dict[k] = self.config.getint('Logging', k)
@@ -78,7 +93,7 @@ class INIFileConfig(BaseConfigClass):
                     try:
                         handler_dict[k] = self.config.getboolean('Logging', k)
                     except ValueError:
-                        handler_dict[k] = v
+                        handler_dict[k] = self.config.get('Logging', k)
 
         return {
             'version': 1,
@@ -92,22 +107,22 @@ class INIFileConfig(BaseConfigClass):
             'loggers': {
                 '': {
                     'handlers': ['default'],
-                    'level': config['level'],
+                    'level': level,
                     'propagate': True
                 },
                 'messageManager': {
                     'handlers': ['default'],
-                    'level': config['level'],
+                    'level': level,
                     'propagate': False
                 },
             }
         }
 
-    def get_home(self, fallback='%(userhome)s/%(appname)s'):
-        return self.config.get('Application', 'Home', fallback=fallback, raw=True)
+    def get_home(self):
+        return self.config.get('Dirs', 'Home', fallback=self.defaults['Osdatadir'])
 
-    def get_data_home(self, fallback='%(home)s/data'):
-        return self.config.get('Actions', 'DataHome', fallback=fallback)
+    def get_data_home(self):
+        return self.config.get('Dirs', 'Data', fallback=os.path.join(self.home, "data"))
 
-    def get_action_home(self, action_name, fallback='%(datahome)s/%(actionname)s'):
-        return self.config.get('Actions', '%sHome' % action_name, fallback=fallback)
+    def get_action_home(self, action_name):
+        return self.config.get('Actions', '%sHome' % action_name, fallback=os.path.join(self.data_home, action_name))

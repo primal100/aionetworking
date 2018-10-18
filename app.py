@@ -39,7 +39,7 @@ def process_args():
 
     args = parser.parse_args()
 
-    conf_file = args.conffile or os.path.join(definitions.CONF_DIR, 'setup.ini')
+    conf_file = args.conffile or os.path.join(definitions.CONF_DIR, 'setup_devel.ini')
 
     return conf_file
 
@@ -50,7 +50,16 @@ def get_configuration_args(config_file=None):
     return config_file,
 
 
+def set_loop():
+    if os.name == 'nt':
+        import asyncio
+        # Following two lines can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+
+
 if __name__ == '__main__':
+    set_loop()
     config_args = get_configuration_args()
     try:
         asyncio.run(main(app_name, receivers, actions, protocols, *config_args, config_cls=INIFileConfig))

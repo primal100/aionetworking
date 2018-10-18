@@ -9,8 +9,8 @@ logger = logging.getLogger('messageManager')
 class BaseSender:
 
     @classmethod
-    def from_config(cls, config, protocols, protocol_name):
-        msg_protocol = protocols[config.protocol]
+    def from_config(cls, receiver_config, client_config, protocols, protocol_name):
+        msg_protocol = protocols[protocol_name]
         return cls(msg_protocol)
 
     def __init__(self, protocol):
@@ -65,14 +65,16 @@ class BaseNetworkClient(BaseSender):
     transport = None
 
     @classmethod
-    def from_config(cls, config, protocols, protocol_name):
+    def from_config(cls, receiver_config, client_config, protocols, protocol_name):
         msg_protocol = protocols[protocol_name]
-        return cls(msg_protocol, config['host'], config['port'], config['ssl'])
+        return cls(msg_protocol, receiver_config['host'], receiver_config['port'], receiver_config['ssl'],
+                   client_config['src_ip'], client_config['src_port'])
 
-    def __init__(self, protocol, host='127.0.0.1', port=4000, ssl=False):
+    def __init__(self, protocol, host='127.0.0.1', port=4000, ssl=False, src_ip='', src_port=0):
         super(BaseNetworkClient, self).__init__(protocol)
         self.host = host
         self.port = port
+        self.localaddr = (src_ip, src_port) if src_ip else None
         self.ssl = ssl
         self.dst = "%s:%s" % (host, port)
 
@@ -100,7 +102,6 @@ class BaseNetworkClient(BaseSender):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         logger.info("Closing %s connection to %s:%s" % (self.sender_type, self.host, self.port))
         await self.close_connection()
-        logger.info('%s Connected to %s:%s closed' % (self.sender_type, self.host, self.port))
 
     async def send_msg(self, msg_encoded):
         logger.debug("Sending message to %s:%s" % (self.host, self.port))

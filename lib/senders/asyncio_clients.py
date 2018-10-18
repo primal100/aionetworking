@@ -17,9 +17,12 @@ class ClientProtocolMixin:
         logger.info('%s connected to %s' % (self.name, self.client.dst))
 
     def connection_lost(self, exc):
-        error = '{} {}'.format(exc, self.client.dst)
-        print(error)
-        logger.error(error)
+        if exc:
+            error = '{} {}'.format(exc, self.client.dst)
+            print(error)
+            logger.error(error)
+        else:
+            logger.info('%s connection to %s has been closed' % (self.name, self.client.dst))
 
 
 class TCPClientProtocol(ClientProtocolMixin, asyncio.Protocol):
@@ -30,9 +33,10 @@ class UDPClientProtocol(ClientProtocolMixin, asyncio.DatagramProtocol):
     name = 'UDP Client'
 
     def error_received(self, exc):
-        error = '{} {}'.format(exc, self.client.dst)
-        print(error)
-        logger.error(error)
+        if exc:
+            error = '{} {}'.format(exc, self.client.dst)
+            print(error)
+            logger.error(error)
 
 
 class TCPClient(BaseNetworkClient):
@@ -42,7 +46,7 @@ class TCPClient(BaseNetworkClient):
 
     async def open_connection(self):
         self.transport, self.protocol = await asyncio.get_event_loop().create_connection(
-            lambda: TCPClientProtocol(self), self.host, self.port, ssl=self.ssl)
+            lambda: TCPClientProtocol(self), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
 
     async def close_connection(self):
         self.transport.close()
