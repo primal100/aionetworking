@@ -3,7 +3,7 @@ import logging
 from lib import utils
 from lib.utils import underline
 
-logger = logging.getLogger('sender')
+logger = logging.getLogger('messageManager')
 
 
 class BaseAction:
@@ -14,15 +14,13 @@ class BaseAction:
     single_extension = "txt"
     multi_extension = "txt"
 
-    def __init__(self, app_name, config, storage=True):
+    def __init__(self, app_name, config, postfix='receiver', storage=True):
 
         self.app_name = app_name
-        self.action_config = config.action_config(app_name, self.action_name, storage=storage)
+        self.action_config = config.action_config(self.default_data_dir, storage=True)
         if storage:
             logger.info("Setting up action %s for storage" % self.action_name)
-            home = self.action_config.get('home')
-            data_dir = self.action_config.get('data_dir') or self.default_data_dir
-            self.base_path = os.path.join(home, data_dir)
+            self.base_path = self.action_config.get('home')
             logger.info("Using directory %s for %s" % (self.base_path, self.action_name))
             os.makedirs(self.base_path, exist_ok=True)
         else:
@@ -49,7 +47,7 @@ class BaseAction:
         if not msg.filter_by_action(self, False):
             path = os.path.join(self.base_path, msg.storage_path_single)
             file_path = msg.unique_filename(path, self.get_file_extension(msg))
-            logger.debug('Storing message %s in %s' % (self.action_name, file_path))
+            logger.debug('Storing %s message in %s' % (self.action_name, file_path))
             with open(file_path, self.store_write_mode) as f:
                 f.write(self.get_content(msg))
         else:

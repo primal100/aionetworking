@@ -4,7 +4,7 @@ import logging
 from lib.utils import cached_property, unpack_variable_len_strings
 
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class BaseProtocol:

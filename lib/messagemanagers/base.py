@@ -1,7 +1,7 @@
 import logging
 import datetime
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class MessageFromNotAuthorizedHost(Exception):
@@ -15,6 +15,7 @@ def raise_message_from_not_authorized_host(sender, allowed_senders):
 
 
 class BaseMessageManager:
+    batch = False
 
     def __init__(self, app_name, protocol, actions, config):
         self.app_name = app_name

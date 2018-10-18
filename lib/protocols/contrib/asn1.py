@@ -4,6 +4,7 @@ from lib.utils import cached_property
 
 import datetime
 
+
 class BasePyCrateAsnProtocol(BaseProtocol):
 
     """

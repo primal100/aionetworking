@@ -2,7 +2,7 @@ import asyncio
 import logging
 from .base import BaseNetworkClient
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class ClientProtocolMixin:

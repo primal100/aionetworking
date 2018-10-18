@@ -1,28 +1,22 @@
 from .base import BaseConfigClass
 from lib.messagemanagers import MessageManager, BatchMessageManager
-from lib import utils
-import os
 
 import configparser
 
 
-class ConfigParserConfig(BaseConfigClass):
+class INIFileConfig(BaseConfigClass):
 
-    def __init__(self, config_meta):
-        super(ConfigParserConfig, self).__init__(config_meta)
-        self.config = config_meta['config']
+    def __init__(self, app_name, filename, postfix='receiver'):
+        self.config = configparser.RawConfigParser()
+        self.config.optionxform = str
+        self.config.read(filename)
+        super(INIFileConfig, self).__init__(app_name, postfix=postfix)
 
     def get_tuple(self, section, option):
         value = self.config.get(section, option, fallback='')
         if value:
             return tuple(value.split(','))
         return ()
-
-    def get_path(self, section, option, fallback=''):
-        path = self.config.get(section, option, fallback=fallback)
-        if os.name == 'nt':
-            path = path.replace('/', '\\')
-        return path
 
     @property
     def receiver(self):
@@ -47,7 +41,7 @@ class ConfigParserConfig(BaseConfigClass):
             'ssl_cert': self.config.get('Receiver', 'SSLCert', fallback=''),
             'ssl_key': self.config.get('Receiver', 'SSLKey', fallback=''),
             'record': self.config.getboolean('Receiver', 'Record', fallback=False),
-            'record_file': self.config.get('Receiver', 'RecordFile', fallback=''),
+            'record_file': self.get_full_path(self.config.get('Receiver', 'RecordFile', fallback='')),
         }
 
     @property
@@ -64,17 +58,56 @@ class ConfigParserConfig(BaseConfigClass):
             'generate_timestamp': self.config.getboolean('MessageManager', 'GenerateTimestamp', fallback=False)
         }
 
-    def action_config(self, app_name, action_name, storage=True):
-        section_name = 'Actions' if storage else 'Print'
+    def log_config(self):
+        config = dict(self.config.items('Logging', raw=True))
+        formatter_dict = {}
+        handler_dict = {'formatter': 'standard'}
+        for k, v in config.items():
+            if k == 'format':
+                formatter_dict['format'] = v
+            elif k == 'datefmt':
+                formatter_dict['datafmt'] = v
+            elif k == 'handler':
+                handler_dict['class'] = "logging." + v
+            elif k == 'filename':
+                handler_dict['filename'] = self.get_full_path(v)
+            else:
+                try:
+                    handler_dict[k] = self.config.getint('Logging', k)
+                except ValueError:
+                    try:
+                        handler_dict[k] = self.config.getboolean('Logging', k)
+                    except ValueError:
+                        handler_dict[k] = v
+
         return {
-            'home': self.get_path(section_name, 'Home', fallback=utils.data_directory(app_name)),
-            'data_dir': self.config.get(section_name, '%s_data_dir' % action_name, fallback=''),
+            'version': 1,
+            'disable_existing_loggers': False,
+            'formatters': {
+                'standard': formatter_dict
+            },
+            'handlers': {
+                'default': handler_dict
+            },
+            'loggers': {
+                '': {
+                    'handlers': ['default'],
+                    'level': config['level'],
+                    'propagate': True
+                },
+                'messageManager': {
+                    'handlers': ['default'],
+                    'level': config['level'],
+                    'propagate': False
+                },
+            }
         }
 
+    def get_home(self, fallback='%(userhome)s/%(appname)s'):
+        return self.config.get('Application', 'Home', fallback=fallback, raw=True)
 
-class ConfigParserFile(ConfigParserConfig):
+    def get_data_home(self, fallback='%(home)s/data'):
+        return self.config.get('Actions', 'DataHome', fallback=fallback)
 
-    def __init__(self, config_meta):
-        config_meta['config'] = configparser.ConfigParser()
-        config_meta['config'].read(config_meta['filename'])
-        super(ConfigParserFile, self).__init__(config_meta)
+    def get_action_home(self, action_name, fallback='%(datahome)s/%(actionname)s'):
+        return self.config.get('Actions', '%sHome' % action_name, fallback=fallback)

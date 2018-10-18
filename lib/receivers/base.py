@@ -1,11 +1,10 @@
-import asyncio
 import ssl
 import logging
 import datetime
 from lib.configuration import ConfigurationException
 from lib import utils
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class ServerException(Exception):
@@ -43,13 +42,14 @@ class BaseReceiver:
             return None
 
     def record_packet(self, msg, sender):
+        logger.debug('Recording packet from %s' % sender)
         if self.prev_message_time:
             message_timedelta = (datetime.datetime.now() - self.prev_message_time).seconds
         else:
             message_timedelta = 0
         self.prev_message_time = datetime.datetime.now()
         data = utils.pack_recorded_packet(message_timedelta, sender, msg)
-        with open(self.record_file, 'a+') as f:
+        with open(self.record_file, 'ab') as f:
             f.write(data)
 
     async def handle_message(self, sender, data):
@@ -57,7 +57,7 @@ class BaseReceiver:
         logger.debug(data)
 
         if self.record:
-            self.record(data, sender)
+            self.record_packet(data, sender)
 
         await self.manager.manage_message(sender, data)
 

@@ -7,6 +7,14 @@ import re
 import asyncio
 
 
+def user_home():
+    return os.path.expanduser("~")
+
+
+def windows_app_data():
+    return
+
+
 def data_directory(app_name):
     if sys.platform == 'win32':
         return os.path.join(os.environ['appdata'], app_name)
@@ -121,8 +129,8 @@ def unpack_variable_len_strings(content):
 
 
 def pack_recorded_packet(seconds, sender, msg):
-    return struct.pack('I', seconds) + utils.pack_variable_len_string(
-            sender) + utils.pack_variable_len_string(msg)
+    return struct.pack('I', seconds) + pack_variable_len_string(
+            sender.encode()) + pack_variable_len_string(msg)
 
 
 def unpack_recorded_packets(content):
@@ -131,6 +139,7 @@ def unpack_recorded_packets(content):
     packets = []
     while pos < len(content):
         seconds = struct.unpack("I", content[pos:pos+int_size])[0]
+        pos += int_size
         pos, sender = unpack_variable_len_string(pos, content)
         pos, packet_data = unpack_variable_len_string(pos, content)
         packets.append((seconds, sender, packet_data))

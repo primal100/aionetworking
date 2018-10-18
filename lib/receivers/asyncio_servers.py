@@ -2,7 +2,7 @@ import asyncio
 import logging
 from .base import BaseServer
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class ServerException(Exception):
@@ -61,7 +61,9 @@ class TCPServerReceiver(BaseServer):
         self.server = await asyncio.get_event_loop().create_server(lambda: TCPServerProtocol(self), self.host,
                                                                    self.port,
                                                                    ssl=self.ssl_context)
-        print('Serving %s on %s' % (self.receiver_type, self.server.sockets[0].getsockname()))
+        sock_name = self.server.sockets[0].getsockname()
+        listening_on = ':'.join([str(v) for v in sock_name])
+        print('Serving %s on %s' % (self.receiver_type, listening_on))
         async with self.server:
             await self.server.serve_forever()
 

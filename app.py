@@ -2,8 +2,8 @@ from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
 from lib.senders.asyncio_clients import TCPClient, UDPClient
 from lib.actions import binary, decode, prettify, summarise, text
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
-from lib.configuration.parser import ConfigParserFile
-from lib.run import main
+from lib.configuration.parser import INIFileConfig
+from lib.run_receiver import main
 import definitions
 
 import asyncio
@@ -11,14 +11,14 @@ import argparse
 import os
 
 
-app_name = 'message_receiver'
+app_name = 'message_manager'
 
+config_cls = INIFileConfig
 
 receivers = {
     'TCPServer': {'receiver': TCPServerReceiver, 'sender': TCPClient},
     'UDPServer': {'receiver': UDPServerReceiver, 'sender': UDPClient}
 }
-
 
 actions = {
     'binary': binary,
@@ -33,34 +33,26 @@ protocols = {
 }
 
 
-def get_config_files(conf_dir=None, configfile=None, log_config_file=None, logfilename='logging.ini'):
-    if not configfile:
-            configfile = os.path.join(conf_dir, 'setup.ini')
-    if not log_config_file:
-            log_config_file = os.path.join(conf_dir, logfilename)
-
-    config_meta = {
-        'filename': configfile
-        }
-
-    return ConfigParserFile(config_meta), log_config_file
-
-
-def process_args(config_dir=definitions.CONF_DIR, logfilename='logging.ini'):
+def process_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--confdir', help='Path to setup.ini and logging.ini', default=config_dir)
-    parser.add_argument('-f', '--config', help='Path to configparser setup file')
-    parser.add_argument('-l', '--logconfig', help='Path to logconfig file')
+    parser.add_argument('-c', '--conffile', help='Path to config ini file')
 
     args = parser.parse_args()
 
-    return get_config_files(conf_dir=args.confdir, configfile=args.config, log_config_file=args.logconfig,
-                            logfilename=logfilename)
+    conf_file = args.conffile or os.path.join(definitions.CONF_DIR, 'setup.ini')
+
+    return conf_file
+
+
+def get_configuration_args(config_file=None):
+    if not config_file:
+        config_file = process_args()
+    return config_file,
 
 
 if __name__ == '__main__':
-    configuration, log_config_path = process_args()
+    config_args = get_configuration_args()
     try:
-        asyncio.run(main(app_name, receivers, actions, protocols, configuration, log_config_path))
+        asyncio.run(main(app_name, receivers, actions, protocols, *config_args, config_cls=INIFileConfig))
     except KeyboardInterrupt:
         pass

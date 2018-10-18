@@ -2,10 +2,12 @@ from .messagemanager import BaseMessageManager
 import asyncio
 import logging
 
-logger = logging.getLogger()
+logger = logging.getLogger('messageManager')
 
 
 class BatchMessageManager(BaseMessageManager):
+    batch = True
+
     def __init__(self, *args, **kwargs):
         super(BatchMessageManager, self).__init__(*args, **kwargs)
         self.interval = kwargs.get('config', {}).get('interval', 5)

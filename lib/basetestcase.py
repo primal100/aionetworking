@@ -2,7 +2,7 @@ import os
 import configparser
 from unittest import TestCase
 
-from lib.configuration.parser import ConfigParserConfig
+from lib.configuration.parser import INIFileConfig
 import definitions
 
 
@@ -25,7 +25,7 @@ class BaseTestCase(TestCase):
         config.set('Actions', 'Home', self.base_data_dir)
         config.set('Actions', 'Types', 'binary,decode,prettify,summarise')
         config.set('Print', 'Types', 'binary,decode,prettify,summarise')
-        return ConfigParserConfig({'config': config})
+        return INIFileConfig({'config': config})
 
     def assertPathEqual(self, expected, actual):
         self.assertEqual(os.path.normpath(expected), os.path.normpath(actual))
