@@ -65,14 +65,13 @@ class TCPServerReceiver(BaseServer):
         listening_on = ':'.join([str(v) for v in sock_name])
         print('Serving %s on %s' % (self.receiver_type, listening_on))
         async with self.server:
-            if self.started_event:
-                self.started_event.set()
-                logger.debug('Started event has been set')
+            self.set_status_changed('started')
             await self.server.serve_forever()
 
     async def stop_server(self):
-        self.server.close()
-        await self.server.wait_closed()
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
 
 
 class UDPServerReceiver(BaseServer):
@@ -84,8 +83,8 @@ class UDPServerReceiver(BaseServer):
         self.transport, self.protocol = await asyncio.get_event_loop().create_datagram_endpoint(
             lambda: UDPServerProtocol(self), local_addr=(self.host, self.port))
         print('Serving %s on %s' % (self.receiver_type, self.transport.sockets[0].getsockname()))
-        if self.started_event:
-            self.started_event.event()
+        self.set_status_changed('started')
 
     async def stop_server(self):
-        self.transport.close()
+        if self.transport:
+            self.transport.close()

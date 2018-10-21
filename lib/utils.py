@@ -21,7 +21,15 @@ def data_directory(app_name):
     return os.path.expanduser(os.path.join("~", "." + app_name))
 
 
-def timestamp_to_utc_string(timestamp):
+def timestamp_to_utc_string(dt):
+    return datetime.datetime.strftime(dt, '%Y%m%d%H%M%S')
+
+
+def now_to_utc_string():
+    return timestamp_to_utc_string(datetime.datetime.now())
+
+
+def asn_timestamp_to_utc_string(timestamp):
     return ''.join(timestamp)
 
 

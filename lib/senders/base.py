@@ -35,6 +35,7 @@ class BaseSender:
     async def send_msgs(self, msgs):
         for msg in msgs:
             await self.send_msg(msg)
+            await asyncio.sleep(0.001)
 
     async def send_hex_msgs(self, hex_msgs):
         await self.send_msgs([binascii.unhexlify(hex_msg) for hex_msg in hex_msgs])
@@ -51,6 +52,8 @@ class BaseSender:
         with open(file_path, 'rb') as f:
             content = f.read()
         packets = utils.unpack_recorded_packets(content)
+        if immediate:
+            self.send_msgs([p[2] for p in packets])
         for seconds, sender, data in packets:
             if not immediate and seconds >= 1:
                 await asyncio.sleep(seconds)
@@ -94,10 +97,10 @@ class BaseNetworkClient(BaseSender):
     async def __aenter__(self):
         logger.info("Opening %s connection to %s:%s" % (self.sender_type, self.host, self.port))
         await self.open_connection()
-        self.peer_name = self.transport.get_extra_info('peername')
+        """self.peer_name = self.transport.get_extra_info('peername')
         self.sock_name = self.transport.get_extra_info('sockname')
         self.src = ':'.join(str(x) for x in self.sock_name)
-        logger.info('%s Connected to %s from %s ' % (self.sender_type, self.dst, self.src))
+        logger.info('%s Connected to %s from %s ' % (self.sender_type, self.dst, self.src))"""
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         logger.info("Closing %s connection to %s:%s" % (self.sender_type, self.host, self.port))

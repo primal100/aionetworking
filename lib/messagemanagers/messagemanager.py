@@ -10,7 +10,7 @@ class MessageManager(BaseMessageManager):
         logger.info('Message Manager closed')
 
     def do_actions(self, msg):
-        logger.debug('Handing msg actions without batch')
+        logger.debug('Handling msg actions without batch')
         for action in self.actions:
             action.do(msg)
         for action in self.print_actions:

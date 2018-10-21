@@ -3,6 +3,7 @@ import logging
 import datetime
 from lib.configuration import ConfigurationException
 from lib import utils
+import os
 
 logger = logging.getLogger('messageManager')
 
@@ -14,13 +15,13 @@ class ServerException(Exception):
 class BaseReceiver:
     receiver_type = ""
 
-    def __init__(self, manager, config, started_event=None, stopped_event=None):
+    def __init__(self, manager, config, status_change=None):
         self.manager = manager
         self.config = config.receiver_config
-        self.started_event = started_event
-        self.stopped_event = stopped_event
+        self.status_change = status_change
         self.record = self.config.get('record', False)
         self.record_file = self.config.get('record_file', False)
+        os.makedirs(os.path.dirname(self.record_file), exist_ok=True)
         if self.record and not self.record_file:
             raise ConfigurationException('Please configure a record file when record is set to true')
 
@@ -69,14 +70,17 @@ class BaseReceiver:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
 
+    def set_status_changed(self, change=''):
+        if self.status_change:
+            self.status_change.set()
+        logger.debug('Status change event has been set to indicate %s receiver was %s' % (self.receiver_type, change))
+
     async def stop(self):
         logger.info('Stopping %s application' % self.receiver_type)
         await self.close()
         await self.manager.close()
         logging.info('%s application stopped' % self.receiver_type)
-        if self.stopped_event:
-            self.stopped_event.set()
-            logger.debug('Stopped event has been set')
+        self.set_status_changed('stopped')
 
     async def close(self):
         raise NotImplementedError
