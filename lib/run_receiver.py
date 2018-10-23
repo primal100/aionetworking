@@ -1,31 +1,38 @@
 import logging
 import os
-from lib.configuration.parser import INIFileConfig
+import definitions
 import asyncio
 
 
-async def main(app_name, receivers, actions, protocols, *config_args, config_cls=INIFileConfig,
-               status_change=None, stop_ordered=None):
+async def main(status_change=None, stop_ordered=None):
 
-    config = config_cls(app_name, *config_args, postfix='receiver')
-    config.configure_logging()
+    definitions.CONFIG = definitions.CONFIG_CLS(definitions.APP_NAME, *definitions.CONFIG_ARGS, postfix='receiver')
+    definitions.CONFIG.configure_logging()
+
+    definitions.postfix = 'RECEIVER'
     logger = logging.getLogger('messageManager')
 
-    receiver_cls = receivers[config.receiver]['receiver']
+    logger.info('Starting %s' % definitions.APP_NAME)
 
-    logger.info('Starting %s' % app_name)
-    logger.info('Using receiver %s' % config.receiver)
+    receiver_name = definitions.CONFIG.receiver
+    logger.info('Using receiver %s' % receiver_name)
 
-    logger.info('Using protocol %s' % config.protocol)
-    protocol = protocols[config.protocol]
+    receiver_cls = definitions.RECEIVERS[receiver_name]['receiver']
 
-    message_manager_cls = config.message_manager
-    manager = message_manager_cls(app_name, protocol, actions, config)
+    protocol_name = definitions.CONFIG.protocol
 
-    if manager.batch:
+    logger.info('Using protocol %s' % protocol_name)
+    protocol = definitions.PROTOCOLS[protocol_name]
+    protocol.set_config()
+
+    message_manager_is_batch = definitions.CONFIG.message_manager_is_batch
+    if message_manager_is_batch:
         logger.info('Message manager configured in batch mode')
+        manager = definitions.BatchMessageManager.from_config(protocol)
+    else:
+        manager = definitions.MessageManager.from_config(protocol)
 
-    receiver = receiver_cls(manager, config, status_change=status_change)
+    receiver = receiver_cls(manager, status_change=status_change)
 
     if os.name == 'nt':
         """Workaround for windows:

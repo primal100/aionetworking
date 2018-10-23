@@ -1,7 +1,7 @@
 import ssl
 import logging
 import datetime
-from lib.configuration import ConfigurationException
+from lib.conf import ConfigurationException
 from lib import utils
 import os
 
@@ -13,7 +13,7 @@ class ServerException(Exception):
 
 
 class BaseReceiver:
-    receiver_type = ""
+    receiver_type: str
 
     def __init__(self, manager, config, status_change=None):
         self.manager = manager
@@ -91,6 +91,7 @@ class BaseReceiver:
 
 class BaseServer(BaseReceiver):
     receiver_type = 'Server'
+    server = None
     default_host = '0.0.0.0'
     default_port = 4000
 

@@ -21,8 +21,8 @@ class TestTCPServer(BaseTestCase):
     )
     status_change = multiprocessing.Event()
     stop_ordered = multiprocessing.Event()
-    config_file = os.path.join(definitions.TEST_CONF_DIR, 'tcp_server_test_setup.ini')
-    client = get_sender(app_name, receivers, protocols, config_file)
+    config_file = os.path.join(definitions.TEST_CONF_DIR, 'ssh_server_test_setup.ini')
+    client = get_sender(app_name, receivers, protocols, config_file, username='testuser', password='abcdefgh')
 
     @staticmethod
     def start_server(config_file, status_change, stop_ordered):

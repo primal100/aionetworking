@@ -9,28 +9,38 @@ logger = logging.getLogger('messageManager')
 class BaseSender:
 
     @classmethod
-    def from_config(cls, receiver_config, client_config, protocols, protocol_name):
+    def from_config(cls, receiver_config, client_config, protocols, protocol_name, **kwargs):
         msg_protocol = protocols[protocol_name]
-        return cls(msg_protocol)
+        return cls(msg_protocol, **kwargs)
 
-    def __init__(self, protocol):
+    def __init__(self, protocol, **kwargs):
         self.msg_protocol = protocol
 
     @property
     def source(self):
         raise NotImplementedError
 
-    async def send_msg(self, msg_encoded):
+    @property
+    def dst(self):
         raise NotImplementedError
-
-    async def send_hex(self, hex_msg):
-        await self.send_msg(binascii.unhexlify(hex_msg))
 
     async def __aenter__(self):
         raise NotImplementedError
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         raise NotImplementedError
+
+    async def send_data(self, msg_encoded):
+        raise NotImplementedError
+
+    async def send_msg(self, msg_encoded):
+        logger.debug("Sending message to %s" % self.dst)
+        logger.debug(msg_encoded)
+        await self.send_data(msg_encoded)
+        logger.debug('Message sent')
+
+    async def send_hex(self, hex_msg):
+        await self.send_msg(binascii.unhexlify(hex_msg))
 
     async def send_msgs(self, msgs):
         for msg in msgs:
@@ -53,7 +63,7 @@ class BaseSender:
             content = f.read()
         packets = utils.unpack_recorded_packets(content)
         if immediate:
-            self.send_msgs([p[2] for p in packets])
+            await self.send_msgs([p[2] for p in packets])
         for seconds, sender, data in packets:
             if not immediate and seconds >= 1:
                 await asyncio.sleep(seconds)
@@ -68,22 +78,25 @@ class BaseNetworkClient(BaseSender):
     transport = None
 
     @classmethod
-    def from_config(cls, receiver_config, client_config, protocols, protocol_name):
+    def from_config(cls, receiver_config, client_config, protocols, protocol_name, **kwargs):
         msg_protocol = protocols[protocol_name]
         return cls(msg_protocol, receiver_config['host'], receiver_config['port'], receiver_config['ssl'],
-                   client_config['src_ip'], client_config['src_port'])
+                   client_config['src_ip'], client_config['src_port'], **kwargs)
 
-    def __init__(self, protocol, host='127.0.0.1', port=4000, ssl=False, src_ip='', src_port=0):
+    def __init__(self, protocol, host='127.0.0.1', port=4000, ssl=False, src_ip='', src_port=0, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol)
         self.host = host
         self.port = port
         self.localaddr = (src_ip, src_port) if src_ip else None
         self.ssl = ssl
-        self.dst = "%s:%s" % (host, port)
 
     @property
     def source(self):
         return self.sock_name[0]
+
+    @property
+    def dst(self):
+        return "%s:%s" % (self.host, self.port)
 
     async def open_connection(self):
         raise NotImplementedError
@@ -106,8 +119,5 @@ class BaseNetworkClient(BaseSender):
         logger.info("Closing %s connection to %s:%s" % (self.sender_type, self.host, self.port))
         await self.close_connection()
 
-    async def send_msg(self, msg_encoded):
-        logger.debug("Sending message to %s:%s" % (self.host, self.port))
-        logger.debug(msg_encoded)
-        await self.send_data(msg_encoded)
-        logger.debug('Message sent')
+    async def send_data(self, msg_encoded):
+        raise NotImplementedError

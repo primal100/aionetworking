@@ -51,7 +51,6 @@ class UDPServerProtocol(ServerProtocolMixin, asyncio.DatagramProtocol):
 
 class TCPServerReceiver(BaseServer):
     receiver_type = "TCP Server"
-    server = None
 
     def __init__(self, *args, **kwargs):
         super(TCPServerReceiver, self).__init__(*args, **kwargs)

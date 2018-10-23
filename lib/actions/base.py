@@ -14,13 +14,17 @@ class BaseAction:
     single_extension = "txt"
     multi_extension = "txt"
 
-    def __init__(self, app_name, config, postfix='receiver', storage=True):
+    @classmethod
+    def from_config(cls, storage=True):
+        import definitions
+        config = definitions.CONFIG.action_config(cls.default_data_dir, storage=storage)
+        return cls(storage=storage, **config)
 
-        self.app_name = app_name
-        self.action_config = config.action_config(self.default_data_dir, storage=True)
+    def __init__(self, storage=True, home=''):
+
         if storage:
             logger.info("Setting up action %s for storage" % self.action_name)
-            self.base_path = self.action_config.get('home')
+            self.base_path = home
             logger.info("Using directory %s for %s" % (self.base_path, self.action_name))
             os.makedirs(self.base_path, exist_ok=True)
         else:

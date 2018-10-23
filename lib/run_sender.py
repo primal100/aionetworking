@@ -1,9 +1,8 @@
-from lib.configuration.parser import INIFileConfig
+from lib.conf.parser import INIFileConfig
 import logging
-import os
 
 
-def get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileConfig):
+def get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileConfig, **kwargs):
 
     config = config_cls(app_name, *config_args, postfix='sender')
     config.configure_logging()
@@ -13,6 +12,6 @@ def get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileC
 
     logger.info('Using %s' % sender_cls.sender_type)
 
-    sender = sender_cls.from_config(config.receiver_config, config.client_config, protocols, config.protocol)
+    sender = sender_cls.from_config(config.receiver_config, config.client_config, protocols, config.protocol, **kwargs)
 
     return sender

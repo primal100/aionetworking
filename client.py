@@ -1,11 +1,45 @@
-from app import app_name, receivers, protocols, get_configuration_args, set_loop
-from lib.configuration.parser import INIFileConfig
+from app import app_name, receivers, protocols, set_loop
+from lib.conf.parser import INIFileConfig
 from lib.run_sender import get_sender
+from lib.senders.tasks import send_hex, encode_send_msg, play_recording
+import definitions
+
+import argparse
+import asyncio
+import os
 
 set_loop()
 
+
+def process_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--conffile', help='Path to config ini file')
+    parser.add_argument('-s', '--sendhex', help='Send hex data')
+    parser.add_argument('-e', '--sendencoded', help='Encode and send')
+    parser.add_argument('-p', '--playback', help='Playback given recording')
+
+    args = parser.parse_args()
+
+    conf_file = args.conffile or os.environ['MESSAGE_MANAGER_CONF_FILE'] or os.path.join(definitions.CONF_DIR,
+                                                                                         'setup_devel.ini')
+    if args.sendencoded:
+        task = encode_send_msg
+        data = args.sendencoded
+    elif args.playback:
+        task = play_recording
+        data = args.playback
+    elif args.sendhex:
+        task = send_hex
+        data = args.sendhex
+    else:
+        task = data = None
+
+    return conf_file, task, data
+
+
 if __name__ == '__main__':
-    config_args = get_configuration_args()
-    client = get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileConfig)
-
-
+    conf_file, task, data = process_args()
+    client = get_sender(app_name, receivers, protocols, *conf_file, config_cls=INIFileConfig)
+    if task:
+        asyncio.run(task(client, data))
+        print('Message sent')

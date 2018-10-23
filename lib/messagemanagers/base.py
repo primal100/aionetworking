@@ -1,5 +1,6 @@
 import logging
 import datetime
+import asyncio
 
 logger = logging.getLogger('messageManager')
 
@@ -17,21 +18,27 @@ def raise_message_from_not_authorized_host(sender, allowed_senders):
 class BaseMessageManager:
     batch = False
 
-    def __init__(self, app_name, protocol, actions, config):
-        self.app_name = app_name
-        self.protocol = protocol
-        self.config = config.message_manager_config
-        self.protocol_config = config.protocol_config
-        self.allowed_senders = self.config['allowed_senders']
-        self.generate_timestamp = self.config['generate_timestamp']
-        action_modules = [actions[a] for a in self.config['actions']]
-        print_modules = [actions[a] for a in self.config['print_actions']]
-        self.actions = [m.Action(app_name, config) for m in action_modules]
-        self.print_actions = [m.Action(app_name, config, storage=False) for m in print_modules]
-        self.aliases = self.config['aliases']
+    @classmethod
+    def from_config(cls, protocol):
+        import definitions
+        kwargs = definitions.CONFIG.message_manager_config
+        store_modules = [definitions.ACTIONS[a] for a in kwargs.pop['actions']]
+        print_modules = [definitions.ACTIONS[a] for a in kwargs.pop['print_actions']]
+        store_actions = [m.Action.from_config(storage=True) for m in store_modules]
+        print_actions = [m.Action.from_config(storage=False) for m in print_modules]
+        return cls(protocol, store_actions, print_actions, **kwargs)
 
-    def close(self):
-        pass
+    def __init__(self, protocol, store_actions, print_actions, allowed_senders=(), generate_timestamp=False,
+                 aliases=None, interval=1):
+        self.protocol = protocol
+        self.allowed_senders = allowed_senders
+        self.aliases = aliases or None
+        self.generate_timestamp = generate_timestamp
+        self.interval = interval
+        self.store_actions = store_actions
+        self.print_actions = print_actions
+        self.queue = asyncio.Queue()
+        self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
 
     def get_alias(self, sender):
         alias = self.aliases.get(sender, sender)
@@ -47,7 +54,7 @@ class BaseMessageManager:
         return self.get_alias(sender)
 
     def make_message(self, sender, encoded, timestamp):
-        return self.protocol(sender, encoded, timestamp=timestamp, config=self.protocol_config)
+        return self.protocol(sender, encoded, timestamp=timestamp)
 
     async def manage_message(self, sender, encoded):
         logger.debug('Managing message from ' + sender)
@@ -57,11 +64,46 @@ class BaseMessageManager:
             logger.debug('Generated timestamp %s' % timestamp)
         else:
             timestamp = None
-        if self.actions:
-            await self.decode_run(host, encoded, timestamp)
+        logger.debug('Adding message from %s to asyncio queue' % host)
+        await self.queue.put((host, encoded, timestamp))
+
+    async def process_queue_later(self):
+        await asyncio.sleep(self.interval)
+        try:
+            await self.process_queue()
+        finally:
+            await self.process_queue_later()
+
+    async def process_queue(self):
+        logger.debug('Processing asyncio queue')
+        msgs = []
+        try:
+            while not self.queue.empty():
+                item = self.queue.get_nowait()
+                logger.debug('Took item from queue')
+                sender, encoded, timestamp = item
+                msg = self.make_message(sender, encoded, timestamp)
+                if not msg.filter():
+                    msgs.append(msg)
+                else:
+                    logger.debug("Message was filtered out")
+            self.do_actions(msgs)
+        finally:
+            for msg in msgs:
+                logger.debug("Setting task done on queue")
+                self.queue.task_done()
+
+    async def close(self):
+        logger.info('Closing Batch Message Manager')
+        try:
+            timeout = self.interval + 1
+            logger.info('Waiting %s seconds for queue to empty' % timeout)
+            await asyncio.wait_for(self.queue.join(), timeout=timeout + 1)
+            logger.info('Queue empty. Cancelling task')
+        except asyncio.TimeoutError:
+            logger.error('Queue did not empty. Cancelling task with messages in queue.')
+        self.process_queue_task.cancel()
+        logger.info('Batch Message Manager closed')
 
     def do_actions(self, msg):
-        raise NotImplementedError
-
-    async def decode_run(self, host, encoded, timestamp):
         raise NotImplementedError

@@ -7,6 +7,14 @@ import re
 import asyncio
 
 
+def set_loop():
+    if os.name == 'nt':
+        # Following two lines can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
+        import asyncio
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+
+
 def user_home():
     return os.path.expanduser("~")
 

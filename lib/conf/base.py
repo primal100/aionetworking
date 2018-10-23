@@ -6,16 +6,14 @@ import definitions
 class ConfigurationException(Exception):
     pass
 
-
-class BaseConfigClass:
-    defaults = {
-        'Testdir': definitions.TESTS_DIR,
-        'Develdir': definitions.ROOT_DIR,
-        'Userhome': definitions.USER_HOME,
-        "~": definitions.USER_HOME,
-        'Osdatadir': definitions.OSDATA_DIR,
-        'timestamp': now_to_utc_string()
-    }
+defaults = {
+    'Testdir': definitions.TESTS_DIR,
+    'Develdir': definitions.ROOT_DIR,
+    'Userhome': definitions.USER_HOME,
+    "~": definitions.USER_HOME,
+    'Osdatadir': definitions.OSDATA_DIR,
+    'timestamp': now_to_utc_string()
+}
 
     def __init__(self, app_name, postfix='receiver'):
         self.defaults.update({
@@ -36,7 +34,7 @@ class BaseConfigClass:
         raise NotImplementedError
 
     @cached_property
-    def message_manager(self):
+    def message_manager_is_batch(self):
         raise NotImplementedError
 
     @cached_property
@@ -67,11 +65,6 @@ class BaseConfigClass:
 
     def configure_logging(self):
         raise NotImplementedError
-
-    @cached_property
-    def home(self):
-        print('HOME IS USED!!!')
-        return self.get_home()
 
     @cached_property
     def data_home(self):

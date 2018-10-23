@@ -1,9 +1,6 @@
-from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
-from lib.senders.asyncio_clients import TCPClient, UDPClient
-from lib.actions import binary, decode, prettify, summarise, text
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
-from lib.configuration.parser import INIFileConfig
 from lib.run_receiver import main
+from lib.utils import set_loop
 import definitions
 
 import asyncio
@@ -11,24 +8,7 @@ import argparse
 import os
 
 
-app_name = 'message_manager'
-
-config_cls = INIFileConfig
-
-receivers = {
-    'TCPServer': {'receiver': TCPServerReceiver, 'sender': TCPClient},
-    'UDPServer': {'receiver': UDPServerReceiver, 'sender': UDPClient}
-}
-
-actions = {
-    'binary': binary,
-    'decode': decode,
-    'prettify': prettify,
-    'summarise': summarise,
-    'text': text
-}
-
-protocols = {
+definitions.PROTOCOLS = {
     'TCAP': TCAP_MAP_ASNProtocol
 }
 
@@ -39,7 +19,8 @@ def process_args():
 
     args = parser.parse_args()
 
-    conf_file = args.conffile or os.path.join(definitions.CONF_DIR, 'setup_devel.ini')
+    conf_file = args.conffile or os.environ['MESSAGE_MANAGER_CONF_FILE'] or os.path.join(definitions.CONF_DIR,
+                                                                                         'setup_devel.ini')
 
     return conf_file
 
@@ -50,18 +31,10 @@ def get_configuration_args(config_file=None):
     return config_file,
 
 
-def set_loop():
-    if os.name == 'nt':
-        import asyncio
-        # Following two lines can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-
-
 if __name__ == '__main__':
     set_loop()
-    config_args = get_configuration_args()
+    definitions.CONFIG_ARGS = get_configuration_args()
     try:
-        asyncio.run(main(app_name, receivers, actions, protocols, *config_args, config_cls=INIFileConfig))
+        asyncio.run(main())
     except KeyboardInterrupt:
         pass

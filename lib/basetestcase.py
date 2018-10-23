@@ -2,7 +2,7 @@ import os
 import configparser
 from unittest import TestCase
 
-from lib.configuration.parser import INIFileConfig
+from lib.conf.parser import INIFileConfig
 import definitions
 
 

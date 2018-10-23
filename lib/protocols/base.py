@@ -14,28 +14,33 @@ class BaseProtocol:
     protocol_name = ""
     supported_actions = ()
     binary = True
+    config = {}
 
     @classmethod
-    def from_file(cls, sender, file_path, config=None):
+    def from_file(cls, sender, file_path):
         logger.debug('Creating new %s message from %s' % (cls.protocol_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             encoded = f.read()
-        return cls(sender, encoded, config=config)
+        return cls.(sender, encoded)
 
     @classmethod
-    def from_file_multi(cls, sender, file_path, config=None):
+    def from_file_multi(cls, sender, file_path):
         logger.debug('Creating new %s messages from %s' % (cls.protocol_name, file_path))
         read_mode = 'rb' if cls.binary else 'r'
         with open(file_path, read_mode) as f:
             contents = f.read()
         if cls.binary:
-            return [cls(sender, encoded, config=config) for encoded in unpack_variable_len_strings(contents)]
-        return [cls(sender, encoded, config=config) for encoded in contents.split('\n') if encoded]
+            return [cls(sender, encoded) for encoded in unpack_variable_len_strings(contents)]
+        return [cls(sender, encoded) for encoded in contents.split('\n') if encoded]
 
-    def __init__(self, sender, encoded=None, decoded=None, timestamp=None, config=None):
+    @classmethod
+    def set_config(cls):
+        import definitions
+        cls.config = definitions.CONFIG.protocol_config
+
+    def __init__(self, sender, encoded=None, decoded=None, timestamp=None, **kwargs):
         self.sender = sender
-        self.config = config or {}
         self._timestamp = timestamp
         if encoded:
             self.encoded = encoded

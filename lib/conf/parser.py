@@ -8,7 +8,8 @@ from logging.config import fileConfig
 
 
 def get_tuple(v):
-    return tuple(v.split(','))
+    return tuple(v.replace(', ', ',').split(','))
+
 
 def get_path(v):
     return pathlib.PurePath(v)
@@ -29,16 +30,6 @@ class INIFileConfig(BaseConfigClass):
         self.config.optionxform = str
         self.config.read(filename)
 
-
-
-
-
-    """def get_tuple(self, section, option):
-        value = self.config.get(section, option, fallback='')
-        if value:
-            return tuple(value.split(','))
-        return ()"""
-
     @property
     def receiver(self):
         return self.config.get('Receiver', 'Type')
@@ -53,6 +44,10 @@ class INIFileConfig(BaseConfigClass):
             'ssl_key': self.config.get('Receiver', 'SSLKey', fallback=''),
             'record': self.config.getboolean('Receiver', 'Record', fallback=False),
             'record_file': self.config.getpath('Receiver', 'RecordFile', fallback=''),
+            'allow_scp': self.config.getboolean('Receiver', 'AllowSCP', fallback=False),
+            'base_upload_dir': self.config.getpath('Receiver', 'BaseSFTPDIR',
+                                                   fallback=os.path.join(self.data_home, "Uploads")),
+            'logins': dict(self.config.items('Logins', raw=True))
         }
 
     @property
@@ -63,10 +58,8 @@ class INIFileConfig(BaseConfigClass):
         }
 
     @property
-    def message_manager(self):
-        if self.config.getboolean('MessageManager', 'Batch', fallback=False):
-            return BatchMessageManager
-        return MessageManager
+    def message_manager_is_batch(self):
+        return self.config.getboolean('MessageManager', 'Batch', fallback=False)
 
     @property
     def message_manager_config(self):
@@ -75,7 +68,8 @@ class INIFileConfig(BaseConfigClass):
             'aliases': self.config['Aliases'],
             'actions': self.config.gettuple('Actions', 'Types'),
             'print_actions': self.config.gettuple('Print', 'Types'),
-            'generate_timestamp': self.config.getboolean('MessageManager', 'GenerateTimestamp', fallback=False)
+            'generate_timestamp': self.config.getboolean('MessageManager', 'GenerateTimestamp', fallback=False),
+            'interval': self.config.getint('MessageManager', 'Interval', fallback=5)
         }
 
     @property
