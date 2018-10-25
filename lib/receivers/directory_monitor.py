@@ -1,5 +1,4 @@
-import os
-
+import asyncio
 
 class DirectoryMonitor:
     prev_message_time = 0
@@ -40,12 +39,11 @@ class DirectoryMonitor:
 
     async def monitor(self, directories):
         for d in directories:
-            files = os.listdir(d)
-            for file in files:
+            for file in d.iterdir():
                 with open(file, 'r') as f:
                     data = f.read()
                     self.loop.create_task(self.handle_packet(os.path.split(directory)[1], data))
-                os.remove(file)
+                file.unlink()
         await asyncio.sleep(1)
         await self.monitor(directories)
 

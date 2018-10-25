@@ -2,6 +2,7 @@ from lib.protocols.base import BaseProtocol
 from lib import utils
 from lib.utils import cached_property
 
+from typing import Sequence, Mapping
 import datetime
 
 
@@ -17,20 +18,20 @@ class BasePyCrateAsnProtocol(BaseProtocol):
     def get_event_type(self):
         return ''
 
-    def decode(self):
+    def decode(self) -> dict:
         self.pycrate_asn_class.from_ber(self.encoded)
         decoded = self.pycrate_asn_class()
         return decoded
 
-    def encode(self):
+    def encode(self) -> bytes:
         return self.pycrate_asn_class.to_ber(self.decoded)
 
     @cached_property
-    def domain(self):
+    def domain(self) -> str:
         return utils.adapt_asn_domain(self.get_asn_domain())
 
-    def get_timestamp(self):
-        return ''
+    def get_timestamp(self) -> tuple:
+        return ()
 
     @cached_property
     def timestamp(self):
@@ -42,11 +43,11 @@ class BasePyCrateAsnProtocol(BaseProtocol):
         return datetime.datetime.now()
 
     @property
-    def prettified(self):
+    def prettified(self) -> Sequence[Mapping]:
         raise NotImplementedError
 
-    def summaries(self):
+    def summaries(self) -> Sequence[Sequence]:
         raise NotImplementedError
 
-    def get_asn_domain(self):
+    def get_asn_domain(self) -> tuple:
         raise NotImplementedError

@@ -1,53 +1,109 @@
 import logging
 import binascii
 import asyncio
+from pathlib import Path
+from typing import Sequence, AnyStr, Type
 from lib import utils
+from lib.protocols.base import BaseProtocol
 
-logger = logging.getLogger('messageManager')
+import definitions
+
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class BaseSender:
+    sender_type: str
+    configurable = {
+        'interval': float
+    }
 
     @classmethod
-    def from_config(cls, receiver_config, client_config, protocols, protocol_name, **kwargs):
-        msg_protocol = protocols[protocol_name]
-        return cls(msg_protocol, **kwargs)
+    def from_config(cls, msg_protocol:Type[BaseProtocol], queue=None, **kwargs):
+        config = definitions.CONFIG.section_as_dict('Sender', **cls.configurable)
+        logger.debug('Found configuration for', cls.sender_type, ':', config)
+        config.update(kwargs)
+        return cls(msg_protocol, queue=queue, **kwargs)
 
-    def __init__(self, protocol, **kwargs):
-        self.msg_protocol = protocol
+    def __init__(self, msg_protocol:Type[BaseProtocol], queue=None, interval:float=0):
+        self.msg_protocol = msg_protocol
+        self.queue = queue
+        self.interval = interval
+        if self.queue:
+            self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
+        else:
+            self.process_queue_task = None
 
     @property
     def source(self):
         raise NotImplementedError
+
+    async def process_queue_later(self):
+        if self.interval:
+            await asyncio.sleep(self.interval)
+        try:
+            await self.process_queue()
+        finally:
+            await self.process_queue_later()
+
+    async def process_queue(self):
+        msgs = []
+        try:
+            while not self.queue.empty():
+                msgs.append(self.queue.get_nowait())
+                logger.debug('Took item from queue')
+            await self.send_msgs(msgs)
+        finally:
+            for msg in msgs:
+                logger.debug("Setting task done on queue")
+                self.queue.task_done()
+
+    async def close(self):
+        if self.queue:
+            logger.debug('Closing message queue')
+            try:
+                timeout = self.interval + 1
+                logger.info('Waiting', timeout, 'seconds for queue to empty')
+                await asyncio.wait_for(self.queue.join(), timeout=timeout)
+            except asyncio.TimeoutError:
+                logger.error('Queue did not empty in time. Cancelling task with messages in queue.')
+            self.process_queue_task.cancel()
+            logger.debug('Message queue closed')
 
     @property
     def dst(self):
         raise NotImplementedError
 
     async def __aenter__(self):
-        raise NotImplementedError
+        await self.start()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+        await self.stop()
+
+    async def start(self):
+        pass
+
+    async def stop(self):
+        pass
+
+    async def send_data(self, msg_encoded:bytes):
         raise NotImplementedError
 
-    async def send_data(self, msg_encoded):
-        raise NotImplementedError
-
-    async def send_msg(self, msg_encoded):
-        logger.debug("Sending message to %s" % self.dst)
+    async def send_msg(self, msg_encoded:bytes):
+        logger.debug("Sending message to", self.dst)
         logger.debug(msg_encoded)
         await self.send_data(msg_encoded)
         logger.debug('Message sent')
 
-    async def send_hex(self, hex_msg):
+    async def send_hex(self, hex_msg:AnyStr):
         await self.send_msg(binascii.unhexlify(hex_msg))
 
-    async def send_msgs(self, msgs):
+    async def send_msgs(self, msgs:Sequence[bytes]):
         for msg in msgs:
             await self.send_msg(msg)
             await asyncio.sleep(0.001)
 
-    async def send_hex_msgs(self, hex_msgs):
+    async def send_hex_msgs(self, hex_msgs:Sequence[AnyStr]):
         await self.send_msgs([binascii.unhexlify(hex_msg) for hex_msg in hex_msgs])
 
     async def encode_and_send_msgs(self, decoded_msgs):
@@ -58,8 +114,8 @@ class BaseSender:
         msg = self.msg_protocol(self.source, decoded=msg_decoded)
         await self.send_msg(msg.encoded)
 
-    async def play_recording(self, file_path, immediate=False):
-        with open(file_path, 'rb') as f:
+    async def play_recording(self, file_path:Path, immediate:bool=False):
+        with file_path.open('rb') as f:
             content = f.read()
         packets = utils.unpack_recorded_packets(content)
         if immediate:
@@ -72,30 +128,31 @@ class BaseSender:
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"
-    peer_name = None
-    sock_name = None
-    src = None
-    transport = None
+    sock_name: str
 
-    @classmethod
-    def from_config(cls, receiver_config, client_config, protocols, protocol_name, **kwargs):
-        msg_protocol = protocols[protocol_name]
-        return cls(msg_protocol, receiver_config['host'], receiver_config['port'], receiver_config['ssl'],
-                   client_config['src_ip'], client_config['src_port'], **kwargs)
+    configurable = BaseSender.configurable.copy()
+    configurable.update({
+        'host': str,
+        'port': int,
+        'ssl': bool,
+        'src_ip': str,
+        'src_port': int
+    })
 
-    def __init__(self, protocol, host='127.0.0.1', port=4000, ssl=False, src_ip='', src_port=0, **kwargs):
-        super(BaseNetworkClient, self).__init__(protocol)
+    def __init__(self, protocol, queue=None, host:str='127.0.0.1', port:int = 4000,
+                 ssl=False, src_ip:str='', src_port:int=0, **kwargs):
+        super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
         self.localaddr = (src_ip, src_port) if src_ip else None
         self.ssl = ssl
 
     @property
-    def source(self):
+    def source(self) -> str:
         return self.sock_name[0]
 
     @property
-    def dst(self):
+    def dst(self) -> str:
         return "%s:%s" % (self.host, self.port)
 
     async def open_connection(self):
@@ -104,20 +161,13 @@ class BaseNetworkClient(BaseSender):
     async def close_connection(self):
         raise NotImplementedError
 
-    async def send_data(self, encoded_data):
+    async def send_data(self, encoded_data:bytes):
         raise NotImplementedError
 
-    async def __aenter__(self):
-        logger.info("Opening %s connection to %s:%s" % (self.sender_type, self.host, self.port))
+    async def start(self):
+        logger.info("Opening", self.sender_type, 'connection to', self.dst)
         await self.open_connection()
-        """self.peer_name = self.transport.get_extra_info('peername')
-        self.sock_name = self.transport.get_extra_info('sockname')
-        self.src = ':'.join(str(x) for x in self.sock_name)
-        logger.info('%s Connected to %s from %s ' % (self.sender_type, self.dst, self.src))"""
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        logger.info("Closing %s connection to %s:%s" % (self.sender_type, self.host, self.port))
+    async def stop(self):
+        logger.info("Closing", self.sender_type, 'connection to', self.dst)
         await self.close_connection()
-
-    async def send_data(self, msg_encoded):
-        raise NotImplementedError

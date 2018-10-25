@@ -16,11 +16,11 @@ class Action(BaseAction):
     def get_content_multi(self, msg):
         return self.get_content(msg) + '\n'
 
-    def print_msg(self, msg):
+    def print_msg(self, msg) -> str:
         return pformat(self.get_content(msg))
 
-    def get_file_extension(self, msg):
+    def get_file_extension(self, msg) -> str:
         return msg.file_extension
 
-    def get_multi_file_extension(self, msg):
+    def get_multi_file_extension(self, msg) -> str:
         return self.get_file_extension(msg)

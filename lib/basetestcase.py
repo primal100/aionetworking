@@ -1,4 +1,3 @@
-import os
 import configparser
 from unittest import TestCase
 
@@ -27,18 +26,12 @@ class BaseTestCase(TestCase):
         config.set('Print', 'Types', 'binary,decode,prettify,summarise')
         return INIFileConfig({'config': config})
 
-    def assertPathEqual(self, expected, actual):
-        self.assertEqual(os.path.normpath(expected), os.path.normpath(actual))
-
-    def assertPathExists(self, path):
-        self.assertTrue(os.path.exists(path))
 
     def assertFileContentsEqual(self, file_path, expected_contents, mode='r'):
-        self.assertPathExists(file_path)
-        with open(file_path, mode) as f:
+        self.assertTrue(file_path.exists())
+        with file_path.open() as f:
             actual_contents = f.read()
             self.assertEqual(actual_contents, expected_contents)
 
     def assertBinaryFileContentsEqual(self, file_path, expected_contents):
-        self.assertPathExists(file_path)
         self.assertFileContentsEqual(file_path, expected_contents, mode='rb')

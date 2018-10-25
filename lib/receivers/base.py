@@ -1,11 +1,15 @@
 import ssl
 import logging
 import datetime
-from lib.conf import ConfigurationException
-from lib import utils
-import os
+from pathlib import Path
+from typing import Optional
 
-logger = logging.getLogger('messageManager')
+from lib import utils
+from lib.conf import ConfigurationException
+from lib.messagemanagers.base import BaseMessageManager
+import definitions
+
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class ServerException(Exception):
@@ -13,54 +17,80 @@ class ServerException(Exception):
 
 
 class BaseReceiver:
-    receiver_type: str
+    receiver_type: str = ''
+    ssl_allowed: bool = False
 
-    def __init__(self, manager, config, status_change=None):
+    configurable = {
+        'record': bool,
+        'record_file': Path,
+        'ssl_enabled': bool,
+        'ssl_cert': Path,
+        'ssl_key': Path
+    }
+
+    @classmethod
+    def from_config(cls, manager:BaseMessageManager, status_change=None, **kwargs):
+        config = definitions.CONFIG.section_as_dict('Receiver', **cls.configurable)
+        logger.debug('Found configuration for', cls.receiver_type, ':', config)
+        config.update(kwargs)
+        return cls(manager, status_change=status_change, **kwargs)
+
+    def __init__(self, manager: BaseMessageManager, status_change=None, record: bool=False,
+                 record_file: Path=None, ssl_enabled: bool=False, ssl_cert: Optional[Path]=None,
+                 ssl_key: Optional[Path]=None):
+
         self.manager = manager
-        self.config = config.receiver_config
         self.status_change = status_change
-        self.record = self.config.get('record', False)
-        self.record_file = self.config.get('record_file', False)
-        os.makedirs(os.path.dirname(self.record_file), exist_ok=True)
-        if self.record and not self.record_file:
-            raise ConfigurationException('Please configure a record file when record is set to true')
+        if self.ssl_allowed:
+            self.ssl_context = self.manage_ssl_params(ssl_enabled, ssl_cert, ssl_key)
+        elif ssl_enabled:
+            logger.error('SSL is now supported for', self.receiver_type)
+            raise ConfigurationException('SSL is now supported for' + self.receiver_type)
+        else:
+            self.ssl_context = None
+        self.record = record
+        self.record_file = record_file
+        if self.record:
+            if self.record_file:
+                self.record_file.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                logger.error('No record file configured although record is set to true')
+                raise ConfigurationException('Please configure a record file when record is set to true')
 
         self.prev_message_time = None
 
-    def manage_ssl_params(self):
-        ssl_enabled = self.config.get('ssl', False)
-        if ssl_enabled:
-            ssl_cert = self.config.get('ssl_cert', '')
-            ssl_key = self.config.get('ssl_key', '')
-            if not ssl_cert or not ssl_key:
+    @staticmethod
+    def manage_ssl_params(enabled: bool, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
+        if enabled:
+            if not cert or not key:
                 raise ConfigurationException('SSLCert and SSLKey must be configured when SSL is enabled')
             logger.info("Setting up SSL")
-            logger.info("Using SSL Cert: " + ssl_cert)
+            logger.info("Using SSL Cert: ", cert)
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_context.load_cert_chain(ssl_cert, ssl_key)
+            ssl_context.load_cert_chain(str(cert), str(key))
             logger.info("SSL Context loaded")
             return ssl_context
         else:
             logger.info("SSL is not enabled")
             return None
 
-    def record_packet(self, msg, sender):
-        logger.debug('Recording packet from %s' % sender)
+    def record_packet(self, sender: str, msg: bytes):
+        logger.debug('Recording packet from', sender)
         if self.prev_message_time:
             message_timedelta = (datetime.datetime.now() - self.prev_message_time).seconds
         else:
             message_timedelta = 0
         self.prev_message_time = datetime.datetime.now()
         data = utils.pack_recorded_packet(message_timedelta, sender, msg)
-        with open(self.record_file, 'ab') as f:
+        with self.record_file.open('ab') as f:
             f.write(data)
 
-    async def handle_message(self, sender, data):
-        logger.debug("Received msg from " + sender)
+    async def handle_message(self, sender: str, data: bytes):
+        logger.debug("Received msg from ", sender)
         logger.debug(data)
 
         if self.record:
-            self.record_packet(data, sender)
+            self.record_packet(sender, data)
 
         await self.manager.manage_message(sender, data)
 
@@ -70,16 +100,16 @@ class BaseReceiver:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
 
-    def set_status_changed(self, change=''):
+    def set_status_changed(self, change: str=''):
         if self.status_change:
             self.status_change.set()
-        logger.debug('Status change event has been set to indicate %s receiver was %s' % (self.receiver_type, change))
+        logger.debug('Status change event has been set to indicate', self.receiver_type, 'receiver was', change)
 
     async def stop(self):
-        logger.info('Stopping %s application' % self.receiver_type)
+        logger.info('Stopping', self.receiver_type, 'application')
         await self.close()
         await self.manager.close()
-        logging.info('%s application stopped' % self.receiver_type)
+        logging.info(self.receiver_type, 'application stopped')
         self.set_status_changed('stopped')
 
     async def close(self):
@@ -90,23 +120,29 @@ class BaseReceiver:
 
 
 class BaseServer(BaseReceiver):
+    configurable = BaseReceiver.configurable.copy()
+    configurable.update({'host': str, 'port': int})
     receiver_type = 'Server'
     server = None
-    default_host = '0.0.0.0'
-    default_port = 4000
 
-    def __init__(self, manager, config, **kwargs):
-        super(BaseServer, self).__init__(manager, config, **kwargs)
-        self.host = self.config.get('host', self.default_host)
-        self.port = self.config.get('port', self.default_port)
+    def __init__(self, *args, host: str='0.0.0.0', port: int=4000, **kwargs):
+        super(BaseServer, self).__init__(*args, **kwargs)
+        self.host = host
+        self.port = port
+        self.listening_on = '%s:%s' % (self.host, self.port)
+
+    def print_listening_message(self, socket):
+        sock_name = socket.getsockname()
+        listening_on = ':'.join([str(v) for v in sock_name])
+        print('Serving', self.receiver_type, 'on', listening_on)
 
     async def close(self):
-        logger.info('Closing %s running at %s:%s' % (self.receiver_type, self.host, self.port))
+        logger.info('Closing', self.receiver_type,  'running at', self.listening_on)
         await self.stop_server()
-        logging.info('%s closed' % self.receiver_type)
+        logging.info(self.receiver_type, 'closed')
 
     async def run(self):
-        logger.info('Starting %s on %s:%s' % (self.receiver_type, self.host, self.port))
+        logger.info('Starting', self.receiver_type, 'on', self.listening_on)
         await self.start_server()
 
     async def stop_server(self):

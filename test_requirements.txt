@@ -1,1 +1,1 @@
-git+git://github.com/P1sec/pycrate
+-e git://github.com/P1sec/pycrate.git#egg=pycrate

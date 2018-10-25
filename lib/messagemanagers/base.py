@@ -1,8 +1,12 @@
 import logging
 import datetime
 import asyncio
+from typing import Sequence
 
-logger = logging.getLogger('messageManager')
+from lib.protocols.base import BaseProtocol
+import definitions
+
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class MessageFromNotAuthorizedHost(Exception):
@@ -16,20 +20,26 @@ def raise_message_from_not_authorized_host(sender, allowed_senders):
 
 
 class BaseMessageManager:
-    batch = False
+    batch: bool = False
+    name: str
+
+    configurable = {
+        'store_actions': tuple,
+        'print_actions': tuple,
+        'generate_timestamp': bool,
+        'aliases': dict,
+        'interval': float
+    }
 
     @classmethod
-    def from_config(cls, protocol):
-        import definitions
-        kwargs = definitions.CONFIG.message_manager_config
-        store_modules = [definitions.ACTIONS[a] for a in kwargs.pop['actions']]
-        print_modules = [definitions.ACTIONS[a] for a in kwargs.pop['print_actions']]
-        store_actions = [m.Action.from_config(storage=True) for m in store_modules]
-        print_actions = [m.Action.from_config(storage=False) for m in print_modules]
-        return cls(protocol, store_actions, print_actions, **kwargs)
+    def from_config(cls, protocol, queue=None, **kwargs):
+        config = definitions.CONFIG.section_as_dict('MessageManager', **cls.configurable)
+        logger.debug('Found configuration for', cls.name, ':', config)
+        config.update(kwargs)
+        return cls(protocol, queue=queue, **kwargs)
 
-    def __init__(self, protocol, store_actions, print_actions, allowed_senders=(), generate_timestamp=False,
-                 aliases=None, interval=1):
+    def __init__(self, protocol, queue=None, store_actions=(), print_actions=(), allowed_senders=(),
+                 generate_timestamp=False, aliases=None, interval=0):
         self.protocol = protocol
         self.allowed_senders = allowed_senders
         self.aliases = aliases or None
@@ -37,13 +47,13 @@ class BaseMessageManager:
         self.interval = interval
         self.store_actions = store_actions
         self.print_actions = print_actions
-        self.queue = asyncio.Queue()
+        self.queue = queue or asyncio.Queue()
         self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
 
     def get_alias(self, sender):
         alias = self.aliases.get(sender, sender)
         if alias != sender:
-            logger.debug('Alias found for %s: %s' % (sender, alias))
+            logger.debug('Alias found for', sender, ':', alias)
         return alias
 
     def check_sender(self, sender):
@@ -57,25 +67,25 @@ class BaseMessageManager:
         return self.protocol(sender, encoded, timestamp=timestamp)
 
     async def manage_message(self, sender, encoded):
-        logger.debug('Managing message from ' + sender)
+        logger.debug('Managing message from', sender)
         host = self.check_sender(sender)
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
-            logger.debug('Generated timestamp %s' % timestamp)
+            logger.debug('Generated timestamp:', timestamp)
         else:
             timestamp = None
-        logger.debug('Adding message from %s to asyncio queue' % host)
+        logger.debug('Adding message from', host, 'to asyncio queue')
         await self.queue.put((host, encoded, timestamp))
 
     async def process_queue_later(self):
-        await asyncio.sleep(self.interval)
+        if self.interval:
+            await asyncio.sleep(self.interval)
         try:
             await self.process_queue()
         finally:
             await self.process_queue_later()
 
     async def process_queue(self):
-        logger.debug('Processing asyncio queue')
         msgs = []
         try:
             while not self.queue.empty():
@@ -105,5 +115,8 @@ class BaseMessageManager:
         self.process_queue_task.cancel()
         logger.info('Batch Message Manager closed')
 
-    def do_actions(self, msg):
+    def do_actions(self, msgs: Sequence[BaseProtocol]):
         raise NotImplementedError
+
+
+

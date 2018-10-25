@@ -1,4 +1,5 @@
 import os
+from pathlib import Path, PurePath
 from lib.conf.parser import INIFileConfig
 from lib.messagemanagers.messagemanager import MessageManager
 from lib.messagemanagers.batchmessagemanager import BatchMessageManager
@@ -9,23 +10,28 @@ from lib.senders.asyncio_clients import TCPClient, UDPClient
 from lib.actions import binary, decode, prettify, summarise, text
 
 APP_NAME = 'Message Manager'
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONF_DIR = os.path.join(ROOT_DIR, 'conf')
-LOGS_DIR = os.path.join(ROOT_DIR, 'logs')
-DATA_DIR = os.path.join(ROOT_DIR, 'data')
-TESTS_DIR = os.path.join(ROOT_DIR, 'tests')
-TEST_CONF_DIR = os.path.join(TESTS_DIR, 'conf')
-TEST_LOGS_DIR = os.path.join(TESTS_DIR, 'logs')
-TEST_DATA_DIR = os.path.join(TESTS_DIR, 'data')
-USER_HOME = os.path.expanduser("~")
-OSDATA_DIR = os.environ.get('appdata', USER_HOME)
-OSDATA_CONF_DIR = os.path.join(OSDATA_DIR, 'conf')
-OSDATA_DATA_DIR = os.path.join(OSDATA_DIR, 'data')
-OSDATA_LOGS_DIR = os.path.join(OSDATA_DIR, 'logs')
+ROOT_DIR = Path.resolve(__file__).parent
+CONF_DIR = ROOT_DIR.joinpath('conf')
+LOGS_DIR = ROOT_DIR.joinpath('logs')
+DATA_DIR = ROOT_DIR.joinpath('data')
+RECORDINGS_DIR = ROOT_DIR.joinpath('recordings')
+TESTS_DIR = ROOT_DIR.joinpath('tests')
+TEST_CONF_DIR = TESTS_DIR.joinpath('conf')
+TEST_LOGS_DIR = TESTS_DIR.joinpath('logs')
+TEST_DATA_DIR = TESTS_DIR.joinpath('data')
+TEST_RECORDINGS_DIR = TEST_DATA_DIR.joinpath('recordings')
+USER_HOME = Path.home()
+OSDATA_DIR = PurePath(os.environ.get('appdata', USER_HOME), APP_NAME)
+OSDATA_CONF_DIR = OSDATA_DIR.joinpath('conf')
+OSDATA_DATA_DIR = OSDATA_DIR.joinpath('data')
+OSDATA_LOGS_DIR = OSDATA_DIR.joinpath('logs')
+OSDATA_RECORDINGS_DIR = OSDATA_DIR.joinpath('recordings')
+HOME = OSDATA_DIR
+LOGGER_NAME = 'receiver'
 POSTFIX = 'receiver'
 CONFIG = None
 CONFIG_CLS = INIFileConfig
-CONFIG_ARGS = os.path.join(CONF_DIR, "setup.ini"),
+CONFIG_ARGS = CONF_DIR.joinpath("setup.ini"),
 RECEIVERS = {
     'TCPServer': {'receiver': TCPServerReceiver, 'sender': TCPClient},
     'UDPServer': {'receiver': UDPServerReceiver, 'sender': UDPClient},

@@ -18,5 +18,5 @@ class Action(BaseStoreAction):
     def get_content_multi(self, msg):
         return self.get_content(msg)
 
-    def print_msg(self, msg):
+    def print_msg(self, msg) -> str:
         return print_dicts(msg.prettified)

@@ -1,4 +1,6 @@
 from lib.conf.parser import INIFileConfig
+import definitions
+
 import logging
 
 
@@ -6,7 +8,7 @@ def get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileC
 
     config = config_cls(app_name, *config_args, postfix='sender')
     config.configure_logging()
-    logger = logging.getLogger('messageManager')
+    logger = logging.getLogger(definitions.LOGGER_NAME)
 
     sender_cls = receivers[config.receiver]['sender']
 

@@ -1,3 +1,4 @@
 asyncssh
 paramiko
 passlib
+-e git://github.com/P1sec/pycrate.git#egg=pycrate

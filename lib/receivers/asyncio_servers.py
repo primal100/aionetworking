@@ -1,68 +1,19 @@
 import asyncio
-import logging
+
 from .base import BaseServer
-
-logger = logging.getLogger('messageManager')
-
-
-class ServerException(Exception):
-    pass
-
-
-class ServerProtocolMixin:
-    transport = None
-    peer_name = None
-    src = None
-    sender = None
-
-    def __init__(self, receiver):
-        self.receiver = receiver
-
-    def connection_made(self, transport):
-        self.transport = transport
-        self.peer_name = self.transport.get_extra_info('peername')
-        self.src = ':'.join(str(prop) for prop in self.peer_name)
-        self.sender = self.peer_name[0]
-        logger.info('New client connection from %s' % self.src)
-
-    def connection_lost(self, exc):
-        if exc:
-            error = '{} {}'.format(exc, self.src)
-            print(error)
-            logger.error(error)
-        else:
-            logger.info('Client connection from %s has been closed' % self.src)
-
-    def on_data_received(self, sender, data):
-        asyncio.create_task(self.receiver.handle_message(sender, data))
-
-
-class TCPServerProtocol(ServerProtocolMixin, asyncio.Protocol):
-
-    def data_received(self, data):
-        self.on_data_received(self.sender, data)
-
-
-class UDPServerProtocol(ServerProtocolMixin, asyncio.DatagramProtocol):
-
-    def datagram_received(self, data, sender):
-        self.on_data_received(sender, data)
+from lib.connection_protocols.asyncio_protocols import TCPServerProtocol, UDPServerProtocol
 
 
 class TCPServerReceiver(BaseServer):
     receiver_type = "TCP Server"
-
-    def __init__(self, *args, **kwargs):
-        super(TCPServerReceiver, self).__init__(*args, **kwargs)
-        self.ssl_context = self.manage_ssl_params()
+    ssl_allowed = True
 
     async def start_server(self):
         self.server = await asyncio.get_event_loop().create_server(lambda: TCPServerProtocol(self), self.host,
                                                                    self.port,
                                                                    ssl=self.ssl_context)
-        sock_name = self.server.sockets[0].getsockname()
-        listening_on = ':'.join([str(v) for v in sock_name])
-        print('Serving %s on %s' % (self.receiver_type, listening_on))
+        socket = self.server.sockets[0]
+        self.print_listening_message(socket)
         async with self.server:
             self.set_status_changed('started')
             await self.server.serve_forever()
@@ -81,7 +32,8 @@ class UDPServerReceiver(BaseServer):
     async def start_server(self):
         self.transport, self.protocol = await asyncio.get_event_loop().create_datagram_endpoint(
             lambda: UDPServerProtocol(self), local_addr=(self.host, self.port))
-        print('Serving %s on %s' % (self.receiver_type, self.transport.sockets[0].getsockname()))
+        socket = self.transport.sockets[0]
+        self.print_listening_message(socket)
         self.set_status_changed('started')
 
     async def stop_server(self):

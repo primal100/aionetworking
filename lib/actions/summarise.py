@@ -1,9 +1,12 @@
 from .decode import Action as BaseStoreAction
-import os
+import definitions
+
 from lib import utils
+from pathlib import Path
 import logging
 
-logger = logging.getLogger('messageManager')
+
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class Action(BaseStoreAction):
@@ -33,8 +36,8 @@ class Action(BaseStoreAction):
         return '\n'.join(['\t'.join([str(cell) for cell in row]) for row in content])
 
     @property
-    def path(self):
-        path = os.path.join(self.base_path, "Summary_%s.%s" % (utils.current_date(), self.single_extension))
+    def path(self) -> Path:
+        path = self.base_path.joinpath("Summary_%s.%s" % (utils.current_date(), self.single_extension))
         logger.debug('Using path %s' % path)
         return path
 
@@ -44,7 +47,7 @@ class Action(BaseStoreAction):
         else:
             logger.debug("Message filtered for action %s" % self.action_name)
 
-    def store_many(self, msgs):
-        logger.debug('Storing %s messages for action %s' % (len(msgs), self.action_name))
+    def store_many(self, msgs:list):
+        logger.debug('Storing', len(msgs), 'messages for action', self.action_name)
         lines = sum([self.get_content(msg) for msg in msgs], [])
         utils.append_to_csv(self.path, lines)

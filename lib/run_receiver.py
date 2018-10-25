@@ -8,9 +8,12 @@ async def main(status_change=None, stop_ordered=None):
 
     definitions.CONFIG = definitions.CONFIG_CLS(definitions.APP_NAME, *definitions.CONFIG_ARGS, postfix='receiver')
     definitions.CONFIG.configure_logging()
+    definitions.LOGGER_NAME = 'receiver'
+    definitions.HOME = definitions.CONFIG.home
+    definitions.DATA_DIR = definitions.CONFIG.data_home
 
     definitions.postfix = 'RECEIVER'
-    logger = logging.getLogger('messageManager')
+    logger = logging.getLogger(definitions.LOGGER_NAME)
 
     logger.info('Starting %s' % definitions.APP_NAME)
 

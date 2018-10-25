@@ -1,13 +1,17 @@
 from .base import BaseMessageManager
+from lib.protocols.base import BaseProtocol
+import definitions
+
+from typing import Sequence
 import logging
 
-logger = logging.getLogger('messageManager')
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class MessageManager(BaseMessageManager):
 
-    def do_actions(self, msgs):
-        logger.debug('Handling msg actions for %s messages without batch' % len(msgs))
+    def do_actions(self, msgs: Sequence[BaseProtocol]):
+        logger.debug('Handling msg actions for', len(msgs), 'messages without batch')
         for msg in msgs:
             for action in self.store_actions:
                 action.do(msg)

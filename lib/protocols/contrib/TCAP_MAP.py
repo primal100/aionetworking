@@ -1,8 +1,9 @@
-from pycrate_asn1dir import TCAP_MAP
+from src.pycrate.pycrate_asn1dir import TCAP_MAP
 from lib.protocols.contrib.asn1 import BasePyCrateAsnProtocol
 from lib.utils import cached_property
 
 import binascii
+from typing import Sequence, Mapping
 
 
 class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
@@ -14,7 +15,7 @@ class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
     Sample implementation of interface for ASN.1 messages via pycrate library
     """
 
-    def get_event_type(self):
+    def get_event_type(self) -> str:
         return self.decoded[0]
 
     def get_asn_domain(self):
@@ -24,7 +25,7 @@ class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
             return ''
 
     @cached_property
-    def otid(self):
+    def otid(self) -> bytes:
         if 'otid' in self.decoded[1]:
             return binascii.hexlify(self.decoded[1]['otid'])
         return binascii.hexlify(b'\x00\x00\x00\x00')
@@ -34,7 +35,7 @@ class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
         return self.otid.decode()
 
     @cached_property
-    def prettified(self):
+    def prettified(self) -> Sequence[Mapping]:
         return [{
             'event_type': self.get_event_type(),
             'otid': self.uid,
@@ -42,7 +43,7 @@ class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
         }]
 
     @cached_property
-    def summaries(self):
+    def summaries(self) -> Sequence[Sequence]:
         return [
             (self.get_event_type(), self.uid, self.timestamp)
         ]

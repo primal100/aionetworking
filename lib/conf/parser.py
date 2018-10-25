@@ -1,41 +1,25 @@
 from .base import BaseConfigClass
-from lib.messagemanagers import MessageManager, BatchMessageManager
-
 from configparser import ConfigParser, ExtendedInterpolation
-import os
-import pathlib
+from pathlib import Path
 from logging.config import fileConfig
 
-
-def get_tuple(v):
-    return tuple(v.replace(', ', ',').split(','))
-
-
-def get_path(v):
-    return pathlib.PurePath(v)
-
-
-converters = {
-    'tuple': get_tuple,
-    'path': get_path
-}
+from typing import Mapping
 
 
 class INIFileConfig(BaseConfigClass):
 
-    def __init__(self, app_name, filename, postfix='receiver'):
+    def __init__(self, app_name: str, filename: Path, postfix: str='receiver'):
         super(INIFileConfig, self).__init__(app_name, postfix=postfix)
-        self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation(),
-                                   converters=converters)
-        self.config.optionxform = str
+        self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
+        #self.config.optionxform = str
         self.config.read(filename)
 
     @property
-    def receiver(self):
+    def receiver(self) -> str:
         return self.config.get('Receiver', 'Type')
 
     @property
-    def receiver_config(self):
+    def receiver_config(self) -> Mapping:
         return {
             'host': self.config.get('Receiver', 'Host', fallback='127.0.0.1'),
             'port': self.config.getint('Receiver', 'Port', fallback=4000),
@@ -46,23 +30,44 @@ class INIFileConfig(BaseConfigClass):
             'record_file': self.config.getpath('Receiver', 'RecordFile', fallback=''),
             'allow_scp': self.config.getboolean('Receiver', 'AllowSCP', fallback=False),
             'base_upload_dir': self.config.getpath('Receiver', 'BaseSFTPDIR',
-                                                   fallback=os.path.join(self.data_home, "Uploads")),
+                                                   fallback=self.data_home.joinpath("Uploads")),
             'logins': dict(self.config.items('Logins', raw=True))
         }
 
     @property
-    def client_config(self):
+    def client_config(self) -> Mapping:
         return {
             'src_ip': self.config.get('Sender', 'SrcIP', fallback=''),
             'src_port': self.config.getint('Sender', 'SrcPort', fallback=0),
         }
 
     @property
-    def message_manager_is_batch(self):
+    def message_manager_is_batch(self) -> bool:
         return self.config.getboolean('MessageManager', 'Batch', fallback=False)
 
+    def get(self, section:str, option:str, data_type: type):
+        if data_type == dict:
+            return self.config[option].items()
+        elif data_type == bool:
+            return self.config[section].getboolean(option, None)
+        else:
+            value = self.config[section].get(option, None)
+            if data_type == tuple or data_type == list:
+                value = value.replace(', ', ',').split(',')
+        if value is None:
+            return value
+        return data_type(value)
+
+    def section_as_dict(self, section, **options) -> Mapping:
+        d = {}
+        for option, data_type in options.items():
+            value = self.get(section, option, data_type)
+            if value is not None:
+                d[option] = value
+        return d
+
     @property
-    def message_manager_config(self):
+    def message_manager_config(self) -> Mapping:
         return {
             'allowed_senders': self.config.gettuple('MessageManager', 'AllowedSenders'),
             'aliases': self.config['Aliases'],
@@ -73,22 +78,21 @@ class INIFileConfig(BaseConfigClass):
         }
 
     @property
-    def protocol(self):
+    def protocol(self) -> str:
         return self.config.get('Protocol', 'Name')
 
     @property
-    def protocol_config(self):
-        return self.config['Protocol']
+    def protocol_config(self) -> Mapping:
+        return self.config['Protocol'].items()
 
-    def get_home(self):
-        return self.config.getpath('Dirs', 'Home')
+    def get_home(self) -> Path:
+        return Path(self.config.get('Dirs', 'Home'))
 
-    def get_data_home(self):
-        return self.config.getpath('Dirs', 'Data')
+    def get_data_home(self) -> Path:
+        return Path(self.config.get('Dirs', 'Home'))
 
-    def get_action_home(self, action_name):
-        return self.config.getpath('Actions', '%sHome' % action_name,
-                                   fallback=os.path.join(self.data_home, action_name))
+    def get_action_home(self, action_name:str) -> Path:
+        return Path(self.config.get('Actions', '%sHome' % action_name))
 
     def configure_logging(self):
         configured = False
@@ -97,4 +101,4 @@ class INIFileConfig(BaseConfigClass):
                 fileConfig(self.config)
                 configured = True
             except FileNotFoundError as e:
-                os.makedirs(os.path.dirname(e.filename), exist_ok=True)
+                Path(e.filename).parent.mkdir(parents=True, exist_ok=True)

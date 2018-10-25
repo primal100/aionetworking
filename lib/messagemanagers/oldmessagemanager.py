@@ -1,7 +1,9 @@
 from .base import BaseMessageManager
+
+import definitions
 import logging
 
-logger = logging.getLogger('messageManager')
+logger = logging.getLogger(definitions.LOGGER_NAME)
 
 
 class MessageManager(BaseMessageManager):

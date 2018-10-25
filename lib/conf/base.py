@@ -1,21 +1,24 @@
 from lib.utils import cached_property, now_to_utc_string
-import os
+from pathlib import Path
 import definitions
 
 
 class ConfigurationException(Exception):
     pass
 
-defaults = {
-    'Testdir': definitions.TESTS_DIR,
-    'Develdir': definitions.ROOT_DIR,
-    'Userhome': definitions.USER_HOME,
-    "~": definitions.USER_HOME,
-    'Osdatadir': definitions.OSDATA_DIR,
-    'timestamp': now_to_utc_string()
-}
 
-    def __init__(self, app_name, postfix='receiver'):
+class BaseConfigClass:
+
+    defaults = {
+        'Testdir': definitions.TESTS_DIR,
+        'Develdir': definitions.ROOT_DIR,
+        'Userhome': definitions.USER_HOME,
+        "~": definitions.USER_HOME,
+        'Osdatadir': definitions.OSDATA_DIR,
+        'timestamp': now_to_utc_string()
+    }
+
+    def __init__(self, app_name: str, postfix: str='receiver'):
         self.defaults.update({
             'appname': app_name.replace(' ', '').lower(),
             'postfix': postfix.replace(' ', '').lower()
@@ -49,10 +52,14 @@ defaults = {
     def protocol_config(self):
         raise NotImplementedError
 
-    def action_config(self, action_name, storage=True):
+    def action_config(self, action_name: str, storage: bool=True):
         return {
             'home': self.path_for_action(action_name),
         }
+
+    @cached_property
+    def home(self):
+        raise NotImplementedError
 
     def get_home(self):
         raise NotImplementedError
@@ -60,19 +67,19 @@ defaults = {
     def get_data_home(self):
         raise NotImplementedError
 
-    def get_action_home(self, action_name):
+    def get_action_home(self, action_name: str) -> Path:
         raise NotImplementedError
 
     def configure_logging(self):
         raise NotImplementedError
 
     @cached_property
-    def data_home(self):
+    def data_home(self) -> Path:
         path = self.get_data_home()
-        os.makedirs(str(path), exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def path_for_action(self, action_name):
+    def path_for_action(self, action_name: str) -> Path:
         path = self.get_action_home(action_name)
-        os.makedirs(str(path), exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
         return path

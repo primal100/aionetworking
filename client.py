@@ -1,4 +1,4 @@
-from app import app_name, receivers, protocols, set_loop
+from lib.utils import set_loop
 from lib.conf.parser import INIFileConfig
 from lib.run_sender import get_sender
 from lib.senders.tasks import send_hex, encode_send_msg, play_recording
@@ -6,12 +6,13 @@ import definitions
 
 import argparse
 import asyncio
+from pathlib import PurePath
 import os
 
 set_loop()
 
 
-def process_args():
+def process_args(devel=False):
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--conffile', help='Path to config ini file')
     parser.add_argument('-s', '--sendhex', help='Send hex data')
@@ -20,8 +21,15 @@ def process_args():
 
     args = parser.parse_args()
 
-    conf_file = args.conffile or os.environ['MESSAGE_MANAGER_CONF_FILE'] or os.path.join(definitions.CONF_DIR,
-                                                                                         'setup_devel.ini')
+    conffile = args.conffile or os.environ.get('MESSAGE_MANAGER_CONF_FILE', '')
+
+    if conffile:
+        conf_file = PurePath(args.conffile)
+    elif devel:
+        conf_file = definitions.CONF_DIR.joinpath('setup_devel.ini')
+    else:
+        conf_file = definitions.CONF_DIR.joinpath('setup.ini')
+
     if args.sendencoded:
         task = encode_send_msg
         data = args.sendencoded

@@ -13,5 +13,5 @@ class BaseJSONProtocol(BaseProtocol):
 
     supported_actions = ("text", "decode", "prettify", "summaries")
 
-    def decode(self):
+    def decode(self) -> bytes:
         return json.loads(self.encoded)
