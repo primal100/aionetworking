@@ -1,12 +1,13 @@
-from .decode import Action as BaseStoreAction
-import definitions
-
 from lib import utils
-from pathlib import Path
 import logging
 
+import settings
+from .decode import Action as BaseStoreAction
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+from pathlib import Path
+from typing import Sequence
+
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class Action(BaseStoreAction):
@@ -19,7 +20,7 @@ class Action(BaseStoreAction):
     multi_extension = "csv"
     store_write_mode = 'a+'
 
-    def get_content(self, msg):
+    def get_content(self, msg) -> Sequence[Sequence]:
         return msg.summaries
 
     def get_content_multi(self, msg):
@@ -29,7 +30,7 @@ class Action(BaseStoreAction):
         if not msg.filter_by_action(self, True):
             print(self.print_msg(msg))
         else:
-            logger.debug("Message filtered for action %s" % self.action_name)
+            logger.debug("Message filtered for action %s", self.action_name)
 
     def print_msg(self, msg):
         content = self.get_content(msg)
@@ -38,16 +39,16 @@ class Action(BaseStoreAction):
     @property
     def path(self) -> Path:
         path = self.base_path.joinpath("Summary_%s.%s" % (utils.current_date(), self.single_extension))
-        logger.debug('Using path %s' % path)
+        logger.debug('Using path %s', path)
         return path
 
     def do(self, msg):
         if not msg.filter_by_action(self, False):
             utils.append_to_csv(self.path, self.get_content(msg))
         else:
-            logger.debug("Message filtered for action %s" % self.action_name)
+            logger.debug("Message filtered for action %s", self.action_name)
 
-    def store_many(self, msgs:list):
-        logger.debug('Storing', len(msgs), 'messages for action', self.action_name)
+    def store_many(self, msgs):
+        logger.debug('Storing %s messages for action', len(msgs), self.action_name)
         lines = sum([self.get_content(msg) for msg in msgs], [])
         utils.append_to_csv(self.path, lines)

@@ -1,10 +1,12 @@
 import asyncssh
 import logging
 
-import definitions
+import settings
 from .base import BaseNetworkClient
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+from typing import AnyStr
+
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class SFTPClient(BaseNetworkClient):
@@ -24,7 +26,7 @@ class SFTPClient(BaseNetworkClient):
     async def close_connection(self):
         self.transport.close()
 
-    async def send_data(self, encoded_data):
+    async def send_data(self, encoded_data: AnyStr):
         filename = 'test'
         with open(filename, 'w') as f:
             f.write(encoded_data)

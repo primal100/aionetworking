@@ -1,7 +1,6 @@
 from lib.basetestcase import BaseTestCase
-import os
+from pathlib import Path
 import shutil
-import binascii
 
 from lib.actions import text
 from lib.protocols.contrib.json_sample import JsonSampleProtocol
@@ -14,17 +13,16 @@ class TestTextActionJSON(BaseTestCase):
         '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}',
         '{"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}'
     ]
-    action_module = text
     sender = '10.10.10.10'
     maxDiff = None
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_data_dir, 'Encoded'))
+            shutil.rmtree(Path(self.base_data_dir, 'Encoded'))
         except OSError:
             pass
-        config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.action = text.Action(self.base_data_dir.joinpath(text.Action.default_data_dir))
+        self.print_action = text.Action(storage=False)
         self.msg = self.protocol(self.sender, self.encoded_json)
         self.msgs = [self.protocol(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 
@@ -35,7 +33,7 @@ class TestTextActionJSON(BaseTestCase):
                          )
 
     def test_01_print_msg(self):
-        result = self.action.print_msg(self.msg)
+        result = self.print_action.print_msg(self.msg)
         self.assertEqual(result,
                          """('{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": '
  '"modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": '
@@ -43,7 +41,7 @@ class TestTextActionJSON(BaseTestCase):
  '"delete", "object_id": 173}]}')""")
 
     def test_02_print(self):
-        self.action.print(self.msg)
+        self.print_action.print(self.msg)
 
     def test_03_get_extension(self):
         result = self.action.get_file_extension(self.msg)
@@ -57,12 +55,12 @@ class TestTextActionJSON(BaseTestCase):
         result = self.action.writes_for_store_many(self.msgs)
         self.assertDictEqual(result,
                              {
-                                 '10.10.10.10_JsonLogHandler.json': '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}\n{"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}\n'}
+                                 Path('10.10.10.10_JsonLogHandler.json'): '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}\n{"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}\n'}
                                       )
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_data_dir, 'Encoded', 'JsonLogHandler', '10.10.10.10_0.json')
+        expected_file = Path(self.base_data_dir, 'Encoded', 'JsonLogHandler', '10.10.10.10_0.json')
         self.assertFileContentsEqual(expected_file,
                                      '{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}'
                                      )
@@ -76,7 +74,7 @@ class TestTextActionJSON(BaseTestCase):
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_data_dir, 'Encoded', '10.10.10.10_JsonLogHandler.json')
+        expected_file = Path(self.base_data_dir, 'Encoded', '10.10.10.10_JsonLogHandler.json')
         self.assertFileContentsEqual(expected_file,
 """{"id": 0, "actions": [{"timestamp": 1537006771.033925, "operation": "modify", "object_id": 1234}, {"timestamp": 1537006782.641033, "operation": "add", "object_id": 2222}, {"timestamp": 1537006798.78229, "operation": "delete", "object_id": 173}]}
 {"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}

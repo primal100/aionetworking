@@ -1,8 +1,8 @@
-from lib.basetestcase import BaseTestCase
-import os
+from pathlib import Path
 import shutil
 
 from lib.actions import summarise
+from lib.basetestcase import BaseTestCase
 from lib import utils
 from lib.protocols.contrib.json_sample import JsonSampleProtocol
 
@@ -14,17 +14,16 @@ class TestSummariseActionJSON(BaseTestCase):
         '{"id": 1, "actions": [{"timestamp": 1537006775.033925, "operation": "modify", "object_id": 7777}, {"timestamp": 1537006792.641033, "operation": "add", "object_id": 7778}, {"timestamp": 1537006799.78229, "operation": "delete", "object_id": 7779}]}'
     ]
 
-    action_module = summarise
     protocol = JsonSampleProtocol
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_data_dir, 'Summaries'))
+            shutil.rmtree(Path(self.base_data_dir, 'Summaries'))
         except OSError:
             pass
-        config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.action = summarise.Action(self.base_data_dir.joinpath(summarise.Action.default_data_dir))
+        self.print_action = summarise.Action(storage=False)
         self.msg = self.protocol(self.sender, self.encoded_json)
         self.msgs = [self.protocol(self.sender, encoded_json) for encoded_json in self.encoded_jsons]
 
@@ -59,14 +58,14 @@ class TestSummariseActionJSON(BaseTestCase):
     def test_05_writes_for_store_many(self):
         content = self.action.writes_for_store_many(self.msgs)
         self.assertDictEqual(content,
-                             {'10.10.10.10_JsonLogHandler.csv':
+                             {Path('10.10.10.10_JsonLogHandler.csv'):
                                      [('2018-09-15 11:09:31.033925', 1234, 'Modify'), ('2018-09-15 11:09:42.641033', 2222, 'Add'), ('2018-09-15 11:09:58.782290', 173, 'Delete'), ('2018-09-15 11:09:35.033925', 7777, 'Modify'), ('2018-09-15 11:09:52.641033', 7778, 'Add'), ('2018-09-15 11:09:59.782290', 7779, 'Delete')]
                               }
                          )
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
 """2018-09-15 11:09:31.033925	1234	Modify
 2018-09-15 11:09:42.641033	2222	Add
@@ -76,7 +75,7 @@ class TestSummariseActionJSON(BaseTestCase):
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      """2018-09-15 11:09:31.033925	1234	Modify
 2018-09-15 11:09:42.641033	2222	Add

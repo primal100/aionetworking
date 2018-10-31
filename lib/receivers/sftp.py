@@ -1,15 +1,16 @@
 import asyncssh
 import logging
-from pathlib import Path
 from passlib.hash import pbkdf2_sha256
-from lib.connection_protocols.asyncio_protocols import ServerProtocolMixin
-import definitions
 
-from typing import Mapping
+import settings
+from lib.connection_protocols.asyncio_protocols import ServerProtocolMixin
 from .base import BaseServer
 
+from typing import Mapping
+from pathlib import Path
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class SFTPFactory(ServerProtocolMixin, asyncssh.SFTPServer):
@@ -56,7 +57,7 @@ class SFTPServer(BaseServer):
     configurable.update({'allow_scp': bool, 'base_upload_dir': Path})
 
     def __init__(self, manager, *args, allow_scp: bool=False,
-                 base_upload_dir: Path=definitions.HOME.join('sftp'), **kwargs):
+                 base_upload_dir: Path=settings.HOME.joinpath('sftp'), **kwargs):
         super(BaseServer, self).__init__(manager, *args, **kwargs)
         self.allow_scp = allow_scp
         self.base_upload_dir = base_upload_dir

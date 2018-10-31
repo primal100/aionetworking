@@ -1,13 +1,28 @@
 import configparser
+import logging
 from unittest import TestCase
 
 from lib.conf.parser import INIFileConfig
-import definitions
+import settings
+
+from pathlib import Path
+from typing import AnyStr
+
+settings.LOGGER_NAME = 'root'
+logger = logging.getLogger(settings.LOGGER_NAME)
+logger.setLevel(logging.CRITICAL)
 
 
 class BaseTestCase(TestCase):
     maxDiff = None
-    base_data_dir = definitions.TEST_DATA_DIR
+    log_level = logging.CRITICAL
+    base_data_dir = settings.TEST_DATA_DIR
+
+    def enable_logging(self):
+        logger.setLevel(self.log_level)
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
 
     def prepare_config(self):
         config = configparser.ConfigParser()
@@ -24,14 +39,24 @@ class BaseTestCase(TestCase):
         config.set('Actions', 'Home', self.base_data_dir)
         config.set('Actions', 'Types', 'binary,decode,prettify,summarise')
         config.set('Print', 'Types', 'binary,decode,prettify,summarise')
-        return INIFileConfig({'config': config})
+        return INIFileConfig()
 
-
-    def assertFileContentsEqual(self, file_path, expected_contents, mode='r'):
+    def assertFileContentsEqual(self, file_path: Path, expected_contents: AnyStr, mode: str='r'):
         self.assertTrue(file_path.exists())
-        with file_path.open() as f:
+        with file_path.open(mode=mode) as f:
             actual_contents = f.read()
             self.assertEqual(actual_contents, expected_contents)
 
-    def assertBinaryFileContentsEqual(self, file_path, expected_contents):
+    def assertBinaryFileContentsEqual(self, file_path: Path, expected_contents: bytes):
         self.assertFileContentsEqual(file_path, expected_contents, mode='rb')
+
+    def assertNumberOfFilesInDirectory(self, dir: Path, expected: int):
+        num_files = len(list(dir.iterdir()))
+        self.assertEqual(num_files, expected)
+
+    def assertNumLinesInFile(self, path: Path, expected: int):
+        i = 0
+        with path.open('r') as f:
+            for i, l in enumerate(f.readlines()):
+                pass
+        self.assertEqual(i + 1, expected)

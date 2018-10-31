@@ -1,11 +1,11 @@
 import argparse
 import os
-
-import definitions
 from pathlib import Path
 
+import settings
 
-def process_args(devel:bool=False) -> Path:
+
+def process_args(devel: bool=False) -> Path:
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--conffile', help='Path to config ini file')
 
@@ -16,14 +16,14 @@ def process_args(devel:bool=False) -> Path:
     if conffile:
         conf_file = Path(args.conffile)
     elif devel:
-        conf_file = definitions.CONF_DIR.joinpath('setup_devel.ini')
+        conf_file = settings.CONF_DIR.joinpath('setup_devel.ini')
     else:
-        conf_file = definitions.CONF_DIR.joinpath('setup.ini')
+        conf_file = settings.CONF_DIR.joinpath('setup.ini')
 
     return conf_file
 
 
-def get_configuration_args(config_file:Path=None) -> tuple:
+def get_configuration_args(config_file: Path=None) -> tuple:
     if not config_file:
         config_file = process_args()
     return config_file,

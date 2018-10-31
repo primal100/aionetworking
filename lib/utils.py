@@ -6,7 +6,8 @@ import re
 import asyncio
 
 from pathlib import Path
-from typing import Sequence, Mapping, AnyStr, Coroutine
+
+from typing import Sequence, Mapping, AnyStr, Tuple
 
 
 def set_loop():
@@ -101,7 +102,7 @@ def pack_recorded_packet(seconds: int, sender: AnyStr, msg: bytes) -> bytes:
             sender.encode()) + pack_variable_len_string(msg)
 
 
-def unpack_recorded_packets(content: bytes) -> Sequence[Sequence[int, AnyStr, bytes]]:
+def unpack_recorded_packets(content: bytes) -> Sequence[Tuple[int, AnyStr, bytes]]:
     int_size = struct.calcsize("I")
     pos = 0
     packets = []
@@ -172,7 +173,7 @@ def underline(text: str) -> str:
     return Color.UNDERLINE + text + Color.END
 
 
-def store_dicts(dicts: Mapping) -> str:
+def store_dicts(dicts: Sequence[Mapping]) -> str:
     text = ""
     for d in dicts:
         for k, v in d.items():
@@ -181,7 +182,7 @@ def store_dicts(dicts: Mapping) -> str:
     return text
 
 
-def print_dicts(dicts: Mapping) -> str:
+def print_dicts(dicts: Sequence[Mapping]) -> str:
     text = ""
     for d in dicts:
         for k, v in d.items():
@@ -195,13 +196,13 @@ async def run_and_wait(method, *args, interval: int=7, **kwargs):
     await asyncio.sleep(interval)
 
 
-async def run_wait_close(method, message_manager, *args, interval:int =12, **kwargs):
+async def run_wait_close(method, message_manager, *args, interval: int=1, **kwargs):
     await run_and_wait(method, *args, interval=interval, **kwargs)
     await message_manager.close()
 
 
 async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequence],
-                                  interval: int=2, final_interval: int=5, **kwargs):
+                                  interval: int=1, final_interval: int=5, **kwargs):
     for message in msgs:
         await run_and_wait(method, sender, message, interval=interval, **kwargs)
     await asyncio.sleep(final_interval)

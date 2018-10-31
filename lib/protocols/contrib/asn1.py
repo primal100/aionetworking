@@ -1,9 +1,10 @@
+import datetime
+
 from lib.protocols.base import BaseProtocol
 from lib import utils
 from lib.utils import cached_property
 
 from typing import Sequence, Mapping
-import datetime
 
 
 class BasePyCrateAsnProtocol(BaseProtocol):
@@ -46,6 +47,7 @@ class BasePyCrateAsnProtocol(BaseProtocol):
     def prettified(self) -> Sequence[Mapping]:
         raise NotImplementedError
 
+    @property
     def summaries(self) -> Sequence[Sequence]:
         raise NotImplementedError
 

@@ -1,14 +1,18 @@
-import logging
-import binascii
 import asyncio
-from pathlib import Path
-from typing import Sequence, AnyStr, Type
+import binascii
+import logging
+
+import settings
 from lib import utils
-from lib.protocols.base import BaseProtocol
 
-import definitions
+from typing import TYPE_CHECKING, Sequence, AnyStr, Type
+from pathlib import Path
+if TYPE_CHECKING:
+    from lib.protocols.base import BaseProtocol
+else:
+    BaseProtocol = None
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BaseSender:
@@ -18,13 +22,13 @@ class BaseSender:
     }
 
     @classmethod
-    def from_config(cls, msg_protocol:Type[BaseProtocol], queue=None, **kwargs):
-        config = definitions.CONFIG.section_as_dict('Sender', **cls.configurable)
-        logger.debug('Found configuration for', cls.sender_type, ':', config)
+    def from_config(cls, msg_protocol: Type[BaseProtocol], queue=None, **kwargs):
+        config = settings.CONFIG.section_as_dict('Sender', **cls.configurable)
+        logger.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
         return cls(msg_protocol, queue=queue, **kwargs)
 
-    def __init__(self, msg_protocol:Type[BaseProtocol], queue=None, interval:float=0):
+    def __init__(self, msg_protocol: Type[BaseProtocol], queue=None, interval: float=0):
         self.msg_protocol = msg_protocol
         self.queue = queue
         self.interval = interval
@@ -57,7 +61,7 @@ class BaseSender:
                 logger.debug("Setting task done on queue")
                 self.queue.task_done()
 
-    async def close(self):
+    async def close_queue(self):
         if self.queue:
             logger.debug('Closing message queue')
             try:
@@ -77,7 +81,7 @@ class BaseSender:
         await self.start()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
+        await self.close_queue()
         await self.stop()
 
     async def start(self):
@@ -86,11 +90,11 @@ class BaseSender:
     async def stop(self):
         pass
 
-    async def send_data(self, msg_encoded:bytes):
+    async def send_data(self, msg_encoded: bytes):
         raise NotImplementedError
 
-    async def send_msg(self, msg_encoded:bytes):
-        logger.debug("Sending message to", self.dst)
+    async def send_msg(self, msg_encoded: bytes):
+        logger.debug("Sending message to %s", self.dst)
         logger.debug(msg_encoded)
         await self.send_data(msg_encoded)
         logger.debug('Message sent')
@@ -128,7 +132,6 @@ class BaseSender:
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"
-    sock_name: str
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
@@ -139,8 +142,8 @@ class BaseNetworkClient(BaseSender):
         'src_port': int
     })
 
-    def __init__(self, protocol, queue=None, host:str='127.0.0.1', port:int = 4000,
-                 ssl=False, src_ip:str='', src_port:int=0, **kwargs):
+    def __init__(self, protocol, queue=None, host: str='127.0.0.1', port: int = 4000,
+                 ssl: bool=False, src_ip: str='', src_port: int=0, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
@@ -149,7 +152,7 @@ class BaseNetworkClient(BaseSender):
 
     @property
     def source(self) -> str:
-        return self.sock_name[0]
+        return self.host
 
     @property
     def dst(self) -> str:
@@ -165,9 +168,9 @@ class BaseNetworkClient(BaseSender):
         raise NotImplementedError
 
     async def start(self):
-        logger.info("Opening", self.sender_type, 'connection to', self.dst)
+        logger.info("Opening %s connection to %s", self.sender_type, self.dst)
         await self.open_connection()
 
     async def stop(self):
-        logger.info("Closing", self.sender_type, 'connection to', self.dst)
+        logger.info("Closing %s connection to %s", self.sender_type, self.dst)
         await self.close_connection()

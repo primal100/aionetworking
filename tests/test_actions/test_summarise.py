@@ -1,11 +1,11 @@
-from lib.basetestcase import BaseTestCase
 import datetime
 import binascii
-import os
 import shutil
+from pathlib import Path
 
 from lib.actions import summarise
 from lib import utils
+from lib.basetestcase import BaseTestCase
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 
 
@@ -23,12 +23,12 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
 
     def setUp(self):
         try:
-            shutil.rmtree(os.path.join(self.base_data_dir, 'Summaries'))
+            shutil.rmtree(Path(self.base_data_dir, 'Summaries'))
         except OSError:
             pass
         timestamp = datetime.datetime(2018, 1, 1, 1, 1, 0)
-        config = self.prepare_config()
-        self.action = self.action_module.Action(self.base_data_dir, config)
+        self.action = summarise.Action(self.base_data_dir.joinpath(summarise.Action.default_data_dir))
+        self.print_action = summarise.Action(storage=False)
         self.msg = self.protocol(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)
         self.msgs = [self.protocol(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)
                      for encoded_hex in self.multiple_encoded_hex]
@@ -60,7 +60,7 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
     def test_05_writes_for_store_many(self):
         content = self.action.writes_for_store_many(self.msgs)
         self.assertDictEqual(content,
-                             {'10.10.10.10_TCAP_MAP.csv': [('begin', '00000001', datetime.datetime(2018, 1, 1, 1, 1)), (
+                             {Path('10.10.10.10_TCAP_MAP.csv'): [('begin', '00000001', datetime.datetime(2018, 1, 1, 1, 1)), (
                              'continue', '840001ff', datetime.datetime(2018, 1, 1, 1, 1)), (
                                                            'continue', 'a5050001', datetime.datetime(2018, 1, 1, 1, 1)),
                                                            ('end', '00000000',
@@ -69,14 +69,14 @@ class TestSummariseActionTCAPMAP(BaseTestCase):
 
     def test_06_do(self):
         self.action.do(self.msg)
-        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      'begin\t00000001\t2018-01-01 01:01:00\n'
                                      )
 
     def test_07_do_many(self):
         self.action.do_multiple(self.msgs)
-        expected_file = os.path.join(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
+        expected_file =Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      """begin	00000001	2018-01-01 01:01:00
 continue	840001ff	2018-01-01 01:01:00

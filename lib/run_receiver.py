@@ -1,41 +1,44 @@
+import asyncio
 import logging
 import os
+
 import definitions
-import asyncio
+import settings
 
 
 async def main(status_change=None, stop_ordered=None):
 
-    definitions.CONFIG = definitions.CONFIG_CLS(definitions.APP_NAME, *definitions.CONFIG_ARGS, postfix='receiver')
-    definitions.CONFIG.configure_logging()
-    definitions.LOGGER_NAME = 'receiver'
-    definitions.HOME = definitions.CONFIG.home
-    definitions.DATA_DIR = definitions.CONFIG.data_home
+    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, postfix='receiver')
+    settings.CONFIG.configure_logging()
+    settings.LOGGER_NAME = 'receiver'
+    settings.HOME = settings.CONFIG.home
+    settings.DATA_DIR = settings.CONFIG.data_home
 
-    definitions.postfix = 'RECEIVER'
-    logger = logging.getLogger(definitions.LOGGER_NAME)
+    settings.postfix = 'RECEIVER'
+    logger = logging.getLogger(settings.LOGGER_NAME)
 
-    logger.info('Starting %s' % definitions.APP_NAME)
+    logger.info('Starting %s', settings.APP_NAME)
 
-    receiver_name = definitions.CONFIG.receiver
-    logger.info('Using receiver %s' % receiver_name)
+    receiver_name = settings.CONFIG.receiver
+    logger.info('Using receiver %s', receiver_name)
 
     receiver_cls = definitions.RECEIVERS[receiver_name]['receiver']
 
-    protocol_name = definitions.CONFIG.protocol
+    protocol_name = settings.CONFIG.protocol
 
-    logger.info('Using protocol %s' % protocol_name)
+    logger.info('Using protocol %s', protocol_name)
     protocol = definitions.PROTOCOLS[protocol_name]
     protocol.set_config()
 
-    message_manager_is_batch = definitions.CONFIG.message_manager_is_batch
+    message_manager_is_batch = settings.CONFIG.message_manager_is_batch
     if message_manager_is_batch:
         logger.info('Message manager configured in batch mode')
-        manager = definitions.BatchMessageManager.from_config(protocol)
+        manager_cls = definitions.BatchMessageManager
     else:
-        manager = definitions.MessageManager.from_config(protocol)
+        manager_cls = definitions.MessageManager
 
-    receiver = receiver_cls(manager, status_change=status_change)
+    manager = manager_cls.from_config(protocol)
+    receiver = receiver_cls.from_config(manager, status_change=status_change)
 
     if os.name == 'nt':
         """Workaround for windows:

@@ -1,5 +1,6 @@
-from .base import BaseAction
 from pprint import pformat
+
+from .base import BaseAction
 
 
 class Action(BaseAction):

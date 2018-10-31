@@ -1,19 +1,37 @@
-from lib.conf.parser import INIFileConfig
+import logging
+import settings
+settings.LOGGER_NAME = 'sender'
+
 import definitions
 
-import logging
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from lib.senders.base import BaseSender
+else:
+    BaseSender = None
 
 
-def get_sender(app_name, receivers, protocols, *config_args, config_cls=INIFileConfig, **kwargs):
+def get_sender() -> BaseSender:
 
-    config = config_cls(app_name, *config_args, postfix='sender')
-    config.configure_logging()
-    logger = logging.getLogger(definitions.LOGGER_NAME)
+    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, postfix='sender')
+    settings.CONFIG.configure_logging()
+    settings.postfix = 'sender'
 
-    sender_cls = receivers[config.receiver]['sender']
+    logger = logging.getLogger(settings.LOGGER_NAME)
+    logger.info('Starting client for %s', settings.APP_NAME)
 
-    logger.info('Using %s' % sender_cls.sender_type)
+    receiver_name = settings.CONFIG.receiver
 
-    sender = sender_cls.from_config(config.receiver_config, config.client_config, protocols, config.protocol, **kwargs)
+    logger.info('Using client for receiver %s', receiver_name)
 
+    sender_cls = definitions.RECEIVERS[receiver_name]['sender']
+
+    protocol_name = settings.CONFIG.protocol
+
+    logger.info('Using protocol %s', protocol_name)
+
+    protocol = definitions.PROTOCOLS[protocol_name]
+    protocol.set_config()
+
+    sender = sender_cls.from_config(protocol)
     return sender

@@ -1,11 +1,11 @@
 import asyncio
 import logging
 
-import definitions
+import settings
 from lib.connection_protocols.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
 from .base import BaseNetworkClient
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class TCPClient(BaseNetworkClient):

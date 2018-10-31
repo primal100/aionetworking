@@ -1,15 +1,15 @@
 from .base import BaseConfigClass
 from configparser import ConfigParser, ExtendedInterpolation
-from pathlib import Path
 from logging.config import fileConfig
 
+from pathlib import Path
 from typing import Mapping
 
 
 class INIFileConfig(BaseConfigClass):
 
-    def __init__(self, app_name: str, filename: Path, postfix: str='receiver'):
-        super(INIFileConfig, self).__init__(app_name, postfix=postfix)
+    def __init__(self, filename: Path, postfix: str='receiver'):
+        super(INIFileConfig, self).__init__(postfix=postfix)
         self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
         #self.config.optionxform = str
         self.config.read(filename)
@@ -45,15 +45,21 @@ class INIFileConfig(BaseConfigClass):
     def message_manager_is_batch(self) -> bool:
         return self.config.getboolean('MessageManager', 'Batch', fallback=False)
 
-    def get(self, section:str, option:str, data_type: type):
+    def get(self, section: str, option: str, data_type: type):
         if data_type == dict:
-            return self.config[option].items()
-        elif data_type == bool:
-            return self.config[section].getboolean(option, None)
-        else:
-            value = self.config[section].get(option, None)
-            if data_type == tuple or data_type == list:
-                value = value.replace(', ', ',').split(',')
+            try:
+                return self.config[option.capitalize()].items()
+            except KeyError:
+                return None
+        try:
+            section = self.config[section]
+        except KeyError:
+            return None
+        if data_type == bool:
+            return section.getboolean(option, None)
+        value = section.get(option, None)
+        if value is not None and data_type == tuple or data_type == list:
+            value = value.replace(', ', ',').split(',')
         if value is None:
             return value
         return data_type(value)
@@ -89,10 +95,11 @@ class INIFileConfig(BaseConfigClass):
         return Path(self.config.get('Dirs', 'Home'))
 
     def get_data_home(self) -> Path:
-        return Path(self.config.get('Dirs', 'Home'))
+        return Path(self.config.get('Dirs', 'Data'))
 
-    def get_action_home(self, action_name:str) -> Path:
-        return Path(self.config.get('Actions', '%sHome' % action_name))
+    def get_action_home(self, action_name: str) -> Path:
+        return Path(
+            self.config.get('Actions', '%sHome' % action_name, fallback=self.get_data_home().joinpath(action_name)))
 
     def configure_logging(self):
         configured = False

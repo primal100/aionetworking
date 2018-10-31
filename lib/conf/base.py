@@ -1,6 +1,6 @@
 from lib.utils import cached_property, now_to_utc_string
+
 from pathlib import Path
-import definitions
 
 
 class ConfigurationException(Exception):
@@ -9,18 +9,18 @@ class ConfigurationException(Exception):
 
 class BaseConfigClass:
 
-    defaults = {
-        'Testdir': definitions.TESTS_DIR,
-        'Develdir': definitions.ROOT_DIR,
-        'Userhome': definitions.USER_HOME,
-        "~": definitions.USER_HOME,
-        'Osdatadir': definitions.OSDATA_DIR,
-        'timestamp': now_to_utc_string()
-    }
-
-    def __init__(self, app_name: str, postfix: str='receiver'):
+    def __init__(self, postfix: str='receiver'):
+        import settings
+        self.defaults = {
+            'Testdir': settings.TESTS_DIR,
+            'Develdir': settings.ROOT_DIR,
+            'Userhome': settings.USER_HOME,
+            "~": settings.USER_HOME,
+            'Osdatadir': settings.OSDATA_DIR,
+            'timestamp': now_to_utc_string()
+        }
         self.defaults.update({
-            'appname': app_name.replace(' ', '').lower(),
+            'appname': settings.APP_NAME.replace(' ', '').lower(),
             'postfix': postfix.replace(' ', '').lower()
         })
 
@@ -59,7 +59,7 @@ class BaseConfigClass:
 
     @cached_property
     def home(self):
-        raise NotImplementedError
+        return self.get_home()
 
     def get_home(self):
         raise NotImplementedError
@@ -81,5 +81,4 @@ class BaseConfigClass:
 
     def path_for_action(self, action_name: str) -> Path:
         path = self.get_action_home(action_name)
-        path.mkdir(parents=True, exist_ok=True)
         return path

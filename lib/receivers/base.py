@@ -1,15 +1,19 @@
 import ssl
 import logging
 import datetime
-from pathlib import Path
-from typing import Optional
 
+import settings
 from lib import utils
 from lib.conf import ConfigurationException
-from lib.messagemanagers.base import BaseMessageManager
-import definitions
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+from typing import TYPE_CHECKING, Optional
+from pathlib import Path
+if TYPE_CHECKING:
+    from lib.messagemanagers.base import BaseMessageManager
+else:
+    BaseMessageManager = None
+
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class ServerException(Exception):
@@ -29,9 +33,9 @@ class BaseReceiver:
     }
 
     @classmethod
-    def from_config(cls, manager:BaseMessageManager, status_change=None, **kwargs):
-        config = definitions.CONFIG.section_as_dict('Receiver', **cls.configurable)
-        logger.debug('Found configuration for', cls.receiver_type, ':', config)
+    def from_config(cls, manager: BaseMessageManager, status_change=None, **kwargs):
+        config = settings.CONFIG.section_as_dict('Receiver', **cls.configurable)
+        logger.debug('Found configuration for %s:%s', cls.receiver_type, config)
         config.update(kwargs)
         return cls(manager, status_change=status_change, **kwargs)
 
@@ -44,7 +48,7 @@ class BaseReceiver:
         if self.ssl_allowed:
             self.ssl_context = self.manage_ssl_params(ssl_enabled, ssl_cert, ssl_key)
         elif ssl_enabled:
-            logger.error('SSL is now supported for', self.receiver_type)
+            logger.error('SSL is now supported for %s', self.receiver_type)
             raise ConfigurationException('SSL is now supported for' + self.receiver_type)
         else:
             self.ssl_context = None
@@ -86,7 +90,7 @@ class BaseReceiver:
             f.write(data)
 
     async def handle_message(self, sender: str, data: bytes):
-        logger.debug("Received msg from ", sender)
+        logger.debug("Received msg from %s", sender)
         logger.debug(data)
 
         if self.record:
@@ -103,13 +107,13 @@ class BaseReceiver:
     def set_status_changed(self, change: str=''):
         if self.status_change:
             self.status_change.set()
-        logger.debug('Status change event has been set to indicate', self.receiver_type, 'receiver was', change)
+        logger.debug('Status change event has been set to indicate %s receiver was %s', self.receiver_type, change)
 
     async def stop(self):
-        logger.info('Stopping', self.receiver_type, 'application')
+        logger.info('Stopping %s application', self.receiver_type)
         await self.close()
         await self.manager.close()
-        logging.info(self.receiver_type, 'application stopped')
+        logging.info('%s application stopped', self.receiver_type)
         self.set_status_changed('stopped')
 
     async def close(self):
@@ -134,15 +138,15 @@ class BaseServer(BaseReceiver):
     def print_listening_message(self, socket):
         sock_name = socket.getsockname()
         listening_on = ':'.join([str(v) for v in sock_name])
-        print('Serving', self.receiver_type, 'on', listening_on)
+        print('Serving %s on %s' % (self.receiver_type, listening_on))
 
     async def close(self):
-        logger.info('Closing', self.receiver_type,  'running at', self.listening_on)
+        logger.info('Closing %s running at %s', self.receiver_type,  self.listening_on)
         await self.stop_server()
-        logging.info(self.receiver_type, 'closed')
+        logging.info('%s closed', self.receiver_type)
 
     async def run(self):
-        logger.info('Starting', self.receiver_type, 'on', self.listening_on)
+        logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
         await self.start_server()
 
     async def stop_server(self):

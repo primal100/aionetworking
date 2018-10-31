@@ -1,6 +1,7 @@
+import binascii
+
 from .base import BaseAction
 from lib import utils
-import binascii
 
 
 class Action(BaseAction):

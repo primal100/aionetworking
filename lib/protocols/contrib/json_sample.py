@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from lib.utils import cached_property
 from .json import BaseJSONProtocol
-from datetime import datetime
+
 from typing import Sequence, Mapping
 
 
@@ -16,7 +18,7 @@ class JsonSampleProtocol(BaseJSONProtocol):
         return 'json'
 
     @staticmethod
-    def readable_time(action:Mapping) -> str:
+    def readable_time(action: Mapping) -> str:
         return datetime.fromtimestamp(action['timestamp']).strftime("%Y-%m-%d %H:%m:%S.%f")
 
     @cached_property
@@ -29,6 +31,7 @@ class JsonSampleProtocol(BaseJSONProtocol):
                     } for action in self.decoded['actions']
             ]
 
+    @cached_property
     def summaries(self) -> Sequence[Sequence]:
         return [
             (

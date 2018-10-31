@@ -40,27 +40,27 @@ class TCAP_MAP_Testcase(BaseTestCase):
 
     def test_04_storage_path(self):
         result = self.interface.storage_path
-        self.assertPathEqual(result, 'TCAP_MAP')
+        self.assertEqual(str(result), 'TCAP_MAP')
 
     def test_05_file_extension(self):
         result = self.interface.file_extension
-        self.assertEqual(result, 'TCAPMAP')
+        self.assertEqual(str(result), 'TCAPMAP')
 
     def test_07_storage_path_single(self):
         result = self.interface.storage_path_single
-        self.assertPathEqual(result, 'TCAP_MAP')
+        self.assertEqual(str(result), 'TCAP_MAP')
 
     def test_08_storage_path_multiple(self):
         result = self.interface.storage_path_multiple
-        self.assertPathEqual(result, 'TCAP_MAP')
+        self.assertEqual(str(result), 'TCAP_MAP')
 
     def test_09_storage_filename_single(self):
         result = self.interface.storage_filename_single
-        self.assertEqual(result, '10.10.10.10_00000001')
+        self.assertEqual(str(result), '10.10.10.10_00000001.TCAPMAP')
 
     def test_10_storage_filename_multiple(self):
         result = self.interface.storage_filename_multiple
-        self.assertEqual(result, '10.10.10.10_TCAP_MAP')
+        self.assertEqual(str(result), '10.10.10.10_TCAP_MAP.TCAPMAPMULTI')
 
     def test_11_summaries(self):
         result = self.interface.summaries

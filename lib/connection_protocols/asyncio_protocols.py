@@ -1,8 +1,8 @@
 import asyncio
-import definitions
+import settings
 import logging
 
-logger = logging.getLogger(definitions.LOGGER_NAME)
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BaseProtocolMixin:
@@ -30,7 +30,7 @@ class BaseProtocolMixin:
         self.other_ip = peer[0]
         self.peer = ':'.join(str(prop) for prop in peer)
         self.sock = ':'.join(str(prop) for prop in sock)
-        logger.info('New', self.name, 'connection from', self.client, 'to', self.server)
+        logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
     def manage_error(self, exc):
         if exc:
@@ -40,7 +40,7 @@ class BaseProtocolMixin:
 
     def connection_lost(self, exc):
         self.manage_error(exc)
-        logger.info(self.name, 'connection from', self.client_str, 'to', self.server_str, 'has been closed')
+        logger.info('%s connection from %s to %s has been closed', self.name, self.client_str, self.server_str)
 
 
 class ClientProtocolMixin(BaseProtocolMixin):

@@ -34,7 +34,7 @@ class JsonSampleInterfaceTestcase(BaseTestCase):
 
     def test_04_storage_path(self):
         result = self.interface.storage_path
-        self.assertPathEqual(result, 'JsonLogHandler')
+        self.assertEqual(str(result), 'JsonLogHandler')
 
     def test_05_file_extension(self):
         result = self.interface.file_extension
@@ -42,19 +42,19 @@ class JsonSampleInterfaceTestcase(BaseTestCase):
 
     def test_07_storage_path_single(self):
         result = self.interface.storage_path_single
-        self.assertPathEqual(result, 'JsonLogHandler')
+        self.assertEqual(str(result), 'JsonLogHandler')
 
     def test_08_storage_path_multiple(self):
         result = self.interface.storage_path_multiple
-        self.assertPathEqual(result, 'JsonLogHandler')
+        self.assertEqual(str(result), 'JsonLogHandler')
 
     def test_09_storage_filename_single(self):
         result = self.interface.storage_filename_single
-        self.assertEqual(result, '192.168.1.2_0')
+        self.assertEqual(str(result), '192.168.1.2_0.json')
 
     def test_10_storage_filename_multiple(self):
         result = self.interface.storage_filename_multiple
-        self.assertEqual(result, '192.168.1.2_JsonLogHandler')
+        self.assertEqual(str(result), '192.168.1.2_JsonLogHandler.jsonMULTI')
 
     def test_11_summaries(self):
         result = self.interface.summaries
