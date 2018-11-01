@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lib.basetestcase import BaseTestCase
 from lib.messagemanagers import MessageFromNotAuthorizedHost
-from lib.messagemanagers.messagemanager import MessageManager
+from lib.messagemanagers.managers import MessageManager
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.actions import binary, decode, prettify, summarise
 from lib import utils
@@ -46,14 +46,8 @@ class TestMessageManager(BaseTestCase):
         self.manager = MessageManager(self.protocol, store_actions=store_actions, print_actions=print_actions,
                                       aliases=aliases, allowed_senders=('10.10.10.10',), interval=0.01)
 
-    def test_01_allowed_sender(self):
-        host = self.manager.check_sender('10.10.10.10')
-        self.assertEqual(host, 'Primary')
 
-    def test_02_not_allowed_sender(self):
-        self.assertRaises(MessageFromNotAuthorizedHost, self.manager.check_sender, '10.10.10.11')
-
-    def test_03_manage_message(self):
+    def test_00_manage_message(self):
         asyncio.get_event_loop().run_until_complete(utils.run_and_wait(self.manager.manage_message, '10.10.10.10', self.msgs[0],
                                                                        interval=1))
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')
@@ -69,7 +63,7 @@ class TestMessageManager(BaseTestCase):
         expected_file = Path(self.base_data_dir, 'Prettified', 'TCAP_MAP', 'Primary_00000001.txt')
         self.assertTrue(expected_file.exists())
 
-    def test_04_manage_multiple_messages(self):
+    def test_01_manage_multiple_messages(self):
         asyncio.get_event_loop().run_until_complete(
             utils.run_wait_close_multiple(self.manager.manage_message, self.manager, '10.10.10.10', self.msgs))
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')

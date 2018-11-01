@@ -1,5 +1,6 @@
 import asyncio
 import binascii
+import logging
 from pathlib import Path
 import os
 import definitions
@@ -17,6 +18,8 @@ from lib.run_sender import get_sender
 settings.CONFIG_ARGS = settings.TEST_CONF_DIR.joinpath('tcp_server_test_setup.ini'),
 definitions.PROTOCOLS = {'TCAP': TCAP_MAP_ASNProtocol}
 
+logger = logging.getLogger(settings.LOGGER_NAME)
+
 
 class TestTCPServer(BaseTestCase):
     multiple_encoded_hex = (
@@ -27,7 +30,6 @@ class TestTCPServer(BaseTestCase):
     )
     status_change = multiprocessing.Event()
     stop_ordered = multiprocessing.Event()
-    client = get_sender()
 
     @staticmethod
     def start_server(status_change, stop_ordered):
@@ -40,6 +42,7 @@ class TestTCPServer(BaseTestCase):
     def start_server_process(self):
         self.process = multiprocessing.Process(target=self.start_server,
                                                args=(self.status_change, self.stop_ordered))
+        self.process.daemon = False
         self.process.start()
         self.status_change.wait()
 
@@ -49,13 +52,14 @@ class TestTCPServer(BaseTestCase):
         except OSError:
             pass
         self.start_server_process()
+        self.client = get_sender()
+        self.client_two = get_sender()
 
     def tearDown(self):
         if os.name == 'nt':
             self.status_change.clear()
             self.stop_ordered.set()
             self.status_change.wait()
-            self.stop_ordered.clear()
         self.process.terminate()
         self.process.join()
 
@@ -75,27 +79,35 @@ class TestTCPServer(BaseTestCase):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
-
         expected_file = Path(self.base_data_dir, 'Decoded', 'TCAP_MAP', 'localhost_00000001.txt')
         self.assertFileContentsEqual(expected_file,
                                      "('begin',\n {'components': [('basicROS',\n                  ('invoke',\n                   {'argument': ('RoutingInfoForSM-Arg',\n                                 {'msisdn': b'\\x91\\x14\\x97Bu3\\xf3',\n                                  'serviceCentreAddress': b'\\x91\\x14\\x97y'\n                                                          b'y\\x08\\xf0',\n                                  'sm-RP-PRI': False}),\n                    'invokeId': ('present', -1),\n                    'opcode': ('local', 45)}))],\n  'dialoguePortion': {'direct-reference': (0, 0, 17, 773, 1, 1, 1),\n                      'encoding': ('single-ASN1-type',\n                                   ('DialoguePDU',\n                                    ('dialogueRequest',\n                                     {'application-context-name': (0,\n                                                                   4,\n                                                                   0,\n                                                                   0,\n                                                                   1,\n                                                                   0,\n                                                                   20,\n                                                                   2),\n                                      'protocol-version': (1, 1)})))},\n  'otid': b'\\x00\\x00\\x00\\x01'})")
-
         expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertTrue(expected_file.exists())
+        self.assertNumLinesInFile(expected_file, 1)
         expected_file = Path(self.base_data_dir, 'Prettified', 'TCAP_MAP', 'localhost_00000001.txt')
         self.assertTrue(expected_file.exists())
+        self.assertNumLinesInFile(expected_file, 4)
         expected_file = Path(self.base_data_dir, 'recordings', 'testrecord.mmr')
-        self.assertTrue(expected_file.exists())
+        self.assertBinaryFileContentsEqual(expected_file, b'\x00\x00\x00\x00\t\x00\x00\x00localhostI\x00\x00\x00bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
+
+    async def create_tasks(self, msgs):
+        asyncio.create_task(tasks.send_hex_msgs(self.client, msgs))
+        #asyncio.create_task(tasks.send_hex_msgs(self.client_two, msgs))
+        #await asyncio.sleep(5)
 
     def test_01_manage_100_messages(self):
         msgs = [self.multiple_encoded_hex[0] for i in range(0, 100)]
+        import datetime
+        start = datetime.datetime.now()
         asyncio.run(tasks.send_hex_msgs(self.client, msgs))
+        end = datetime.datetime.now()
         time.sleep(3)
-        path = os.path.join(self.base_data_dir, 'Encoded', 'TCAP_MAP')
-        files = os.listdir(path)
-        self.assertEqual(len(files), 100)
+        #path = os.path.join(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        #files = os.listdir(path)
+        #self.assertEqual(len(files), 22)
 
-    def test_01_manage_multiple_messages(self):
+    def test_02_manage_multiple_messages(self):
         asyncio.run(tasks.send_hex_msgs(self.client, self.multiple_encoded_hex))
         time.sleep(3)
         expected_file = os.path.join(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000000.TCAPMAP')

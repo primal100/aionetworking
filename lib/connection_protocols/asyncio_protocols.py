@@ -2,18 +2,23 @@ import asyncio
 import settings
 import logging
 
+from typing import TYPE_CHECKING, Sequence
+if TYPE_CHECKING:
+    from lib.receivers.base import BaseReceiver
+else:
+    BaseReceiver = None
+
 logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BaseProtocolMixin:
-    name = ''
-    peer_str = ''
-    peer = (None, None)
+    name: str = ''
+    alias: str = ''
+    peer: str = ''
     sock = (None, None)
-    client_str = None
-    server_str = None
-    other_ip = None
+    other_ip: str = None
     transport = None
+    i = 0
 
     @property
     def client(self):
@@ -23,6 +28,9 @@ class BaseProtocolMixin:
     def server(self):
         raise NotImplementedError
 
+    def check_other(self, other_ip):
+        return other_ip
+
     def connection_made(self, transport):
         self.transport = transport
         peer = self.transport.get_extra_info('peername')
@@ -30,6 +38,7 @@ class BaseProtocolMixin:
         self.other_ip = peer[0]
         self.peer = ':'.join(str(prop) for prop in peer)
         self.sock = ':'.join(str(prop) for prop in sock)
+        self.alias = self.check_other(self.other_ip)
         logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
     def manage_error(self, exc):
@@ -40,7 +49,8 @@ class BaseProtocolMixin:
 
     def connection_lost(self, exc):
         self.manage_error(exc)
-        logger.info('%s connection from %s to %s has been closed', self.name, self.client_str, self.server_str)
+        logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
+        print(self.i)
 
 
 class ClientProtocolMixin(BaseProtocolMixin):
@@ -67,11 +77,13 @@ class UDPClientProtocol(ClientProtocolMixin, asyncio.DatagramProtocol):
 
 class ServerProtocolMixin(BaseProtocolMixin):
 
-    def __init__(self, receiver):
+    def __init__(self, receiver: BaseReceiver):
         self.receiver = receiver
 
     @property
     def client(self) -> str:
+        if self.alias:
+            return '%s(%s)' % (self.alias, self.peer)
         return self.peer
 
     @property
@@ -79,13 +91,17 @@ class ServerProtocolMixin(BaseProtocolMixin):
         return self.sock
 
     def on_data_received(self, sender, data):
-        asyncio.create_task(self.receiver.handle_message(sender, data))
+        asyncio.create_task(self.receiver.handle_message(self.alias, data))
+
+    def check_other(self, other_ip):
+        return self.receiver.check_sender(other_ip)
 
 
 class TCPServerProtocol(ServerProtocolMixin, asyncio.Protocol):
     name = 'TCP Server'
 
     def data_received(self, data):
+        self.i += 1
         self.on_data_received(self.other_ip, data)
 
 

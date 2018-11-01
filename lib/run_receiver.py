@@ -6,16 +6,16 @@ import definitions
 import settings
 
 
-async def main(status_change=None, stop_ordered=None):
+logger = logging.getLogger(settings.LOGGER_NAME)
 
-    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, postfix='receiver')
+
+async def main(queue=None, status_change=None, stop_ordered=None):
+
+    settings.POSTFIX = 'receiver'
+    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
     settings.CONFIG.configure_logging()
-    settings.LOGGER_NAME = 'receiver'
     settings.HOME = settings.CONFIG.home
     settings.DATA_DIR = settings.CONFIG.data_home
-
-    settings.postfix = 'RECEIVER'
-    logger = logging.getLogger(settings.LOGGER_NAME)
 
     logger.info('Starting %s', settings.APP_NAME)
 
@@ -24,32 +24,34 @@ async def main(status_change=None, stop_ordered=None):
 
     receiver_cls = definitions.RECEIVERS[receiver_name]['receiver']
 
-    protocol_name = settings.CONFIG.protocol
+    multiprocess = settings.CONFIG.multiprocess
 
-    logger.info('Using protocol %s', protocol_name)
-    protocol = definitions.PROTOCOLS[protocol_name]
-    protocol.set_config()
-
-    message_manager_is_batch = settings.CONFIG.message_manager_is_batch
-    if message_manager_is_batch:
-        logger.info('Message manager configured in batch mode')
-        manager_cls = definitions.BatchMessageManager
+    if multiprocess:
+        from multiprocessing import Queue
+        queue = queue or Queue()
+        manager_task = definitions.MESSAGE_MANAGER_PROCESS(queue)
     else:
-        manager_cls = definitions.MessageManager
+        from queue import Queue
+        from lib.run_manager import start_threaded_manager
+        queue = queue or Queue
+        manager_task = start_threaded_manager(queue)
 
-    manager = manager_cls.from_config(protocol)
-    receiver = receiver_cls.from_config(manager, status_change=status_change)
+    receiver = receiver_cls.from_config(queue, status_change=status_change)
 
     if os.name == 'nt':
         """Workaround for windows:
         https://stackoverflow.com/questions/24774980/why-cant-i-catch-sigint-when-asyncio-event-loop-is-running/24775107#24775107
         """
-        def wakeup():
+        async def wakeup():
             if stop_ordered and stop_ordered.is_set():
                 logger.debug('Stop order event set')
-                asyncio.create_task(receiver.stop())
-            asyncio.get_event_loop().call_later(0.1, wakeup)
-        wakeup()
+                stop_ordered.clear()
+                raise KeyboardInterrupt
+            else:
+                await asyncio.sleep(1)
+                await wakeup()
+        asyncio.create_task(wakeup())
 
     async with receiver:
         await receiver.run()
+    manager_task.cancel()

@@ -41,14 +41,7 @@ class TestMessageManager(BaseTestCase):
         self.msgs = [binascii.unhexlify(encoded_hex) for encoded_hex in self.multiple_encoded_hex]
         self.manager = BatchMessageManager('PyMessageTest', self.protocol, action_modules, config)
 
-    def test_01_allowed_sender(self):
-        host = self.manager.check_sender('10.10.10.10')
-        self.assertEqual(host, 'Primary')
-
-    def test_02_not_allowed_sender(self):
-        self.assertRaises(MessageFromNotAuthorizedHost, self.manager.check_sender, '10.10.10.11')
-
-    def test_03_manage_multiple_messages(self):
+    def test_00_manage_multiple_messages(self):
         self.loop.run_until_complete(
             utils.run_wait_close_multiple(self.manager.manage_message, self.manager, '10.10.10.10', self.msgs))
         expected_file = os.path.join(self.base_data_dir, 'Encoded', 'Primary_TCAP_MAP.TCAPMAPMULTI')

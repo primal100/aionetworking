@@ -16,6 +16,7 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 class SFTPFactory(ServerProtocolMixin, asyncssh.SFTPServer):
 
     def __init__(self, receiver, conn):
+        #receiver.check_sender
         root = receiver.base_upload_dir.joinpath(conn.get_extra_info('username'))
         root.mkdir(parents=True, exist_ok=True)
         super().__init__(conn, chroot=root)

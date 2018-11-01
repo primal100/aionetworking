@@ -1,6 +1,6 @@
 import logging
 import settings
-settings.LOGGER_NAME = 'sender'
+
 
 import definitions
 
@@ -10,14 +10,15 @@ if TYPE_CHECKING:
 else:
     BaseSender = None
 
+logger = logging.getLogger(settings.LOGGER_NAME)
+
 
 def get_sender() -> BaseSender:
 
-    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, postfix='sender')
+    settings.POSTFIX = 'sender'
+    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
     settings.CONFIG.configure_logging()
-    settings.postfix = 'sender'
 
-    logger = logging.getLogger(settings.LOGGER_NAME)
     logger.info('Starting client for %s', settings.APP_NAME)
 
     receiver_name = settings.CONFIG.receiver

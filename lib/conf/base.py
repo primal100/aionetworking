@@ -9,7 +9,7 @@ class ConfigurationException(Exception):
 
 class BaseConfigClass:
 
-    def __init__(self, postfix: str='receiver'):
+    def __init__(self):
         import settings
         self.defaults = {
             'Testdir': settings.TESTS_DIR,
@@ -21,7 +21,7 @@ class BaseConfigClass:
         }
         self.defaults.update({
             'appname': settings.APP_NAME.replace(' ', '').lower(),
-            'postfix': postfix.replace(' ', '').lower()
+            'postfix': settings.POSTFIX.replace(' ', '').lower()
         })
 
     @cached_property
@@ -29,32 +29,16 @@ class BaseConfigClass:
         raise NotImplementedError
 
     @cached_property
-    def receiver_config(self):
-        raise NotImplementedError
-
-    @cached_property
-    def client_config(self):
-        raise NotImplementedError
-
-    @cached_property
     def message_manager_is_batch(self):
-        raise NotImplementedError
-
-    @cached_property
-    def message_manager_config(self):
         raise NotImplementedError
 
     @cached_property
     def protocol(self):
         raise NotImplementedError
 
-    @cached_property
-    def protocol_config(self):
-        raise NotImplementedError
-
-    def action_config(self, action_name: str, storage: bool=True):
+    def action_config(self, action_name: str, d: str, storage: bool=True):
         return {
-            'home': self.path_for_action(action_name),
+            'home': self.path_for_action(action_name, d)
         }
 
     @cached_property
@@ -67,7 +51,7 @@ class BaseConfigClass:
     def get_data_home(self):
         raise NotImplementedError
 
-    def get_action_home(self, action_name: str) -> Path:
+    def get_action_home(self, action_name: str, d: str) -> Path:
         raise NotImplementedError
 
     def configure_logging(self):
@@ -79,6 +63,6 @@ class BaseConfigClass:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def path_for_action(self, action_name: str) -> Path:
-        path = self.get_action_home(action_name)
+    def path_for_action(self, action_name: str, d: str) -> Path:
+        path = self.get_action_home(action_name, d)
         return path

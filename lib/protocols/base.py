@@ -45,7 +45,7 @@ class BaseProtocol:
     @classmethod
     def set_config(cls, **kwargs):
         config = settings.CONFIG.section_as_dict('Protocol', **cls.configurable)
-        logger.debug('Found configuration for %: %s', cls.protocol_name, config)
+        logger.debug('Found configuration for %s: %s', cls.protocol_name, config)
         config.update(kwargs)
         cls.config = config
 
@@ -100,8 +100,7 @@ class BaseProtocol:
         file_path = base_file_path.with_suffix("." + extension)
         i = 1
         while file_path.exists():
-            logger.debug('File %s exists. Creating alternative name', file_path)
-            file_path = Path("%s_%s.%s" % (file_path.stem, i, file_path.suffix))
+            file_path = Path(base_file_path.parent, "%s_%s%s" % (base_file_path.stem, i, file_path.suffix))
             i += 1
         return file_path
 

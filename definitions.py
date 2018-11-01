@@ -1,6 +1,5 @@
 from lib.conf.parser import INIFileConfig
-from lib.messagemanagers.messagemanager import MessageManager
-from lib.messagemanagers.batchmessagemanager import BatchMessageManager
+from lib.messagemanagers.managers import MessageManager, BatchMessageManager
 from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
 from lib.receivers.sftp import SFTPServerPswAuth
 from lib.senders.sftp import SFTPClient
@@ -40,3 +39,4 @@ ACTIONS: Mapping[str, Type[BaseAction]] = {
 MESSAGE_MANAGER: Type[BaseMessageManager] = MessageManager
 BATCH_MESSAGE_MANAGER: Type[BaseMessageManager] = BatchMessageManager
 PROTOCOLS: Mapping[str, Type[BaseProtocol]] = {}
+MESSAGE_MANAGER_PROCESS: function = None

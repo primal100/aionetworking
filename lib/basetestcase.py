@@ -8,7 +8,7 @@ import settings
 from pathlib import Path
 from typing import AnyStr
 
-settings.LOGGER_NAME = 'root'
+settings.LOGGER_NAME = 'messagemanager'
 logger = logging.getLogger(settings.LOGGER_NAME)
 logger.setLevel(logging.CRITICAL)
 

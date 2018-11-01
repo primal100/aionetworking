@@ -27,7 +27,7 @@ class BaseAction:
     @classmethod
     def from_config(cls, storage: bool=True, **kwargs):
         config = settings.CONFIG.section_as_dict(cls.action_name, **cls.configurable)
-        config['base_path'] = settings.CONFIG.path_for_action(cls.action_name)
+        config['base_path'] = settings.CONFIG.path_for_action(cls.action_name, cls.default_data_dir)
         logger.debug('Found configuration for %s:%s', cls.action_name, config)
         config.update(kwargs)
         return cls(storage=storage, **config)

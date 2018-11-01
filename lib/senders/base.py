@@ -13,6 +13,7 @@ else:
     BaseProtocol = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
+data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
 
 
 class BaseSender:
@@ -20,13 +21,16 @@ class BaseSender:
     configurable = {
         'interval': float
     }
+    receiver_configurable = {
+    }
 
     @classmethod
     def from_config(cls, msg_protocol: Type[BaseProtocol], queue=None, **kwargs):
         config = settings.CONFIG.section_as_dict('Sender', **cls.configurable)
+        config.update(settings.CONFIG.section_as_dict('Receiver', **cls.receiver_configurable))
         logger.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
-        return cls(msg_protocol, queue=queue, **kwargs)
+        return cls(msg_protocol, queue=queue, **config)
 
     def __init__(self, msg_protocol: Type[BaseProtocol], queue=None, interval: float=0):
         self.msg_protocol = msg_protocol
@@ -95,7 +99,7 @@ class BaseSender:
 
     async def send_msg(self, msg_encoded: bytes):
         logger.debug("Sending message to %s", self.dst)
-        logger.debug(msg_encoded)
+        data_logger.debug(msg_encoded)
         await self.send_data(msg_encoded)
         logger.debug('Message sent')
 
@@ -135,11 +139,14 @@ class BaseNetworkClient(BaseSender):
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
+        'src_ip': str,
+        'src_port': int
+    })
+    receiver_configurable = BaseSender.configurable.copy()
+    receiver_configurable.update({
         'host': str,
         'port': int,
         'ssl': bool,
-        'src_ip': str,
-        'src_port': int
     })
 
     def __init__(self, protocol, queue=None, host: str='127.0.0.1', port: int = 4000,
