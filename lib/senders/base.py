@@ -119,7 +119,7 @@ class BaseSender:
             await self.encode_and_send_msg(decoded_msg)
 
     async def encode_and_send_msg(self, msg_decoded):
-        msg = self.msg_protocol(self.source, decoded=msg_decoded)
+        msg = self.msg_protocol.from_decoded(msg_decoded, sender=self.source)
         await self.send_msg(msg.encoded)
 
     async def play_recording(self, file_path:Path, immediate:bool=False):
@@ -128,9 +128,9 @@ class BaseSender:
         packets = utils.unpack_recorded_packets(content)
         if immediate:
             await self.send_msgs([p[2] for p in packets])
-        for seconds, sender, data in packets:
-            if not immediate and seconds >= 1:
-                await asyncio.sleep(seconds)
+        for microseconds, sender, data in packets:
+            if not immediate:
+                await asyncio.sleep(microseconds / 1000)
             await self.send_msg(data)
 
 

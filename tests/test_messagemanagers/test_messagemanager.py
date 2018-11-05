@@ -1,11 +1,11 @@
 import asyncio
 import binascii
+import datetime
 import logging
 import shutil
 from pathlib import Path
 
 from lib.basetestcase import BaseTestCase
-from lib.messagemanagers import MessageFromNotAuthorizedHost
 from lib.messagemanagers.managers import MessageManager
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.actions import binary, decode, prettify, summarise
@@ -14,7 +14,7 @@ from lib import utils
 
 class TestMessageManager(BaseTestCase):
     log_level = logging.DEBUG
-    sender = '10.10.10.10'
+    sender = 'Primary'
     protocol = TCAP_MAP_ASNProtocol
     multiple_encoded_hex = (
         b'62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f0',
@@ -32,36 +32,37 @@ class TestMessageManager(BaseTestCase):
 
         action_modules = (
             binary,
-            decode,
-            prettify,
             summarise
         )
 
-        aliases = {self.sender: 'Primary'}
-        store_actions = [m.Action(self.base_data_dir.joinpath(m.Action.default_data_dir), storage=True) for m in
-                         action_modules]
-        print_actions = [m.Action(self.base_data_dir.joinpath(m.Action.default_data_dir), storage=True) for m in
-                         action_modules]
+        store_actions = [m.Action() for m in action_modules]
+        print_actions = [m.Action(storage=True) for m in action_modules]
+        self.timestamp = datetime.datetime(2018, 1, 1, 1, 1)
+        self.queue = asyncio.Queue()
         self.msgs = [binascii.unhexlify(encoded_hex) for encoded_hex in self.multiple_encoded_hex]
-        self.manager = MessageManager(self.protocol, store_actions=store_actions, print_actions=print_actions,
-                                      aliases=aliases, allowed_senders=('10.10.10.10',), interval=0.01)
+        self.manager = MessageManager(self.protocol, self.queue, store_actions=store_actions,
+                                      print_actions=print_actions, interval=0.1)
 
+    async def run_and_add_item_to_queue(self):
+        asyncio.create_task(self.manager.process_queue_forever())
+        await self.queue.put((self.sender, self.msgs[0], self.timestamp))
+        await asyncio.sleep(1)
+        await asyncio.wait_for(self.queue.join(), timeout=10)
 
     def test_00_manage_message(self):
-        asyncio.get_event_loop().run_until_complete(utils.run_and_wait(self.manager.manage_message, '10.10.10.10', self.msgs[0],
-                                                                       interval=1))
+        asyncio.run(self.run_and_add_item_to_queue())
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
 
-        expected_file = Path(self.base_data_dir, 'Decoded', 'TCAP_MAP', 'Primary_00000001.txt')
+        """expected_file = Path(self.base_data_dir, 'Decoded', 'TCAP_MAP', 'Primary_00000001.txt')
         self.assertFileContentsEqual(expected_file,
                                      "('begin',\n {'components': [('basicROS',\n                  ('invoke',\n                   {'argument': ('RoutingInfoForSM-Arg',\n                                 {'msisdn': b'\\x91\\x14\\x97Bu3\\xf3',\n                                  'serviceCentreAddress': b'\\x91\\x14\\x97y'\n                                                          b'y\\x08\\xf0',\n                                  'sm-RP-PRI': False}),\n                    'invokeId': ('present', -1),\n                    'opcode': ('local', 45)}))],\n  'dialoguePortion': {'direct-reference': (0, 0, 17, 773, 1, 1, 1),\n                      'encoding': ('single-ASN1-type',\n                                   ('DialoguePDU',\n                                    ('dialogueRequest',\n                                     {'application-context-name': (0,\n                                                                   4,\n                                                                   0,\n                                                                   0,\n                                                                   1,\n                                                                   0,\n                                                                   20,\n                                                                   2),\n                                      'protocol-version': (1, 1)})))},\n  'otid': b'\\x00\\x00\\x00\\x01'})")
-
+        """
         expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertTrue(expected_file.exists())
-        expected_file = Path(self.base_data_dir, 'Prettified', 'TCAP_MAP', 'Primary_00000001.txt')
-        self.assertTrue(expected_file.exists())
+        #expected_file = Path(self.base_data_dir, 'Prettified', 'TCAP_MAP', 'Primary_00000001.txt')
+        #self.assertTrue(expected_file.exists())
 
     def test_01_manage_multiple_messages(self):
         asyncio.get_event_loop().run_until_complete(

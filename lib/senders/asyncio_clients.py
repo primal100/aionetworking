@@ -22,6 +22,9 @@ class TCPClient(BaseNetworkClient):
 
     async def send_data(self, encoded_data):
         self.transport.write(encoded_data)
+        if logger.isEnabledFor(logging.INFO):
+            self.connection_protocol.num_msgs += 1
+            self.connection_protocol.num_bytes += len(encoded_data)
 
 
 class UDPClient(BaseNetworkClient):

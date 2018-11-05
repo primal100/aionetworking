@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-
+import aiofiles
 
 APP_NAME = 'Message Manager'
 ROOT_DIR = Path(__file__).parent
@@ -25,3 +25,4 @@ RAWDATA_LOGGER_NAME = 'rawdata'
 POSTFIX = 'receiver'
 CONFIG = None
 CONFIG_ARGS = CONF_DIR.joinpath("setup.ini"),
+FILE_OPENER = aiofiles

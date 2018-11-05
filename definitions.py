@@ -1,12 +1,13 @@
 from lib.conf.parser import INIFileConfig
 from lib.messagemanagers.managers import MessageManager, BatchMessageManager
+from lib import run_manager
 from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
 from lib.receivers.sftp import SFTPServerPswAuth
 from lib.senders.sftp import SFTPClient
 from lib.senders.asyncio_clients import TCPClient, UDPClient
 from lib.actions import binary, decode, prettify, summarise, text
 
-from typing import Mapping, Union, TYPE_CHECKING, Type
+from typing import Mapping, Union, TYPE_CHECKING, Type, Callable
 
 if TYPE_CHECKING:
     from lib.actions.base import BaseAction
@@ -22,6 +23,8 @@ else:
     BaseProtocol = None
     BaseReceiver = None
     BaseSender = None
+    Queue = None
+    Task = None
 
 CONFIG_CLS: Type[BaseConfigClass] = INIFileConfig
 RECEIVERS: Mapping[str, Mapping[str, Union[Type[BaseReceiver], Type[BaseSender]]]] = {
@@ -39,4 +42,4 @@ ACTIONS: Mapping[str, Type[BaseAction]] = {
 MESSAGE_MANAGER: Type[BaseMessageManager] = MessageManager
 BATCH_MESSAGE_MANAGER: Type[BaseMessageManager] = BatchMessageManager
 PROTOCOLS: Mapping[str, Type[BaseProtocol]] = {}
-MESSAGE_MANAGER_PROCESS: function = None
+START_MESSAGE_MANAGER_PROCESS: Callable = run_manager.start_manager_as_process

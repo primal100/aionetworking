@@ -1,8 +1,11 @@
-from lib import utils
+import asyncio
 import logging
+import csv
+from io import StringIO
 
 import settings
 from .decode import Action as BaseStoreAction
+from lib.utils import current_date
 
 from pathlib import Path
 from typing import Sequence
@@ -18,37 +21,31 @@ class Action(BaseStoreAction):
     default_data_dir = "Summaries"
     single_extension = "csv"
     multi_extension = "csv"
-    store_write_mode = 'a+'
+    store_write_mode = 'a'
 
-    def get_content(self, msg) -> Sequence[Sequence]:
-        return msg.summaries
+    def get_content(self, msg) -> str:
+        s = StringIO()
+        writer = csv.writer(s, delimiter='\t', lineterminator='\n')
+        writer.writerows(msg.summaries)
+        return s.getvalue()
 
-    def get_content_multi(self, msg):
-        return self.get_content(msg)
-
-    def print(self, msg):
-        if not msg.filter_by_action(self, True):
+    def print(self, msg, sender):
+        if not self.filtered(msg, True):
             print(self.print_msg(msg))
         else:
             logger.debug("Message filtered for action %s", self.action_name)
 
     def print_msg(self, msg):
         content = self.get_content(msg)
-        return '\n'.join(['\t'.join([str(cell) for cell in row]) for row in content])
+        return content.rstrip("\n\r")
 
-    @property
-    def path(self) -> Path:
-        path = self.base_path.joinpath("Summary_%s.%s" % (utils.current_date(), self.single_extension))
-        logger.debug('Using path %s', path)
-        return path
+    def get_storage_filename_single(self, msg):
+        return "Summary_%s.%s" % (current_date(), self.single_extension)
 
-    def do(self, msg):
-        if not msg.filter_by_action(self, False):
-            utils.append_to_csv(self.path, self.get_content(msg))
-        else:
-            logger.debug("Message filtered for action %s", self.action_name)
+    def get_storage_path_single(self, msg) -> Path:
+        return self.base_path.joinpath("Summary_%s.%s" % (current_date(), self.single_extension))
 
     def store_many(self, msgs):
         logger.debug('Storing %s messages for action', len(msgs), self.action_name)
         lines = sum([self.get_content(msg) for msg in msgs], [])
-        utils.append_to_csv(self.path, lines)
+        asyncio.create_task(self.append_to_csv(self.path, lines))

@@ -1,8 +1,11 @@
 import asyncio
-import settings
 import logging
 
-from typing import TYPE_CHECKING, Sequence
+
+import settings
+from lib.utils import plural
+
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lib.receivers.base import BaseReceiver
 else:
@@ -18,7 +21,9 @@ class BaseProtocolMixin:
     sock = (None, None)
     other_ip: str = None
     transport = None
-    i = 0
+    num_msgs: int = 0
+    num_bytes: int = 0
+    direction: str = ''
 
     @property
     def client(self):
@@ -50,10 +55,12 @@ class BaseProtocolMixin:
     def connection_lost(self, exc):
         self.manage_error(exc)
         logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
-        print(self.i)
+        logger.info('%s and %s kb were %s during session', plural(self.num_msgs, 'message'), self.num_bytes / 1024,
+                     self.direction)
 
 
 class ClientProtocolMixin(BaseProtocolMixin):
+    direction = 'sent'
 
     @property
     def client(self) -> str:
@@ -76,6 +83,7 @@ class UDPClientProtocol(ClientProtocolMixin, asyncio.DatagramProtocol):
 
 
 class ServerProtocolMixin(BaseProtocolMixin):
+    direction = 'received'
 
     def __init__(self, receiver: BaseReceiver):
         self.receiver = receiver
@@ -91,7 +99,10 @@ class ServerProtocolMixin(BaseProtocolMixin):
         return self.sock
 
     def on_data_received(self, sender, data):
-        asyncio.create_task(self.receiver.handle_message(self.alias, data))
+        if logger.isEnabledFor(logging.INFO):
+            self.num_msgs += 1
+            self.num_bytes += len(data)
+        self.receiver.handle_message(self.alias, data)
 
     def check_other(self, other_ip):
         return self.receiver.check_sender(other_ip)
@@ -101,7 +112,6 @@ class TCPServerProtocol(ServerProtocolMixin, asyncio.Protocol):
     name = 'TCP Server'
 
     def data_received(self, data):
-        self.i += 1
         self.on_data_received(self.other_ip, data)
 
 

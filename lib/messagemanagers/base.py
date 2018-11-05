@@ -1,11 +1,13 @@
+import asyncio
 import logging
 import datetime
 
-import definitions
+from lib.conf import ConfigurationException
+from lib.utils import cached_property
 import settings
-import time
 
 from typing import TYPE_CHECKING, Sequence, AnyStr, Type
+from pathlib import Path
 
 if TYPE_CHECKING:
     from lib.protocols.base import BaseProtocol
@@ -24,11 +26,13 @@ class BaseMessageManager:
     configurable = {
         'store_actions': tuple,
         'print_actions': tuple,
-        'interval': float
+        'record': bool,
+        'record_file': Path,
     }
 
     @classmethod
     def from_config(cls, protocol: Type[BaseProtocol], queue=None, **kwargs):
+        import definitions
         config = settings.CONFIG.section_as_dict('MessageManager', **cls.configurable)
         logger.info('Found configuration for %s: %s', cls.name,  config)
         if config.get('store_actions', None):
@@ -40,34 +44,37 @@ class BaseMessageManager:
         config.update(kwargs)
         return cls(protocol, queue=queue, **config)
 
-    def __init__(self, protocol: Type[BaseProtocol], queue, store_actions: Sequence=(), print_actions: Sequence=(),
-                 interval: int=0.001):
+    def __init__(self, protocol: Type[BaseProtocol], queue, store_actions: Sequence=(), print_actions: Sequence=()):
         self.protocol = protocol
         self.queue = queue
-        self.interval = interval
-        if not self.interval:
-            from lib.conf import ConfigurationException
-            raise ConfigurationException('Message Manager Interval must be a float greater than 0')
         self.store_actions = store_actions
         self.print_actions = print_actions
-        self.process_queue_forever()
 
-    def make_message(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> BaseProtocol:
-        return self.protocol(sender, encoded, timestamp=timestamp)
+    def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
+        return self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
 
     def process_queue(self):
         raise NotImplementedError
 
-    def process_queue_forever(self):
-        if self.interval:
-            time.sleep(self.interval)
+    async def task_done(self, tasks: Sequence[asyncio.Task], num_times=1):
+        for task in tasks:
+            await task
+        for i in range(0, num_times):
+            logger.debug("All actions complete. Setting task done on queue")
+            self.queue.task_done()
+
+    async def process_queue_forever(self):
         try:
-            self.process_queue()
+            await self.process_queue()
         finally:
-            self.process_queue_forever()
+            await self.process_queue_forever()
 
-    def do_actions(self, msgs: Sequence[BaseProtocol]):
-        raise NotImplementedError
+    @cached_property
+    def has_actions_no_decoding(self) -> bool:
+        return any([not a.requires_decoding for a in self.store_actions]) or any([not a.requires_decoding for a in self.print_actions])
 
+    @cached_property
+    def requires_decoding(self) -> bool:
+        return any([a.requires_decoding for a in self.store_actions]) or any([a.requires_decoding for a in self.print_actions])
 
 

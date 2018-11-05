@@ -1,10 +1,16 @@
 import datetime
-
+import logging
+import settings
 from lib.protocols.base import BaseProtocol
 from lib import utils
 from lib.utils import cached_property
 
 from typing import Sequence, Mapping
+
+
+from pycrate_core.charpy import Charpy
+
+logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BasePyCrateAsnProtocol(BaseProtocol):
@@ -14,18 +20,23 @@ class BasePyCrateAsnProtocol(BaseProtocol):
     """
 
     pycrate_asn_class = None
-    supported_actions = ("binary", "decode", "prettify", "summaries")
+    supported_actions = ("binary", "decode", "prettify", "summarise")
 
     def get_event_type(self):
         return ''
 
-    def decode(self) -> dict:
-        self.pycrate_asn_class.from_ber(self.encoded)
-        decoded = self.pycrate_asn_class()
-        return decoded
+    @classmethod
+    def decode(cls, encoded: bytes) -> Sequence:
+        msgs = []
+        char = Charpy(encoded)
+        while char._cur < char._len_bit:
+            cls.pycrate_asn_class.from_ber(char, single=True)
+            msgs.append(cls.pycrate_asn_class())
+        return msgs
 
-    def encode(self) -> bytes:
-        return self.pycrate_asn_class.to_ber(self.decoded)
+    @classmethod
+    def encode(cls, decoded) -> bytes:
+        return cls.pycrate_asn_class.to_ber(decoded)
 
     @cached_property
     def domain(self) -> str:

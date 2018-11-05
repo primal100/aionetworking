@@ -24,7 +24,7 @@ class SFTPClient(BaseNetworkClient):
         self.sftp = self.transport.start_sftp_client()
 
     async def close_connection(self):
-        self.transport.close()
+        self.transport.stop()
 
     async def send_data(self, encoded_data: AnyStr):
         filename = 'test'

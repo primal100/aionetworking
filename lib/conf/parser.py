@@ -19,8 +19,8 @@ class INIFileConfig(BaseConfigClass):
         return self.config.get('Receiver', 'Type')
 
     @property
-    def multiprocess(self):
-        return self.config.get('MessageManager', 'multiprocess')
+    def run_as(self):
+        return self.config.get('MessageManager', 'run_as', fallback='asyncio')
 
     @property
     def message_manager_is_batch(self) -> bool:

@@ -73,7 +73,7 @@ class SFTPServer(BaseServer):
 
     async def stop_server(self):
         if self.server:
-            self.server.close()
+            self.server.stop()
             await self.server.wait_closed()
 
 

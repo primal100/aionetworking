@@ -1,15 +1,16 @@
 import datetime
+import asyncio
 import logging
 
-from lib.utils import cached_property, unpack_variable_len_strings
+from lib.utils import cached_property
 import settings
 
 from typing import TYPE_CHECKING, Sequence, Mapping
 from pathlib import Path
 if TYPE_CHECKING:
-    from lib.actions.base import BaseAction
+    from lib.actions.base import BaseRawAction
 else:
-    BaseAction = None
+    BaseRawAction = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -24,23 +25,24 @@ class BaseProtocol:
     configurable = {}
 
     @classmethod
-    def from_file(cls, sender, file_path: Path):
-        logger.debug('Creating new %s message from %s', cls.protocol_name, file_path)
+    async def read_file(cls, file_path: Path):
         read_mode = 'rb' if cls.binary else 'r'
-        with file_path.open(read_mode) as f:
-            encoded = f.read()
-        return cls(sender, encoded)
+        async with settings.FILE_OPENER.open(file_path, read_mode) as f:
+            return await f.read()
 
     @classmethod
-    def from_file_multi(cls, sender, file_path: Path):
-        logger.debug('Creating new %s messages from %s', cls.protocol_name, file_path)
-        if cls.binary:
-            with file_path.open('rb') as f:
-                contents = f.read()
-            return [cls(sender, encoded) for encoded in unpack_variable_len_strings(contents)]
-        with file_path.open('r') as f:
-            contents = f.read()
-        return [cls(sender, encoded) for encoded in contents.split('\n') if encoded]
+    async def from_file(cls, file_path: Path, sender=''):
+        logger.debug('Creating new %s message from %s', cls.protocol_name, file_path)
+        encoded = await asyncio.create_task(cls.read_file(file_path))
+        return cls.from_buffer(sender, encoded)
+
+    @classmethod
+    def from_buffer(cls, sender, encoded, **kwargs) -> Sequence:
+        return [cls(sender, encoded, decoded, **kwargs) for decoded in cls.decode(encoded)]
+
+    @classmethod
+    def from_decoded(cls, decoded, sender='', **kwargs):
+        return cls(sender, cls.encode(decoded), decoded, **kwargs)
 
     @classmethod
     def set_config(cls, **kwargs):
@@ -49,15 +51,11 @@ class BaseProtocol:
         config.update(kwargs)
         cls.config = config
 
-    def __init__(self, sender, encoded=None, decoded=None, timestamp=None):
+    def __init__(self, sender, encoded, decoded, timestamp=None):
         self.sender = sender
         self._timestamp = timestamp
-        if encoded:
-            self.encoded = encoded
-            self.decoded = decoded or self.decode()
-        else:
-            self.decoded = decoded
-            self.encoded = self.encode()
+        self.encoded = encoded
+        self.decoded = decoded
 
     def get_protocol_name(self) -> str:
         return self.protocol_name
@@ -83,26 +81,14 @@ class BaseProtocol:
         return Path('%s_%s.%s' % (self.prefix, self.uid, self.file_extension))
 
     @cached_property
+    def storage_filename_multi(self) -> Path:
+        return Path('%s_%s.%s' % (self.prefix, self.protocol_name, self.file_extension))
+
+    @cached_property
     def file_extension(self) -> str:
         return self.protocol_name.replace('_', '').replace('-', '') or self.protocol_name.replace('_', '').replace('-',
                                                                                                                    '')
 
-    @cached_property
-    def file_extension_multi(self) -> str:
-        return self.file_extension + 'MULTI'
-
-    @property
-    def storage_filename_multiple(self) -> Path:
-        return Path('%s_%s.%s' % (self.prefix, self.protocol_name, self.file_extension_multi))
-
-    def unique_filename(self, base_path: Path, extension: str) -> Path:
-        base_file_path = base_path.joinpath(self.storage_filename_single)
-        file_path = base_file_path.with_suffix("." + extension)
-        i = 1
-        while file_path.exists():
-            file_path = Path(base_file_path.parent, "%s_%s%s" % (base_file_path.stem, i, file_path.suffix))
-            i += 1
-        return file_path
 
     @cached_property
     def uid(self):
@@ -132,5 +118,5 @@ class BaseProtocol:
     def filter(self):
         return False
 
-    def filter_by_action(self, action: 'BaseAction', toprint: bool):
+    def filter_by_action(self, action: BaseRawAction, toprint: bool):
         return False

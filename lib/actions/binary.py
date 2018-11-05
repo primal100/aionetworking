@@ -1,7 +1,6 @@
 import binascii
 
 from .base import BaseAction
-from lib import utils
 
 
 class Action(BaseAction):
@@ -16,14 +15,11 @@ class Action(BaseAction):
     def get_content(self, msg):
         return msg.encoded
 
-    def get_content_multi(self, msg) -> bytes:
-        return utils.pack_variable_len_string(self.get_content(msg))
-
     def get_file_extension(self, msg) -> str:
         return msg.file_extension
 
     def get_multi_file_extension(self, msg):
-        return self.get_file_extension(msg) + "MULTI"
+        return self.get_file_extension(msg)
 
     def print_msg(self, msg) -> str:
         return binascii.hexlify(msg.encoded).decode()

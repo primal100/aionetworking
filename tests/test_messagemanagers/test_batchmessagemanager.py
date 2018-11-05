@@ -1,5 +1,5 @@
 from lib.basetestcase import BaseTestCase
-from lib.messagemanagers import BatchMessageManager, MessageFromNotAuthorizedHost
+from lib.messagemanagers import BatchMessageManager
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.actions import binary, decode, prettify, summarise
 from lib import utils

@@ -1,2 +1,1 @@
-from .batchmessagemanager import BatchMessageManager
-from .managers import MessageManager
+from .managers import MessageManager, BatchMessageManager

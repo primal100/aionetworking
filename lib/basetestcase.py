@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import AnyStr
 
 settings.LOGGER_NAME = 'messagemanager'
+settings.DATA_DIR = settings.TEST_DATA_DIR
 logger = logging.getLogger(settings.LOGGER_NAME)
 logger.setLevel(logging.CRITICAL)
 
@@ -17,6 +18,9 @@ class BaseTestCase(TestCase):
     maxDiff = None
     log_level = logging.CRITICAL
     base_data_dir = settings.TEST_DATA_DIR
+
+    async def do_async(self, func, *args):
+        await func(*args)
 
     def enable_logging(self):
         logger.setLevel(self.log_level)

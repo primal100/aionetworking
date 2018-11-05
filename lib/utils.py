@@ -55,12 +55,6 @@ def current_date() -> str:
     return datetime.datetime.now().strftime("%Y%m%d")
 
 
-def append_to_csv(file_path: Path, lines: Sequence[Sequence]):
-    with file_path.open('a+') as f:
-        writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-        writer.writerows(lines)
-
-
 def adapt_asn_domain(domain: Sequence) -> str:
     return '.'.join([str(x) for x in domain])
 
@@ -97,7 +91,7 @@ def unpack_variable_len_strings(content: bytes) -> Sequence[bytes]:
     return bytes_list
 
 
-def pack_recorded_packet(seconds: int, sender: AnyStr, msg: bytes) -> bytes:
+def pack_recorded_packet(sender: AnyStr, msg: bytes, seconds: int) -> bytes:
     return struct.pack('I', seconds) + pack_variable_len_string(
             sender.encode()) + pack_variable_len_string(msg)
 
@@ -198,7 +192,7 @@ async def run_and_wait(method, *args, interval: int=7, **kwargs):
 
 async def run_wait_close(method, message_manager, *args, interval: int=1, **kwargs):
     await run_and_wait(method, *args, interval=interval, **kwargs)
-    await message_manager.close()
+    await message_manager.stop()
 
 
 async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequence],
@@ -206,4 +200,12 @@ async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequen
     for message in msgs:
         await run_and_wait(method, sender, message, interval=interval, **kwargs)
     await asyncio.sleep(final_interval)
-    await message_manager.close()
+    await message_manager.stop()
+
+
+def plural(num, string, past=False):
+    s = '%s %ss' % (num, string) if num != 1 else '%s %s' % (num, string)
+    if past:
+        s += ' were' if num != 1 else ' was'
+    return s
+

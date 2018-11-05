@@ -12,7 +12,7 @@ class TCAP_MAP_Testcase(BaseTestCase):
 
     def setUp(self):
         encoded = binascii.unhexlify(self.encoded_hex)
-        self.interface = self.protocol(self.sender, encoded)
+        self.interface = self.protocol.from_buffer(self.sender, encoded)[0]
 
     def test_00_decoded(self):
         self.assertTupleEqual(self.interface.decoded, ('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
@@ -58,11 +58,7 @@ class TCAP_MAP_Testcase(BaseTestCase):
         result = self.interface.storage_filename_single
         self.assertEqual(str(result), '10.10.10.10_00000001.TCAPMAP')
 
-    def test_10_storage_filename_multiple(self):
-        result = self.interface.storage_filename_multiple
-        self.assertEqual(str(result), '10.10.10.10_TCAP_MAP.TCAPMAPMULTI')
-
-    def test_11_summaries(self):
+    def test_10_summaries(self):
         result = self.interface.summaries
         self.assertListEqual(result, [('begin', '00000001', self.interface.timestamp)])
         self.assertIsInstance(self.interface.summaries[0][2], datetime.datetime)

@@ -1,12 +1,9 @@
 import asyncio
-import concurrent.futures
 import ssl
 import logging
 import datetime
 
-import definitions
 import settings
-from lib import utils
 from lib.conf import ConfigurationException
 
 from typing import TYPE_CHECKING, Optional, Sequence, Mapping, AnyStr
@@ -41,8 +38,6 @@ class BaseReceiver:
     ssl_allowed: bool = False
 
     configurable = {
-        'record': bool,
-        'record_file': Path,
         'ssl_enabled': bool,
         'ssl_cert': Path,
         'ssl_key': Path,
@@ -59,12 +54,11 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, status_change=status_change, **config)
 
-    def __init__(self, queue, status_change=None, record: bool=False,
-                 record_file: Path=None, ssl_enabled: bool=False, ssl_cert: Optional[Path]=None,
+    def __init__(self, queue, status_change=None, ssl_enabled: bool=False, ssl_cert: Optional[Path]=None,
                  ssl_key: Optional[Path]=None, allowed_senders: Sequence=(), aliases: Mapping=None,
                  generate_timestamp: bool=False):
 
-        self.queue = None
+        self.queue = queue
         self.status_change = status_change
         self.generate_timestamp = generate_timestamp
         if self.ssl_allowed:
@@ -76,16 +70,6 @@ class BaseReceiver:
             self.ssl_context = None
         self.allowed_senders = allowed_senders
         self.aliases = aliases or {}
-        self.record = record
-        self.record_file = record_file
-        if self.record:
-            if self.record_file:
-                self.record_file.parent.mkdir(parents=True, exist_ok=True)
-            else:
-                logger.error('No record file configured although record is set to true')
-                raise ConfigurationException('Please configure a record file when record is set to true')
-
-        self.prev_message_time = None
 
     @staticmethod
     def manage_ssl_params(enabled: bool, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
@@ -102,34 +86,20 @@ class BaseReceiver:
             logger.info("SSL is not enabled")
             return None
 
-    def record_packet(self, sender: str, msg: bytes):
-        logger.debug('Recording packet from %s', sender)
-        if self.prev_message_time:
-            message_timedelta = (datetime.datetime.now() - self.prev_message_time).seconds
-        else:
-            message_timedelta = 0
-        self.prev_message_time = datetime.datetime.now()
-        data = utils.pack_recorded_packet(message_timedelta, sender, msg)
-        with self.record_file.open('ab') as f:
-            f.write(data)
-
-    async def handle_message(self, sender: str, data: bytes):
+    def handle_message(self, sender: str, data: AnyStr):
         logger.debug("Received msg from %s", sender)
         data_logger.debug(data)
-
-        if self.record:
-            self.record_packet(sender, data)
 
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
             logger.debug('Generated timestamp: %s', timestamp)
         else:
             timestamp = None
-        logger.debug('Adding message from %s to queue', sender)
-        await self.add_to_queue(sender, data, timestamp)
+        logger.debug('Adding message to queue')
+        self.add_to_queue(sender, data, timestamp)
 
-    async def add_to_queue(self, host: str, encoded: AnyStr, timestamp: datetime):
-        self.queue.put((host, encoded, timestamp))
+    def add_to_queue(self, host: str, encoded: AnyStr, timestamp: datetime):
+        asyncio.create_task(self.queue.put((host, encoded, timestamp)))
 
     def get_alias(self, sender: str):
         alias = self.aliases.get(sender, sender)
@@ -148,33 +118,26 @@ class BaseReceiver:
         pass
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.stop()
+        await self.cleanup()
 
     def set_status_changed(self, change: str=''):
         if self.status_change:
             self.status_change.set()
         logger.debug('Status change event has been set to indicate %s receiver was %s', self.receiver_type, change)
 
-    def join(self, timeout=10):
-        self.queue.join()
-        with self.queue.all_tasks_done:
-            while self.queue.unfinished_tasks:
-                return self.queue.all_tasks_done.wait(timeout=timeout)
-
-    async def stop(self):
-        logger.info('Stopping %s application', self.receiver_type)
-        await self.close()
+    async def cleanup(self):
         timeout = 10
         logger.info('Waiting %s seconds for queue to empty', timeout)
-        if self.join(timeout=timeout):
-            logger.info('Queue empty. Cancelling task')
-        else:
-            logger.error('Queue did not empty. Cancelling task with messages in queue.')
-        self.process_queue_task.cancel()
+        #await self.queue.join()
+        try:
+            join_result = await asyncio.wait_for(self.queue.join(), timeout)
+            logger.info('Queue empty')
+        except asyncio.TimeoutError:
+            logger.error('Queue did not empty')
         logging.info('%s application stopped', self.receiver_type)
         self.set_status_changed('stopped')
 
-    async def close(self):
+    async def stop(self):
         raise NotImplementedError
 
     async def run(self):
@@ -198,14 +161,14 @@ class BaseServer(BaseReceiver):
         listening_on = ':'.join([str(v) for v in sock_name])
         print('Serving %s on %s' % (self.receiver_type, listening_on))
 
-    async def close(self):
-        logger.info('Closing %s running at %s', self.receiver_type,  self.listening_on)
+    async def stop(self):
+        logger.info('Stopping %s running at %s', self.receiver_type,  self.listening_on)
         await self.stop_server()
-        logging.info('%s closed', self.receiver_type)
+        logging.info('%s stopped', self.receiver_type)
 
     async def run(self):
         logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
-        await self.start_server()
+        return await self.start_server()
 
     async def stop_server(self):
         raise NotImplementedError
