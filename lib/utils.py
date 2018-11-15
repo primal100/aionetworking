@@ -1,6 +1,5 @@
 import datetime
 import os
-import csv
 import struct
 import re
 import asyncio

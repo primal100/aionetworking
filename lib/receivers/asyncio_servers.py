@@ -12,9 +12,8 @@ class TCPServerReceiver(BaseServer):
         self.server = await asyncio.get_event_loop().create_server(lambda: TCPServerProtocol(self), self.host,
                                                                    self.port,
                                                                    ssl=self.ssl_context)
-        socket = self.server.sockets[0]
-        self.print_listening_message(socket)
         async with self.server:
+            self.print_listening_message(self.server.sockets)
             self.set_status_changed('started')
             await self.server.serve_forever()
 
@@ -32,8 +31,7 @@ class UDPServerReceiver(BaseServer):
     async def start_server(self):
         self.transport, self.protocol = await asyncio.get_event_loop().create_datagram_endpoint(
             lambda: UDPServerProtocol(self), local_addr=(self.host, self.port))
-        socket = self.transport.sockets[0]
-        self.print_listening_message(socket)
+        self.print_listening_message(self.transport.sockets)
         self.set_status_changed('started')
 
     async def stop_server(self):

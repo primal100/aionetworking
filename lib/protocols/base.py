@@ -16,13 +16,12 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BaseProtocol:
-    asn_class = None
     protocol_type = None
-    domain_id_name = None
     protocol_name = ""
     supported_actions = ()
     binary = True
     configurable = {}
+    supports_responses = False
 
     @classmethod
     async def read_file(cls, file_path: Path):
@@ -89,7 +88,6 @@ class BaseProtocol:
         return self.protocol_name.replace('_', '').replace('-', '') or self.protocol_name.replace('_', '').replace('-',
                                                                                                                    '')
 
-
     @cached_property
     def uid(self):
         return ''
@@ -97,8 +95,9 @@ class BaseProtocol:
     def pprinted(self) -> Sequence[Mapping]:
         return self.prettified
 
-    def decode(self):
-        return self.encoded
+    @classmethod
+    def decode(cls, encoded: bytes) -> Sequence:
+        return [encoded]
 
     def encode(self):
         return self.decoded
@@ -118,5 +117,7 @@ class BaseProtocol:
     def filter(self):
         return False
 
-    def filter_by_action(self, action: BaseRawAction, toprint: bool):
+    def filter_by_action(self, action: BaseRawAction, to_print: bool):
         return False
+
+    def make_response(self, tasks): ...

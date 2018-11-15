@@ -2,16 +2,19 @@ import asyncio
 import binascii
 import datetime
 import logging
+import queue
 import shutil
+import threading
 from pathlib import Path
 
 from lib.basetestcase import BaseTestCase
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.actions import binary, decode, prettify, summarise
-from lib.run_manager import start_manager
+from lib.run_manager import start_threaded_manager
 from lib import utils
 import settings
 import definitions
+
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
@@ -49,18 +52,23 @@ class TestMessageManager(BaseTestCase):
         self.store_actions = [m.Action() for m in action_modules]
         self.print_actions = [m.Action(storage=False) for m in print_action_modules]
         self.timestamp = datetime.datetime(2018, 1, 1, 1, 1)
-        self.queue = asyncio.Queue()
         self.msgs = [binascii.unhexlify(encoded_hex) for encoded_hex in self.multiple_encoded_hex]
 
     async def run_and_add_item_to_queue(self):
-        manager_task = asyncio.create_task(start_manager(self.queue))
-        await self.queue.put((self.sender, self.msgs[0], self.timestamp))
+        manager_task = start_threaded_manager()
+        queue = manager_task.queue
+        await queue.put((self.sender, self.msgs[0], self.timestamp))
+        logger.debug('SLEEPING')
         await asyncio.sleep(1)
-        await asyncio.wait_for(self.queue.join(), timeout=10)
+        logger.debug('JOINING')
+        await asyncio.wait_for(queue.join(), timeout=10)
+        logger.debug('JOINED')
         manager_task.cancel()
+        logger.debug('TASK CANCELLED')
 
     def test_00_manage_message(self):
         asyncio.run(self.run_and_add_item_to_queue(), debug=True)
+        logger.debug('CHECKING')
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'Primary_00000001.TCAPMAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')

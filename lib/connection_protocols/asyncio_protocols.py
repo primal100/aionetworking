@@ -21,9 +21,14 @@ class BaseProtocolMixin:
     sock = (None, None)
     other_ip: str = None
     transport = None
-    num_msgs: int = 0
-    num_bytes: int = 0
-    direction: str = ''
+    sent_msgs: int = 0
+    sent_bytes: int = 0
+    received_msgs: int = 0
+    received_bytes: int = 0
+
+    def __init__(self, manager, has_responses=True):
+        self.manager = manager
+        self.has_responses = has_responses
 
     @property
     def client(self):
@@ -33,8 +38,11 @@ class BaseProtocolMixin:
     def server(self):
         raise NotImplementedError
 
+    def send(self, msg):
+        raise NotImplementedError
+
     def check_other(self, other_ip):
-        return other_ip
+        return self.manager.check_sender(other_ip)
 
     def connection_made(self, transport):
         self.transport = transport
@@ -55,12 +63,63 @@ class BaseProtocolMixin:
     def connection_lost(self, exc):
         self.manage_error(exc)
         logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
-        logger.info('%s and %s kb were %s during session', plural(self.num_msgs, 'message'), self.num_bytes / 1024,
-                     self.direction)
+        logger.info('%s and %s kb were sent during session', plural(self.sent_msgs, 'message'), self.sent_bytes / 1024)
+        logger.info('%s and %s kb were received during session', plural(self.received_msgs, 'message'), self.received_bytes / 1024)
+
+    def send_msgs(self, msgs):
+        for msg in msgs:
+            self.send(msg)
+
+    def on_data_received(self, sender, data):
+        if logger.isEnabledFor(logging.INFO):
+            self.received_msgs += 1
+            self.received_bytes += len(data)
+        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
+        if self.has_responses:
+            await task
+            result = task.result()
+            if result:
+                self.send_msgs(task.result())
 
 
-class ClientProtocolMixin(BaseProtocolMixin):
-    direction = 'sent'
+class TCP(BaseProtocolMixin, asyncio.Protocol):
+
+    @property
+    def client(self):
+        raise NotImplementedError
+
+    @property
+    def server(self):
+        raise NotImplementedError
+
+    def data_received(self, data):
+        self.on_data_received(self.other_ip, data)
+
+    def send(self, msg):
+        self.transport.write(msg)
+
+
+class UDP(BaseProtocolMixin, asyncio.DatagramProtocol):
+
+    @property
+    def client(self):
+        raise NotImplementedError
+
+    @property
+    def server(self):
+        raise NotImplementedError
+
+    def send(self, msg):
+        self.transport.sendto(msg)
+
+    def datagram_received(self, data, sender):
+        self.on_data_received(sender, data)
+
+    def error_received(self, exc):
+        self.manage_error(exc)
+
+
+class ClientProtocolMixin:
 
     @property
     def client(self) -> str:
@@ -71,22 +130,7 @@ class ClientProtocolMixin(BaseProtocolMixin):
         return self.peer
 
 
-class TCPClientProtocol(ClientProtocolMixin, asyncio.Protocol):
-    name = 'TCP Client'
-
-
-class UDPClientProtocol(ClientProtocolMixin, asyncio.DatagramProtocol):
-    name = 'UDP Client'
-
-    def error_received(self, exc):
-        self.manage_error(exc)
-
-
-class ServerProtocolMixin(BaseProtocolMixin):
-    direction = 'received'
-
-    def __init__(self, receiver: BaseReceiver):
-        self.receiver = receiver
+class ServerProtocolMixin:
 
     @property
     def client(self) -> str:
@@ -98,28 +142,18 @@ class ServerProtocolMixin(BaseProtocolMixin):
     def server(self) -> str:
         return self.sock
 
-    def on_data_received(self, sender, data):
-        if logger.isEnabledFor(logging.INFO):
-            self.num_msgs += 1
-            self.num_bytes += len(data)
-        self.receiver.handle_message(self.alias, data)
 
-    def check_other(self, other_ip):
-        return self.receiver.check_sender(other_ip)
-
-
-class TCPServerProtocol(ServerProtocolMixin, asyncio.Protocol):
+class TCPServerProtocol(ServerProtocolMixin, TCP):
     name = 'TCP Server'
 
-    def data_received(self, data):
-        self.on_data_received(self.other_ip, data)
+
+class TCPClientProtocol(ClientProtocolMixin, TCP):
+    name = 'TCP Client'
 
 
-class UDPServerProtocol(ServerProtocolMixin, asyncio.DatagramProtocol):
+class UDPServerProtocol(ServerProtocolMixin, UDP):
     name = 'UDP Server'
 
-    def error_received(self, exc):
-        self.manage_error(exc)
 
-    def datagram_received(self, data, sender):
-        self.on_data_received(sender, data)
+class UDPClientProtocol(ClientProtocolMixin, UDP):
+    name = 'UDP Client'

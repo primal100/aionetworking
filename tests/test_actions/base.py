@@ -31,3 +31,17 @@ class BaseTCAPMAPActionTestCase(BaseTestCase):
         self.msg = self.protocol.from_buffer(self.sender, binascii.unhexlify(self.encoded_hex), timestamp=timestamp)[0]
         self.msgs = [self.protocol.from_buffer(self.sender, binascii.unhexlify(encoded_hex), timestamp=timestamp)[0] for encoded_hex in
                      self.multiple_encoded_hex]
+
+
+class BaseTCAPMAPRawActionTestCase(BaseTCAPMAPActionTestCase):
+
+    def setUp(self):
+        self.enable_logging()
+        try:
+            shutil.rmtree(Path(self.base_data_dir, BaseAction.default_data_dir))
+        except OSError:
+            pass
+        self.action = self.action_cls()
+        self.print_action = self.action_cls(storage=False)
+        self.packet = binascii.unhexlify(self.encoded_hex)
+        self.packets = [binascii.unhexlify(h) for h in self.multiple_encoded_hex]

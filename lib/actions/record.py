@@ -2,7 +2,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from .base import BaseRawAction
+from .base import BaseAction
 from lib import utils
 import settings
 
@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(settings.LOGGER_NAME)
 
 
-class Action(BaseRawAction):
+class Action(BaseAction):
     requires_decoding = False
     store_many_write_mode = 'ab'
     prev_message_time = 0

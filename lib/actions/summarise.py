@@ -29,7 +29,7 @@ class Action(BaseStoreAction):
         writer.writerows(msg.summaries)
         return s.getvalue()
 
-    def print(self, msg, sender):
+    def print(self, msg):
         if not self.filtered(msg, True):
             print(self.print_msg(msg))
         else:

@@ -3,8 +3,7 @@ import concurrent.futures
 import logging
 
 import settings
-
-from typing import Callable
+from lib.wrappers.tasks import TaskWrapper
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -31,15 +30,6 @@ def start_manager_as_process(queue):
     start_manager_as_loop(queue)
 
 
-async def run(executor, callback: Callable, *args):
-    logger.debug('Running Message Manager in executor')
-    with executor() as pool:
-        task = await asyncio.get_running_loop().run_in_executor(
-            pool, callback, *args)
-        task.add_done_callback(executor_callback)
-        return task
-
-
 def get_protocol_manager():
 
     import definitions
@@ -60,24 +50,27 @@ def get_protocol_manager():
 
 
 async def start_manager(queue, **kwargs):
-    logger.debug('starting manager')
+    logger.debug('Starting manager')
     protocol_cls, manager_cls = get_protocol_manager()
-    await manager_cls.from_config(protocol_cls, queue, **kwargs).process_queue_forever()
+    manager_cls.from_config(protocol_cls, queue, **kwargs).process_queue_forever()
 
 
-def start_manager_as_loop(queue, **kwargs):
-    logger.debug('starting manager as loop')
-    asyncio.run(start_manager(queue, **kwargs))
+def start_manager_task(queue=None):
+    return TaskWrapper.get_task(start_manager, queue=queue, run_as=settings.CONFIG.run_as)
 
 
-def start_threaded_manager(queue) -> asyncio.Task:
-    executor = concurrent.futures.ThreadPoolExecutor
-    return asyncio.create_task(run(executor, start_manager_as_loop, queue))
+def start_manager_as_loop(queue, stop_event, **kwargs):
+    logger.debug('Starting manager as loop')
+    asyncio.run(start_manager(queue, stop_event, **kwargs))
 
 
-def start_multiprocess_manager(queue) -> asyncio.Task:
-    executor = concurrent.futures.ProcessPoolExecutor
-    return asyncio.create_task(run(executor, start_manager_as_process, queue))
+def start_threaded_manager():
+    return ExecutorTaskWrapper.thread(start_manager)
+
+
+def start_multiprocess_manager():
+    return ExecutorTaskWrapper.process(start_manager_as_process)
+
 
 def start_multiprocess_manager2(queue) -> asyncio.Task:
     executor = concurrent.futures.ThreadPoolExecutor

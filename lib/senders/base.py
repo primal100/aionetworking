@@ -8,9 +8,9 @@ from lib import utils
 from typing import TYPE_CHECKING, Sequence, AnyStr, Type
 from pathlib import Path
 if TYPE_CHECKING:
-    from lib.protocols.base import BaseProtocol
+    from lib.messagemanagers.base import BaseMessageManager
 else:
-    BaseProtocol = None
+    BaseMessageManager = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
@@ -25,15 +25,15 @@ class BaseSender:
     }
 
     @classmethod
-    def from_config(cls, msg_protocol: Type[BaseProtocol], queue=None, **kwargs):
+    def from_config(cls, manager: BaseMessageManager, queue=None, **kwargs):
         config = settings.CONFIG.section_as_dict('Sender', **cls.configurable)
         config.update(settings.CONFIG.section_as_dict('Receiver', **cls.receiver_configurable))
         logger.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
-        return cls(msg_protocol, queue=queue, **config)
+        return cls(manager, queue=queue, **config)
 
-    def __init__(self, msg_protocol: Type[BaseProtocol], queue=None, interval: float=0):
-        self.msg_protocol = msg_protocol
+    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0):
+        self.manager = manager
         self.queue = queue
         self.interval = interval
         if self.queue:
@@ -54,16 +54,13 @@ class BaseSender:
             await self.process_queue_later()
 
     async def process_queue(self):
-        msgs = []
+        msg = await self.queue.wait()
         try:
-            while not self.queue.empty():
-                msgs.append(self.queue.get_nowait())
-                logger.debug('Took item from queue')
-            await self.send_msgs(msgs)
+            logger.debug('Took item from queue')
+            await self.send_msg(msg)
         finally:
-            for msg in msgs:
-                logger.debug("Setting task done on queue")
-                self.queue.task_done()
+            logger.debug("Setting task done on queue")
+            self.queue.task_done()
 
     async def close_queue(self):
         if self.queue:
@@ -83,6 +80,7 @@ class BaseSender:
 
     async def __aenter__(self):
         await self.start()
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close_queue()
@@ -119,7 +117,7 @@ class BaseSender:
             await self.encode_and_send_msg(decoded_msg)
 
     async def encode_and_send_msg(self, msg_decoded):
-        msg = self.msg_protocol.from_decoded(msg_decoded, sender=self.source)
+        msg = self.manager.protocol.from_decoded(msg_decoded, sender=self.source)
         await self.send_msg(msg.encoded)
 
     async def play_recording(self, file_path:Path, immediate:bool=False):

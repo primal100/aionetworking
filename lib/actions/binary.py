@@ -9,11 +9,9 @@ class Action(BaseAction):
     """
     action_name = 'Binary'
     default_data_dir = "Encoded"
-    store_write_mode = 'wb+'
-    store_many_write_mode = 'ab+'
-
-    def get_content(self, msg):
-        return msg.encoded
+    store_write_mode = 'wb'
+    store_many_write_mode = 'ab'
+    single_extension = None
 
     def get_file_extension(self, msg) -> str:
         return msg.file_extension

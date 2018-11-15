@@ -13,7 +13,7 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 queue = AsyncQueueWrapper(JoinableQueue())
 
 
-def start_manager_as_process():
+def start_manager_as_process(stop_event):
     print('STARTING')
     import settings
     import definitions
@@ -25,12 +25,12 @@ def start_manager_as_process():
     logger.info('Starting Message Manager for %s', settings.APP_NAME)
     settings.HOME = settings.CONFIG.home
     settings.DATA_DIR = settings.CONFIG.data_home
-    start_manager_as_loop(queue)
+    start_manager_as_loop(queue, stop_event)
 
 
-def start_multiprocess_manager() -> asyncio.Task:
+def start_multiprocess_manager(stop_event) -> asyncio.Task:
     executor = concurrent.futures.ProcessPoolExecutor
-    return asyncio.create_task(run(executor, start_manager_as_process))
+    return asyncio.create_task(run(executor, start_manager_as_process, stop_event))
 
 
 def start_multiprocess_manager2(queue) -> asyncio.Task:

@@ -14,7 +14,7 @@ else:
 logger = logging.getLogger(settings.LOGGER_NAME)
 
 
-class BaseRawAction:
+class BaseAction:
 
     action_name = ''
     default_data_dir = ""
@@ -44,7 +44,7 @@ class BaseRawAction:
             logger.info("Setting up action %s for print", self.action_name)
 
     def get_content(self, msg: BaseProtocol):
-        raise NotImplementedError
+        return msg.encoded
 
     def get_content_multi(self, msg: BaseProtocol):
         return self.get_content(msg)
@@ -52,9 +52,9 @@ class BaseRawAction:
     def print_msg(self, msg: BaseProtocol):
         return self.get_content(msg)
 
-    def print(self, msg: BaseProtocol, sender: str):
+    def print(self, msg: BaseProtocol):
         if not self.filtered(msg, True):
-            print(underline("Message received from %s:" % sender))
+            print(underline("Message received from %s:" % msg.sender))
             print(self.print_msg(msg))
             print("")
         else:
@@ -66,9 +66,8 @@ class BaseRawAction:
             await f.write(data)
         logger.debug('%s message stored in %s', self.action_name.capitalize(), file_path)
 
-    def unique_filename(self, base_path: Path, msg) -> Path:
+    def unique_filename(self, base_file_path: Path, msg) -> Path:
         extension = self.get_file_extension(msg)
-        base_file_path = base_path.joinpath(self.get_storage_filename_single(msg))
         file_path = base_file_path.with_suffix("." + extension)
         i = 1
         while True:
@@ -80,33 +79,23 @@ class BaseRawAction:
                 i += 1
         return file_path
 
-    def do(self, msg: BaseProtocol, sender: str):
+    def do(self, msg: BaseProtocol):
         if not self.filtered(msg):
             file_path = self.get_storage_path_single(msg)
-            file_path.touch()
             task = asyncio.create_task(self.write_to_file(file_path, self.get_content(msg), self.store_write_mode))
             return task
         else:
             logger.debug("Message filtered for action %s", self.action_name)
             return None
 
-    def get_storage_path_single(self, msg):
-        return Path('')
-
-    def get_storage_filename_single(self, msg):
-        return Path('')
-
     def get_file_extension(self, msg: BaseProtocol) -> str:
-        return self.single_extension
+        return self.single_extension or msg.file_extension
 
     def get_multi_file_extension(self, msg: BaseProtocol) -> str:
         return self.multi_extension
 
-    def get_storage_filename_multiple(self, msg):
-        return Path('')
-
-    def filtered(self, msg, storage=True):
-        return False
+    def filtered(self, msg, to_print=False):
+        return msg.filter_by_action(self, to_print)
 
     def writes_for_store_many(self, msgs: Sequence[BaseProtocol]) -> Mapping[Path, AnyStr]:
         writes = {}
@@ -134,20 +123,13 @@ class BaseRawAction:
     def do_multiple(self, msgs):
         self.store_many(msgs)
 
-
-class BaseAction(BaseRawAction):
-
-    def get_content(self, msg: BaseProtocol):
-        raise NotImplementedError
-
     def get_storage_filename_multiple(self, msg):
         return msg.storage_filename_multi.with_suffix("." + self.get_multi_file_extension(msg))
-
-    def filtered(self, msg, print=False):
-        return msg.filter_by_action(self, print)
 
     def get_storage_path_single(self, msg):
         path = self.base_path.joinpath(msg.storage_path_single, msg.storage_filename_single)
         path.parent.mkdir(exist_ok=True, parents=True)
         return self.unique_filename(path, msg)
+
+
 

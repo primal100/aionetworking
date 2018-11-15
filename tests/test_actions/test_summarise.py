@@ -20,12 +20,12 @@ class TestSummariseActionTCAPMAP(BaseTCAPMAPActionTestCase):
     def test_01_print_msg(self):
         content = self.action.print_msg(self.msg)
         self.assertEqual(content,
-                         'begin\t00000001\t2018-01-01 01:01:00\n'
+                         'begin\t00000001\t2018-01-01 01:01:00'
                          )
 
     def test_02_print(self):
         for msg in self.msgs:
-            self.action.print(msg, self.sender)
+            self.action.print(msg)
 
     def test_03_get_extension(self):
         result = self.action.get_file_extension(self.msg)
@@ -35,6 +35,7 @@ class TestSummariseActionTCAPMAP(BaseTCAPMAPActionTestCase):
         result = self.action.get_multi_file_extension(self.msg)
         self.assertEqual(result, 'csv')
 
+    @skip
     def test_05_writes_for_store_many(self):
         content = self.action.writes_for_store_many(self.msgs)
         self.assertDictEqual(content,
@@ -46,7 +47,7 @@ class TestSummariseActionTCAPMAP(BaseTCAPMAPActionTestCase):
                          )
 
     def test_06_do(self):
-        asyncio.run(self.do_async(self.action.do, self.msg, self.sender))
+        asyncio.run(self.do_async(self.action.do, self.msg))
         expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
         self.assertFileContentsEqual(expected_file,
                                      'begin\t00000001\t2018-01-01 01:01:00\n'

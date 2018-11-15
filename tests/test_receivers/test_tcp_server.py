@@ -10,13 +10,9 @@ import shutil
 import multiprocessing
 
 from lib.basetestcase import BaseTestCase
-from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.senders import tasks
 from lib import utils
 from lib.run_sender import get_sender
-
-settings.CONFIG_ARGS = settings.TEST_CONF_DIR.joinpath('tcp_server_test_setup.ini'),
-definitions.PROTOCOLS = {'TCAP': TCAP_MAP_ASNProtocol}
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
