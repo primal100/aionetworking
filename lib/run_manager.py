@@ -39,12 +39,7 @@ def get_protocol_manager():
     protocol = definitions.PROTOCOLS[protocol_name]
     protocol.set_config()
 
-    message_manager_is_batch = settings.CONFIG.message_manager_is_batch
-    if message_manager_is_batch:
-        logger.info('Message manager configured in batch mode')
-        manager_cls = definitions.BATCH_MESSAGE_MANAGER
-    else:
-        manager_cls = definitions.MESSAGE_MANAGER
+    manager_cls = definitions.MESSAGE_MANAGER
 
     return protocol, manager_cls
 

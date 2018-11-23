@@ -34,6 +34,7 @@ class BaseSender:
 
     def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0):
         self.manager = manager
+        self.protocol = manager.protocol
         self.queue = queue
         self.interval = interval
         if self.queue:
@@ -91,6 +92,9 @@ class BaseSender:
 
     async def stop(self):
         pass
+
+    async def response(self):
+        await self.manager.wait_response()
 
     async def send_data(self, msg_encoded: bytes):
         raise NotImplementedError
@@ -175,7 +179,9 @@ class BaseNetworkClient(BaseSender):
     async def start(self):
         logger.info("Opening %s connection to %s", self.sender_type, self.dst)
         await self.open_connection()
+        logger.info("Connection open")
 
     async def stop(self):
         logger.info("Closing %s connection to %s", self.sender_type, self.dst)
         await self.close_connection()
+        logger.info("Connection closed")

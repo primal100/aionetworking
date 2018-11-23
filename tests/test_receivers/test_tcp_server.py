@@ -8,11 +8,13 @@ import settings
 import time
 import shutil
 import multiprocessing
+import traceback
 
 from lib.basetestcase import BaseTestCase
 from lib.senders import tasks
 from lib import utils
 from lib.run_sender import get_sender
+from lib.wrappers.events import AsyncEventWrapper
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -52,10 +54,9 @@ class TestTCPServer(BaseTestCase):
         self.client_two = get_sender()
 
     def tearDown(self):
-        if os.name == 'nt':
-            self.status_change.clear()
-            self.stop_ordered.set()
-            self.status_change.wait()
+        self.status_change.clear()
+        self.stop_ordered.set()
+        self.status_change.wait()
         self.process.terminate()
         self.process.join()
 

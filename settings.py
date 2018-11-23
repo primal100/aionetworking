@@ -25,4 +25,4 @@ RAWDATA_LOGGER_NAME = 'rawdata'
 POSTFIX = 'receiver'
 CONFIG = None
 CONFIG_ARGS = CONF_DIR.joinpath("setup.ini"),
-FILE_OPENER = aiofile
+FILE_OPENER = aiofile.AIOFile

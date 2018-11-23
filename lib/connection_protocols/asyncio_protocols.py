@@ -3,13 +3,13 @@ import logging
 
 
 import settings
-from lib.utils import plural
+from lib.utils import plural, log_exception
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from lib.receivers.base import BaseReceiver
+    from lib.messagemanagers.base import BaseMessageManager
 else:
-    BaseReceiver = None
+     BaseMessageManager = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -26,9 +26,8 @@ class BaseProtocolMixin:
     received_msgs: int = 0
     received_bytes: int = 0
 
-    def __init__(self, manager, has_responses=True):
+    def __init__(self, manager: BaseMessageManager):
         self.manager = manager
-        self.has_responses = has_responses
 
     @property
     def client(self):
@@ -40,6 +39,12 @@ class BaseProtocolMixin:
 
     def send(self, msg):
         raise NotImplementedError
+
+    def send_msg(self, msg):
+        if logger.isEnabledFor(logging.INFO):
+            self.sent_msgs += 1
+            self.sent_bytes += len(msg)
+        return self.send(msg)
 
     def check_other(self, other_ip):
         return self.manager.check_sender(other_ip)
@@ -68,18 +73,20 @@ class BaseProtocolMixin:
 
     def send_msgs(self, msgs):
         for msg in msgs:
-            self.send(msg)
+            self.send_msg(msg)
+
+    async def data_received_task(self, data):
+        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
+        responses = await task
+        if responses:
+            self.send_msgs(responses)
 
     def on_data_received(self, sender, data):
+        logger.debug("Received msg from %s", sender)
         if logger.isEnabledFor(logging.INFO):
             self.received_msgs += 1
             self.received_bytes += len(data)
-        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
-        if self.has_responses:
-            await task
-            result = task.result()
-            if result:
-                self.send_msgs(task.result())
+        asyncio.create_task(self.data_received_task(data))
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):

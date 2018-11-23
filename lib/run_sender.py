@@ -34,5 +34,9 @@ def get_sender() -> BaseSender:
     protocol = definitions.PROTOCOLS[protocol_name]
     protocol.set_config()
 
-    sender = sender_cls.from_config(protocol)
+    manager_cls = definitions.CLIENT_MESSAGE_MANAGER
+
+    manager = manager_cls.from_config(protocol)
+
+    sender = sender_cls.from_config(manager)
     return sender

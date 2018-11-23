@@ -120,4 +120,8 @@ class BaseProtocol:
     def filter_by_action(self, action: BaseRawAction, to_print: bool):
         return False
 
-    def make_response(self, tasks): ...
+    def make_response(self, *tasks): ...
+
+    def make_response_invalid_request(self, task):
+        return self.make_response(task)
+

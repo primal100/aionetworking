@@ -3,7 +3,9 @@ import logging
 from pathlib import Path
 
 import settings
+from lib.wrappers.executors import TaskExecutor
 from lib.utils import underline
+from .wrappers import QueueWrapper
 
 from typing import TYPE_CHECKING, Sequence, Mapping, AnyStr
 if TYPE_CHECKING:
@@ -26,15 +28,18 @@ class BaseAction:
     requires_decoding: bool = True
 
     @classmethod
-    def from_config(cls, storage: bool=True, **kwargs):
+    def from_config(cls, batch:bool=False, storage: bool=True, **kwargs):
         config = settings.CONFIG.section_as_dict(cls.action_name, **cls.configurable)
         config['base_path'] = settings.CONFIG.path_for_action(cls.action_name, cls.default_data_dir)
         logger.debug('Found configuration for %s:%s', cls.action_name, config)
         config.update(kwargs)
+        if batch:
+            return QueueWrapper(cls(storage=storage, **config))
         return cls(storage=storage, **config)
 
-    def __init__(self, base_path: Path=None, storage: bool=True):
+    def __init__(self, base_path: Path=None, storage: bool=True, executor=None):
 
+        self.storage = storage
         if storage:
             logger.info("Setting up action %s for storage", self.action_name)
             self.base_path = base_path or settings.DATA_DIR.joinpath(self.default_data_dir)
@@ -42,6 +47,7 @@ class BaseAction:
             self.base_path.mkdir(parents=True, exist_ok=True)
         else:
             logger.info("Setting up action %s for print", self.action_name)
+        self.executor = executor or TaskExecutor()
 
     def get_content(self, msg: BaseProtocol):
         return msg.encoded
@@ -52,7 +58,7 @@ class BaseAction:
     def print_msg(self, msg: BaseProtocol):
         return self.get_content(msg)
 
-    def print(self, msg: BaseProtocol):
+    async def print(self, msg: BaseProtocol):
         if not self.filtered(msg, True):
             print(underline("Message received from %s:" % msg.sender))
             print(self.print_msg(msg))
@@ -62,7 +68,7 @@ class BaseAction:
 
     async def write_to_file(self, file_path: Path, data: AnyStr, write_mode: str):
         logger.debug('Storing %s message in %s', self.action_name, file_path)
-        async with settings.FILE_OPENER.open(file_path, write_mode) as f:
+        async with settings.FILE_OPENER(str(file_path), write_mode) as f:
             await f.write(data)
         logger.debug('%s message stored in %s', self.action_name.capitalize(), file_path)
 
@@ -97,16 +103,22 @@ class BaseAction:
     def filtered(self, msg, to_print=False):
         return msg.filter_by_action(self, to_print)
 
-    def writes_for_store_many(self, msgs: Sequence[BaseProtocol]) -> Mapping[Path, AnyStr]:
+    @staticmethod
+    def writes_for_store_many(items: Sequence[Sequence]) -> Mapping[Path, AnyStr]:
         writes = {}
-        for msg in msgs:
-            if not self.filtered(msg):
-                file_name = self.get_storage_filename_multiple(msg)
-                if file_name in writes:
-                    writes[file_name] += self.get_content_multi(msg)
-                else:
-                    writes[file_name] = self.get_content_multi(msg)
+        for file_name, content in items:
+            if file_name in writes:
+                writes[file_name] += content
+            else:
+                writes[file_name] = content
         return writes
+
+    def prepare_for_multi(self, msg):
+        if not self.filtered(msg):
+            file_name = self.get_storage_filename_multiple(msg)
+            data = self.get_content_multi(msg)
+            return file_name, data
+        return None
 
     def write_to_files(self, base_path: Path, write_mode: str, file_writes: Mapping[Path, AnyStr]):
         """
@@ -116,8 +128,8 @@ class BaseAction:
             file_path = base_path.joinpath(file_name)
             asyncio.create_task(self.write_to_file(file_path, file_writes[file_name], write_mode))
 
-    def store_many(self, msgs: Sequence[BaseProtocol]):
-        writes = self.writes_for_store_many(msgs)
+    async def store_many(self, items: Sequence[Sequence]):
+        writes = await self.executor.run(self.writes_for_store_many(items))
         self.write_to_files(self.base_path, self.store_many_write_mode, writes)
 
     def do_multiple(self, msgs):
@@ -131,5 +143,7 @@ class BaseAction:
         path.parent.mkdir(exist_ok=True, parents=True)
         return self.unique_filename(path, msg)
 
+    async def close(self):
+        logger.debug('Action closed')
 
 

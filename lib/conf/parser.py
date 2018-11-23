@@ -11,7 +11,6 @@ class INIFileConfig(BaseConfigClass):
     def __init__(self, filename: Path):
         super(INIFileConfig, self).__init__()
         self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
-        #self.config.optionxform = str
         self.config.read(filename)
 
     @property

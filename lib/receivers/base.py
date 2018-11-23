@@ -1,4 +1,5 @@
 import ssl
+import traceback
 import logging
 
 import settings
@@ -22,6 +23,7 @@ class ServerException(Exception):
 class BaseReceiver:
     receiver_type: str = ''
     ssl_allowed: bool = False
+    supports_responses: bool = False
 
     configurable = {
         'ssl_enabled': bool,
@@ -49,6 +51,10 @@ class BaseReceiver:
         else:
             self.ssl_context = None
 
+    @property
+    def has_responses(self):
+        return self.supports_responses and self.manager.supports_responses
+
     @staticmethod
     def manage_ssl_params(enabled: bool, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
         if enabled:
@@ -68,22 +74,24 @@ class BaseReceiver:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        logger.debug('Exiting %s receiver', self.receiver_type)
+        if exc_type:
+            error = traceback.format_exception(exc_type, exc_val, exc_tb)
+            logger.error('\n'.join(error))
         await self.close()
+        logger.debug('Exited from %s', self.receiver_type)
 
-    def set_status_changed(self, change: str=''):
-        if self.status_change:
-            self.status_change.set()
-        logger.debug('Status change event has been set to indicate %s receiver was %s', self.receiver_type, change)
+    def set_status_changed(self, event, change: str=''):
+        event.set()
+        logger.debug('Event has been set to indicate %s receiver was %s', self.receiver_type, change)
 
     async def close(self):
         await self.stop()
-        await self.manager.cleanup()
-        self.set_status_changed('stopped')
 
     async def stop(self):
         raise NotImplementedError
 
-    async def run(self):
+    async def run(self, started_event):
         raise NotImplementedError
 
 
@@ -110,12 +118,12 @@ class BaseServer(BaseReceiver):
         await self.stop_server()
         logging.info('%s stopped', self.receiver_type)
 
-    async def run(self):
+    async def run(self, started_event):
         logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
-        return await self.start_server()
+        return await self.start_server(started_event)
 
     async def stop_server(self):
         raise NotImplementedError
 
-    async def start_server(self):
+    async def start_server(self, started_event):
         raise NotImplementedError

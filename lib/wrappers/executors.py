@@ -12,6 +12,9 @@ class BaseTaskExecutor:
     async def run(self, func, *args):
         raise NotImplementedError
 
+    async def run_coroutine(self, coro):
+        raise NotImplementedError
+
 
 class TaskExecutor:
 
@@ -24,10 +27,11 @@ class ThreadedTaskExecutor:
 
     def __init__(self, max_workers=None):
         self.executor = self.executor_cls(max_workers=max_workers)
+        self.loop = asyncio.get_event_loop()
 
     async def run(self, func, *args):
-        return asyncio.get_event_loop().run_in_executor(self.executor, func, *args)
+        return await self.loop.run_in_executor(self.executor, func, *args)
 
 
-class ProcessTaskExecutor:
+class ProcessTaskExecutor(ThreadedTaskExecutor):
     executor_cls = concurrent.futures.ProcessPoolExecutor

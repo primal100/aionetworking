@@ -3,11 +3,11 @@ import os
 import struct
 import re
 import asyncio
+import traceback
 
 from pathlib import Path
 
 from typing import Sequence, Mapping, AnyStr, Tuple
-
 
 def set_loop():
     if os.name == 'nt':
@@ -15,6 +15,11 @@ def set_loop():
         import asyncio
         loop = asyncio.ProactorEventLoop()
         asyncio.set_event_loop(loop)
+
+
+def log_exception(ex):
+        return [line.rstrip('\n') for line in
+                traceback.format_exception(ex.__class__, ex, ex.__traceback__)]
 
 
 def timestamp_to_utc_string(dt) -> str:

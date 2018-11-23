@@ -16,7 +16,7 @@ class BaseAsyncioClient(BaseNetworkClient):
         self.transport.close()
 
     async def send_data(self, encoded_data):
-        self.connection_protocol.send(encoded_data)
+        self.connection_protocol.send_msg(encoded_data)
 
     async def open_connection(self):
         raise NotImplementedError
@@ -29,7 +29,7 @@ class TCPClient(BaseAsyncioClient):
 
     async def open_connection(self):
         self.transport, self.connection_protocol = await asyncio.get_event_loop().create_connection(
-            TCPClientProtocol, self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
+            lambda: TCPClientProtocol(self.manager, has_responses=False), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
 
 
 class UDPClient(BaseAsyncioClient):
