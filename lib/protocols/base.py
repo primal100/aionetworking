@@ -24,6 +24,10 @@ class BaseProtocol:
     supports_responses = False
 
     @classmethod
+    def invalid_request_response(cls, sender, data, exc):
+        return None
+
+    @classmethod
     async def read_file(cls, file_path: Path):
         read_mode = 'rb' if cls.binary else 'r'
         async with settings.FILE_OPENER.open(file_path, read_mode) as f:

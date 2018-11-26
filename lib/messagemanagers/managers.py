@@ -2,6 +2,7 @@ import asyncio
 import datetime
 
 from .base import BaseMessageManager
+from lib.utils import log_exception
 import settings
 import logging
 
@@ -14,6 +15,7 @@ else:
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
+
 
 class MessageManager(BaseMessageManager):
     name = 'Message Manager'
@@ -42,8 +44,14 @@ class MessageManager(BaseMessageManager):
             for msg in msgs:
                 if not msg.filter():
                     tasks = self.do_actions(msg)
+                    done, pending = await asyncio.wait(tasks)
+                    results = [d.result() for d in done]
+                    exceptions = [d.exception() for d in done]
+                    for exc in exceptions:
+                        if exc:
+                            logger.error(log_exception(exc))
                     if self.supports_responses:
-                        response = msg.make_response(asyncio.gather(tasks))
+                        response = msg.make_response(results, exceptions)
                         if response is not None:
                             responses.append(response)
                 else:

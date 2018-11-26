@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lib.messagemanagers.base import BaseMessageManager
 else:
-     BaseMessageManager = None
+    BaseMessageManager = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -41,10 +41,10 @@ class BaseProtocolMixin:
         raise NotImplementedError
 
     def send_msg(self, msg):
+        self.send(msg)
         if logger.isEnabledFor(logging.INFO):
             self.sent_msgs += 1
             self.sent_bytes += len(msg)
-        return self.send(msg)
 
     def check_other(self, other_ip):
         return self.manager.check_sender(other_ip)
@@ -59,11 +59,10 @@ class BaseProtocolMixin:
         self.alias = self.check_other(self.other_ip)
         logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
-    def manage_error(self, exc):
+    @staticmethod
+    def manage_error(exc):
         if exc:
-            error = '{} {}'.format(exc, self.peer)
-            print(error)
-            logger.error(error)
+            logger.error(log_exception(exc))
 
     def connection_lost(self, exc):
         self.manage_error(exc)
@@ -75,18 +74,20 @@ class BaseProtocolMixin:
         for msg in msgs:
             self.send_msg(msg)
 
-    async def data_received_task(self, data):
-        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
-        responses = await task
+    def task_callback(self, future):
+        exc = future.exception()
+        self.manage_error(exc)
+        responses = future.result()
         if responses:
             self.send_msgs(responses)
 
     def on_data_received(self, sender, data):
-        logger.debug("Received msg from %s", sender)
         if logger.isEnabledFor(logging.INFO):
+            logger.debug("Received msg from %s", sender)
             self.received_msgs += 1
             self.received_bytes += len(data)
-        asyncio.create_task(self.data_received_task(data))
+        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
+        task.add_done_callback(self.task_callback)
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):

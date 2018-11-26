@@ -29,7 +29,7 @@ class TCPClient(BaseAsyncioClient):
 
     async def open_connection(self):
         self.transport, self.connection_protocol = await asyncio.get_event_loop().create_connection(
-            lambda: TCPClientProtocol(self.manager, has_responses=False), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
+            lambda: TCPClientProtocol(self.manager), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
 
 
 class UDPClient(BaseAsyncioClient):

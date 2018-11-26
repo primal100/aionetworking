@@ -3,7 +3,7 @@ import traceback
 import logging
 import datetime
 
-from lib.utils import cached_property
+from lib.utils import cached_property, log_exception
 from lib.protocols.raw import RawDataProtocol
 from lib.wrappers import executors
 import settings
@@ -106,11 +106,14 @@ class BaseMessageManager:
         return self.get_alias(other_ip)
 
     async def handle_message(self, sender: str, data: AnyStr):
-        try:
-            result = await self.manage(sender, data)
-            return result
-        except Exception as exc:
-            logger.error(exc)
+        done, pending = await asyncio.wait([self.manage(sender, data)])
+        t = list(done)[0]
+        exc = t.exception()
+        if exc:
+            logger.error(log_exception(exc))
+            if self.supports_responses:
+                return [self.protocol.invalid_request_response(sender, data, exc)]
+        return t.result()
 
     def make_raw_message(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime):
         return self.raw_data_protocol.from_buffer(sender, encoded, timestamp=timestamp)[0]
