@@ -1,6 +1,6 @@
 import asyncio
 import logging
-
+import time
 
 import settings
 from lib.utils import plural, log_exception
@@ -25,6 +25,9 @@ class BaseProtocolMixin:
     sent_bytes: int = 0
     received_msgs: int = 0
     received_bytes: int = 0
+    processed_msgs: int = 0
+    first_message_received: float = 0
+    last_message_processed: float = 0
 
     def __init__(self, manager: BaseMessageManager):
         self.manager = manager
@@ -69,10 +72,18 @@ class BaseProtocolMixin:
         logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
         logger.info('%s and %s kb were sent during session', plural(self.sent_msgs, 'message'), self.sent_bytes / 1024)
         logger.info('%s and %s kb were received during session', plural(self.received_msgs, 'message'), self.received_bytes / 1024)
+        self.check_last_message_processed()
 
     def send_msgs(self, msgs):
         for msg in msgs:
             self.send_msg(msg)
+
+    def check_last_message_processed(self):
+        if self.received_msgs and self.received_msgs == self.processed_msgs:
+            seconds = self.last_message_processed - self.first_message_received
+            kb = self.received_bytes / 1024
+            rate = kb / seconds
+            logger.info('%s kb from %s were processed in %2.2f ms, %2.2f kb/s', kb, self.alias, seconds * 1000, rate)
 
     def task_callback(self, future):
         exc = future.exception()
@@ -80,10 +91,17 @@ class BaseProtocolMixin:
         responses = future.result()
         if responses:
             self.send_msgs(responses)
+        if logger.isEnabledFor(logging.INFO):
+            self.processed_msgs += 1
+            self.last_message_processed = time.time()
+            if self.transport.is_closing():
+                self.check_last_message_processed()
 
     def on_data_received(self, sender, data):
         if logger.isEnabledFor(logging.INFO):
             logger.debug("Received msg from %s", sender)
+            if not self.first_message_received:
+                self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
         task = asyncio.create_task(self.manager.handle_message(self.alias, data))

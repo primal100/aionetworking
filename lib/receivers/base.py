@@ -116,7 +116,7 @@ class BaseServer(BaseReceiver):
     async def stop(self):
         logger.info('Stopping %s running at %s', self.receiver_type,  self.listening_on)
         await self.stop_server()
-        logging.info('%s stopped', self.receiver_type)
+        logger.info('%s stopped', self.receiver_type)
 
     async def run(self, started_event):
         logger.info('Starting %s on %s', self.receiver_type, self.listening_on)

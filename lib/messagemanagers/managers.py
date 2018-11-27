@@ -14,7 +14,6 @@ else:
     BaseProtocol = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
-data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
 
 
 class MessageManager(BaseMessageManager):
@@ -26,15 +25,11 @@ class MessageManager(BaseMessageManager):
             await asyncio.sleep(1)
 
     async def manage(self, sender, data):
-        logger.debug("Handling msg from %s", sender)
-        data_logger.debug(data)
-
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
             logger.debug('Generated timestamp: %s', timestamp)
         else:
             timestamp = None
-        logger.debug('Managing msg from %s' % sender)
         responses = []
         if self.has_actions_no_decoding:
             msg = self.make_raw_message(sender, data, timestamp=timestamp)
@@ -42,6 +37,7 @@ class MessageManager(BaseMessageManager):
         if self.requires_decoding:
             msgs = self.make_messages(sender, data, timestamp)
             for msg in msgs:
+                logger.debug('Managing %s from %s', msg, sender)
                 if not msg.filter():
                     tasks = self.do_actions(msg)
                     done, pending = await asyncio.wait(tasks)
@@ -55,7 +51,7 @@ class MessageManager(BaseMessageManager):
                         if response is not None:
                             responses.append(response)
                 else:
-                    logger.debug("Message was filtered out")
+                    logger.debug("%s was filtered out" % str(msg).capitalize())
         return responses
 
     async def cleanup(self):
@@ -65,8 +61,9 @@ class MessageManager(BaseMessageManager):
         logger.debug('Message manager cleanup completed')
 
     def _do_actions(self, msg, key='protocol'):
-        tasks = [task for task in [(action.action_name, action.do(msg)) for action in self.actions[key]['store'].values()] if task[1]]
-        tasks += [task for task in [(action.action_name, action.print(msg)) for action in self.actions[key]['print'].values()] if task]
+        tasks = [action.do(msg) for action in self.actions[key]['store'].values()]
+        tasks += [task for task in [action.print(msg) for action in self.actions[key]['print'].values()] if task]
+        logger.debug('Created tasks %s for %s', ','.join([str(id(task)) for task in tasks]), str(msg))
         return tasks
 
     def do_raw_actions(self, msg):
@@ -74,7 +71,7 @@ class MessageManager(BaseMessageManager):
         return self._do_actions(msg, key='raw')
 
     def do_actions(self, msg):
-        logger.debug('Running actions')
+        logger.debug('Running actions for %s', msg)
         return self._do_actions(msg, key='protocol')
 
 

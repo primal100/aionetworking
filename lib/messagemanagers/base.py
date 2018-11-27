@@ -17,6 +17,7 @@ else:
     BaseProtocol = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
+data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
 
 
 class MessageFromNotAuthorizedHost(Exception):
@@ -106,6 +107,19 @@ class BaseMessageManager:
         return self.get_alias(other_ip)
 
     async def handle_message(self, sender: str, data: AnyStr):
+        logger.debug("Handling msg from %s", sender)
+        data_logger.debug(data)
+        try:
+            result = await self.manage(sender, data)
+            return result
+        except Exception as exc:
+            logger.error(log_exception(exc))
+            if self.supports_responses:
+                return [self.protocol.invalid_request_response(sender, data, exc)]
+
+    async def handle_message2(self, sender: str, data: AnyStr):
+        logger.debug("Handling msg from %s", sender)
+        data_logger.debug(data)
         done, pending = await asyncio.wait([self.manage(sender, data)])
         t = list(done)[0]
         exc = t.exception()

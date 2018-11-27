@@ -129,3 +129,5 @@ class BaseProtocol:
     def make_response_invalid_request(self, task):
         return self.make_response(task)
 
+    def __str__(self):
+        return "%s message %s" % (self.protocol_name, id(self))

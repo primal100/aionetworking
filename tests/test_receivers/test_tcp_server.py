@@ -34,8 +34,9 @@ class TestTCPServer(BaseTestCase):
     def start_server(status_change, stop_ordered):
         settings.CONFIG_ARGS = settings.TEST_CONF_DIR.joinpath('tcp_server_test_setup.ini'),
         from lib.run_receiver import main
-        from lib.utils import set_loop
-        set_loop()
+        from lib.utils import set_loop_policy
+        set_loop_policy()
+        #asyncio.get_event_loop().run_until_complete(main(status_change=status_change, stop_ordered=stop_ordered))
         asyncio.run(main(status_change=status_change, stop_ordered=stop_ordered), debug=True)
 
     def start_server_process(self):
@@ -113,10 +114,14 @@ class TestTCPServer(BaseTestCase):
     def test_02_manage_100_messages(self):
         msgs = [self.multiple_encoded_hex[0] for i in range(0, 100)]
         asyncio.run(tasks.send_hex_msgs(self.client, msgs))
-        time.sleep(5)
+        #time.sleep(5)
         path = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        while len(list(path.iterdir())) < 100:
+            logger.debug(len(list(path.iterdir())))
+            time.sleep(0.003)
         files = list(path.iterdir())
         self.assertEqual(len(files), 100)
+        time.sleep(1)
 
     def test_02_manage_multiple_messages(self):
         asyncio.run(tasks.send_hex_msgs(self.client, self.multiple_encoded_hex))

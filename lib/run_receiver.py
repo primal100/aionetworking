@@ -28,7 +28,7 @@ async def main(status_change=None, stop_ordered=None):
     settings.DATA_DIR = settings.CONFIG.data_home
 
     asyncio.get_event_loop().set_exception_handler(log_exceptions)
-    logger.info('Starting %s', settings.APP_NAME)
+    logger.info('Starting %s on %s', settings.APP_NAME, asyncio.get_event_loop())
 
     receiver_name = settings.CONFIG.receiver
     logger.info('Using receiver %s', receiver_name)

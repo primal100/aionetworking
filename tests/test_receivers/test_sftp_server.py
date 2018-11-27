@@ -27,8 +27,8 @@ class TestTCPServer(BaseTestCase):
     @staticmethod
     def start_server(config_file, status_change, stop_ordered):
         from lib.run_receiver import main
-        from app import app_name, receivers, actions, protocols, set_loop
-        set_loop()
+        from app import app_name, receivers, actions, protocols, set_loop_policy
+        set_loop_policy()
         asyncio.run(main(app_name, receivers, actions, protocols, config_file, status_change=status_change,
                          stop_ordered=stop_ordered))
 

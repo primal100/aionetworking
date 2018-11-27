@@ -64,10 +64,10 @@ class BaseAction:
             print(self.print_msg(msg))
             print("")
         else:
-            logger.debug("Message filtered for action %s print", self.action_name)
+            logger.debug("%s filtered for action %s print", msg.capitalize(), self.action_name)
 
     async def write_to_file(self, file_path: Path, data: AnyStr, write_mode: str):
-        logger.debug('Storing %s message in %s', self.action_name, file_path)
+        logger.debug('Task: %s. Storing %s message in %s. Total tasks: %s', id(asyncio.current_task()), self.action_name, file_path, len(asyncio.all_tasks()))
         async with settings.FILE_OPENER(str(file_path), write_mode) as f:
             await f.write(data)
         logger.debug('%s message stored in %s', self.action_name.capitalize(), file_path)
@@ -91,7 +91,7 @@ class BaseAction:
             task = asyncio.create_task(self.write_to_file(file_path, self.get_content(msg), self.store_write_mode))
             return task
         else:
-            logger.debug("Message filtered for action %s", self.action_name)
+            logger.debug("%s filtered for action %s", msg.capitalize(), self.action_name)
             return None
 
     def get_file_extension(self, msg: BaseProtocol) -> str:

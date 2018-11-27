@@ -1,4 +1,4 @@
-from src.pycrate.pycrate_asn1dir import TCAP_MAP
+from pycrate_asn1dir import TCAP_MAP
 from lib.protocols.contrib.asn1 import BasePyCrateAsnProtocol
 from lib.utils import cached_property
 

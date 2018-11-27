@@ -1,4 +1,4 @@
-from lib.utils import set_loop
+from lib.utils import set_loop_policy
 from lib.conf.parser import INIFileConfig
 from lib.run_sender import get_sender
 from lib.senders.tasks import send_hex, encode_send_msg, play_recording
@@ -9,7 +9,7 @@ import asyncio
 from pathlib import PurePath
 import os
 
-set_loop()
+set_loop_policy()
 
 
 def process_args(devel=False):
