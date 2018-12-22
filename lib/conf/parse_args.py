@@ -2,7 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
-import settings
+from lib import settings
 
 
 def process_args(devel: bool=False) -> Path:

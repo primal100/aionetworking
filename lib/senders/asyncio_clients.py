@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-import settings
+from lib import settings
 from lib.connection_protocols.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
 from .base import BaseNetworkClient
 

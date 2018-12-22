@@ -2,19 +2,14 @@ import asyncio
 import binascii
 import datetime
 import logging
-import queue
 import shutil
-import threading
 from pathlib import Path
 
 from lib.basetestcase import BaseTestCase
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.actions import binary, decode, prettify, summarise
 from lib.run_manager import start_threaded_manager
-from lib import utils
-import settings
-import definitions
-
+from lib import utils, definitions, settings
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)

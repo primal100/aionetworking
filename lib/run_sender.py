@@ -1,8 +1,6 @@
 import logging
-import settings
 
-
-import definitions
+from lib import definitions, settings
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:

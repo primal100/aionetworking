@@ -1,11 +1,10 @@
 from lib.basetestcase import BaseTestCase
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
-from lib import utils
+from lib import utils, definitions
 
 import asyncio
 import os
 import subprocess
-import definitions
 import signal
 import time
 import shutil

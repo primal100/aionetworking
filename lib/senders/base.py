@@ -2,10 +2,9 @@ import asyncio
 import binascii
 import logging
 
-import settings
-from lib import utils
+from lib import utils, settings
 
-from typing import TYPE_CHECKING, Sequence, AnyStr, Type
+from typing import TYPE_CHECKING, Sequence, AnyStr
 from pathlib import Path
 if TYPE_CHECKING:
     from lib.messagemanagers.base import BaseMessageManager

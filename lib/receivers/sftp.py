@@ -2,7 +2,7 @@ import asyncssh
 import logging
 from passlib.hash import pbkdf2_sha256
 
-import settings
+from lib import settings
 from lib.connection_protocols.asyncio_protocols import ServerProtocolMixin
 from .base import BaseServer
 
@@ -58,7 +58,7 @@ class SFTPServer(BaseServer):
     configurable.update({'allow_scp': bool, 'base_upload_dir': Path})
 
     def __init__(self, manager, *args, allow_scp: bool=False,
-                 base_upload_dir: Path=settings.HOME.joinpath('sftp'), **kwargs):
+                 base_upload_dir: Path= settings.HOME.joinpath('sftp'), **kwargs):
         super(BaseServer, self).__init__(manager, *args, **kwargs)
         self.allow_scp = allow_scp
         self.base_upload_dir = base_upload_dir

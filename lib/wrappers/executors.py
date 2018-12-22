@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import concurrent.futures
-import settings
+from lib import settings
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 

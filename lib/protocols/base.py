@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from lib.utils import cached_property
-import settings
+from lib import settings
 
 from typing import TYPE_CHECKING, Sequence, Mapping
 from pathlib import Path

@@ -1,8 +1,7 @@
 import datetime
 import logging
-import settings
 from lib.protocols.base import BaseProtocol
-from lib import utils
+from lib import utils, settings
 from lib.utils import cached_property
 
 from typing import Sequence, Mapping

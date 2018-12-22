@@ -2,7 +2,7 @@ from lib.utils import set_loop_policy
 from lib.conf.parser import INIFileConfig
 from lib.run_sender import get_sender
 from lib.senders.tasks import send_hex, encode_send_msg, play_recording
-import definitions
+from lib import definitions
 
 import argparse
 import asyncio

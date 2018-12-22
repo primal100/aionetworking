@@ -4,8 +4,7 @@ from unittest import TestCase
 
 from lib.conf.parser import INIFileConfig
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
-import definitions
-import settings
+from lib import definitions, settings
 
 from pathlib import Path
 from typing import AnyStr

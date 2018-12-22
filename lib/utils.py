@@ -20,7 +20,8 @@ class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
 
 def set_loop_policy():
     if os.name == 'nt':
-        asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
+        pass
+        #asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
 
 
 def set_loop2():

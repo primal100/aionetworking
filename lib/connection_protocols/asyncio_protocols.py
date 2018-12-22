@@ -1,8 +1,9 @@
 import asyncio
+from concurrent import futures
 import logging
 import time
 
-import settings
+from lib import settings
 from lib.utils import plural, log_exception
 
 from typing import TYPE_CHECKING
@@ -12,6 +13,9 @@ else:
     BaseMessageManager = None
 
 logger = logging.getLogger(settings.LOGGER_NAME)
+
+
+executor = futures.ProcessPoolExecutor()
 
 
 class BaseProtocolMixin:
@@ -104,8 +108,12 @@ class BaseProtocolMixin:
                 self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
-        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
-        task.add_done_callback(self.task_callback)
+        f = executor.submit(self.manager.handle_message, self.alias, data)
+        f.add_done_callback(self.task_callback)
+        #self.processed_msgs += 1
+        #self.last_message_processed = time.time()
+        #self.check_last_message_processed()
+        #task.add_done_callback(self.task_callback)
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):

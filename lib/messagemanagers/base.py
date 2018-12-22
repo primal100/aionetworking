@@ -6,7 +6,7 @@ import datetime
 from lib.utils import cached_property, log_exception
 from lib.protocols.raw import RawDataProtocol
 from lib.wrappers import executors
-import settings
+from lib import settings
 
 from typing import TYPE_CHECKING, Sequence, AnyStr, Type
 from pathlib import Path
@@ -52,7 +52,7 @@ class BaseMessageManager:
 
     @classmethod
     def from_config(cls, protocol: Type[BaseProtocol], **kwargs):
-        import definitions
+        from lib import definitions
         config = settings.CONFIG.section_as_dict('MessageManager', **cls.configurable)
         logger.info('Found configuration for %s: %s', cls.name,  config)
         executor, max_workers = config.pop('executor', None), config.pop('max_workers', None)
@@ -106,16 +106,16 @@ class BaseMessageManager:
             logger.debug('Sender is in allowed senders')
         return self.get_alias(other_ip)
 
-    async def handle_message(self, sender: str, data: AnyStr):
-        logger.debug("Handling msg from %s", sender)
+    def handle_message(self, sender: str, data: AnyStr):
+        logger.debug("Handling buffer for %s", sender)
         data_logger.debug(data)
-        try:
-            result = await self.manage(sender, data)
-            return result
-        except Exception as exc:
-            logger.error(log_exception(exc))
-            if self.supports_responses:
-                return [self.protocol.invalid_request_response(sender, data, exc)]
+        if self.generate_timestamp:
+            timestamp = datetime.datetime.now()
+            logger.debug('Generated timestamp: %s', timestamp)
+        else:
+            timestamp = None
+        msgs = self.make_messages(sender, data, timestamp)
+        return self.manage(msgs)
 
     async def handle_message2(self, sender: str, data: AnyStr):
         logger.debug("Handling msg from %s", sender)
@@ -168,7 +168,11 @@ class BaseMessageManager:
     def requires_decoding(self) -> bool:
         return bool(self.actions['protocol']['print'] or self.actions['protocol']['store'])
 
-    async def manage(self, sender, data):
+    async def manage(self, msgs):
         raise NotImplementedError
 
-    async def cleanup(self): ...
+    async def cleanup(self):
+        logger.debug('Running message manager cleanup')
+        for action in self.all_actions:
+            await action.close()
+        logger.debug('Message manager cleanup completed')

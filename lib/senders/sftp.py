@@ -1,7 +1,7 @@
 import asyncssh
 import logging
 
-import settings
+from lib import settings
 from .base import BaseNetworkClient
 
 from typing import AnyStr

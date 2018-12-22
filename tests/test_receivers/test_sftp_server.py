@@ -1,12 +1,11 @@
 from lib.basetestcase import BaseTestCase
 from lib.senders import tasks
-from lib import utils
+from lib import utils, definitions
 from app import app_name, receivers, protocols
 from client import get_sender
 import asyncio
 import binascii
 import os
-import definitions
 import time
 import shutil
 import multiprocessing

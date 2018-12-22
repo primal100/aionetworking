@@ -2,8 +2,7 @@ import asyncio
 from asyncio import Event
 import logging
 
-import settings
-from lib.wrappers.events import AsyncEventWrapper
+from lib import settings
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 

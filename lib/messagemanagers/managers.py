@@ -3,11 +3,11 @@ import datetime
 
 from .base import BaseMessageManager
 from lib.utils import log_exception
-import settings
+from lib import settings
 import logging
 
 
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, AnyStr
 if TYPE_CHECKING:
     from lib.protocols.base import BaseProtocol
 else:
@@ -19,60 +19,40 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 class MessageManager(BaseMessageManager):
     name = 'Message Manager'
 
-    async def run(self, started_event):
-        started_event.set()
-        while True:
-            await asyncio.sleep(1)
-
-    async def manage(self, sender, data):
-        if self.generate_timestamp:
-            timestamp = datetime.datetime.now()
-            logger.debug('Generated timestamp: %s', timestamp)
-        else:
-            timestamp = None
-        responses = []
-        if self.has_actions_no_decoding:
-            msg = self.make_raw_message(sender, data, timestamp=timestamp)
-            self.do_raw_actions([msg])
-        if self.requires_decoding:
-            msgs = self.make_messages(sender, data, timestamp)
-            for msg in msgs:
-                logger.debug('Managing %s from %s', msg, sender)
-                if not msg.filter():
-                    tasks = self.do_actions(msg)
-                    done, pending = await asyncio.wait(tasks)
-                    results = [d.result() for d in done]
-                    exceptions = [d.exception() for d in done]
-                    for exc in exceptions:
-                        if exc:
-                            logger.error(log_exception(exc))
-                    if self.supports_responses:
-                        response = msg.make_response(results, exceptions)
-                        if response is not None:
-                            responses.append(response)
-                else:
-                    logger.debug("%s was filtered out" % str(msg).capitalize())
-        return responses
-
-    async def cleanup(self):
-        logger.debug('Running message manager cleanup')
-        for action in self.all_actions:
-            await action.close()
-        logger.debug('Message manager cleanup completed')
-
-    def _do_actions(self, msg, key='protocol'):
-        tasks = [action.do(msg) for action in self.actions[key]['store'].values()]
-        tasks += [task for task in [action.print(msg) for action in self.actions[key]['print'].values()] if task]
-        logger.debug('Created tasks %s for %s', ','.join([str(id(task)) for task in tasks]), str(msg))
+    def do_task_actions(self, msg):
+        tasks = []
+        for action in self.actions:
+            fut = asyncio.ensure_future(action.do_one(msg))
+            fut.add_done_callback(self.log_task_exceptions)
+            tasks.append(fut)
         return tasks
 
-    def do_raw_actions(self, msg):
-        logger.debug('Running raw actions')
-        return self._do_actions(msg, key='raw')
+    async def do_simple_actions(self, msg):
+        for action in self.actions:
+            try:
+                await action.do_one(msg)
+            except Exception as exc:
+                logger.error(log_exception(exc))
 
-    def do_actions(self, msg):
-        logger.debug('Running actions for %s', msg)
-        return self._do_actions(msg, key='protocol')
+    @staticmethod
+    def log_task_exceptions(task):
+        exc = task.exception()
+        if exc:
+            logger.error(log_exception(exc))
+
+    async def manage(self, msgs):
+        responses = []
+        tasks = []
+        for msg in msgs:
+            if not msg.filter():
+                await self.do_simple_actions(msg)
+                task_set = self.do_task_actions(msg)
+                if self.supports_responses:
+                    tasks.append((msg, task_set))
+        if self.supports_responses:
+            for msg, task_set in tasks:
+                responses.append(msg.get_response(task_set))
+        return responses
 
 
 class ClientMessageManager(BaseMessageManager):

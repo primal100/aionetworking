@@ -2,7 +2,7 @@ import asyncio
 from concurrent import futures
 import logging
 
-import settings
+from lib import settings
 from lib.conf import ConfigurationException
 from lib.wrappers.events import AsyncEventWrapper
 

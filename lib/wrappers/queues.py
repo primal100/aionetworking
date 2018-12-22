@@ -1,8 +1,7 @@
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
-import settings
+from lib import settings
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 

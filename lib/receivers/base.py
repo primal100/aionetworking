@@ -2,7 +2,7 @@ import ssl
 import traceback
 import logging
 
-import settings
+from lib import settings
 from lib.conf import ConfigurationException
 
 from typing import TYPE_CHECKING, Optional

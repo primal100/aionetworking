@@ -1,3 +1,4 @@
+from . import RawStr
 from .base import BaseConfigClass
 from configparser import ConfigParser, ExtendedInterpolation
 from logging.config import fileConfig
@@ -37,6 +38,8 @@ class INIFileConfig(BaseConfigClass):
             return None
         if data_type == bool:
             return section.getboolean(option, None)
+        if data_type == RawStr:
+            return section.get(option, None, raw=True)
         value = section.get(option, None)
         if data_type == tuple or data_type == list:
             if value:

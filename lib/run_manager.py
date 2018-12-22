@@ -2,7 +2,7 @@ import asyncio
 import concurrent.futures
 import logging
 
-import settings
+from lib import settings
 from lib.wrappers.tasks import TaskWrapper
 
 logger = logging.getLogger(settings.LOGGER_NAME)
@@ -15,8 +15,7 @@ def executor_callback(fut):
 
 def start_manager_as_process(queue):
     print('STARTING')
-    import settings
-    import definitions
+    from lib import definitions
     import logging
     from lib.wrappers.queues import AsyncQueueWrapper
     queue = AsyncQueueWrapper(queue)
@@ -32,7 +31,7 @@ def start_manager_as_process(queue):
 
 def get_protocol_manager():
 
-    import definitions
+    from lib import definitions
     protocol_name = settings.CONFIG.protocol
 
     logger.info('Using protocol %s', protocol_name)

@@ -3,8 +3,7 @@ import logging
 from pathlib import Path
 
 from .base import BaseAction
-from lib import utils
-import settings
+from lib import utils, settings
 
 from typing import Sequence
 from datetime import datetime, timedelta

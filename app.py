@@ -1,11 +1,10 @@
-from asyncio import Task
 from multiprocessing import Queue
 
 from lib.conf.parse_args import get_configuration_args
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 from lib.run_receiver import main
 from lib.utils import set_loop_policy
-import definitions
+from lib import definitions
 from lib.run_manager import start_manager_as_process
 
 

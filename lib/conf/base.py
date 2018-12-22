@@ -10,7 +10,7 @@ class ConfigurationException(Exception):
 class BaseConfigClass:
 
     def __init__(self):
-        import settings
+        from lib import settings
         self.defaults = {
             'Testdir': settings.TESTS_DIR,
             'Develdir': settings.ROOT_DIR,

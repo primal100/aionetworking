@@ -2,8 +2,7 @@ import asyncio
 import logging
 import os
 
-import definitions
-import settings
+from lib import definitions, settings
 from lib.run_manager import get_protocol_manager
 from lib.utils import log_exception
 from lib.wrappers.tasks import TaskWrapper

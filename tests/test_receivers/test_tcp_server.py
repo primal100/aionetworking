@@ -3,18 +3,14 @@ import binascii
 import logging
 from pathlib import Path
 import os
-import definitions
-import settings
 import time
 import shutil
 import multiprocessing
-import traceback
 
 from lib.basetestcase import BaseTestCase
 from lib.senders import tasks
-from lib import utils
+from lib import utils, definitions, settings
 from lib.run_sender import get_sender
-from lib.wrappers.events import AsyncEventWrapper
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 
@@ -36,7 +32,6 @@ class TestTCPServer(BaseTestCase):
         from lib.run_receiver import main
         from lib.utils import set_loop_policy
         set_loop_policy()
-        #asyncio.get_event_loop().run_until_complete(main(status_change=status_change, stop_ordered=stop_ordered))
         asyncio.run(main(status_change=status_change, stop_ordered=stop_ordered), debug=True)
 
     def start_server_process(self):

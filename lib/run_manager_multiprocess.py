@@ -3,7 +3,7 @@ import concurrent.futures
 from multiprocessing import JoinableQueue
 import logging
 
-import settings
+from lib import settings
 from .run_manager import run, start_manager_as_loop
 from lib.wrappers.queues import AsyncQueueWrapper
 
@@ -15,8 +15,7 @@ queue = AsyncQueueWrapper(JoinableQueue())
 
 def start_manager_as_process(stop_event):
     print('STARTING')
-    import settings
-    import definitions
+    from lib import definitions
     import logging
     settings.POSTFIX = 'manager'
     settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
