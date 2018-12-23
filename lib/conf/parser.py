@@ -1,5 +1,6 @@
 from . import RawStr
 from .base import BaseConfigClass
+from .log_filters import BaseFilter
 from configparser import ConfigParser, ExtendedInterpolation
 from logging.config import fileConfig
 
@@ -80,3 +81,5 @@ class INIFileConfig(BaseConfigClass):
                 configured = True
             except FileNotFoundError as e:
                 Path(e.filename).parent.mkdir(parents=True, exist_ok=True)
+        for filter_name in self.get('filters', 'keys', tuple):
+            BaseFilter.from_config(filter_name)

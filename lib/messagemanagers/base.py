@@ -16,8 +16,10 @@ if TYPE_CHECKING:
 else:
     BaseProtocol = None
 
-logger = logging.getLogger(settings.LOGGER_NAME)
-data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
+
+logger = settings.get_logger('main')
+raw_logger = settings.get_logger('raw')
+msg_logger = settings.get_logger('message')
 
 
 class MessageFromNotAuthorizedHost(Exception):
@@ -107,34 +109,25 @@ class BaseMessageManager:
         return self.get_alias(other_ip)
 
     def handle_message(self, sender: str, data: AnyStr):
-        logger.debug("Handling buffer for %s", sender)
-        data_logger.debug(data)
+        logger.debug("Handling buffer for %s", extra={'sender': sender})
+        raw_logger.debug(data, extra={'sender': sender})
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
-            logger.debug('Generated timestamp: %s', timestamp)
+            logger.debug('Generated timestamp: %s', timestamp, extra={'sender': sender})
         else:
             timestamp = None
         msgs = self.make_messages(sender, data, timestamp)
-        return self.manage(msgs)
-
-    async def handle_message2(self, sender: str, data: AnyStr):
-        logger.debug("Handling msg from %s", sender)
-        data_logger.debug(data)
-        done, pending = await asyncio.wait([self.manage(sender, data)])
-        t = list(done)[0]
-        exc = t.exception()
-        if exc:
-            logger.error(log_exception(exc))
-            if self.supports_responses:
-                return [self.protocol.invalid_request_response(sender, data, exc)]
-        return t.result()
+        return self.manage(sender, msgs)
 
     def make_raw_message(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime):
         return self.raw_data_protocol.from_buffer(sender, encoded, timestamp=timestamp)[0]
 
     def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
         try:
-            return self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
+            msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
+            for msg in msgs:
+                msg_logger.debug('', extra={'msg': msg, 'sender': sender})
+            return msgs
         except Exception as e:
             logger.error(e)
             return None
@@ -151,10 +144,10 @@ class BaseMessageManager:
         logger.debug('Exited from %s', self.name)
 
     @staticmethod
-    def filter(msg):
+    def filter(msg, **logextra):
         filtered = msg.filtered()
         if filtered:
-            logger.debug("Message was filtered out")
+            logger.debug("Message was filtered out", extra={logextra)
         return filtered
 
     async def run(self, started_event):
@@ -168,7 +161,7 @@ class BaseMessageManager:
     def requires_decoding(self) -> bool:
         return bool(self.actions['protocol']['print'] or self.actions['protocol']['store'])
 
-    async def manage(self, msgs):
+    async def manage(self, sender, msgs):
         raise NotImplementedError
 
     async def cleanup(self):

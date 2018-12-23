@@ -1,4 +1,5 @@
 from lib.conf.parser import INIFileConfig
+from lib.conf.log_filters import BaseFilter, SenderFilter, MessageFilter
 from lib.messagemanagers.managers import MessageManager, ClientMessageManager
 from lib import run_manager
 from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
@@ -38,6 +39,10 @@ ACTIONS: Mapping[str, Type[BaseAction]] = {
     'prettify': prettify.Action,
     'summarise': summarise.Action,
     'text': text.Action
+}
+LOG_FILTERS: Mapping[str, Type[BaseFilter]] = {
+    'sender_filter': SenderFilter,
+    'message_filter': MessageFilter
 }
 MESSAGE_MANAGER: Type[BaseMessageManager] = MessageManager
 CLIENT_MESSAGE_MANAGER: Type[BaseMessageManager] = ClientMessageManager

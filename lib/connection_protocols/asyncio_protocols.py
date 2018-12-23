@@ -1,5 +1,4 @@
 import asyncio
-from concurrent import futures
 import logging
 import time
 
@@ -12,10 +11,9 @@ if TYPE_CHECKING:
 else:
     BaseMessageManager = None
 
-logger = logging.getLogger(settings.LOGGER_NAME)
 
-
-executor = futures.ProcessPoolExecutor()
+logger = settings.get_logger('main')
+stats = settings.get_logger('stats')
 
 
 class BaseProtocolMixin:
@@ -23,7 +21,8 @@ class BaseProtocolMixin:
     alias: str = ''
     peer: str = ''
     sock = (None, None)
-    other_ip: str = None
+    peer_ip: str = None
+    peer_port: int = 0
     transport = None
     sent_msgs: int = 0
     sent_bytes: int = 0
@@ -44,26 +43,51 @@ class BaseProtocolMixin:
     def server(self):
         raise NotImplementedError
 
+    @property
+    def sent_kbs(self):
+        return self.sent_bytes / 1024
+
+    @property
+    def received_kbs(self):
+        return self.received_bytes / 1024
+
+    @property
+    def sent_mbs(self):
+        return self.sent_kbs / 1024
+
+    @property
+    def received_mbs(self):
+        return self.received_kbs / 1024
+
+    @property
+    def processing_time(self):
+        return self.last_message_processed - self.first_message_received
+
+    @property
+    def rate(self):
+        return self.received_kbs / self.processing_time
+
     def send(self, msg):
         raise NotImplementedError
 
     def send_msg(self, msg):
         self.send(msg)
-        if logger.isEnabledFor(logging.INFO):
+        if stats.isEnabledFor(logging.INFO):
             self.sent_msgs += 1
             self.sent_bytes += len(msg)
 
-    def check_other(self, other_ip):
-        return self.manager.check_sender(other_ip)
+    def check_other(self, peer_ip):
+        return self.manager.check_sender(peer_ip)
 
     def connection_made(self, transport):
         self.transport = transport
         peer = self.transport.get_extra_info('peername')
         sock = self.transport.get_extra_info('sockname')
-        self.other_ip = peer[0]
+        self.peer_ip = peer[0]
+        self.peer_port = peer[1]
         self.peer = ':'.join(str(prop) for prop in peer)
         self.sock = ':'.join(str(prop) for prop in sock)
-        self.alias = self.check_other(self.other_ip)
+        self.alias = self.check_other(self.peer_ip)
         logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
     @staticmethod
@@ -74,9 +98,8 @@ class BaseProtocolMixin:
     def connection_lost(self, exc):
         self.manage_error(exc)
         logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
-        logger.info('%s and %s kb were sent during session', plural(self.sent_msgs, 'message'), self.sent_bytes / 1024)
-        logger.info('%s and %s kb were received during session', plural(self.received_msgs, 'message'), self.received_bytes / 1024)
-        self.check_last_message_processed()
+        if stats.isEnabledFor(logging.INFO):
+            self.check_last_message_processed()
 
     def send_msgs(self, msgs):
         for msg in msgs:
@@ -84,10 +107,8 @@ class BaseProtocolMixin:
 
     def check_last_message_processed(self):
         if self.received_msgs and self.received_msgs == self.processed_msgs:
-            seconds = self.last_message_processed - self.first_message_received
-            kb = self.received_bytes / 1024
-            rate = kb / seconds
-            logger.info('%s kb from %s were processed in %2.2f ms, %2.2f kb/s', kb, self.alias, seconds * 1000, rate)
+            stats.info('', extra={'conn': self})
+            #stats.info('%s kb from %s were processed in %2.2f ms, %2.2f kb/s', self.received_kbs, self.alias, seconds * 1000, rate)
 
     def task_callback(self, future):
         exc = future.exception()
@@ -95,25 +116,21 @@ class BaseProtocolMixin:
         responses = future.result()
         if responses:
             self.send_msgs(responses)
-        if logger.isEnabledFor(logging.INFO):
+        if stats.isEnabledFor(logging.INFO):
             self.processed_msgs += 1
             self.last_message_processed = time.time()
             if self.transport.is_closing():
                 self.check_last_message_processed()
 
     def on_data_received(self, sender, data):
-        if logger.isEnabledFor(logging.INFO):
-            logger.debug("Received msg from %s", sender)
+        logger.debug("Received msg from %s", sender)
+        if stats.isEnabledFor(logging.INFO):
             if not self.first_message_received:
                 self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
-        f = executor.submit(self.manager.handle_message, self.alias, data)
-        f.add_done_callback(self.task_callback)
-        #self.processed_msgs += 1
-        #self.last_message_processed = time.time()
-        #self.check_last_message_processed()
-        #task.add_done_callback(self.task_callback)
+        task = self.manager.handle_message(sender, data)
+        task.add_done_callback(self.task_callback)
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):
@@ -127,7 +144,7 @@ class TCP(BaseProtocolMixin, asyncio.Protocol):
         raise NotImplementedError
 
     def data_received(self, data):
-        self.on_data_received(self.other_ip, data)
+        self.on_data_received(self.peer_ip, data)
 
     def send(self, msg):
         self.transport.write(msg)

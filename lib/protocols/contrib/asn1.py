@@ -1,15 +1,15 @@
 import datetime
 import logging
-from lib.protocols.base import BaseProtocol
-from lib import utils, settings
-from lib.utils import cached_property
-
-from typing import Sequence, Mapping
-
-
 from pycrate_core.charpy import Charpy
 
-logger = logging.getLogger(settings.LOGGER_NAME)
+from lib.protocols.base import BaseProtocol
+from lib import settings
+from lib.utils import cached_property, adapt_asn_domain, asn_timestamp_to_datetime
+
+from typing import Sequence
+
+
+logger = settings.get_logger('main')
 
 
 class BasePyCrateAsnProtocol(BaseProtocol):
@@ -19,7 +19,6 @@ class BasePyCrateAsnProtocol(BaseProtocol):
     """
 
     pycrate_asn_class = None
-    supported_actions = ("binary", "decode", "prettify", "summarise")
 
     def get_event_type(self):
         return ''
@@ -39,7 +38,7 @@ class BasePyCrateAsnProtocol(BaseProtocol):
 
     @cached_property
     def domain(self) -> str:
-        return utils.adapt_asn_domain(self.get_asn_domain())
+        return adapt_asn_domain(self.get_asn_domain())
 
     def get_timestamp(self) -> tuple:
         return ()
@@ -50,16 +49,8 @@ class BasePyCrateAsnProtocol(BaseProtocol):
             return self._timestamp
         timestamp = self.get_timestamp()
         if timestamp:
-            return utils.asn_timestamp_to_datetime(self.get_timestamp())
+            return asn_timestamp_to_datetime(self.get_timestamp())
         return datetime.datetime.now()
-
-    @property
-    def prettified(self) -> Sequence[Mapping]:
-        raise NotImplementedError
-
-    @property
-    def summaries(self) -> Sequence[Sequence]:
-        raise NotImplementedError
 
     def get_asn_domain(self) -> tuple:
         raise NotImplementedError

@@ -3,7 +3,6 @@ from lib.protocols.contrib.asn1 import BasePyCrateAsnProtocol
 from lib.utils import cached_property
 
 import binascii
-from typing import Sequence, Mapping
 
 
 class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
@@ -33,17 +32,3 @@ class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
     @cached_property
     def uid(self):
         return self.otid.decode()
-
-    @cached_property
-    def prettified(self) -> Sequence[Mapping]:
-        return [{
-            'event_type': self.get_event_type(),
-            'otid': self.uid,
-            'direct-reference': self.domain,
-        }]
-
-    @cached_property
-    def summaries(self) -> Sequence[Sequence]:
-        return [
-            (self.get_event_type(), self.uid, self.timestamp)
-        ]

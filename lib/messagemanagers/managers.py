@@ -40,7 +40,11 @@ class MessageManager(BaseMessageManager):
         if exc:
             logger.error(log_exception(exc))
 
-    async def manage(self, msgs):
+    async def wait_simple_actions(self, **logs_extra):
+        for action in self.actions:
+            await action.wait_complete(**logs_extra)
+
+    async def manage(self, sender, msgs):
         responses = []
         tasks = []
         for msg in msgs:
@@ -49,6 +53,7 @@ class MessageManager(BaseMessageManager):
                 task_set = self.do_task_actions(msg)
                 if self.supports_responses:
                     tasks.append((msg, task_set))
+        await self.wait_simple_actions(sender=sender)
         if self.supports_responses:
             for msg, task_set in tasks:
                 responses.append(msg.get_response(task_set))
