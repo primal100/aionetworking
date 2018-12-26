@@ -1,4 +1,4 @@
-from .base import ConfigurationException
+from .base import BaseConfigClass, ConfigurationException
 
 
 class RawStr(str):

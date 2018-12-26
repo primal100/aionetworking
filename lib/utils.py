@@ -20,18 +20,8 @@ class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
 
 def set_loop_policy():
     if os.name == 'nt':
-        pass
-        #asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
-
-
-def set_loop2():
-    print('test')
-    if os.name == 'nt':
-        # Following two lines can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
-        import asyncio
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-
+        #pass
+        asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
 
 
 def log_exception(ex):

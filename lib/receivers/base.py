@@ -1,6 +1,5 @@
+import asyncio
 import ssl
-import traceback
-import logging
 
 from lib import settings
 from lib.conf import ConfigurationException
@@ -13,7 +12,7 @@ if TYPE_CHECKING:
 else:
     BaseMessageManager = None
 
-logger = logging.getLogger(settings.LOGGER_NAME)
+logger = settings.get_logger('main')
 
 
 class ServerException(Exception):
@@ -23,7 +22,7 @@ class ServerException(Exception):
 class BaseReceiver:
     receiver_type: str = ''
     ssl_allowed: bool = False
-    supports_responses: bool = False
+    started_event: asyncio.Event = asyncio.Event()
 
     configurable = {
         'ssl_enabled': bool,
@@ -38,9 +37,8 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, status_change=status_change, **config)
 
-    def __init__(self, manager, status_change=None, ssl_enabled: bool=False, ssl_cert: Optional[Path]=None,
-                 ssl_key: Optional[Path]=None):
-
+    def __init__(self, manager, status_change=None, ssl_enabled: bool = False, ssl_cert: Optional[Path] = None,
+                 ssl_key: Optional[Path] = None):
         self.manager = manager
         self.status_change = status_change
         if self.ssl_allowed:
@@ -50,10 +48,6 @@ class BaseReceiver:
             raise ConfigurationException('SSL is not supported for' + self.receiver_type)
         else:
             self.ssl_context = None
-
-    @property
-    def has_responses(self):
-        return self.supports_responses and self.manager.supports_responses
 
     @staticmethod
     def manage_ssl_params(enabled: bool, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
@@ -70,7 +64,7 @@ class BaseReceiver:
             logger.info("SSL is not enabled")
             return None
 
-    async def __aenter__(self):
+    """async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -79,19 +73,30 @@ class BaseReceiver:
             error = traceback.format_exception(exc_type, exc_val, exc_tb)
             logger.error('\n'.join(error))
         await self.close()
-        logger.debug('Exited from %s', self.receiver_type)
+        logger.debug('Exited from %s', self.receiver_type)"""
 
-    def set_status_changed(self, event, change: str=''):
-        event.set()
+    async def started(self):
+        await self.started_event.wait()
+
+    def set_status_changed(self, change: str=''):
+        self.started_event.set()
         logger.debug('Event has been set to indicate %s receiver was %s', self.receiver_type, change)
+
+    async def start(self):
+        try:
+            await self.run()
+        except asyncio.CancelledError:
+            logger.debug('Receiver task cancelled')
+            await self.close()
 
     async def close(self):
         await self.stop()
+        await self.manager.close()
 
-    async def stop(self):
+    async def run(self):
         raise NotImplementedError
 
-    async def run(self, started_event):
+    async def stop(self):
         raise NotImplementedError
 
 
@@ -118,12 +123,12 @@ class BaseServer(BaseReceiver):
         await self.stop_server()
         logger.info('%s stopped', self.receiver_type)
 
-    async def run(self, started_event):
+    async def run(self):
         logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
-        return await self.start_server(started_event)
+        await self.start_server()
 
     async def stop_server(self):
         raise NotImplementedError
 
-    async def start_server(self, started_event):
+    async def start_server(self):
         raise NotImplementedError

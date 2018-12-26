@@ -5,7 +5,6 @@ import os
 from lib import definitions, settings
 from lib.run_manager import get_protocol_manager
 from lib.utils import log_exception
-from lib.wrappers.tasks import TaskWrapper
 from lib.wrappers.events import AsyncEventWrapper
 
 
@@ -36,14 +35,12 @@ async def main(status_change=None, stop_ordered=None):
 
     protocol_cls, manager_cls = get_protocol_manager()
 
-    manager_task = TaskWrapper(manager_cls.from_config, protocol_cls)
+    manager = manager_cls.from_config(protocol_cls)
 
-    receiver_task = TaskWrapper(receiver_cls.from_config, manager_task.instance)
+    receiver = receiver_cls.from_config(manager)
+    receiver_task = asyncio.create_task(receiver.start())
 
-    await manager_task.started()
-    logger.debug('Manager started')
-
-    await receiver_task.started()
+    await receiver.started()
     logger.debug('Receiver started')
 
     if status_change:
@@ -58,21 +55,16 @@ async def main(status_change=None, stop_ordered=None):
             await wakeup()
         asyncio.create_task(wakeup())
 
-    if not isinstance(stop_ordered, asyncio.Event):
-        stop_ordered = AsyncEventWrapper(stop_ordered)
-
     try:
         if stop_ordered:
+            if not isinstance(stop_ordered, asyncio.Event):
+                stop_ordered = AsyncEventWrapper(stop_ordered)
             await stop_ordered.wait()
-            logger.debug('Stop order event set')
         else:
-            while True:
-                pass
+            await receiver_task
     finally:
         receiver_task.cancel()
-        await receiver_task.stopped()
+        await receiver.stopped()
         logger.debug('Receiver task stopped')
-        manager_task.cancel()
-        await manager_task.stopped()
-        logger.debug('Manager task stopped')
-        status_change.set()
+        if status_change:
+            status_change.set()

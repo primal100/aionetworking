@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 
+from .base import BaseAction
 from lib.conf import RawStr
 from lib.settings import FILE_OPENER, get_logger
 from lib import settings
@@ -72,30 +73,27 @@ class ManagedFile:
                 self.cleanup()
 
 
-class BaseFileStorage:
-    action_type = ''
+class BaseFileStorage(BaseAction):
 
-    configurable = {
+    configurable = BaseAction.configurable
+    configurable.update({
         'base_path': Path,
         'path': RawStr,
         'attr': str,
         'mode': str,
         'separator': str
-    }
+    })
 
-    @classmethod
-    def from_config(cls, **kwargs):
-        config = settings.CONFIG.section_as_dict('FileStorage', **cls.configurable)
-        logger.debug('Found configuration for %s:%s', cls.action_type, config)
-        config.update(kwargs)
-        return cls(**config)
-
-    def __init__(self, base_path, path, attr, mode='w', separator=None):
+    def __init__(self, base_path, path, attr, mode='w', separator=None, **kwargs):
+        super(BaseAction, self).__init__(**kwargs)
         self.base_path = base_path
         self.path = path
         self.attr = attr
         self.mode = mode
         self.separator = separator
+
+    def process(self, msg):
+        raise NotImplementedError
 
     def get_full_path(self, msg):
         return self.base_path.joinpath(self.get_path(msg))
@@ -111,8 +109,9 @@ class BaseFileStorage:
 
 
 class FileStorage(BaseFileStorage):
-    action_type = 'File Storage'
-    as_task = True
+    name = 'File Storage'
+    key = 'filestorage'
+    outstanding_tasks = []
 
     async def write_to_file(self, path, data, **logs_extra):
         logger.debug('Writing to file %s', path, extra=logs_extra)
@@ -121,7 +120,7 @@ class FileStorage(BaseFileStorage):
         logger.debug('Data written to file %s', path, extra=logs_extra)
 
     async def process(self, msg):
-        logger.debug('Processing message for action %s', self.action_type, extra={'msg': msg})
+        logger.debug('Processing message for action %s', self.name, extra={'msg': msg})
         path = self.get_full_path(msg)
         data = self.get_data(msg)
         await self.write_to_file(path, data)
@@ -129,8 +128,8 @@ class FileStorage(BaseFileStorage):
 
 
 class BufferedFileStorage(BaseFileStorage):
-    action_type = 'Buffered File Storage'
-    as_task = False
+    name = 'Buffered File Storage'
+    key = 'bufferedfilestorage'
     files = {}
     files_with_outstanding_writes = []
 
@@ -164,6 +163,9 @@ class BufferedFileStorage(BaseFileStorage):
         path = self.get_path(msg)
         data = self.get_data(msg)
         await self.write_to_file(path, data, msg=msg)
+
+    async def do_one(self, msg):
+        await self.process(msg)
 
     async def wait_complete(self, **logs_extra):
         logger.debug('Waiting for outstanding writes to complete', extra=logs_extra)

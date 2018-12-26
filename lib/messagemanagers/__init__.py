@@ -1,1 +1,1 @@
-from .managers import MessageManager
+from .managers import BaseMessageManager, OneWayMessageManager, TwoWayMessageManager
