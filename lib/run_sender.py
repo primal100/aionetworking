@@ -11,7 +11,7 @@ else:
 logger = logging.getLogger(settings.LOGGER_NAME)
 
 
-def get_sender() -> BaseSender:
+def get_sender(**kwargs) -> BaseSender:
 
     settings.POSTFIX = 'sender'
     settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
@@ -36,5 +36,5 @@ def get_sender() -> BaseSender:
 
     manager = manager_cls.from_config(protocol)
 
-    sender = sender_cls.from_config(manager)
+    sender = sender_cls.from_config(manager, **kwargs)
     return sender

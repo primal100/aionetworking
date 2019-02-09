@@ -22,7 +22,6 @@ class ServerException(Exception):
 class BaseReceiver:
     receiver_type: str = ''
     ssl_allowed: bool = False
-    started_event: asyncio.Event = asyncio.Event()
 
     configurable = {
         'ssl_enabled': bool,
@@ -31,8 +30,9 @@ class BaseReceiver:
     }
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, status_change=None, **kwargs):
-        config = settings.CONFIG.section_as_dict('Receiver', **cls.configurable)
+    def from_config(cls, manager: BaseMessageManager, status_change=None, cp=None, **kwargs):
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict('Receiver', **cls.configurable)
         logger.debug('Found configuration for %s:%s', cls.receiver_type, config)
         config.update(kwargs)
         return cls(manager, status_change=status_change, **config)
@@ -76,11 +76,10 @@ class BaseReceiver:
         logger.debug('Exited from %s', self.receiver_type)"""
 
     async def started(self):
-        await self.started_event.wait()
+        return True
 
-    def set_status_changed(self, change: str=''):
-        self.started_event.set()
-        logger.debug('Event has been set to indicate %s receiver was %s', self.receiver_type, change)
+    async def stopped(self):
+        return True
 
     async def start(self):
         try:
@@ -90,14 +89,16 @@ class BaseReceiver:
             await self.close()
 
     async def close(self):
-        await self.stop()
-        await self.manager.close()
+        pass
 
     async def run(self):
         raise NotImplementedError
 
     async def stop(self):
         raise NotImplementedError
+
+    async def wait_stopped(self):
+        pass
 
 
 class BaseServer(BaseReceiver):
@@ -106,7 +107,7 @@ class BaseServer(BaseReceiver):
     receiver_type = 'Server'
     server = None
 
-    def __init__(self, *args, host: str='0.0.0.0', port: int=4000, **kwargs):
+    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, **kwargs):
         super(BaseServer, self).__init__(*args, **kwargs)
         self.host = host
         self.port = port
@@ -118,7 +119,7 @@ class BaseServer(BaseReceiver):
             listening_on = ':'.join([str(v) for v in sock_name])
             print('Serving %s on %s' % (self.receiver_type, listening_on))
 
-    async def stop(self):
+    async def close(self):
         logger.info('Stopping %s running at %s', self.receiver_type,  self.listening_on)
         await self.stop_server()
         logger.info('%s stopped', self.receiver_type)
@@ -132,3 +133,11 @@ class BaseServer(BaseReceiver):
 
     async def start_server(self):
         raise NotImplementedError
+
+    async def started(self):
+        if not self.server or not self.server.is_serving():
+            await asyncio.sleep(0.01)
+
+    async def stopped(self):
+        if self.server:
+            await self.server.wait_closed()

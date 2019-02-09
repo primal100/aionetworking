@@ -30,7 +30,7 @@ class ManagedFile:
         await self.queue.put(data)
         logger.debug('Added to write queue for file %s', self.path, extra=logs_extra)
 
-    def close(self):
+    async def close(self):
         logger.debug('Closing file %s', self.path)
         await self.wait_writes_done()
         self.task.cancel()
@@ -84,7 +84,7 @@ class BaseFileStorage(BaseAction):
         'separator': str
     })
 
-    def __init__(self, base_path, path, attr, mode='w', separator=None, **kwargs):
+    def __init__(self, base_path, path, attr='encoded', mode='wb', separator=None, **kwargs):
         super(BaseAction, self).__init__(**kwargs)
         self.base_path = base_path
         self.path = path
@@ -110,7 +110,7 @@ class BaseFileStorage(BaseAction):
 
 class FileStorage(BaseFileStorage):
     name = 'File Storage'
-    key = 'filestorage'
+    key = 'Filestorage'
     outstanding_tasks = []
 
     async def write_to_file(self, path, data, **logs_extra):
@@ -120,9 +120,10 @@ class FileStorage(BaseFileStorage):
         logger.debug('Data written to file %s', path, extra=logs_extra)
 
     async def process(self, msg):
-        logger.debug('Processing message for action %s', self.name, extra={'msg': msg})
+        logger.debug('Processing message for action %s', self.name, extra={'msg_obj': msg})
         path = self.get_full_path(msg)
         data = self.get_data(msg)
+        path.parent.mkdir(parents=True, exist_ok=True)
         await self.write_to_file(path, data)
         return path
 
@@ -159,7 +160,7 @@ class BufferedFileStorage(BaseFileStorage):
         self.set_outstanding_writes(path)
 
     async def process(self, msg):
-        logger.debug('Storing message', extra={'msg':msg})
+        logger.debug('Storing message', extra={'msg_obj':msg})
         path = self.get_path(msg)
         data = self.get_data(msg)
         await self.write_to_file(path, data, msg=msg)

@@ -45,8 +45,9 @@ class BaseProtocol:
         return cls(sender, cls.encode(decoded), decoded, **kwargs)
 
     @classmethod
-    def set_config(cls, **kwargs):
-        config = settings.CONFIG.section_as_dict('Protocol', **cls.configurable)
+    def set_config(cls, cp=None, **kwargs):
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict('Protocol', **cls.configurable)
         logger.debug('Found configuration for %s: %s', cls.protocol_name, config)
         config.update(kwargs)
         cls.config = config

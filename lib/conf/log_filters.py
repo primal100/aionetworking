@@ -38,12 +38,11 @@ class SenderFilter(BaseFilter):
         super(SenderFilter, self).__init__(*args, **kwargs)
 
     def filter(self, record):
-        print('Filtering')
         sender = getattr(record, 'sender', None)
         if not sender:
-            message = getattr(record, 'msg', None)
-            if message:
-                sender = message.sender
+            msg_obj = getattr(record, 'msg_obj', None)
+            if msg_obj:
+                sender = msg_obj.sender
                 return sender in self.senders
             return True
         return sender in self.senders
@@ -69,10 +68,9 @@ class MessageFilter(BaseFilter):
         super(MessageFilter, self).__init__(*args, **kwargs)
 
     def filter(self, record):
-        print('Filtering')
-        message = getattr(record, 'msg', None)
-        if message:
-            value = getattr(message, self.attr, None)
+        msg_obj = getattr(record, 'msg_obj', None)
+        if msg_obj:
+            value = getattr(msg_obj, self.attr, None)
             data_type = type(value)
             if self.case_sensitive or not data_type == str:
                 return self.operator(value, data_type(self.value))

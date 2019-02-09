@@ -15,13 +15,11 @@ class TCPServerReceiver(BaseServer):
 
         async with self.server:
             self.print_listening_message(self.server.sockets)
-            self.set_status_changed('started')
             await self.server.serve_forever()
 
     async def stop_server(self):
         if self.server:
             self.server.close()
-            await self.server.wait_closed()
 
 
 class UDPServerReceiver(BaseServer):
@@ -29,7 +27,7 @@ class UDPServerReceiver(BaseServer):
     transport = None
     protocol = None
 
-    async def start_server(self, started_event):
+    async def start_server(self):
         self.transport, self.protocol = await asyncio.get_event_loop().create_datagram_endpoint(
             lambda: UDPServerProtocol(self.manager), local_addr=(self.host, self.port))
         self.print_listening_message(self.transport.sockets)

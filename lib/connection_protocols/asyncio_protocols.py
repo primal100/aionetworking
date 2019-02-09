@@ -3,7 +3,8 @@ import logging
 import time
 
 from lib import settings
-from lib.utils import plural, log_exception
+from lib import messagemanagers
+from lib.utils import log_exception
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -87,8 +88,11 @@ class BaseProtocolMixin:
         self.peer_port = peer[1]
         self.peer = ':'.join(str(prop) for prop in peer)
         self.sock = ':'.join(str(prop) for prop in sock)
-        self.alias = self.check_other(self.peer_ip)
-        logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
+        try:
+            self.alias = self.check_other(self.peer_ip)
+            logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
+        except messagemanagers.MessageFromNotAuthorizedHost:
+            self.transport.close()
 
     @staticmethod
     def manage_error(exc):
@@ -105,9 +109,17 @@ class BaseProtocolMixin:
         for msg in msgs:
             self.send_msg(msg)
 
+    @property
+    def stats_extra(self):
+        return {'peer_ip': self.peer_port, 'peer_port': self.peer_port, 'peer': self.peer, 'sock': self.sock,
+                'alias': self.alias, 'first_message_received': self.first_message_received,
+                'received_msgs': self.received_msgs,
+                'received_bytes': self.received_bytes, 'processed_msgs': self.processed_msgs,
+                'last_message_processed': self.last_message_processed}
+
     def check_last_message_processed(self):
         if self.received_msgs and self.received_msgs == self.processed_msgs:
-            stats.info('', extra={'conn': self})
+            stats.info('', extra=self.stats_extra)
             #stats.info('%s kb from %s were processed in %2.2f ms, %2.2f kb/s', self.received_kbs, self.alias, seconds * 1000, rate)
 
     def task_callback(self, future):
@@ -129,7 +141,7 @@ class BaseProtocolMixin:
                 self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
-        task = self.manager.handle_message(sender, data)
+        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
         task.add_done_callback(self.task_callback)
 
 

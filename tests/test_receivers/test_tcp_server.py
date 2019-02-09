@@ -46,8 +46,6 @@ class TestTCPServer(BaseTestCase):
         except OSError:
             pass
         self.start_server_process()
-        self.client = get_sender()
-        self.client_two = get_sender()
 
     def tearDown(self):
         self.status_change.clear()
@@ -57,7 +55,8 @@ class TestTCPServer(BaseTestCase):
         self.process.join()
 
     def test_00_one_msg(self):
-        asyncio.run(tasks.encode_send_msgs(self.client, [('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
+        client = get_sender()
+        asyncio.run(tasks.encode_send_msgs(client, [('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
             'direct-reference': (0, 0, 17, 773, 1, 1, 1), 'encoding': ('single-ASN1-type', ('DialoguePDU', (
             'dialogueRequest', {'protocol-version': (1, 1), 'application-context-name': (0, 4, 0, 0, 1, 0, 20, 2)})))},
                                                                 'components': [('basicROS', ('invoke', {
@@ -72,30 +71,30 @@ class TestTCPServer(BaseTestCase):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAP_MAP')
         self.assertBinaryFileContentsEqual(expected_file,
                                      b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
-        """expected_file = Path(self.base_data_dir, 'Decoded', 'TCAP_MAP', 'localhost_00000001.txt')
-        self.assertFileContentsEqual(expected_file,
-                                     "('begin',\n {'components': [('basicROS',\n                  ('invoke',\n                   {'argument': ('RoutingInfoForSM-Arg',\n                                 {'msisdn': b'\\x91\\x14\\x97Bu3\\xf3',\n                                  'serviceCentreAddress': b'\\x91\\x14\\x97y'\n                                                          b'y\\x08\\xf0',\n                                  'sm-RP-PRI': False}),\n                    'invokeId': ('present', -1),\n                    'opcode': ('local', 45)}))],\n  'dialoguePortion': {'direct-reference': (0, 0, 17, 773, 1, 1, 1),\n                      'encoding': ('single-ASN1-type',\n                                   ('DialoguePDU',\n                                    ('dialogueRequest',\n                                     {'application-context-name': (0,\n                                                                   4,\n                                                                   0,\n                                                                   0,\n                                                                   1,\n                                                                   0,\n                                                                   20,\n                                                                   2),\n                                      'protocol-version': (1, 1)})))},\n  'otid': b'\\x00\\x00\\x00\\x01'})")
-        expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
-        self.assertTrue(expected_file.exists())
-        self.assertNumLinesInFile(expected_file, 1)
-        expected_file = Path(self.base_data_dir, 'Prettified', 'TCAP_MAP', 'localhost_00000001.txt')
-        self.assertTrue(expected_file.exists())
-        self.assertNumLinesInFile(expected_file, 4)
-        expected_file = Path(self.base_data_dir, 'recordings', 'testrecord.mmr')
-        self.assertBinaryFileContentsEqual(expected_file, b'\x00\x00\x00\x00\t\x00\x00\x00localhostI\x00\x00\x00bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
-        """
 
-    async def send_two_clients(self, msg1, msg2):
-        asyncio.create_task(tasks.send_hex(self.client, msg1))
-        asyncio.create_task(tasks.send_hex(self.client_two, msg2))
+    @staticmethod
+    async def send_three_clients(client1, client2, client3, msg1, msg2, msg3):
+        async with client1, client2, client3:
+            await client1.send_hex(msg1)
+            await client2.send_hex(msg2)
+            await client3.send_hex(msg3)
         await asyncio.sleep(3)
 
-    def test_01_from_two_clients(self):
-        asyncio.run(self.send_two_clients(self.multiple_encoded_hex[0], self.multiple_encoded_hex[1]))
-        expected_file = Path(self.base_data_dir, 'Summaries', "Summary_%s.csv" % utils.current_date())
-        self.assertTrue(expected_file.exists())
-        self.assertNumLinesInFile(expected_file, 2)
+    def test_01_from_three_clients(self):
+        client_one = get_sender(srcip='127.0.0.1')
+        client_two = get_sender(srcip='127.0.0.2')
+        client_three = get_sender(srcip='127.0.0.3')
+        asyncio.run(self.send_three_clients(client_one, client_two, client_three, self.multiple_encoded_hex[0],
+                                            self.multiple_encoded_hex[1], self.multiple_encoded_hex[2]))
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAP_MAP')
+        self.assertBinaryFileContentsEqual(expected_file,
+                                     b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0')
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost2_840001ff.TCAP_MAP')
+        self.assertBinaryFileContentsEqual(expected_file,
+                                           b"e\x81\xaaH\x04\x84\x00\x01\xffI\x04\xa5\x05\x00\x01k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x0e\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x80\xa2l\x02\x01\x010g\x02\x018\xa3\x80\xa1\x800Z\x04\x10K\x9da\x91\x10u6e\x8c\xfeY\x88\x0c\xd2\xac'\x04\x10K\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8\x04\x10\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x04\x10C\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x8c\x04\x10\xa2U\x1a\x05\x8c\xdb\x00\x00K\x8dy\xf7\xca\xffP\x12\x00\x00\x00\x00\x00\x00")
+        self.assertNumberOfFilesInDirectory(Path(self.base_data_dir, 'Encoded', 'TCAP_MAP'), 2)
 
+    """
     def test_send_incrementing_bytes(self):
         asyncio.run(tasks.send_incremented_msgs(self.client))
 
@@ -158,4 +157,4 @@ class TestTCPServer(BaseTestCase):
         self.assertPathExists(expected_file)
         expected_file = os.path.join(definitions.TESTS_DIR, 'recordings', 'testrecord.mmr')
         self.assertPathExists(expected_file)
-
+"""

@@ -25,7 +25,9 @@ async def main(status_change=None, stop_ordered=None):
     settings.HOME = settings.CONFIG.home
     settings.DATA_DIR = settings.CONFIG.data_home
 
-    asyncio.get_event_loop().set_exception_handler(log_exceptions)
+    loop = asyncio.get_event_loop()
+
+    #loop.set_exception_handler(log_exceptions)
     logger.info('Starting %s on %s', settings.APP_NAME, asyncio.get_event_loop())
 
     receiver_name = settings.CONFIG.receiver
@@ -50,10 +52,9 @@ async def main(status_change=None, stop_ordered=None):
         """Workaround for windows:
         https://stackoverflow.com/questions/24774980/why-cant-i-catch-sigint-when-asyncio-event-loop-is-running/24775107#24775107
         """
-        async def wakeup():
-            await asyncio.sleep(0.1)
-            await wakeup()
-        asyncio.create_task(wakeup())
+        def wakeup():
+            loop.call_later(0.1, wakeup)
+        loop.call_later(0.1, wakeup)
 
     try:
         if stop_ordered:
@@ -66,5 +67,7 @@ async def main(status_change=None, stop_ordered=None):
         receiver_task.cancel()
         await receiver.stopped()
         logger.debug('Receiver task stopped')
+        await manager.close()
+        logger.debug('Message Manager closed')
         if status_change:
             status_change.set()

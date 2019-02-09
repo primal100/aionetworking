@@ -12,8 +12,9 @@ class BaseAction:
     configurable = {}
 
     @classmethod
-    def from_config(cls, **kwargs):
-        config = settings.CONFIG.section_as_dict(cls.key, **cls.configurable)
+    def from_config(cls, cp=None, **kwargs):
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict(cls.key, **cls.configurable)
         logger.debug('Found configuration for %s:%s', cls.name, config)
         config.update(kwargs)
         return cls(**config)
@@ -28,5 +29,10 @@ class BaseAction:
         task = asyncio.create_task(self.process(msg))
         self.outstanding_tasks.append(task)
 
-    async def wait_complete(self):
-        await asyncio.wait(self.outstanding_tasks)
+    async def wait_complete(self, **logs_extra):
+        if self.outstanding_tasks:
+            await asyncio.wait(self.outstanding_tasks)
+            self.outstanding_tasks = []
+
+    async def close(self):
+        await self.wait_complete()

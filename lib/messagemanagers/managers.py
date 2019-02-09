@@ -3,6 +3,7 @@ import datetime
 
 from lib.utils import log_exception
 from lib import settings
+from .exceptions import MessageFromNotAuthorizedHost
 
 from typing import TYPE_CHECKING, Sequence, Mapping, Type, AnyStr
 if TYPE_CHECKING:
@@ -14,10 +15,6 @@ else:
 logger = settings.get_logger('main')
 raw_logger = settings.get_logger('raw')
 msg_logger = settings.get_logger('message')
-
-
-class MessageFromNotAuthorizedHost(Exception):
-    pass
 
 
 def raise_message_from_not_authorized_host(sender, allowed_senders):
@@ -32,30 +29,31 @@ class BaseMessageManager:
 
     configurable = {
         'actions': tuple,
-        'allowed_senders': tuple,
+        'allowedsenders': tuple,
         'aliases': dict,
         'generate_timestamp': bool,
     }
 
     @classmethod
-    def from_config(cls, protocol: Type[BaseProtocol], **kwargs):
+    def from_config(cls, protocol: Type[BaseProtocol], cp=None, **kwargs):
         from lib import definitions
-        config = settings.CONFIG.section_as_dict('MessageManager', **cls.configurable)
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict('MessageManager', **cls.configurable)
         logger.info('Found configuration for %s: %s', cls.name,  config)
         action_modules = (definitions.ACTIONS[action] for action in config.pop('actions'))
-        config['actions'] += [action.from_config() for action in action_modules]
+        config['actions'] = [action.from_config() for action in action_modules]
         config.update(kwargs)
         if protocol.supports_responses:
             return TwoWayMessageManager(protocol, **config)
         return OneWayMessageManager(protocol, **config)
 
     def __init__(self, protocol: Type[BaseProtocol], supports_responses:bool = False, actions: Sequence = (),
-                 generate_timestamp: bool = False, aliases: Mapping = None, allowed_senders: Sequence = ()):
+                 generate_timestamp: bool = False, aliases: Mapping = None, allowedsenders: Sequence = ()):
         self.protocol = protocol
         self.generate_timestamp = generate_timestamp
         self.actions = actions
         self.aliases = aliases or {}
-        self.allowed_senders = allowed_senders
+        self.allowed_senders = allowedsenders
         self.supports_responses = supports_responses
 
     def get_alias(self, sender: str):
@@ -65,10 +63,6 @@ class BaseMessageManager:
         return alias
 
     def check_sender(self, other_ip):
-        if self.allowed_senders and other_ip not in self.allowed_senders:
-            raise_message_from_not_authorized_host(other_ip, self.allowed_senders)
-        if self.allowed_senders:
-            logger.debug('Sender is in allowed senders')
         return self.get_alias(other_ip)
 
     def handle_message(self, sender: str, data: AnyStr):
@@ -86,22 +80,11 @@ class BaseMessageManager:
         try:
             msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
             for msg in msgs:
-                msg_logger.debug('', extra={'msg': msg, 'sender': sender})
+                msg_logger.debug('', extra={'msg_obj': msg, 'sender': sender})
             return msgs
         except Exception as e:
             logger.error(e)
             return None
-
-    """async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        logger.debug('Exiting %s', self.name)
-        if exc_type:
-            error = traceback.format_exception(exc_type, exc_val, exc_tb)
-            logger.error('\n'.join(error))
-        await self.cleanup()
-        logger.debug('Exited from %s', self.name)"""
 
     @staticmethod
     def filter(msg, **log_extra):
@@ -120,15 +103,30 @@ class BaseMessageManager:
         logger.debug('%s closed', self.name)
 
 
-class OneWayMessageManager(BaseMessageManager):
+class BaseReceiverMessageManager(BaseMessageManager):
+
+    configurable = BaseMessageManager.configurable
+    configurable.update({
+        'allowedsenders': tuple,
+    })
+
+    def check_sender(self, other_ip):
+        if self.allowed_senders and other_ip not in self.allowed_senders:
+            raise_message_from_not_authorized_host(other_ip, self.allowed_senders)
+        if self.allowed_senders:
+            logger.debug('Sender is in allowed senders')
+        return super(BaseReceiverMessageManager,self).check_sender(other_ip)
+
+    async def manage(self, sender, msgs):
+        raise NotImplementedError
+
+
+class OneWayMessageManager(BaseReceiverMessageManager):
     name = 'One Way Message Manager'
 
-    async def do_actions(self, msg):
+    def do_actions(self, msg):
         for action in self.actions:
-            try:
-                await action.do_one(msg)
-            except Exception as exc:
-                logger.error(log_exception(exc))
+            action.do_one(msg)
 
     async def wait_actions(self, **logs_extra):
         for action in self.actions:
@@ -137,11 +135,11 @@ class OneWayMessageManager(BaseMessageManager):
     async def manage(self, sender, msgs):
         for msg in msgs:
                 if not msg.filter():
-                    await self.do_actions(msg)
+                    self.do_actions(msg)
         await self.wait_actions(sender=sender)
 
 
-class TwoWayMessageManager(BaseMessageManager):
+class TwoWayMessageManager(BaseReceiverMessageManager):
     name = 'Two Way Message Manager'
 
     @staticmethod

@@ -140,8 +140,8 @@ class BaseNetworkClient(BaseSender):
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
-        'src_ip': str,
-        'src_port': int
+        'srcip': str,
+        'srcport': int
     })
     receiver_configurable = BaseSender.configurable.copy()
     receiver_configurable.update({
@@ -150,12 +150,12 @@ class BaseNetworkClient(BaseSender):
         'ssl': bool,
     })
 
-    def __init__(self, protocol, queue=None, host: str='127.0.0.1', port: int = 4000,
-                 ssl: bool=False, src_ip: str='', src_port: int=0, **kwargs):
+    def __init__(self, protocol, queue=None, host: str = '127.0.0.1', port: int = 4000,
+                 ssl: bool = False, srcip: str = '', srcport: int = 0, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
-        self.localaddr = (src_ip, src_port) if src_ip else None
+        self.localaddr = (srcip, srcport) if srcip else None
         self.ssl = ssl
 
     @property

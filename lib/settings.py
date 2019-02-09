@@ -1,13 +1,11 @@
 import logging
 import os
 from pathlib import Path
-import aiofile
 import aiofiles
 
 
-
 APP_NAME = 'Message Manager'
-ROOT_DIR = Path(__file__).parent
+ROOT_DIR = Path(__file__).parent.parent
 CONF_DIR = ROOT_DIR.joinpath('conf')
 LOGS_DIR = ROOT_DIR.joinpath('logs')
 DATA_DIR = ROOT_DIR.joinpath('data')

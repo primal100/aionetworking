@@ -10,10 +10,10 @@ from typing import Mapping
 
 class INIFileConfig(BaseConfigClass):
 
-    def __init__(self, filename: Path):
+    def __init__(self, *file_names: Path):
         super(INIFileConfig, self).__init__()
         self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
-        self.config.read(filename)
+        self.config.read(file_names)
 
     @property
     def receiver(self) -> str:
