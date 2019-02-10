@@ -50,7 +50,7 @@ class BaseTestCase(TestCase):
         return INIFileConfig()
 
     def assertFileContentsEqual(self, file_path: Path, expected_contents: AnyStr, mode: str='r'):
-        self.assertTrue(file_path.exists())
+        self.assertTrue(file_path.exists(), msg='%s does not exist' % file_path)
         with file_path.open(mode=mode) as f:
             actual_contents = f.read()
             self.assertEqual(actual_contents, expected_contents)

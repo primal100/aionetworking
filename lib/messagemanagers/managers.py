@@ -1,7 +1,8 @@
 import asyncio
 import datetime
+import logging
 
-from lib.utils import log_exception
+from lib.utils import log_exception, plural
 from lib import settings
 from .exceptions import MessageFromNotAuthorizedHost
 
@@ -66,7 +67,7 @@ class BaseMessageManager:
         return self.get_alias(other_ip)
 
     def handle_message(self, sender: str, data: AnyStr):
-        logger.debug("Handling buffer for %s", extra={'sender': sender})
+        logger.debug("Handling buffer from %s", sender, extra={'sender': sender})
         raw_logger.debug(data, extra={'sender': sender})
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
@@ -79,8 +80,11 @@ class BaseMessageManager:
     def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
         try:
             msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
-            for msg in msgs:
-                msg_logger.debug('', extra={'msg_obj': msg, 'sender': sender})
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug('Buffer contains %s', plural(len(msgs), 'message'))
+                for msg in msgs:
+                    msg_logger.debug('', extra={'msg_obj': msg, 'sender': sender})
+            logger.debug(msgs)
             return msgs
         except Exception as e:
             logger.error(e)
@@ -124,18 +128,17 @@ class BaseReceiverMessageManager(BaseMessageManager):
 class OneWayMessageManager(BaseReceiverMessageManager):
     name = 'One Way Message Manager'
 
-    def do_actions(self, msg):
+    async def do_actions(self, msgs):
         for action in self.actions:
-            action.do_one(msg)
+            await action.do_many(msgs)
 
     async def wait_actions(self, **logs_extra):
         for action in self.actions:
             await action.wait_complete(**logs_extra)
 
     async def manage(self, sender, msgs):
-        for msg in msgs:
-                if not msg.filter():
-                    self.do_actions(msg)
+        msgs = [msg for msg in msgs if not msg.filter()]
+        await self.do_actions(msgs)
         await self.wait_actions(sender=sender)
 
 

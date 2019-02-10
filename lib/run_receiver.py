@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 
 from lib import definitions, settings
 from lib.run_manager import get_protocol_manager
@@ -9,6 +10,15 @@ from lib.wrappers.events import AsyncEventWrapper
 
 
 logger = logging.getLogger(settings.LOGGER_NAME)
+
+
+def except_handler(exc_type, exc_value, exc_tb):
+    logger.exception('', exc_info=(exc_type, exc_value, exc_tb))
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+
+# Install exception handler
+sys.excepthook = except_handler
 
 
 def log_exceptions(loop, context):

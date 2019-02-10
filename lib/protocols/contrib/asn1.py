@@ -28,8 +28,10 @@ class BasePyCrateAsnProtocol(BaseProtocol):
         msgs = []
         char = Charpy(encoded)
         while char._cur < char._len_bit:
+            start = int(char._cur / 8)
             cls.pycrate_asn_class.from_ber(char, single=True)
-            msgs.append(cls.pycrate_asn_class())
+            end = int(char._cur / 8)
+            msgs.append((encoded[start:end], cls.pycrate_asn_class()))
         return msgs
 
     @classmethod

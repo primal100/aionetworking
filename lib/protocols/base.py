@@ -38,7 +38,7 @@ class BaseProtocol:
 
     @classmethod
     def from_buffer(cls, sender, encoded, **kwargs) -> Sequence:
-        return [cls(sender, encoded, decoded, **kwargs) for decoded in cls.decode(encoded)]
+        return [cls(sender, encoded, decoded, **kwargs) for encoded, decoded in cls.decode(encoded)]
 
     @classmethod
     def from_decoded(cls, decoded, sender='', **kwargs):
@@ -71,7 +71,7 @@ class BaseProtocol:
 
     @classmethod
     def decode(cls, encoded: bytes) -> Sequence:
-        return [encoded]
+        return [encoded, encoded]
 
     @classmethod
     def encode(cls, decoded):
