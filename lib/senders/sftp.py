@@ -6,8 +6,6 @@ from .base import BaseNetworkClient
 
 from typing import AnyStr
 
-logger = logging.getLogger(settings.LOGGER_NAME)
-
 
 class SFTPClient(BaseNetworkClient):
     sender_type = 'SFTP Client'

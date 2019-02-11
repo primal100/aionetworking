@@ -1,3 +1,5 @@
+import logging
+
 from lib.utils import cached_property, now_to_utc_string
 
 from pathlib import Path
@@ -9,7 +11,8 @@ class ConfigurationException(Exception):
 
 class BaseConfigClass:
 
-    def __init__(self):
+    def __init__(self, logger_name='receiver'):
+        self.logger_name = logger_name
         from lib import settings
         self.defaults = {
             'Testdir': settings.TESTS_DIR,
@@ -21,8 +24,12 @@ class BaseConfigClass:
         }
         self.defaults.update({
             'appname': settings.APP_NAME.replace(' ', '').lower(),
-            'postfix': settings.POSTFIX.replace(' ', '').lower()
         })
+
+    def get_logger(self, *names):
+        list(names).insert(0, self.logger_name)
+        name = '.'.join(names)
+        return logging.getLogger(name)
 
     @cached_property
     def receiver(self):

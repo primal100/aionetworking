@@ -10,17 +10,15 @@ from typing import Mapping
 from pathlib import Path
 
 
-logger = logging.getLogger(settings.LOGGER_NAME)
-
-
 class SFTPFactory(ServerProtocolMixin, asyncssh.SFTPServer):
+    logger_name = 'receiver'
 
     def __init__(self, receiver, conn):
         #receiver.check_sender
         root = receiver.base_upload_dir.joinpath(conn.get_extra_info('username'))
         root.mkdir(parents=True, exist_ok=True)
         super().__init__(conn, chroot=root)
-        self.logger = logger
+        self.log = settings.get_logger(self.logger_name)
         self.receiver = receiver
 
     def close(self, file_obj):

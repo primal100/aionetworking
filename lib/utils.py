@@ -20,7 +20,6 @@ class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
 
 def set_loop_policy():
     if os.name == 'nt':
-        #pass
         asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
 
 
@@ -220,3 +219,8 @@ def plural(num, string, past=False):
         s += ' were' if num != 1 else ' was'
     return s
 
+def addr_tuple_to_str(addr):
+    return ':'.join(str(a) for a in addr)
+
+def addr_str_to_tuple(addr):
+    return tuple(addr.split(':'))

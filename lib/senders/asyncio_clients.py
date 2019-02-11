@@ -2,10 +2,9 @@ import asyncio
 import logging
 
 from lib import settings
+from lib.conf import ConfigurationException
 from lib.connection_protocols.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
 from .base import BaseNetworkClient
-
-logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class BaseAsyncioClient(BaseNetworkClient):
@@ -38,5 +37,8 @@ class UDPClient(BaseAsyncioClient):
     connection_protocol = None
 
     async def open_connection(self):
+        loop = asyncio.get_event_loop()
+        if loop.__class__.__name__ == 'ProactorEventLoop':
+            raise ConfigurationException('UDP Server cannot be run on Windows Proactor Loop. Use Selector Loop instead')
         self.transport, self.connection_protocol = await asyncio.get_event_loop().create_datagram_endpoint(
-            UDPClientProtocol, remote_addr=(self.host, self.port))
+            lambda: UDPClientProtocol(self.manager), remote_addr=(self.host, self.port), local_addr=self.localaddr)

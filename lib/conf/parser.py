@@ -10,8 +10,8 @@ from typing import Mapping
 
 class INIFileConfig(BaseConfigClass):
 
-    def __init__(self, *file_names: Path):
-        super(INIFileConfig, self).__init__()
+    def __init__(self, *file_names: Path, **kwargs):
+        super(INIFileConfig, self).__init__(**kwargs)
         self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
         self.config.read(file_names)
 

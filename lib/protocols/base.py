@@ -51,6 +51,7 @@ class BaseProtocol:
         logger.debug('Found configuration for %s: %s', cls.protocol_name, config)
         config.update(kwargs)
         cls.config = config
+        cls.log = logging.getLogger(cp.logger_name)
 
     def __init__(self, sender, encoded, decoded, timestamp=None):
         self.sender = sender

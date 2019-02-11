@@ -8,33 +8,36 @@ if TYPE_CHECKING:
 else:
     BaseSender = None
 
-logger = logging.getLogger(settings.LOGGER_NAME)
+logger = logging.getLogger('sender')
 
 
-def get_sender(**kwargs) -> BaseSender:
+def get_sender(*config_args, configure_logging=False, logger_name='sender', **kwargs) -> BaseSender:
 
-    settings.POSTFIX = 'sender'
-    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
-    settings.CONFIG.configure_logging()
+    if config_args:
+        cp = definitions.CONFIG_CLS(*config_args, logger_name=logger_name)
+    else:
+        settings.CONFIG = definitions.CONFIG_CLS(*config_args, logger_name='sender')
+        cp = settings.CONFIG
 
-    logger.info('Starting client for %s', settings.APP_NAME)
+    if configure_logging:
+        cp.configure_logging()
 
-    receiver_name = settings.CONFIG.receiver
+    receiver_name = cp.receiver
 
-    logger.info('Using client for receiver %s', receiver_name)
+    logger.info('Getting client for receiver %s', receiver_name)
 
     sender_cls = definitions.RECEIVERS[receiver_name]['sender']
 
-    protocol_name = settings.CONFIG.protocol
+    protocol_name = cp.protocol
 
     logger.info('Using protocol %s', protocol_name)
 
     protocol = definitions.PROTOCOLS[protocol_name]
-    protocol.set_config()
+    protocol.set_config(cp=cp)
 
     manager_cls = definitions.CLIENT_MESSAGE_MANAGER
 
-    manager = manager_cls.from_config(protocol)
+    manager = manager_cls.from_config(protocol, cp=cp)
 
-    sender = sender_cls.from_config(manager, **kwargs)
+    sender = sender_cls.from_config(manager, cp=cp, **kwargs)
     return sender

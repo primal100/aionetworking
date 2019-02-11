@@ -18,7 +18,7 @@ raw_logger = settings.get_logger('raw')
 msg_logger = settings.get_logger('message')
 
 
-def raise_message_from_not_authorized_host(sender, allowed_senders):
+def raise_message_from_not_authorized_host(sender, allowed_senders, logger):
     msg = "Received message from unauthorized host %s. Authorized hosts are: %s"
     args = (sender, allowed_senders)
     logger.error(msg, *args)
@@ -36,42 +36,47 @@ class BaseMessageManager:
     }
 
     @classmethod
-    def from_config(cls, protocol: Type[BaseProtocol], cp=None, **kwargs):
+    def from_config(cls, protocol: Type[BaseProtocol], cp = None, **kwargs):
         from lib import definitions
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('MessageManager', **cls.configurable)
-        logger.info('Found configuration for %s: %s', cls.name,  config)
+        log = logging.getLogger(cp.logger_name)
+        log.info('Found configuration for %s: %s', cls.name,  config)
         action_modules = (definitions.ACTIONS[action] for action in config.pop('actions'))
         config['actions'] = [action.from_config() for action in action_modules]
         config.update(kwargs)
+        config['logger_name'] = cp.logger_name
         if protocol.supports_responses:
             return TwoWayMessageManager(protocol, **config)
         return OneWayMessageManager(protocol, **config)
 
-    def __init__(self, protocol: Type[BaseProtocol], supports_responses:bool = False, actions: Sequence = (),
-                 generate_timestamp: bool = False, aliases: Mapping = None, allowedsenders: Sequence = ()):
+    def __init__(self, protocol: Type[BaseProtocol], actions: Sequence = (),
+                 generate_timestamp: bool = False, aliases: Mapping = None, allowedsenders: Sequence = (),
+                 logger_name: str = 'receiver'):
+        self.log = logging.getLogger(logger_name)
+        self.raw_log = logging.getLogger("%s.raw" % logger_name)
+        self.msg_log = logging.getLogger("%s.message" % logger_name)
         self.protocol = protocol
         self.generate_timestamp = generate_timestamp
         self.actions = actions
         self.aliases = aliases or {}
         self.allowed_senders = allowedsenders
-        self.supports_responses = supports_responses
 
     def get_alias(self, sender: str):
         alias = self.aliases.get(sender, sender)
         if alias != sender:
-            logger.debug('Alias found for %s: %s', sender, alias)
+            self.log.debug('Alias found for %s: %s', sender, alias)
         return alias
 
     def check_sender(self, other_ip):
         return self.get_alias(other_ip)
 
     def handle_message(self, sender: str, data: AnyStr):
-        logger.debug("Handling buffer from %s", sender, extra={'sender': sender})
-        raw_logger.debug(data, extra={'sender': sender})
+        self.log.debug("Handling buffer from %s", sender, extra={'sender': sender})
+        self.raw_log.debug(data, extra={'sender': sender})
         if self.generate_timestamp:
             timestamp = datetime.datetime.now()
-            logger.debug('Generated timestamp: %s', timestamp, extra={'sender': sender})
+            self.log.debug('Generated timestamp: %s', timestamp, extra={'sender': sender})
         else:
             timestamp = None
         msgs = self.make_messages(sender, data, timestamp)
@@ -80,31 +85,29 @@ class BaseMessageManager:
     def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
         try:
             msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug('Buffer contains %s', plural(len(msgs), 'message'))
+            if self.log.isEnabledFor(logging.DEBUG):
+                self.log.debug('Buffer contains %s', plural(len(msgs), 'message'))
                 for msg in msgs:
-                    msg_logger.debug('', extra={'msg_obj': msg, 'sender': sender})
-            logger.debug(msgs)
+                    self.msg_log.debug('', extra={'msg_obj': msg, 'sender': sender})
             return msgs
         except Exception as e:
-            logger.error(e)
+            self.log.error(e)
             return None
 
-    @staticmethod
-    def filter(msg, **log_extra):
+    def filter(self, msg, **log_extra):
         filtered = msg.filtered()
         if filtered:
-            logger.debug("Message was filtered out", extra=log_extra)
+            self.log.debug("Message was filtered out", extra=log_extra)
         return filtered
 
     async def manage(self, sender, msgs):
         raise NotImplementedError
 
     async def close(self):
-        logger.debug('Closing %s', self.name)
+        self.log.debug('Closing %s', self.name)
         for action in self.actions:
             await action.close()
-        logger.debug('%s closed', self.name)
+        self.log.debug('%s closed', self.name)
 
 
 class BaseReceiverMessageManager(BaseMessageManager):
@@ -116,9 +119,9 @@ class BaseReceiverMessageManager(BaseMessageManager):
 
     def check_sender(self, other_ip):
         if self.allowed_senders and other_ip not in self.allowed_senders:
-            raise_message_from_not_authorized_host(other_ip, self.allowed_senders)
+            raise_message_from_not_authorized_host(other_ip, self.allowed_senders, self.log)
         if self.allowed_senders:
-            logger.debug('Sender is in allowed senders')
+            self.log.debug('%s is in allowed senders', other_ip)
         return super(BaseReceiverMessageManager,self).check_sender(other_ip)
 
     async def manage(self, sender, msgs):
@@ -145,11 +148,10 @@ class OneWayMessageManager(BaseReceiverMessageManager):
 class TwoWayMessageManager(BaseReceiverMessageManager):
     name = 'Two Way Message Manager'
 
-    @staticmethod
-    def log_task_exceptions(task):
+    def log_task_exceptions(self, task):
         exc = task.exception()
         if exc:
-            logger.error(log_exception(exc))
+            self.log.error(log_exception(exc))
 
     def do_actions(self, msg):
         tasks = []
@@ -171,8 +173,7 @@ class TwoWayMessageManager(BaseReceiverMessageManager):
         return responses
 
 
-class ClientMessageManager(BaseMessageManager):
-    name = 'Client Message Manager'
+class BaseClientMessageManager(BaseMessageManager):
 
     configurable = {}
 
@@ -180,20 +181,26 @@ class ClientMessageManager(BaseMessageManager):
     def from_config(cls, protocol: Type[BaseProtocol], **kwargs):
         config = settings.CONFIG.section_as_dict('MessageManager', **cls.configurable)
         config.update(kwargs)
-        return cls(protocol, supports_responses=False, **config)
+        return cls(protocol, **config)
 
-    async def run(self, started_event):
-        started_event.set()
+
+class ClientOneWayMessageManager(BaseClientMessageManager):
+    name = 'Client One Way Message Manager'
+
+    def handle_message(self, sender: str, data: AnyStr):
+        raise NotImplementedError
+
+
+class ClientTwoWayMessageManager(BaseMessageManager):
+    name = 'Client Two Way Message Manager'
 
     def __init__(self, *args, **kwargs):
-        super(ClientMessageManager, self).__init__(*args, **kwargs)
+        super(ClientTwoWayMessageManager, self).__init__(*args, **kwargs)
         self.queue = asyncio.Queue()
 
-    def manage(self, sender, data, timestamp):
-        try:
-            self.queue.put_nowait((sender, data, timestamp))
-        except asyncio.QueueFull:
-            asyncio.create_task(self.queue.put(data))
+    async def manage(self, sender, msgs):
+        for msg in msgs:
+            await self.queue.put((sender, msg))
 
     async def wait_response(self):
         await self.queue.get()

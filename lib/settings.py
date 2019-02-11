@@ -29,7 +29,3 @@ CONFIG = None
 CONFIG_ARGS = CONF_DIR.joinpath("setup.ini"),
 #FILE_OPENER = aiofile.AIOFile
 FILE_OPENER = aiofiles.open
-
-
-def get_logger(name):
-    return logging.getLogger("%s.%s" % (LOGGER_NAME, name))

@@ -8,8 +8,6 @@ from lib import utils, settings
 from typing import Sequence
 from datetime import datetime, timedelta
 
-logger = logging.getLogger(settings.LOGGER_NAME)
-
 
 class Action(BaseAction):
     requires_decoding = False
@@ -22,7 +20,7 @@ class Action(BaseAction):
     def store_many(self, msgs: Sequence[Sequence[str, bytes, datetime]]):
         data = b''
         for sender, msg, timestamp in msgs:
-            logger.debug('Recording packet from %s', sender)
+            self.log.debug('Recording packet from %s', sender)
             timestamp = timestamp or datetime.now()
             if self.prev_message_time:
                 message_timedelta = (timestamp - self.prev_message_time).microseconds

@@ -1,25 +1,28 @@
 import asyncio
+import logging
 
 from lib import settings
-
-logger = settings.get_logger('actions')
 
 
 class BaseAction:
     name = ''
     key = ''
-    outstanding_tasks = []
-    configurable = {}
+    configurable = {'timeout': int}
 
     @classmethod
     def from_config(cls, cp=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict(cls.key, **cls.configurable)
-        logger.debug('Found configuration for %s:%s', cls.name, config)
+        logger = logging.getLogger("%s.actions" % cp.logger_name)
+        logger.info('Found configuration for %s:%s', cls.name, config)
         config.update(kwargs)
+        config['logger_name'] = cp.logger_name
         return cls(**config)
 
-    def __init__(self, **kwargs): ...
+    def __init__(self, timeout=10, logger_name:str = 'receiver'):
+        self.log = logging.getLogger("%s.actions" % logger_name)
+        self.timeout = timeout
+        self.outstanding_tasks = []
 
     async def do_many(self, msgs):
         await self.do_many_parallel(msgs)
@@ -36,10 +39,11 @@ class BaseAction:
 
     async def wait_complete(self, **logs_extra):
         if self.outstanding_tasks:
+            self.log .debug('Waiting for tasks to complete')
             try:
-                await asyncio.wait(self.outstanding_tasks)
+                await asyncio.wait(self.outstanding_tasks, timeout=self.timeout)
             finally:
-                self.outstanding_tasks = []
+                self.outstanding_tasks.clear()
 
     async def close(self):
         await self.wait_complete()

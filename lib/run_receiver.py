@@ -9,7 +9,7 @@ from lib.utils import log_exception
 from lib.wrappers.events import AsyncEventWrapper
 
 
-logger = logging.getLogger(settings.LOGGER_NAME)
+logger = settings.get_logger('receiver')
 
 
 def except_handler(exc_type, exc_value, exc_tb):
@@ -24,32 +24,36 @@ sys.excepthook = except_handler
 def log_exceptions(loop, context):
     logger.error(context['message'])
     logger.error(log_exception(context['exception']))
-    raise context['exception']
+    loop.default_exception_handler(context)
 
 
-async def main(status_change=None, stop_ordered=None):
+async def main(*config_args, status_change=None, stop_ordered=None, logger_name='receiver', configure_logging=True):
 
-    settings.POSTFIX = 'receiver'
-    settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS)
-    settings.CONFIG.configure_logging()
-    settings.HOME = settings.CONFIG.home
-    settings.DATA_DIR = settings.CONFIG.data_home
+    if config_args:
+        cp = definitions.CONFIG_CLS(*config_args, logger_name=logger_name)
+    else:
+        settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, logger_name='receiver')
+        cp = settings.CONFIG
+    if configure_logging:
+        cp.configure_logging()
+    #settings.HOME = settings.CONFIG.home
+    #settings.DATA_DIR = settings.CONFIG.data_home
 
     loop = asyncio.get_event_loop()
 
-    #loop.set_exception_handler(log_exceptions)
+    loop.set_exception_handler(log_exceptions)
     logger.info('Starting %s on %s', settings.APP_NAME, asyncio.get_event_loop())
 
-    receiver_name = settings.CONFIG.receiver
+    receiver_name = cp.receiver
     logger.info('Using receiver %s', receiver_name)
 
     receiver_cls = definitions.RECEIVERS[receiver_name]['receiver']
 
-    protocol_cls, manager_cls = get_protocol_manager()
+    protocol_cls, manager_cls = get_protocol_manager(cp=cp)
 
-    manager = manager_cls.from_config(protocol_cls)
+    manager = manager_cls.from_config(protocol_cls, cp=cp)
 
-    receiver = receiver_cls.from_config(manager)
+    receiver = receiver_cls.from_config(manager, cp=cp)
     receiver_task = asyncio.create_task(receiver.start())
 
     await receiver.started()

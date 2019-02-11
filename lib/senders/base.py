@@ -7,12 +7,9 @@ from lib import utils, settings
 from typing import TYPE_CHECKING, Sequence, AnyStr
 from pathlib import Path
 if TYPE_CHECKING:
-    from lib.messagemanagers.base import BaseMessageManager
+    from lib.messagemanagers import BaseMessageManager
 else:
     BaseMessageManager = None
-
-logger = logging.getLogger(settings.LOGGER_NAME)
-data_logger = logging.getLogger(settings.RAWDATA_LOGGER_NAME)
 
 
 class BaseSender:
@@ -24,14 +21,19 @@ class BaseSender:
     }
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, queue=None, **kwargs):
-        config = settings.CONFIG.section_as_dict('Sender', **cls.configurable)
-        config.update(settings.CONFIG.section_as_dict('Receiver', **cls.receiver_configurable))
-        logger.debug('Found configuration for %s: %s', cls.sender_type, config)
+    def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, **kwargs):
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict('Sender', **cls.configurable)
+        config.update(cp.section_as_dict('Receiver', **cls.receiver_configurable))
+        log = logging.getLogger(cp.logger_name)
+        log.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
+        config['logger_name'] = cp.logger_name
         return cls(manager, queue=queue, **config)
 
-    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0):
+    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0, logger_name: str = 'sender'):
+        self.log = logging.getLogger(logger_name)
+        self.raw_log = logging.getLogger("%s.raw" % logger_name)
         self.manager = manager
         self.protocol = manager.protocol
         self.queue = queue
@@ -56,23 +58,23 @@ class BaseSender:
     async def process_queue(self):
         msg = await self.queue.wait()
         try:
-            logger.debug('Took item from queue')
+            self.log.debug('Took item from queue')
             await self.send_msg(msg)
         finally:
-            logger.debug("Setting task done on queue")
+            self.log.debug("Setting task done on queue")
             self.queue.task_done()
 
     async def close_queue(self):
         if self.queue:
-            logger.debug('Closing message queue')
+            self.log.debug('Closing message queue')
             try:
                 timeout = self.interval + 1
-                logger.info('Waiting', timeout, 'seconds for queue to empty')
+                self.log.info('Waiting', timeout, 'seconds for queue to empty')
                 await asyncio.wait_for(self.queue.join(), timeout=timeout)
             except asyncio.TimeoutError:
-                logger.error('Queue did not empty in time. Cancelling task with messages in queue.')
+                self.log.error('Queue did not empty in time. Cancelling task with messages in queue.')
             self.process_queue_task.cancel()
-            logger.debug('Message queue closed')
+            self.log.debug('Message queue closed')
 
     @property
     def dst(self):
@@ -99,10 +101,10 @@ class BaseSender:
         raise NotImplementedError
 
     async def send_msg(self, msg_encoded: bytes):
-        logger.debug("Sending message to %s", self.dst)
-        data_logger.debug(msg_encoded)
+        self.log.debug("Sending message to %s", self.dst)
+        self.raw_log.debug(msg_encoded)
         await self.send_data(msg_encoded)
-        logger.debug('Message sent')
+        self.log.debug('Message sent')
 
     async def send_hex(self, hex_msg:AnyStr):
         await self.send_msg(binascii.unhexlify(hex_msg))
@@ -176,11 +178,11 @@ class BaseNetworkClient(BaseSender):
         raise NotImplementedError
 
     async def start(self):
-        logger.info("Opening %s connection to %s", self.sender_type, self.dst)
+        self.log.info("Opening %s connection to %s", self.sender_type, self.dst)
         await self.open_connection()
-        logger.info("Connection open")
+        self.log.info("Connection open")
 
     async def stop(self):
-        logger.info("Closing %s connection to %s", self.sender_type, self.dst)
+        self.log.info("Closing %s connection to %s", self.sender_type, self.dst)
         await self.close_connection()
-        logger.info("Connection closed")
+        self.log.info("Connection closed")
