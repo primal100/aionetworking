@@ -13,11 +13,6 @@ else:
     BaseProtocol = None
 
 
-logger = settings.get_logger('main')
-raw_logger = settings.get_logger('raw')
-msg_logger = settings.get_logger('message')
-
-
 def raise_message_from_not_authorized_host(sender, allowed_senders, logger):
     msg = "Received message from unauthorized host %s. Authorized hosts are: %s"
     args = (sender, allowed_senders)
@@ -84,7 +79,7 @@ class BaseMessageManager:
 
     def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
         try:
-            msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp)
+            msgs = self.protocol.from_buffer(sender, encoded, timestamp=timestamp, log=self.log)
             if self.log.isEnabledFor(logging.DEBUG):
                 self.log.debug('Buffer contains %s', plural(len(msgs), 'message'))
                 for msg in msgs:

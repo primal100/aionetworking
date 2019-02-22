@@ -10,7 +10,7 @@ from lib import settings
 from typing import Sequence
 
 
-logger = settings.get_logger('main')
+root_logger = logging.getLogger('root')
 
 
 class BaseProtocol:
@@ -21,43 +21,39 @@ class BaseProtocol:
     supports_responses = False
 
     @classmethod
-    def invalid_request_response(cls, sender, data, exc):
-        return None
-
-    @classmethod
-    async def read_file(cls, file_path: Path):
+    async def read_file(cls, file_path: Path, log=root_logger):
         read_mode = 'rb' if cls.binary else 'r'
         async with settings.FILE_OPENER(file_path, read_mode) as f:
             return await f.read()
 
     @classmethod
-    async def from_file(cls, file_path: Path, sender=''):
-        logger.debug('Creating new %s message from %s', cls.protocol_name, file_path)
-        encoded = await asyncio.create_task(cls.read_file(file_path))
-        return cls.from_buffer(sender, encoded)
+    async def from_file(cls, file_path: Path, sender='', log=root_logger, **kwargs):
+        log.debug('Creating new %s message from %s', cls.protocol_name, file_path)
+        encoded = await asyncio.create_task(cls.read_file(file_path, log=log))
+        return cls.from_buffer(sender, encoded, log=log, **kwargs)
 
     @classmethod
-    def from_buffer(cls, sender, encoded, **kwargs) -> Sequence:
-        return [cls(sender, encoded, decoded, **kwargs) for encoded, decoded in cls.decode(encoded)]
+    def from_buffer(cls, sender, encoded, log=root_logger, **kwargs) -> Sequence:
+        return [cls(sender, encoded, decoded, log=log, **kwargs) for encoded, decoded in cls.decode(encoded, log=log)]
 
     @classmethod
-    def from_decoded(cls, decoded, sender='', **kwargs):
-        return cls(sender, cls.encode(decoded), decoded, **kwargs)
+    def from_decoded(cls, decoded, sender='', log=root_logger, **kwargs):
+        return cls(sender, cls.encode(decoded, log=log), decoded, log=log, **kwargs)
 
     @classmethod
-    def set_config(cls, cp=None, **kwargs):
-        cp = cp or settings.CONFIG
-        config = cp.section_as_dict('Protocol', **cls.configurable)
-        logger.debug('Found configuration for %s: %s', cls.protocol_name, config)
-        config.update(kwargs)
-        cls.config = config
-        cls.log = logging.getLogger(cp.logger_name)
+    def decode(cls, encoded: bytes, log=root_logger) -> Sequence:
+        return [encoded, encoded]
 
-    def __init__(self, sender, encoded, decoded, timestamp=None):
+    @classmethod
+    def encode(cls, decoded, log=root_logger):
+        return decoded
+
+    def __init__(self, sender, encoded, decoded, timestamp=None, log=root_logger):
         self.sender = sender
         self._timestamp = timestamp
         self.encoded = encoded
         self.decoded = decoded
+        self.log = log
 
     def get_protocol_name(self) -> str:
         return self.protocol_name
@@ -69,14 +65,6 @@ class BaseProtocol:
     @property
     def pformat(self) -> str:
         return pformat(self.decoded)
-
-    @classmethod
-    def decode(cls, encoded: bytes) -> Sequence:
-        return [encoded, encoded]
-
-    @classmethod
-    def encode(cls, decoded):
-        return decoded
 
     @cached_property
     def timestamp(self) -> datetime.datetime:

@@ -1,15 +1,10 @@
 import datetime
-import logging
 from pycrate_core.charpy import Charpy
 
 from lib.protocols.base import BaseProtocol
-from lib import settings
 from lib.utils import cached_property, adapt_asn_domain, asn_timestamp_to_datetime
 
 from typing import Sequence
-
-
-logger = settings.get_logger('main')
 
 
 class BasePyCrateAsnProtocol(BaseProtocol):
@@ -24,7 +19,7 @@ class BasePyCrateAsnProtocol(BaseProtocol):
         return ''
 
     @classmethod
-    def decode(cls, encoded: bytes) -> Sequence:
+    def decode(cls, encoded: bytes, log=None) -> Sequence:
         msgs = []
         char = Charpy(encoded)
         while char._cur < char._len_bit:
@@ -35,7 +30,7 @@ class BasePyCrateAsnProtocol(BaseProtocol):
         return msgs
 
     @classmethod
-    def encode(cls, decoded) -> bytes:
+    def encode(cls, decoded, log=None) -> bytes:
         return cls.pycrate_asn_class.to_ber(decoded)
 
     @cached_property
