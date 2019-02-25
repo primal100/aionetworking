@@ -13,14 +13,15 @@ class BaseFilter(logging.Filter):
         return cls(*args, **kwargs)
 
     @classmethod
-    def from_config(cls, section_name, *args, **kwargs):
+    def from_config(cls, section_name, cp=None, *args, **kwargs):
         from lib import settings, definitions
         full_section_name = "filter_%s" % section_name
-        config = settings.CONFIG.section_as_dict(full_section_name, **cls.configurable)
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict(full_section_name, **cls.configurable)
         config.update(kwargs)
         cls_name = config.pop('class')
         actual_cls = definitions.LOG_FILTERS[cls_name]
-        return actual_cls.with_config(settings.CONFIG, full_section_name, *args, **config)
+        return actual_cls.with_config(cp, full_section_name, *args, **config)
 
     def __init__(self, loggers, *args, **kwargs):
         super(BaseFilter, self).__init__(*args, **kwargs)

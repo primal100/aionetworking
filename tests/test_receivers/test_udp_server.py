@@ -10,8 +10,6 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 
 
 class TestUDPServer(BaseReceiverTestCase):
-    status_change = multiprocessing.Event()
-    stop_ordered = multiprocessing.Event()
     change_loop_policy = False
     config_file = 'udp_server_test_setup.ini'
 
@@ -29,8 +27,6 @@ class TestUDPServer(BaseReceiverTestCase):
 class TestUDPServerBufferedFileStorage(BaseReceiverTestCase):
     config_file = 'udp_server_buffered_storage_test_setup.ini'
     change_loop_policy = False
-    status_change = multiprocessing.Event()
-    stop_ordered = multiprocessing.Event()
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')

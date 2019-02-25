@@ -1,6 +1,6 @@
 from lib.conf.parser import INIFileConfig
 from lib.conf.log_filters import BaseFilter, SenderFilter, MessageFilter
-from lib.messagemanagers.managers import OneWayMessageManager, ClientMessageManager
+from lib.messagemanagers.managers import OneWayMessageManager, ClientOneWayMessageManager
 from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
 from lib.receivers.sftp import SFTPServerPswAuth
 from lib.senders.sftp import SFTPClient
@@ -40,5 +40,5 @@ LOG_FILTERS: Mapping[str, Type[BaseFilter]] = {
     'message_filter': MessageFilter
 }
 MESSAGE_MANAGER: Type[BaseMessageManager] = OneWayMessageManager
-CLIENT_MESSAGE_MANAGER: Type[BaseMessageManager] = ClientMessageManager
+CLIENT_MESSAGE_MANAGER: Type[BaseMessageManager] = ClientOneWayMessageManager
 PROTOCOLS: Mapping[str, Type[BaseProtocol]] = {}

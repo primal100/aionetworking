@@ -24,20 +24,19 @@ class BaseReceiver:
     }
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, status_change=None, cp=None, **kwargs):
+    def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Receiver', **cls.configurable)
-        log = cp.get_logger()
-        log.debug('Found configuration for %s:%s', cls.receiver_type, config)
         config['logger_name'] = cp.logger_name
+        log = logging.getLogger(cp.logger_name)
+        log.debug('Found configuration for %s:%s', cls.receiver_type, config)
         config.update(kwargs)
-        return cls(manager, status_change=status_change, **config)
+        return cls(manager, **config)
 
-    def __init__(self, manager, status_change=None, ssl_enabled: bool = False, ssl_cert: Optional[Path] = None,
+    def __init__(self, manager, ssl_enabled: bool = False, ssl_cert: Optional[Path] = None,
                  ssl_key: Optional[Path] = None, logger_name: str = 'receiver'):
         self.log = logging.getLogger(logger_name)
         self.manager = manager
-        self.status_change = status_change
         if self.ssl_allowed:
             self.ssl_context = self.manage_ssl_params(ssl_enabled, ssl_cert, ssl_key)
         elif ssl_enabled:

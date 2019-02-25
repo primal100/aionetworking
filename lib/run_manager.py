@@ -12,7 +12,6 @@ def get_protocol_manager(cp=settings.CONFIG):
 
     logger.info('Using protocol %s', protocol_name)
     protocol = definitions.PROTOCOLS[protocol_name]
-    protocol.set_config(cp=cp)
 
     manager_cls = definitions.MESSAGE_MANAGER
 

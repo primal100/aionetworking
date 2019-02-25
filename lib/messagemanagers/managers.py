@@ -38,7 +38,7 @@ class BaseMessageManager:
         log = logging.getLogger(cp.logger_name)
         log.info('Found configuration for %s: %s', cls.name,  config)
         action_modules = (definitions.ACTIONS[action] for action in config.pop('actions'))
-        config['actions'] = [action.from_config() for action in action_modules]
+        config['actions'] = [action.from_config(cp=cp) for action in action_modules]
         config.update(kwargs)
         config['logger_name'] = cp.logger_name
         if protocol.supports_responses:
@@ -173,8 +173,9 @@ class BaseClientMessageManager(BaseMessageManager):
     configurable = {}
 
     @classmethod
-    def from_config(cls, protocol: Type[BaseProtocol], **kwargs):
-        config = settings.CONFIG.section_as_dict('MessageManager', **cls.configurable)
+    def from_config(cls, protocol: Type[BaseProtocol], cp=None, **kwargs):
+        cp = cp or settings.CONFIG
+        config = cp.section_as_dict('MessageManager', **cls.configurable)
         config.update(kwargs)
         return cls(protocol, **config)
 

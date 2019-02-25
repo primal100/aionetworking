@@ -9,19 +9,16 @@ from lib.utils import log_exception
 from lib.wrappers.events import AsyncEventWrapper
 
 
-logger = settings.get_logger('receiver')
-
-
-def except_handler(exc_type, exc_value, exc_tb):
+def except_handler(logger, exc_type, exc_value, exc_tb):
     logger.exception('', exc_info=(exc_type, exc_value, exc_tb))
     sys.__excepthook__(exc_type, exc_value, exc_tb)
 
 
 # Install exception handler
-sys.excepthook = except_handler
+#sys.excepthook = except_handler
 
 
-def log_exceptions(loop, context):
+def log_exceptions(logger, loop, context):
     logger.error(context['message'])
     logger.error(log_exception(context['exception']))
     loop.default_exception_handler(context)
@@ -29,19 +26,18 @@ def log_exceptions(loop, context):
 
 async def main(*config_args, status_change=None, stop_ordered=None, logger_name='receiver', configure_logging=True):
 
-    if config_args:
-        cp = definitions.CONFIG_CLS(*config_args, logger_name=logger_name)
-    else:
-        settings.CONFIG = definitions.CONFIG_CLS(*settings.CONFIG_ARGS, logger_name='receiver')
-        cp = settings.CONFIG
+    config_args = config_args or settings.CONFIG_ARGS
+    cp = definitions.CONFIG_CLS(*config_args, logger_name=logger_name)
+
     if configure_logging:
         cp.configure_logging()
-    #settings.HOME = settings.CONFIG.home
-    #settings.DATA_DIR = settings.CONFIG.data_home
+
+    logger = logging.getLogger(logger_name)
 
     loop = asyncio.get_event_loop()
 
-    loop.set_exception_handler(log_exceptions)
+    #exception_handler = partial(log_exception, logger)
+    #loop.set_exception_handler(log_exceptions)
     logger.info('Starting %s on %s', settings.APP_NAME, asyncio.get_event_loop())
 
     receiver_name = cp.receiver

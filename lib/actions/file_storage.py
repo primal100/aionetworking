@@ -139,14 +139,14 @@ class FileStorage(BaseFileStorage):
 class BufferedFileStorage(BaseFileStorage):
     name = 'Buffered File Storage'
     key = 'Bufferedfilestorage'
-    files = {}
-    files_with_outstanding_writes = []
 
     configurable = BaseFileStorage.configurable.copy()
     configurable.update({'buffering': int, 'timeout': float})
 
     def __init__(self, *args, buffering=-1, timeout=5, **kwargs):
         super(BufferedFileStorage, self).__init__(*args, **kwargs)
+        self.files = {}
+        self.files_with_outstanding_writes = []
         self.buffering = buffering
         self.timeout = timeout
 
@@ -180,12 +180,14 @@ class BufferedFileStorage(BaseFileStorage):
     async def wait_complete(self, **logs_extra):
         try:
             self.log.debug('Waiting for outstanding writes to complete', extra=logs_extra)
+            self.log.debug(self.files_with_outstanding_writes)
             for path in self.files_with_outstanding_writes:
                 f = self.get_file(path)
                 await f.wait_writes_done()
             self.log.debug('All outstanding writes have been completed', extra=logs_extra)
         finally:
-            self.files_with_outstanding_writes = []
+            self.files_with_outstanding_writes.clear()
+            self.log.debug(self.files_with_outstanding_writes)
 
     async def close(self):
         files = list(self.files.values())

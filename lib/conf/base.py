@@ -11,7 +11,7 @@ class ConfigurationException(Exception):
 
 class BaseConfigClass:
 
-    def __init__(self, logger_name='receiver'):
+    def __init__(self, logger_name='root'):
         self.logger_name = logger_name
         from lib import settings
         self.defaults = {
@@ -25,11 +25,6 @@ class BaseConfigClass:
         self.defaults.update({
             'appname': settings.APP_NAME.replace(' ', '').lower(),
         })
-
-    def get_logger(self, *names):
-        list(names).insert(0, self.logger_name)
-        name = '.'.join(names)
-        return logging.getLogger(name)
 
     @cached_property
     def receiver(self):

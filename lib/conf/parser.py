@@ -82,4 +82,4 @@ class INIFileConfig(BaseConfigClass):
             except FileNotFoundError as e:
                 Path(e.filename).parent.mkdir(parents=True, exist_ok=True)
         for filter_name in self.get('filters', 'keys', tuple):
-            BaseFilter.from_config(filter_name)
+            BaseFilter.from_config(filter_name, cp=self)
