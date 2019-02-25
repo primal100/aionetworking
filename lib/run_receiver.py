@@ -79,5 +79,6 @@ async def main(*config_args, status_change=None, stop_ordered=None, logger_name=
         logger.debug('Receiver task stopped')
         await manager.close()
         logger.debug('Message Manager closed')
+        await asyncio.sleep(0.1)
         if status_change:
             status_change.set()

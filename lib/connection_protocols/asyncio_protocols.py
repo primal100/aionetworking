@@ -3,7 +3,6 @@ from asyncio import transports
 import logging
 import time
 
-from lib import settings
 from lib import messagemanagers
 from lib.utils import log_exception, addr_tuple_to_str
 
@@ -158,6 +157,10 @@ class BaseProtocolMixin:
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):
+
+    def connection_lost(self, exc):
+        super(TCP, self).connection_lost(exc)
+        self.transport.close()
 
     @property
     def client(self):

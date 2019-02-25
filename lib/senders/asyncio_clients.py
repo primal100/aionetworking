@@ -25,6 +25,7 @@ class TCPClient(BaseAsyncioClient):
     sender_type = "TCP Client"
     transport = None
     connection_protocol = None
+    ssl_allowed = True
 
     async def open_connection(self):
         self.transport, self.connection_protocol = await asyncio.get_event_loop().create_connection(

@@ -47,8 +47,8 @@ class INIFileConfig(BaseConfigClass):
                 value = value.replace(', ', ',').split(',')
             elif data_type == '':
                 value = ()
-        if value is None:
-            return value
+        if value is None or value == '':
+            return None
         return data_type(value)
 
     def section_as_dict(self, section, **options) -> Mapping:

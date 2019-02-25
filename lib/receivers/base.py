@@ -16,12 +16,7 @@ else:
 
 class BaseReceiver:
     receiver_type: str = ''
-    ssl_allowed: bool = False
-    configurable = {
-        'ssl_enabled': bool,
-        'ssl_cert': Path,
-        'ssl_key': Path,
-    }
+    configurable = {}
 
     @classmethod
     def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
@@ -33,31 +28,9 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, **config)
 
-    def __init__(self, manager, ssl_enabled: bool = False, ssl_cert: Optional[Path] = None,
-                 ssl_key: Optional[Path] = None, logger_name: str = 'receiver'):
+    def __init__(self, manager, logger_name: str = 'receiver'):
         self.log = logging.getLogger(logger_name)
         self.manager = manager
-        if self.ssl_allowed:
-            self.ssl_context = self.manage_ssl_params(ssl_enabled, ssl_cert, ssl_key)
-        elif ssl_enabled:
-            self.log.error('SSL is not supported for %s', self.receiver_type)
-            raise ConfigurationException('SSL is not supported for' + self.receiver_type)
-        else:
-            self.ssl_context = None
-
-    def manage_ssl_params(self, enabled: bool, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
-        if enabled:
-            if not cert or not key:
-                raise ConfigurationException('SSLCert and SSLKey must be configured when SSL is enabled')
-            self.log.info("Setting up SSL")
-            self.log.info("Using SSL Cert: ", cert)
-            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_context.load_cert_chain(str(cert), str(key))
-            self.log.info("SSL Context loaded")
-            return ssl_context
-        else:
-            self.log.info("SSL is not enabled")
-            return None
 
     async def started(self):
         return True
@@ -84,15 +57,46 @@ class BaseReceiver:
 
 class BaseServer(BaseReceiver):
     configurable = BaseReceiver.configurable.copy()
-    configurable.update({'host': str, 'port': int})
+    configurable.update({
+        'host': str,
+        'port': int,
+        'ssl': bool,
+        'sslcert': Path,
+        'sslkey': Path,
+    })
+    ssl_allowed: bool = False
     receiver_type = 'Server'
     server = None
 
-    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, **kwargs):
+    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, ssl=False, sslcert: Optional[Path] = None,
+                 sslkey: Optional[Path] = None, **kwargs):
         super(BaseServer, self).__init__(*args, **kwargs)
         self.host = host
         self.port = port
         self.listening_on = '%s:%s' % (self.host, self.port)
+        if self.ssl_allowed:
+            self.ssl_context = self.manage_ssl_params(ssl, sslcert, sslkey)
+        elif ssl:
+            self.log.error('SSL is not supported for %s', self.receiver_type)
+            raise ConfigurationException('SSL is not supported for' + self.receiver_type)
+        else:
+            self.ssl_context = None
+
+    def manage_ssl_params(self, ssl_context, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
+        if ssl_context:
+            self.log.info("Setting up SSL")
+            if ssl_context is True:
+                ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                if cert and key:
+                    self.log.info("Using SSL Cert: %s", cert)
+                    ssl_context.load_cert_chain(str(cert), str(key))
+                else:
+                    self.log.info("Using default cert")
+            self.log.info("SSL Context loaded")
+            return ssl_context
+        else:
+            self.log.info("SSL is not enabled")
+            return None
 
     def print_listening_message(self, sockets):
         for socket in sockets:
@@ -116,9 +120,11 @@ class BaseServer(BaseReceiver):
         raise NotImplementedError
 
     async def started(self):
-        if not self.server or not self.server.is_serving():
+        while not self.server or not self.server.is_serving():
             await asyncio.sleep(0.01)
 
     async def stopped(self):
         if self.server:
+            self.log.debug('waiting till closed')
             await self.server.wait_closed()
+            self.log.debug('finished waiting closed')

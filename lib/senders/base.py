@@ -1,7 +1,9 @@
 import asyncio
 import binascii
 import logging
+import ssl
 
+from lib.conf import ConfigurationException
 from lib import utils, settings
 
 from typing import TYPE_CHECKING, Sequence, AnyStr
@@ -139,11 +141,17 @@ class BaseSender:
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"
+    ssl_allowed: bool = False
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
         'srcip': str,
-        'srcport': int
+        'srcport': int,
+        'certrequired': bool,
+        'hostnamecheck': bool,
+        'cafile': Path,
+        'capath': Path,
+        'cadata': str
     })
     receiver_configurable = BaseSender.configurable.copy()
     receiver_configurable.update({
@@ -153,12 +161,47 @@ class BaseNetworkClient(BaseSender):
     })
 
     def __init__(self, protocol, queue=None, host: str = '127.0.0.1', port: int = 4000,
-                 ssl: bool = False, srcip: str = '', srcport: int = 0, **kwargs):
+                 ssl: bool = False, srcip: str = '', srcport: int = 0, cafile: Path= None,
+                 capath: Path=None, cadata: str=None, certrequired: bool=True,
+                          hostnamecheck: bool=True, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
         self.localaddr = (srcip, srcport) if srcip else None
         self.ssl = ssl
+        if self.ssl_allowed:
+            self.ssl = self.manage_ssl_params(ssl, cafile, capath, cadata, certrequired, hostnamecheck)
+        elif ssl:
+            self.log.error('SSL is not supported for %s', self.sender_type)
+            raise ConfigurationException('SSL is not supported for %s' + self.sender_type)
+        else:
+            self.ssl = None
+
+    def manage_ssl_params(self, context, cafile: Path, capath: Path, cadata: str, certrequired: bool,
+                          hostnamecheck: bool):
+        if context:
+            self.log.info("Setting up SSL")
+            if context is True:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+
+                context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
+                context.check_hostname = hostnamecheck
+
+                if context.verify_mode != ssl.CERT_NONE:
+                    if cafile or capath or cadata:
+                        locations = {'cafile': str(cafile) if cafile else None,
+                                     'capath': str(capath) if capath else None,
+                                     'cadata': cadata}
+                        context.load_verify_locations(**locations)
+                        self.log.info("Verifying SSL certs with: %s", locations)
+                    else:
+                        context.load_default_certs(ssl.Purpose.SERVER_AUTH)
+                        self.log.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
+            self.log.info("SSL Context loaded")
+            return context
+        else:
+            self.log.info("SSL is not enabled")
+            return None
 
     @property
     def source(self) -> str:
