@@ -3,7 +3,6 @@ import binascii
 import logging
 import ssl
 
-from lib.conf import ConfigurationException
 from lib import utils, settings
 
 from typing import TYPE_CHECKING, Sequence, AnyStr
@@ -123,9 +122,13 @@ class BaseSender:
         for decoded_msg in decoded_msgs:
             await self.encode_and_send_msg(decoded_msg)
 
+    def encode_msg(self, msg_decoded):
+        msg_obj = self.manager.protocol.from_decoded(msg_decoded, sender=self.source)
+        return msg_obj.encoded
+
     async def encode_and_send_msg(self, msg_decoded):
-        msg = self.manager.protocol.from_decoded(msg_decoded, sender=self.source)
-        await self.send_msg(msg.encoded)
+        msg_encoded = self.encode_msg(msg_decoded)
+        await self.send_msg(msg_encoded)
 
     async def play_recording(self, file_path:Path, immediate:bool=False):
         with file_path.open('rb') as f:
@@ -147,61 +150,19 @@ class BaseNetworkClient(BaseSender):
     configurable.update({
         'srcip': str,
         'srcport': int,
-        'certrequired': bool,
-        'hostnamecheck': bool,
-        'cafile': Path,
-        'capath': Path,
-        'cadata': str
     })
     receiver_configurable = BaseSender.configurable.copy()
     receiver_configurable.update({
         'host': str,
         'port': int,
-        'ssl': bool,
     })
 
     def __init__(self, protocol, queue=None, host: str = '127.0.0.1', port: int = 4000,
-                 ssl: bool = False, srcip: str = '', srcport: int = 0, cafile: Path= None,
-                 capath: Path=None, cadata: str=None, certrequired: bool=True,
-                          hostnamecheck: bool=True, **kwargs):
+                 srcip: str = '', srcport: int = 0, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
         self.localaddr = (srcip, srcport) if srcip else None
-        self.ssl = ssl
-        if self.ssl_allowed:
-            self.ssl = self.manage_ssl_params(ssl, cafile, capath, cadata, certrequired, hostnamecheck)
-        elif ssl:
-            self.log.error('SSL is not supported for %s', self.sender_type)
-            raise ConfigurationException('SSL is not supported for %s' + self.sender_type)
-        else:
-            self.ssl = None
-
-    def manage_ssl_params(self, context, cafile: Path, capath: Path, cadata: str, certrequired: bool,
-                          hostnamecheck: bool):
-        if context:
-            self.log.info("Setting up SSL")
-            if context is True:
-                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-
-                context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
-                context.check_hostname = hostnamecheck
-
-                if context.verify_mode != ssl.CERT_NONE:
-                    if cafile or capath or cadata:
-                        locations = {'cafile': str(cafile) if cafile else None,
-                                     'capath': str(capath) if capath else None,
-                                     'cadata': cadata}
-                        context.load_verify_locations(**locations)
-                        self.log.info("Verifying SSL certs with: %s", locations)
-                    else:
-                        context.load_default_certs(ssl.Purpose.SERVER_AUTH)
-                        self.log.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
-            self.log.info("SSL Context loaded")
-            return context
-        else:
-            self.log.info("SSL is not enabled")
-            return None
 
     @property
     def source(self) -> str:
@@ -229,3 +190,50 @@ class BaseNetworkClient(BaseSender):
         self.log.info("Closing %s connection to %s", self.sender_type, self.dst)
         await self.close_connection()
         self.log.info("Connection closed")
+
+
+class SSLSupportedNetworkClient(BaseNetworkClient):
+    configurable = BaseNetworkClient.configurable.copy()
+    configurable.update({
+        'certrequired': bool,
+        'hostnamecheck': bool,
+        'cafile': Path,
+        'capath': Path,
+        'cadata': str
+    })
+    receiver_configurable = BaseNetworkClient.receiver_configurable.copy()
+    receiver_configurable.update({
+        'ssl': bool,
+    })
+
+    def __init__(self, *args,
+                 ssl: bool = False, cafile: Path= None, capath: Path=None, cadata: str=None, certrequired: bool=True,
+                          hostnamecheck: bool=True, **kwargs):
+        super(SSLSupportedNetworkClient, self).__init__(*args, **kwargs)
+        self.ssl = self.manage_ssl_params(ssl, cafile, capath, cadata, certrequired, hostnamecheck)
+
+    def manage_ssl_params(self, context, cafile: Path, capath: Path, cadata: str, certrequired: bool,
+                          hostnamecheck: bool):
+        if context:
+            self.log.info("Setting up SSL")
+            if context is True:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+
+                context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
+                context.check_hostname = hostnamecheck
+
+                if context.verify_mode != ssl.CERT_NONE:
+                    if cafile or capath or cadata:
+                        locations = {'cafile': str(cafile) if cafile else None,
+                                     'capath': str(capath) if capath else None,
+                                     'cadata': cadata}
+                        context.load_verify_locations(**locations)
+                        self.log.info("Verifying SSL certs with: %s", locations)
+                    else:
+                        context.load_default_certs(ssl.Purpose.SERVER_AUTH)
+                        self.log.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
+            self.log.info("SSL Context loaded")
+            return context
+        else:
+            self.log.info("SSL is not enabled")
+            return None

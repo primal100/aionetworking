@@ -9,10 +9,13 @@ class TCPServerReceiver(BaseServer):
     receiver_type = "TCP Server"
     ssl_allowed = True
 
-    async def start_server(self):
-        self.server = await asyncio.get_event_loop().create_server(
+    async def get_server(self):
+        return await asyncio.get_event_loop().create_server(
             lambda: TCPServerProtocol(self.manager),
             self.host, self.port, ssl=self.ssl_context)
+
+    async def start_server(self):
+        self.server = await self.get_server()
 
         async with self.server:
             self.print_listening_message(self.server.sockets)

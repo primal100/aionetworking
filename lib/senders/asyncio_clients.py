@@ -1,13 +1,11 @@
 import asyncio
-import logging
 
-from lib import settings
 from lib.conf import ConfigurationException
 from lib.connection_protocols.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
-from .base import BaseNetworkClient
+from .base import BaseNetworkClient, SSLSupportedNetworkClient
 
 
-class BaseAsyncioClient(BaseNetworkClient):
+class BaseAsyncioMixin:
     transport = None
     connection_protocol = None
 
@@ -21,7 +19,7 @@ class BaseAsyncioClient(BaseNetworkClient):
         raise NotImplementedError
 
 
-class TCPClient(BaseAsyncioClient):
+class TCPClient(BaseAsyncioMixin, SSLSupportedNetworkClient):
     sender_type = "TCP Client"
     transport = None
     connection_protocol = None
@@ -32,7 +30,7 @@ class TCPClient(BaseAsyncioClient):
             lambda: TCPClientProtocol(self.manager), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
 
 
-class UDPClient(BaseAsyncioClient):
+class UDPClient(BaseAsyncioMixin, BaseNetworkClient):
     sender_type = "UDP Client"
     transport = None
     connection_protocol = None

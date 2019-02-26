@@ -86,16 +86,16 @@ class BaseFileStorage(BaseAction):
 
     configurable = BaseAction.configurable
     configurable.update({
-        'base_path': Path,
+        'basepath': Path,
         'path': RawStr,
         'attr': str,
         'mode': str,
         'separator': str
     })
 
-    def __init__(self, base_path, path, attr='encoded', mode='wb', separator=None, **kwargs):
+    def __init__(self, basepath, path, attr='encoded', mode='wb', separator=None, **kwargs):
         super(BaseFileStorage, self).__init__(**kwargs)
-        self.base_path = base_path
+        self.base_path = basepath
         self.path = path
         self.attr = attr
         self.mode = mode

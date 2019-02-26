@@ -23,13 +23,13 @@ class BaseReceiver:
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Receiver', **cls.configurable)
         config['logger_name'] = cp.logger_name
-        log = logging.getLogger(cp.logger_name)
-        log.debug('Found configuration for %s:%s', cls.receiver_type, config)
+        logger = logging.getLogger(cp.logger_name)
+        logger.debug('Found configuration for %s:%s', cls.receiver_type, config)
         config.update(kwargs)
         return cls(manager, **config)
 
     def __init__(self, manager, logger_name: str = 'receiver'):
-        self.log = logging.getLogger(logger_name)
+        self.logger = logging.getLogger(logger_name)
         self.manager = manager
 
     async def started(self):
@@ -42,7 +42,7 @@ class BaseReceiver:
         try:
             await self.run()
         except asyncio.CancelledError:
-            self.log.debug('Receiver task cancelled')
+            self.logger.debug('Receiver task cancelled')
             await self.close()
 
     async def close(self):
@@ -77,25 +77,25 @@ class BaseServer(BaseReceiver):
         if self.ssl_allowed:
             self.ssl_context = self.manage_ssl_params(ssl, sslcert, sslkey)
         elif ssl:
-            self.log.error('SSL is not supported for %s', self.receiver_type)
+            self.logger.error('SSL is not supported for %s', self.receiver_type)
             raise ConfigurationException('SSL is not supported for' + self.receiver_type)
         else:
             self.ssl_context = None
 
     def manage_ssl_params(self, ssl_context, cert: Path, key: Path) -> Optional[ssl.SSLContext]:
         if ssl_context:
-            self.log.info("Setting up SSL")
+            self.logger.info("Setting up SSL")
             if ssl_context is True:
                 ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 if cert and key:
-                    self.log.info("Using SSL Cert: %s", cert)
+                    self.logger.info("Using SSL Cert: %s", cert)
                     ssl_context.load_cert_chain(str(cert), str(key))
                 else:
-                    self.log.info("Using default cert")
-            self.log.info("SSL Context loaded")
+                    self.logger.info("Using default cert")
+            self.logger.info("SSL Context loaded")
             return ssl_context
         else:
-            self.log.info("SSL is not enabled")
+            self.logger.info("SSL is not enabled")
             return None
 
     def print_listening_message(self, sockets):
@@ -105,12 +105,12 @@ class BaseServer(BaseReceiver):
             print('Serving %s on %s' % (self.receiver_type, listening_on))
 
     async def close(self):
-        self.log.info('Stopping %s running at %s', self.receiver_type,  self.listening_on)
+        self.logger.info('Stopping %s running at %s', self.receiver_type, self.listening_on)
         await self.stop_server()
-        self.log.info('%s stopped', self.receiver_type)
+        self.logger.info('%s stopped', self.receiver_type)
 
     async def run(self):
-        self.log.info('Starting %s on %s', self.receiver_type, self.listening_on)
+        self.logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
         await self.start_server()
 
     async def stop_server(self):
@@ -125,6 +125,4 @@ class BaseServer(BaseReceiver):
 
     async def stopped(self):
         if self.server:
-            self.log.debug('waiting till closed')
             await self.server.wait_closed()
-            self.log.debug('finished waiting closed')

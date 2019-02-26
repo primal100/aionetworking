@@ -19,6 +19,7 @@ class BaseReceiverTestCase(BaseTestCase):
     long_msg = b'62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f06581aa4804840001ff4904a50500016b2a2828060700118605010101a01d611b80020780a109060704000001000e03a203020100a305a1030201006c80a26c0201013067020138a380a180305a04104b9d6191107536658cfe59880cd2ac2704104b8c43a2542050120467f333c00f42d804108c43a2542050120467f333c00f42d84b041043a2542050120467f333c00f42d84b8c0410a2551a058cdb00004b8d79f7caff5012000000000000'
     change_loop_policy = False
     config_file = ''
+    sender_kwargs = {}
 
     @classmethod
     def setUpClass(cls):
@@ -33,6 +34,7 @@ class BaseReceiverTestCase(BaseTestCase):
             pass
 
     def get_sender(self, **kwargs):
+        kwargs.update(self.sender_kwargs)
         return get_sender(*self.config_args, **kwargs)
 
     async def main(self, coro):
