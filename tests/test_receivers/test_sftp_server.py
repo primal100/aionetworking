@@ -5,15 +5,8 @@ from .base import BaseReceiverTestCase
 
 class TestSFTPServer(BaseReceiverTestCase):
     config_file = 'sftp_server_test_setup.ini'
-    sender_kwargs = {'sftp_kwargs': {'username': 'sftpuser', 'password': 'abcd1234', 'known_hosts': None}}
-
-    @classmethod
-    def setUpClass(cls):
-        super(TestSFTPServer, cls).setUpClass()
-        #ssh_dir = Path.home().joinpath('.ssh')
-        #ssh_dir.mkdir(exist_ok=True)
-        #known_hosts_file = ssh_dir.joinpath('known_hosts')
-        #known_hosts_file.touch(exist_ok=True)
+    sender_kwargs = {'sftp_kwargs': {'username': 'sftpuser', 'password': 'abcd1234'}}
+    #sender_kwargs = {'sftp_kwargs': {}}
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAP_MAP')

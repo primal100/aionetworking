@@ -12,19 +12,25 @@ from typing import AnyStr
 
 class SFTPClient(BaseNetworkClient):
     configurable = BaseNetworkClient.configurable.copy()
-    configurable.update({'basepath': Path, 'filename': RawStr, 'remotepath': Path, 'sftploglevel': int})
+    configurable.update({'basepath': Path, 'filename': RawStr, 'remotepath': Path, 'sftploglevel': int,
+                         'knownhosts': Path, 'username': str, 'password': str, 'clientkeys': Path,
+                         'passphrase': None, 'clientversion': RawStr})
     sender_type = 'SFTP Client'
     sftp = None
     conn = None
     cwd = None
 
     def __init__(self, *args, basepath=settings.DATA_DIR.joinpath('tmp'), filename=None, remotepath=Path('.'),
-                 sftp_kwargs=None, **kwargs):
+                 knownhosts: Path=None, username: str=None, password: str=None, sftp_kwargs=None,
+                 clientkeys: Path=(), passphrase: str=None, clientversion:str = (), **kwargs):
         self.filename = filename
         self.remotepath = remotepath
         self.base_path = basepath
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self.sftp_kwargs = sftp_kwargs or {}
+        self.sftp_kwargs = {'known_hosts': str(knownhosts), 'username': username, 'password': password,
+                                 'client_keys': clientkeys,
+                                 'passphrase': passphrase, 'client_version': clientversion}
+        self.sftp_kwargs.update(sftp_kwargs)
         super(SFTPClient, self).__init__(*args, **kwargs)
         self.mode = 'ba' if self.manager.protocol.binary else 'a'
 

@@ -67,6 +67,9 @@ class SSHServerPswAuth(SSHServer):
     def password_auth_supported(self) -> bool:
         return True
 
+    def public_key_auth_supported(self):
+        return True
+
     def hash_password(self, password: str) -> str:
         return self.hash_algorithm.hash(password)
 
@@ -94,18 +97,24 @@ class SFTPServer(TCPServerReceiver):
 
     configurable = TCPServerReceiver.configurable.copy()
     configurable.update({'chroot': bool, 'sftploglevel': int, 'allowscp': bool,
-                         'baseuploaddir': Path, 'hostkey': Path, 'gsshost': str, 'remove_after_processing': bool})
+                         'baseuploaddir': Path, 'hostkey': Path, 'removeafterprocessing': bool, 'passphrase': str,
+                         'authorizedkeys': Path})
 
-    def __init__(self, manager, *args, chroot: bool=True, allowscp: bool=False, sftploglevel=1, hostkey='', gsshost=(),
-                 baseuploaddir: Path = settings.HOME.joinpath('sftp'), remove_after_processing:bool = True, **kwargs):
+    def __init__(self, manager, *args, chroot: bool=True, sftploglevel=1,
+                 baseuploaddir: Path = settings.HOME.joinpath('sftp'), remove_after_processing:bool = True,
+                 allowscp: bool=False, hostkey: Path=(), passphrase: str = None, authorizedkeys: Path=None,
+                 sftp_kwargs=None, **kwargs):
         asyncssh.logging.set_debug_level(sftploglevel)
         self.chroot = chroot
         super(TCPServerReceiver, self).__init__(manager, *args, **kwargs)
         self.sftp_kwargs = {
-            'server_host_keys': [hostkey] if hostkey else None,
-            'gss_host': gsshost,
-            'allow_scp': allowscp
+            'allow_scp': allowscp,
+            'server_host_keys': hostkey,
+            'passphrase': passphrase,
+            'authorized_client_keys': str(authorizedkeys) if authorizedkeys else None
         }
+        sftp_kwargs = sftp_kwargs or {}
+        self.sftp_kwargs.update(sftp_kwargs)
         self.allow_scp = allowscp
         self.base_upload_dir = baseuploaddir
         self.base_upload_dir.mkdir(parents=True, exist_ok=True)
