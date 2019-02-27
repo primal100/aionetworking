@@ -1,52 +1,51 @@
 import asyncio
+import time
+from pathlib import Path
+from lib.receivers import BaseReceiver
 
-class DirectoryMonitor:
-    prev_message_time = 0
 
-    def __init__(self, manager, config, loop=None):
+class DirectoryMonitor(BaseReceiver):
+    configurable = {'directory': Path, 'glob': str, 'scan_interval': int, 'check_finished': int, 'recursive': bool,
+                    'remove_after_processing': bool}
 
-        self.manager = manager
-        self.config = config.receiver
-        self.record = config.receiver.get('record', False)
-        self.record_file = config.receiver.get('record_file', False)
-        if self.record and not self.record_file:
-            raise ConfigurationException('Please configure a record file when record is set to true')
-        directories = self.config.get('directories')
+    def __init__(self, *args, directory, glob=None, rglob=None, scan_interval=0, check_finished=0.1,
+                 remove_after_processing:bool = True, **kwargs):
+        super(DirectoryMonitor, self).__init__(*args, **kwargs)
+        self.method = directory.rglob if rglob else directory.glob if glob else directory.iterdir
+        self.args = (rglob,) if rglob else (glob,) if glob else ()
+        self.dir = directory
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.scan_interval = scan_interval
+        self.check_finished = check_finished
+        self.mode = 'rb' if self.manager.protocol.binary else 'r'
+        self.remove_after_processing = remove_after_processing
+        self.tasks = {}
 
-        self.loop = loop or asyncio.get_event_loop()
+    async def close(self):
+        await asyncio.wait(self.tasks)
 
-        self.task = self.run(directories)
+    def delete_task(self, future):
+        path = future.result()
+        del self.tasks[str(path)]
 
-    def record_packet(self, msg, sender):
-        if self.prev_message_time:
-            message_timedelta = (datetime.datetime.now() - self.prev_message_time).seconds
-        else:
-            message_timedelta = 0
-        self.prev_message_time = datetime.datetime.now()
-        data = utils.pack_recorded_packet(message_timedelta, sender, msg)
-        with open(self.record_file, 'a+') as f:
-            f.write(data)
+    async def process_file(self, path):
+        self.logger.debug('Found file %s', path)
+        while time.time() - path.stat.st_mtime < self.check_finished:
+            await asyncio.sleep(self.check_finished)
+        with path.open(mode=self.mode):
+            data = path.read()
+        self.manager.handle_message(path.owner(), data)
+        if self.remove_after_processing:
+            path.unlink()
+        return path
 
-    async def handle_packet(self, user, data):
-        logger.debug("Received msg from " + sender)
-        logger.debug(data)
-        await self.manager.manage(user, data)
+    async def run(self):
+        while True:
+            for path in self.method(*self.args):
+                task = asyncio.create_task(self.process_file(path))
+                self.tasks[str(path)] = task
+                task.add_done_callback(self.delete_task)
+            await asyncio.sleep(self.scan_interval)
 
-    def close(self):
-        logger.info('Cancelling Directory Monitor')
-        self.task.cancel()
-        logging.info('Directory Monitor Cancelled')
 
-    async def monitor(self, directories):
-        for d in directories:
-            for file in d.iterdir():
-                with open(file, 'r') as f:
-                    data = f.read()
-                    self.loop.create_task(self.handle_packet(os.path.split(directory)[1], data))
-                file.unlink()
-        await asyncio.sleep(1)
-        await self.monitor(directories)
 
-    def run(self, directories):
-        logger.info('Starting Directory Monitor on %s' % directories)
-        return loop.create_task(self.monitor(directories))
