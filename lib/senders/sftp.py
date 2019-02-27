@@ -16,6 +16,7 @@ class SFTPClient(BaseNetworkClient):
     sender_type = 'SFTP Client'
     sftp = None
     conn = None
+    cwd = None
 
     def __init__(self, *args, basepath=settings.DATA_DIR.joinpath('tmp'), filename=None, remotepath=Path('.'),
                  sftp_kwargs=None, **kwargs):
@@ -28,17 +29,20 @@ class SFTPClient(BaseNetworkClient):
         self.mode = 'ba' if self.manager.protocol.binary else 'a'
 
     async def open_connection(self, **kwargs):
-        self.conn = await asyncssh.connect(self.host, self.port, **self.sftp_kwargs)
+        self.conn = await asyncssh.connect(self.host, self.port, local_addr=self.localaddr, **self.sftp_kwargs)
         self.sftp = await self.conn.start_sftp_client()
+        self.cwd = await self.sftp.realpath('.')
 
     async def close_connection(self):
         self.sftp.exit()
         self.conn.close()
         await self.conn.wait_closed()
 
-    async def put(self, *args, **kwargs):
-        kwargs['remotepath'] = kwargs.get('remotepath', self.remotepath)
-        await self.sftp.put(*args, **kwargs)
+    async def put(self, file_path, **kwargs):
+        remote_path = self.cwd + file_path.name
+        real_remote_path = await self.sftp.realpath(remote_path)
+        kwargs['remotepath'] = kwargs.get('remotepath', str(real_remote_path))
+        await self.sftp.put(str(file_path), **kwargs)
 
     def encode_msg(self, msg_decoded):
         msg_obj = self.manager.protocol.from_decoded(msg_decoded, sender=self.source)
@@ -57,7 +61,7 @@ class SFTPClient(BaseNetworkClient):
     async def encode_and_send_msg(self, msg_decoded):
         file_path = self.encode_msg(msg_decoded)
         await self.send_msg(file_path)
-        file_path.remove()
+        file_path.unlink()
 
     async def send_data(self, file_path: AnyStr):
-        await self.put(str(file_path))
+        await self.put(file_path)
