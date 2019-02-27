@@ -23,6 +23,7 @@ class SFTPFactory(asyncssh.SFTPServer):
         self.conn = conn
 
     def connection_made(self):
+        self.logger.debug('Connection made')
         print('connection made')
 
     def close(self, file_obj):
@@ -31,13 +32,25 @@ class SFTPFactory(asyncssh.SFTPServer):
         # self.on_data_received('username', data)
 
 
-class SFTPFactoryPswAuth(SFTPFactory):
+class SSHServer(asyncssh.SSHServer):
+    logger_name = 'receiver'
+
+    def __init__(self, receiver, logger=None):
+        self.receiver = receiver
+        if logger:
+            self.logger = logger
+        else:
+            self.logger = logger.getLogger(self.logger_name)
+
+
+class SSHServerPswAuth(SSHServer):
     hash_algorithm = pbkdf2_sha256
 
     def get_password(self, username: str) -> str:
-        return self.receiver.logins[username]
+        return self.receiver.logins.get(username, raw=True)
 
     def begin_auth(self, username: str) -> bool:
+        self.logger.debug('Beginning password authentication for user %s', username)
         user_allowed = username in self.receiver.logins
         if not user_allowed:
             self.logger.info('SFTP User %s does not exist', username)
@@ -62,29 +75,33 @@ class SFTPFactoryPswAuth(SFTPFactory):
 
 class SFTPServer(TCPServerReceiver):
     factory = SFTPFactory
+    protocol = SSHServer
     receiver_type = 'SFTP Server'
     logger_name = 'receiver'
 
     configurable = TCPServerReceiver.configurable.copy()
-    configurable.update({'allowscp': bool, 'baseuploaddir': Path, 'hostkey': Path})
+    configurable.update({'sftploglevel': int, 'allowscp': bool, 'baseuploaddir': Path, 'hostkey': Path, 'gsshost': str})
 
-    def __init__(self, manager, *args, allowscp: bool=False, hostkey='',
+    def __init__(self, manager, *args, allowscp: bool=False, sftploglevel=1, hostkey='', gsshost=(),
                  baseuploaddir: Path = settings.HOME.joinpath('sftp'), **kwargs):
+        asyncssh.logging.set_debug_level(sftploglevel)
         super(TCPServerReceiver, self).__init__(manager, *args, **kwargs)
-        #self.hostkeys = [hostkey]
-        self.hostkeys = None
+        self.sftp_kwargs = {
+            'server_host_keys': [hostkey] if hostkey else None,
+            'gss_host': gsshost,
+            'allow_scp': allowscp
+        }
         self.allow_scp = allowscp
         self.base_upload_dir = baseuploaddir
         self.base_upload_dir.mkdir(parents=True, exist_ok=True)
 
     async def get_server(self):
-        return await asyncssh.listen(self.host, self.port, server_host_keys=self.hostkeys,
-                                     sftp_factory=lambda conn: self.factory(conn, self),
-                                     allow_scp=self.allow_scp)
+        return await asyncssh.create_server(lambda :self.protocol(self, logger=self.logger), self.host, self.port,
+                                            sftp_factory=lambda conn: self.factory(conn, self), **self.sftp_kwargs)
 
 
 class SFTPServerPswAuth(SFTPServer):
-    factory = SFTPFactoryPswAuth
+    protocol = SSHServerPswAuth
 
     configurable = SFTPServer.configurable.copy()
     configurable.update({'logins': dict})
