@@ -314,4 +314,3 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
                 conn.connection_lost(None)
                 del self.clients[conn.peer]
         await asyncio.sleep(60)
-

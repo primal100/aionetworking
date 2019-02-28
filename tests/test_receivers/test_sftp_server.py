@@ -1,12 +1,47 @@
+import asyncio
+import binascii
 from pathlib import Path
 
 from .base import BaseReceiverTestCase
+from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
 
 
-class TestSFTPServer(BaseReceiverTestCase):
+class BaseSFTPTestCase(BaseReceiverTestCase):
+
+    def setUp(self):
+        super(BaseSFTPTestCase, self).setUp()
+        msgs = [TCAP_MAP_ASNProtocol.decode_one(binascii.unhexlify(msg)) for msg in self.messages]
+        path = self.base_data_dir.joinpath('tmp')
+        path.mkdir(parents=True, exist_ok=True)
+        self.messages = []
+        for i, msg in enumerate(msgs):
+            file_path = path.joinpath("msg_%s" % i)
+            self.messages.append(file_path)
+            file_path.write_bytes(msg)
+
+    async def send_three_clients(self, msg1, msg2, msg3):
+        client1 = self.get_sender(srcip='127.0.0.1')
+        client2 = self.get_sender(srcip='127.0.0.2')
+        client3 = self.get_sender(srcip='127.0.0.3')
+        async with client1, client2:
+            await client1.send_msg(msg1)
+            await client2.send_msg(msg2)
+        try:
+            await client3.start()
+            raise AssertionError('ConnectionResetError not raised by client3')
+        except ConnectionResetError:
+            pass
+        await asyncio.sleep(3)
+
+    async def send_multiple_messages(self):
+        client = self.get_sender(srcip='127.0.0.1')
+        async with client:
+            await client.send_msgs(self.messages)
+
+
+class TestSFTPServer(BaseSFTPTestCase):
     config_file = 'sftp_server_test_setup.ini'
     sender_kwargs = {'sftp_kwargs': {'username': 'sftpuser', 'password': 'abcd1234'}}
-    #sender_kwargs = {'sftp_kwargs': {}}
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAP_MAP')
@@ -19,8 +54,9 @@ class TestSFTPServer(BaseReceiverTestCase):
         self.assertSendFromThreeClientsOk(expected_file1, expected_file2, directory)
 
 
-class TestTCPServerBufferedFileStorage(BaseReceiverTestCase):
-    config_file = 'tcp_server_buffered_storage_test_setup.ini'
+class TestTCPServerBufferedFileStorage(BaseSFTPTestCase):
+    config_file = 'sftp_server_buffered_storage_test_setup.ini'
+    sender_kwargs = {'sftp_kwargs': {'username': 'sftpuser'}}
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')

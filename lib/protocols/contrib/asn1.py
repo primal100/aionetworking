@@ -19,6 +19,10 @@ class BasePyCrateAsnProtocol(BaseProtocol):
         return ''
 
     @classmethod
+    def decode_one(cls, encoded: bytes, log=None):
+        return cls.decode(encoded, log=log)[0][0]
+
+    @classmethod
     def decode(cls, encoded: bytes, log=None) -> Sequence:
         msgs = []
         char = Charpy(encoded)

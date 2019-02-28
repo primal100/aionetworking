@@ -18,14 +18,12 @@ class BaseSender:
     configurable = {
         'interval': float
     }
-    receiver_configurable = {
-    }
 
     @classmethod
     def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Sender', **cls.configurable)
-        config.update(cp.section_as_dict('Receiver', **cls.receiver_configurable))
+        config.update(cp.section_as_dict('Receiver'))
         log = logging.getLogger(cp.logger_name)
         log.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
@@ -33,7 +31,8 @@ class BaseSender:
         return cls(manager, queue=queue, **config)
 
     def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0, logger_name: str = 'sender'):
-        self.log = logging.getLogger(logger_name)
+        self.logger_name = logger_name
+        self.logger = logging.getLogger(logger_name)
         self.raw_log = logging.getLogger("%s.raw" % logger_name)
         self.manager = manager
         self.protocol = manager.protocol
@@ -59,23 +58,23 @@ class BaseSender:
     async def process_queue(self):
         msg = await self.queue.wait()
         try:
-            self.log.debug('Took item from queue')
+            self.logger.debug('Took item from queue')
             await self.send_msg(msg)
         finally:
-            self.log.debug("Setting task done on queue")
+            self.logger.debug("Setting task done on queue")
             self.queue.task_done()
 
     async def close_queue(self):
         if self.queue:
-            self.log.debug('Closing message queue')
+            self.logger.debug('Closing message queue')
             try:
                 timeout = self.interval + 1
-                self.log.info('Waiting', timeout, 'seconds for queue to empty')
+                self.logger.info('Waiting', timeout, 'seconds for queue to empty')
                 await asyncio.wait_for(self.queue.join(), timeout=timeout)
             except asyncio.TimeoutError:
-                self.log.error('Queue did not empty in time. Cancelling task with messages in queue.')
+                self.logger.error('Queue did not empty in time. Cancelling task with messages in queue.')
             self.process_queue_task.cancel()
-            self.log.debug('Message queue closed')
+            self.logger.debug('Message queue closed')
 
     @property
     def dst(self):
@@ -102,12 +101,12 @@ class BaseSender:
         raise NotImplementedError
 
     async def send_msg(self, msg_encoded: bytes):
-        self.log.debug("Sending message to %s", self.dst)
+        self.logger.debug("Sending message to %s", self.dst)
         self.raw_log.debug(msg_encoded)
         await self.send_data(msg_encoded)
-        self.log.debug('Message sent')
+        self.logger.debug('Message sent')
 
-    async def send_hex(self, hex_msg:AnyStr):
+    async def send_hex(self, hex_msg: AnyStr):
         await self.send_msg(binascii.unhexlify(hex_msg))
 
     async def send_msgs(self, msgs:Sequence[bytes]):
@@ -148,17 +147,14 @@ class BaseNetworkClient(BaseSender):
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
+        'host': str,
+        'port': int,
         'srcip': str,
         'srcport': int,
     })
-    receiver_configurable = BaseSender.configurable.copy()
-    receiver_configurable.update({
-        'host': str,
-        'port': int,
-    })
 
     def __init__(self, protocol, queue=None, host: str = '127.0.0.1', port: int = 4000,
-                 srcip: str = '', srcport: int = 0, **kwargs):
+                 srcip: str = '', srcport: int = None, **kwargs):
         super(BaseNetworkClient, self).__init__(protocol, queue=queue, **kwargs)
         self.host = host
         self.port = port
@@ -182,42 +178,49 @@ class BaseNetworkClient(BaseSender):
         raise NotImplementedError
 
     async def start(self):
-        self.log.info("Opening %s connection to %s", self.sender_type, self.dst)
+        self.logger.info("Opening %s connection to %s", self.sender_type, self.dst)
         await self.open_connection()
-        self.log.info("Connection open")
+        self.logger.info("Connection open")
 
     async def stop(self):
-        self.log.info("Closing %s connection to %s", self.sender_type, self.dst)
+        self.logger.info("Closing %s connection to %s", self.sender_type, self.dst)
         await self.close_connection()
-        self.log.info("Connection closed")
+        self.logger.info("Connection closed")
 
 
 class SSLSupportedNetworkClient(BaseNetworkClient):
     configurable = BaseNetworkClient.configurable.copy()
     configurable.update({
+        'ssl': bool,
+        'sslcert': Path,
+        'sslkey': Path,
+        'sslkeypassword': str,
         'certrequired': bool,
         'hostnamecheck': bool,
-        'cafile': Path,
-        'capath': Path,
-        'cadata': str
-    })
-    receiver_configurable = BaseNetworkClient.receiver_configurable.copy()
-    receiver_configurable.update({
-        'ssl': bool,
+        'servercertfile': Path,
+        'servercertspath': Path,
+        'servercertsdata': str,
+        'sslhandshaketimeout': int
     })
 
-    def __init__(self, *args,
-                 ssl: bool = False, cafile: Path= None, capath: Path=None, cadata: str=None, certrequired: bool=True,
-                          hostnamecheck: bool=True, **kwargs):
+    def __init__(self, *args, ssl: bool = False, sslcert: Path = None, sslkey: Path = None, sslkeypassword: str = None,
+                servercertfile: Path= None, servercertspath: Path=None, servercertsdata: str=None, certrequired: bool=True,
+                hostnamecheck: bool=True, sslhandshaketimeout: int=None, **kwargs):
         super(SSLSupportedNetworkClient, self).__init__(*args, **kwargs)
-        self.ssl = self.manage_ssl_params(ssl, cafile, capath, cadata, certrequired, hostnamecheck)
+        self.ssl_handshake_timeout = sslhandshaketimeout
+        self.ssl = self.manage_ssl_params(ssl, sslcert, sslkey, sslkeypassword, servercertfile, servercertspath, servercertsdata,
+                                          certrequired, hostnamecheck)
 
-    def manage_ssl_params(self, context, cafile: Path, capath: Path, cadata: str, certrequired: bool,
-                          hostnamecheck: bool):
+    def manage_ssl_params(self, context, cert: Path, key: Path, sslkeypassword: str, cafile: Path, capath: Path, cadata: str,
+                          certrequired: bool, hostnamecheck: bool):
         if context:
-            self.log.info("Setting up SSL")
+            self.logger.info("Setting up SSL")
             if context is True:
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+
+                if cert and key:
+                    self.logger.info("Using SSL Cert: %s", cert)
+                    context.load_cert_chain(str(cert), str(key), password=sslkeypassword)
 
                 context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
                 context.check_hostname = hostnamecheck
@@ -228,12 +231,12 @@ class SSLSupportedNetworkClient(BaseNetworkClient):
                                      'capath': str(capath) if capath else None,
                                      'cadata': cadata}
                         context.load_verify_locations(**locations)
-                        self.log.info("Verifying SSL certs with: %s", locations)
+                        self.logger.info("Verifying SSL certs with: %s", locations)
                     else:
                         context.load_default_certs(ssl.Purpose.SERVER_AUTH)
-                        self.log.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
-            self.log.info("SSL Context loaded")
+                        self.logger.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
+            self.logger.info("SSL Context loaded")
             return context
         else:
-            self.log.info("SSL is not enabled")
+            self.logger.info("SSL is not enabled")
             return None

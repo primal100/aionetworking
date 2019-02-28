@@ -5,22 +5,33 @@ from pathlib import Path
 
 from .base import BaseNetworkClient
 from lib import settings
+from lib.connection_protocols.asyncio_protocols import TCPClientProtocol
 from lib.conf import RawStr
+from .exceptions import ClientException
 
 from typing import AnyStr
 
 
+class SSHClient(TCPClientProtocol, asyncssh.SSHClient):
+
+    def send(self, msg):
+        raise ClientException('Cannot send from connection protocol')
+
+
 class SFTPClient(BaseNetworkClient):
+    connection_protocol = SSHClient
     configurable = BaseNetworkClient.configurable.copy()
     configurable.update({'basepath': Path, 'filename': RawStr, 'remotepath': Path, 'sftploglevel': int,
                          'knownhosts': Path, 'username': str, 'password': str, 'clientkeys': Path,
                          'passphrase': None, 'clientversion': RawStr})
     sender_type = 'SFTP Client'
+    sftp_client = None
     sftp = None
     conn = None
     cwd = None
 
-    def __init__(self, *args, basepath=settings.DATA_DIR.joinpath('tmp'), filename=None, remotepath=Path('.'),
+    def __init__(self, *args, port=asyncssh.connection._DEFAULT_PORT, srcport=asyncssh.connection._DEFAULT_PORT,
+                 basepath=settings.DATA_DIR.joinpath('tmp'), filename=None, remotepath=Path('.'),
                  knownhosts: Path=None, username: str=None, password: str=None, sftp_kwargs=None,
                  clientkeys: Path=(), passphrase: str=None, clientversion:str = (), **kwargs):
         self.filename = filename
@@ -31,11 +42,13 @@ class SFTPClient(BaseNetworkClient):
                                  'client_keys': clientkeys,
                                  'passphrase': passphrase, 'client_version': clientversion}
         self.sftp_kwargs.update(sftp_kwargs)
-        super(SFTPClient, self).__init__(*args, **kwargs)
+        super(SFTPClient, self).__init__(*args, port=port, srcport=srcport, **kwargs)
         self.mode = 'ba' if self.manager.protocol.binary else 'a'
 
     async def open_connection(self, **kwargs):
-        self.conn = await asyncssh.connect(self.host, self.port, local_addr=self.localaddr, **self.sftp_kwargs)
+        self.conn, self.sftp_client = await asyncssh.create_connection(
+            lambda: self.connection_protocol(self.manager, logger_name=self.logger_name),
+            self.host, self.port, local_addr=self.localaddr, **self.sftp_kwargs)
         self.sftp = await self.conn.start_sftp_client()
         self.cwd = await self.sftp.realpath('.')
 
@@ -57,7 +70,7 @@ class SFTPClient(BaseNetworkClient):
         else:
             filename = binascii.hexlify(os.urandom(12)).decode('utf-8')
         path = self.base_path.joinpath(filename)
-        self.log.debug(path)
+        self.logger.debug(path)
         data = msg_obj.encoded
         self.raw_log.debug(data)
         with path.open(self.mode) as f:

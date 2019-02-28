@@ -5,6 +5,7 @@ from passlib.hash import pbkdf2_sha256
 from lib import settings
 from lib.connection_protocols.asyncio_protocols import TCPServerProtocol
 from .asyncio_servers import TCPServerReceiver
+from .exceptions import ServerException
 
 from typing import Mapping
 from pathlib import Path
@@ -51,11 +52,11 @@ class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
         else:
             self.logger = logger.getLogger(self.logger_name)
 
-    def change_password(self, username, old_password, new_password):
-        pass
+    def send(self, msg):
+        raise ServerException('Unable to send messages with this receiver')
 
 
-class SSHServerPswAuth(SSHServer):
+class SSHServerPswPublicAuth(SSHServer):
     hash_algorithm = pbkdf2_sha256
 
     def get_password(self, username: str) -> str:
@@ -65,10 +66,7 @@ class SSHServerPswAuth(SSHServer):
         return True
 
     def password_auth_supported(self) -> bool:
-        return True
-
-    def public_key_auth_supported(self):
-        return True
+        return bool(self.receiver.logins)
 
     def hash_password(self, password: str) -> str:
         return self.hash_algorithm.hash(password)
@@ -88,6 +86,9 @@ class SSHServerPswAuth(SSHServer):
             self.logger.debug('SFTP User % successfully authorized', username)
         return authorized
 
+    def public_key_auth_supported(self):
+        return self.receiver.public_key_auth_supported
+
 
 class SFTPServer(TCPServerReceiver):
     factory = SFTPFactory
@@ -100,19 +101,20 @@ class SFTPServer(TCPServerReceiver):
                          'baseuploaddir': Path, 'hostkey': Path, 'removeafterprocessing': bool, 'passphrase': str,
                          'authorizedkeys': Path})
 
-    def __init__(self, manager, *args, chroot: bool=True, sftploglevel=1,
+    def __init__(self, manager, *args, port=asyncssh.connection._DEFAULT_PORT, chroot: bool=True, sftploglevel=1,
                  baseuploaddir: Path = settings.HOME.joinpath('sftp'), remove_after_processing:bool = True,
                  allowscp: bool=False, hostkey: Path=(), passphrase: str = None, authorizedkeys: Path=None,
                  sftp_kwargs=None, **kwargs):
         asyncssh.logging.set_debug_level(sftploglevel)
         self.chroot = chroot
-        super(TCPServerReceiver, self).__init__(manager, *args, **kwargs)
+        super(TCPServerReceiver, self).__init__(manager, *args, port=port, **kwargs)
         self.sftp_kwargs = {
             'allow_scp': allowscp,
             'server_host_keys': hostkey,
             'passphrase': passphrase,
             'authorized_client_keys': str(authorizedkeys) if authorizedkeys else None
         }
+        self.public_key_auth_supported = bool(authorizedkeys)
         sftp_kwargs = sftp_kwargs or {}
         self.sftp_kwargs.update(sftp_kwargs)
         self.allow_scp = allowscp
@@ -125,14 +127,14 @@ class SFTPServer(TCPServerReceiver):
                                             sftp_factory=lambda conn: self.factory(conn, self), **self.sftp_kwargs)
 
 
-class SFTPServerPswAuth(SFTPServer):
-    protocol = SSHServerPswAuth
+class SFTPServerPswPublicAuth(SFTPServer):
+    protocol = SSHServerPswPublicAuth
 
     configurable = SFTPServer.configurable.copy()
     configurable.update({'logins': dict})
 
-    def __init__(self, manager, logins: Mapping[str, str], *args, **kwargs):
+    def __init__(self, manager, logins: Mapping[str, str]=None, *args, **kwargs):
         self.logins = logins
-        super(SFTPServerPswAuth, self).__init__(manager, *args, **kwargs)
+        super(SFTPServerPswPublicAuth, self).__init__(manager, *args, **kwargs)
 
 

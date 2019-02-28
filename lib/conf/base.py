@@ -31,6 +31,10 @@ class BaseConfigClass:
         raise NotImplementedError
 
     @cached_property
+    def sender_type(self):
+        raise NotImplementedError
+
+    @cached_property
     def message_manager_is_batch(self):
         raise NotImplementedError
 

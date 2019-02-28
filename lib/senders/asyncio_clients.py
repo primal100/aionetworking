@@ -27,7 +27,8 @@ class TCPClient(BaseAsyncioMixin, SSLSupportedNetworkClient):
 
     async def open_connection(self):
         self.transport, self.connection_protocol = await asyncio.get_event_loop().create_connection(
-            lambda: TCPClientProtocol(self.manager), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr)
+            lambda: TCPClientProtocol(self.manager), self.host, self.port, ssl=self.ssl, local_addr=self.localaddr,
+        ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
 class UDPClient(BaseAsyncioMixin, BaseNetworkClient):

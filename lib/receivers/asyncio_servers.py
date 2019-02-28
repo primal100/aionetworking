@@ -12,7 +12,7 @@ class TCPServerReceiver(BaseServer):
     async def get_server(self):
         return await asyncio.get_event_loop().create_server(
             lambda: TCPServerProtocol(self.manager),
-            self.host, self.port, ssl=self.ssl_context)
+            self.host, self.port, ssl=self.ssl_context, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
     async def start_server(self):
         self.server = await self.get_server()

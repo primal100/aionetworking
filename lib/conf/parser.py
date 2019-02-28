@@ -20,6 +20,10 @@ class INIFileConfig(BaseConfigClass):
         return self.config.get('Receiver', 'Type')
 
     @property
+    def sender_type(self):
+        return self.config.get('Sender', 'Type')
+
+    @property
     def run_as(self):
         return self.config.get('MessageManager', 'run_as', fallback='asyncio')
 

@@ -2,7 +2,7 @@ from lib.conf.parser import INIFileConfig
 from lib.conf.log_filters import BaseFilter, SenderFilter, MessageFilter
 from lib.messagemanagers.managers import OneWayMessageManager, ClientOneWayMessageManager
 from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
-from lib.receivers.sftp import SFTPServerPswAuth
+from lib.receivers.sftp import SFTPServerPswPublicAuth
 from lib.senders.sftp import SFTPClient
 from lib.senders.asyncio_clients import TCPClient, UDPClient
 from lib.actions import FileStorage, BufferedFileStorage
@@ -29,7 +29,7 @@ CONFIG_CLS: Type[BaseConfigClass] = INIFileConfig
 RECEIVERS: Mapping[str, Mapping[str, Union[Type[BaseReceiver], Type[BaseSender]]]] = {
     'TCPServer': {'receiver': TCPServerReceiver, 'sender': TCPClient},
     'UDPServer': {'receiver': UDPServerReceiver, 'sender': UDPClient},
-    'SFTPServer':  {'receiver': SFTPServerPswAuth, 'sender': SFTPClient},
+    'SFTPServer':  {'receiver': SFTPServerPswPublicAuth, 'sender': SFTPClient},
 }
 ACTIONS: Mapping[str, Type[BaseAction]] = {
     'filestorage': FileStorage,

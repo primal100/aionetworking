@@ -19,7 +19,7 @@ def get_sender(*config_args, configure_logging=False, logger_name='sender', **kw
 
     logger = logging.getLogger(logger_name)
 
-    receiver_name = cp.receiver
+    receiver_name = cp.sender_type
 
     logger.info('Getting client for receiver %s', receiver_name)
 
