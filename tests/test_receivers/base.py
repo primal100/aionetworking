@@ -39,11 +39,14 @@ class BaseReceiverTestCase(BaseTestCase):
     async def main(self, coro):
         status_change = asyncio.Event()
         server_task = asyncio.create_task(main(*self.config_args, status_change=status_change))
-        await status_change.wait()
+        completed, pending = await asyncio.wait([status_change.wait(), server_task], return_when=asyncio.FIRST_COMPLETED)
+        for e in [t.exception() for t in completed]:
+            if e:
+                raise e
         await coro
         status_change.clear()
         server_task.cancel()
-        await server_task
+        await asyncio.wait(pending)
 
     async def send_one(self):
         client = self.get_sender()
@@ -58,7 +61,6 @@ class BaseReceiverTestCase(BaseTestCase):
                                                                     {'msisdn': b'\x91\x14\x97Bu3\xf3',
                                                                      'sm-RP-PRI': False,
                                                                      'serviceCentreAddress': b'\x91\x14\x97yy\x08\xf0'})}))]})])
-        await asyncio.sleep(3)
 
     def assertSendOneMsgOk(self, expected_file):
         asyncio.run(self.main(self.send_one()), debug=True)
@@ -73,7 +75,6 @@ class BaseReceiverTestCase(BaseTestCase):
             await client1.send_hex(msg1)
             await client2.send_hex(msg2)
             await client3.send_hex(msg3)
-        await asyncio.sleep(3)
 
     def assertSendFromThreeClientsOk(self, expected_file1, expected_file2, directory):
         asyncio.run(self.main(self.send_three_clients(self.messages[0],

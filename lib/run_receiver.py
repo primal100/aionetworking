@@ -18,6 +18,9 @@ def except_handler(logger, exc_type, exc_value, exc_tb):
 #sys.excepthook = except_handler
 
 
+logger = logging.getLogger('receiver')
+
+
 def log_exceptions(logger, loop, context):
     logger.error(context['message'])
     logger.error(log_exception(context['exception']))
@@ -37,7 +40,7 @@ async def main(*config_args, status_change=None, stop_ordered=None, logger_name=
     loop = asyncio.get_event_loop()
 
     #exception_handler = partial(log_exception, logger)
-    #loop.set_exception_handler(log_exceptions)
+    loop.set_exception_handler(log_exceptions)
     logger.info('Starting %s on %s', settings.APP_NAME, asyncio.get_event_loop())
 
     receiver_name = cp.receiver

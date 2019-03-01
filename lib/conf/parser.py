@@ -49,7 +49,7 @@ class INIFileConfig(BaseConfigClass):
         if data_type == tuple or data_type == list:
             if value:
                 value = value.replace(', ', ',').split(',')
-            elif data_type == '':
+            elif value == '':
                 value = ()
         if value is None or value == '':
             return None
