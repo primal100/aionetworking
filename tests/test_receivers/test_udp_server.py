@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-import multiprocessing
 
 from lib import settings
 
@@ -41,4 +40,10 @@ class TestUDPServerBufferedFileStorage(BaseReceiverTestCase):
     def test_02_multiple_from_same_client(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
-        self.assertMultipleMessagesSameSenderOK(expected_file, directory)
+        self.assertMultipleMessagesSameSenderOK(expected_file, directory, delay=0.2)
+
+    def test_03_play_recording(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
+        directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        path = Path(settings.TESTS_DIR, 'recordings', 'localhost.recording')
+        self.assertRecordingOK(path, expected_file, directory, delay=0.2)

@@ -4,6 +4,7 @@ import logging
 import ssl
 
 from lib import utils, settings
+from lib.utils import Record
 
 from typing import TYPE_CHECKING, Sequence, AnyStr
 from pathlib import Path
@@ -129,16 +130,15 @@ class BaseSender:
         msg_encoded = self.encode_msg(msg_decoded)
         await self.send_msg(msg_encoded)
 
-    async def play_recording(self, file_path:Path, immediate:bool=False):
-        with file_path.open('rb') as f:
-            content = f.read()
-        packets = utils.unpack_recorded_packets(content)
-        if immediate:
-            await self.send_msgs([p[2] for p in packets])
-        for microseconds, sender, data in packets:
-            if not immediate:
-                await asyncio.sleep(microseconds / 1000)
-            await self.send_msg(data)
+    async def play_recording(self, file_path: Path, hosts=(), timing: bool=True):
+        self.logger.debug("Playing recording from file %s", file_path)
+        for packet in Record.from_file(file_path):
+            if (not hosts or packet['host'] in hosts) and not packet['sent_by_server']:
+                if timing:
+                    await asyncio.sleep(packet['seconds'])
+                self.logger.debug('Sending msg with %s bytes', len(packet['data']))
+                await self.send_msg(packet['data'])
+        self.logger.debug("Recording finished")
 
 
 class BaseNetworkClient(BaseSender):

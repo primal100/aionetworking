@@ -152,7 +152,7 @@ class BaseProtocolMixin:
                 self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
-        task = asyncio.create_task(self.manager.handle_message(self.alias, data))
+        task = self.manager.handle_message(self.alias, data)
         task.add_done_callback(self.task_callback)
 
 

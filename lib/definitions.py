@@ -6,7 +6,7 @@ from lib.receivers.directory_monitor import DirectoryMonitor
 from lib.receivers.sftp import SFTPServerPswPublicAuth
 from lib.senders.sftp import SFTPClient
 from lib.senders.asyncio_clients import TCPClient, UDPClient
-from lib.actions import FileStorage, BufferedFileStorage
+from lib.actions import FileStorage, BufferedFileStorage, Recording
 
 from typing import Mapping, Union, TYPE_CHECKING, Type
 
@@ -35,7 +35,8 @@ RECEIVERS: Mapping[str, Mapping[str, Union[Type[BaseReceiver], Type[BaseSender]]
 }
 ACTIONS: Mapping[str, Type[BaseAction]] = {
     'filestorage': FileStorage,
-    'bufferedfilestorage': BufferedFileStorage
+    'bufferedfilestorage': BufferedFileStorage,
+    'record': Recording
 }
 LOG_FILTERS: Mapping[str, Type[BaseFilter]] = {
     'sender_filter': SenderFilter,

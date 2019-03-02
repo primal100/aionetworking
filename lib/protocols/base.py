@@ -48,12 +48,14 @@ class BaseProtocol:
     def encode(cls, decoded, log=root_logger):
         return decoded
 
-    def __init__(self, sender, encoded, decoded, timestamp=None, log=root_logger):
+    def __init__(self, sender, encoded, decoded=None, timestamp=None, log=root_logger):
         self.sender = sender
-        self._timestamp = timestamp
         self.encoded = encoded
         self.decoded = decoded
         self.log = log
+        self.received_timestamp = timestamp
+        if not self.received_timestamp:
+            self.received_timestamp = datetime.datetime.now()
 
     def get_protocol_name(self) -> str:
         return self.protocol_name
@@ -68,7 +70,7 @@ class BaseProtocol:
 
     @cached_property
     def timestamp(self) -> datetime.datetime:
-        return self._timestamp or datetime.datetime.now()
+        return self.received_timestamp
 
     def filter(self):
         return False
@@ -83,3 +85,7 @@ class BaseProtocol:
 
     def __str__(self):
         return "%s message %s" % (self.protocol_name, id(self))
+
+
+class BufferProtocol(BaseProtocol):
+    pass

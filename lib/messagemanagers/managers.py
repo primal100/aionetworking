@@ -3,6 +3,8 @@ import datetime
 import logging
 
 from lib.utils import log_exception, plural
+from lib.protocols.base import BufferProtocol
+from lib.counters import TaskCounter
 from lib import settings
 from .exceptions import MessageFromNotAuthorizedHost
 
@@ -25,6 +27,7 @@ class BaseMessageManager:
 
     configurable = {
         'actions': tuple,
+        'preactions': tuple,
         'allowedsenders': tuple,
         'aliases': dict,
         'generate_timestamp': bool,
@@ -37,15 +40,17 @@ class BaseMessageManager:
         config = cp.section_as_dict('MessageManager', **cls.configurable)
         log = logging.getLogger(cp.logger_name)
         log.info('Found configuration for %s: %s', cls.name,  config)
-        action_modules = (definitions.ACTIONS[action] for action in config.pop('actions'))
+        action_modules = (definitions.ACTIONS[action] for action in config.pop('actions', ()))
         config['actions'] = [action.from_config(cp=cp) for action in action_modules]
+        pre_action_modules = (definitions.ACTIONS[action] for action in config.pop('preactions', ()))
+        config['pre_actions'] = [action.from_config(cp=cp) for action in pre_action_modules]
         config.update(kwargs)
         config['logger_name'] = cp.logger_name
         if protocol.supports_responses:
             return TwoWayMessageManager(protocol, **config)
         return OneWayMessageManager(protocol, **config)
 
-    def __init__(self, protocol: Type[BaseProtocol], actions: Sequence = (),
+    def __init__(self, protocol: Type[BaseProtocol], actions: Sequence = (), pre_actions: Sequence = (),
                  generate_timestamp: bool = False, aliases: Mapping = None, allowedsenders: Sequence = (),
                  logger_name: str = 'receiver'):
         self.log = logging.getLogger(logger_name)
@@ -54,11 +59,13 @@ class BaseMessageManager:
         self.protocol = protocol
         self.generate_timestamp = generate_timestamp
         self.actions = actions
+        self.pre_actions = pre_actions
         self.aliases = aliases or {}
         self.allowed_senders = allowedsenders
+        self.task_counter = TaskCounter()
 
     def get_alias(self, sender: str):
-        alias = self.aliases.get(sender, sender)
+        alias = self.aliases.get(str(sender), sender)
         if alias != sender:
             self.log.debug('Alias found for %s: %s', sender, alias)
         return alias
@@ -66,16 +73,19 @@ class BaseMessageManager:
     def check_sender(self, other_ip):
         return self.get_alias(other_ip)
 
+    async def do_pre_actions(self, sender, data, timestamp):
+        buffer = BufferProtocol(sender, data, timestamp=timestamp, log=self.log)
+        for action in self.pre_actions:
+            await action.do_one(buffer)
+
     def handle_message(self, sender: str, data: AnyStr):
         self.log.debug("Handling buffer from %s", sender, extra={'sender': sender})
         self.raw_log.debug(data, extra={'sender': sender})
-        if self.generate_timestamp:
-            timestamp = datetime.datetime.now()
-            self.log.debug('Generated timestamp: %s', timestamp, extra={'sender': sender})
-        else:
-            timestamp = None
+        timestamp = datetime.datetime.now()
+        if self.pre_actions:
+            self.task_counter.create_task(self.do_pre_actions(sender, data, timestamp))
         msgs = self.make_messages(sender, data, timestamp)
-        return self.manage(sender, msgs)
+        return self.task_counter.create_task(self.manage(sender, msgs))
 
     def make_messages(self, sender: str, encoded: AnyStr, timestamp: datetime.datetime) -> Sequence[BaseProtocol]:
         try:
@@ -89,18 +99,15 @@ class BaseMessageManager:
             self.log.error(e)
             return None
 
-    def filter(self, msg, **log_extra):
-        filtered = msg.filtered()
-        if filtered:
-            self.log.debug("Message was filtered out", extra=log_extra)
-        return filtered
-
     async def manage(self, sender, msgs):
         raise NotImplementedError
 
     async def close(self):
         self.log.debug('Closing %s', self.name)
+        await self.task_counter.wait()
         for action in self.actions:
+            await action.close()
+        for action in self.pre_actions:
             await action.close()
         self.log.debug('%s closed', self.name)
 
@@ -135,7 +142,6 @@ class OneWayMessageManager(BaseReceiverMessageManager):
             await action.wait_complete(**logs_extra)
 
     async def manage(self, sender, msgs):
-        msgs = [msg for msg in msgs if not msg.filter()]
         await self.do_actions(msgs)
         await self.wait_actions(sender=sender)
 
@@ -160,9 +166,8 @@ class TwoWayMessageManager(BaseReceiverMessageManager):
         responses = []
         tasks = []
         for msg in msgs:
-            if not msg.filter():
-                task_set = self.do_actions(msg)
-                tasks.append((msg, task_set))
+            task_set = self.do_actions(msg)
+            tasks.append((msg, task_set))
         for msg, task_set in tasks:
             responses.append(msg.get_response(task_set))
         return responses

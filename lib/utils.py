@@ -83,13 +83,18 @@ def pack_variable_len_string(content:bytes) -> bytes:
     return struct.pack("I", len(content)) + content
 
 
-def unpack_variable_len_string(pos: int, content: bytes) -> (int, bytes):
+def unpack_variable_len_bytes(pos: int, content: bytes) -> (int, bytes):
     int_size = struct.calcsize("I")
     length = struct.unpack("I", content[pos:pos + int_size])[0]
     pos += int_size
     end_byte = pos + length
     data = content[pos:end_byte]
     return end_byte, data
+
+
+def unpack_variable_len_string(*args) -> (int, str):
+    end_byte, data = unpack_variable_len_bytes(*args)
+    return end_byte, data.decode()
 
 
 def unpack_variable_len_strings(content: bytes) -> Sequence[bytes]:
@@ -101,9 +106,42 @@ def unpack_variable_len_strings(content: bytes) -> Sequence[bytes]:
     return bytes_list
 
 
-def pack_recorded_packet(sender: AnyStr, msg: bytes, seconds: int) -> bytes:
-    return struct.pack('I', seconds) + pack_variable_len_string(
-            sender.encode()) + pack_variable_len_string(msg)
+class Record:
+    first_msg_time = 0
+
+    @classmethod
+    def from_file(cls, path):
+        content = path.read_bytes()
+        float_size = struct.calcsize("f")
+        bool_size = struct.calcsize("?")
+        pos = 0
+        while pos < len(content):
+            sent_by_server = struct.unpack("?", content[pos:pos + bool_size])[0]
+            pos += bool_size
+            seconds = struct.unpack("f", content[pos:pos + float_size])[0]
+            pos += float_size
+            pos, peer = unpack_variable_len_string(pos, content)
+            pos, packet_data = unpack_variable_len_bytes(pos, content)
+            yield ({'sent_by_server': sent_by_server,
+                    'seconds': seconds,
+                    'peer': peer,
+                    'data': packet_data})
+
+    def pack_server_msg(self, msg):
+        return self.pack_recorded_packet(True, msg)
+
+    def pack_client_msg(self, msg):
+        return self.pack_recorded_packet(False, msg)
+
+    def pack_recorded_packet(self, sent_by_server: bool, msg) -> bytes:
+        if self.first_msg_time:
+            time_delta = msg.received_timestamp - self.first_msg_time
+            seconds = time_delta.seconds + round(time_delta.microseconds / 1000000)
+        else:
+            self.first_msg_time = msg.received_timestamp
+            seconds = 0
+        return struct.pack('?', sent_by_server) + struct.pack('f', seconds) + pack_variable_len_string(
+            msg.sender.encode()) + pack_variable_len_string(msg.encoded)
 
 
 def unpack_recorded_packets(content: bytes) -> Sequence[Tuple[int, AnyStr, bytes]]:

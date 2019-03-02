@@ -116,6 +116,9 @@ class BaseFileStorage(BaseAction):
             data += self.separator
         return data
 
+    def get_logs_extra(self, msg):
+        return {'msg_obj': msg}
+
 
 class FileStorage(BaseFileStorage):
     name = 'File Storage'
@@ -128,7 +131,7 @@ class FileStorage(BaseFileStorage):
         self.log.debug('Data written to file %s', path, extra=logs_extra)
 
     async def do_one(self, msg):
-        self.log.debug('Processing message for action %s', self.name, extra={'msg_obj': msg})
+        self.log.debug('Processing message for action %s', self.name, extra=self.get_logs_extra(msg))
         path = self.get_full_path(msg)
         data = self.get_data(msg)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,7 +171,7 @@ class BufferedFileStorage(BaseFileStorage):
         self.set_outstanding_writes(path)
 
     async def do_one(self, msg):
-        logs_extra = {'msg_obj': msg}
+        logs_extra = self.get_logs_extra(msg)
         self.log.debug('Storing message', extra=logs_extra)
         path = self.get_path(msg)
         data = self.get_data(msg)

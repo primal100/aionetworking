@@ -1,36 +1,25 @@
 import asyncio
-import logging
-from pathlib import Path
 
-from .base import BaseAction
-from lib import utils, settings
+from .file_storage import BufferedFileStorage
+from lib.utils import Record
 
-from typing import Sequence
-from datetime import datetime, timedelta
+class Recording(BufferedFileStorage):
+    name = 'Recording'
+    key = 'Recording'
+    first_msg_time = 0
+    configurable = BufferedFileStorage.configurable.copy()
+    configurable.update({'senders': tuple})
 
+    def __init__(self, *args, senders=(), **kwargs):
+        super(Recording, self).__init__(*args, **kwargs)
+        self.senders = senders
+        self.record = Record()
 
-class Action(BaseAction):
-    requires_decoding = False
-    store_many_write_mode = 'ab'
-    prev_message_time = 0
+    def get_data(self, msg):
+        return self.record.pack_client_msg(msg)
 
-    def get_content(self, msg: Sequence[str, bytes, timedelta]):
-        return utils.pack_recorded_packet(*msg)
+    def filter(self, msg):
+        return self.senders and msg.sender not in self.senders
 
-    def store_many(self, msgs: Sequence[Sequence[str, bytes, datetime]]):
-        data = b''
-        for sender, msg, timestamp in msgs:
-            self.log.debug('Recording packet from %s', sender)
-            timestamp = timestamp or datetime.now()
-            if self.prev_message_time:
-                message_timedelta = (timestamp - self.prev_message_time).microseconds
-            else:
-                message_timedelta = 0
-            self.prev_message_time = timestamp
-            data += self.get_content((sender, msg, message_timedelta))
-        record_file_path = Path('')
-        record_file_path.parent.mkdir(exist_ok=True, parents=True)
-        asyncio.create_task(self.write_to_file(record_file_path, data, 'ab'))
-
-    def do(self, msg: Sequence[str, bytes, datetime]):
-        self.store_many([msg])
+    def get_logs_extra(self, msg):
+        return {'sender': msg.sender}

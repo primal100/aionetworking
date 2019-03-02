@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from lib import settings
-
+from lib.conf import RawStr
 
 class BaseAction:
     name = ''
@@ -28,11 +29,15 @@ class BaseAction:
         await self.do_many_parallel(msgs)
 
     async def do_many_parallel(self, msgs):
-        self.outstanding_tasks += [asyncio.create_task(self.do_one(msg)) for msg in msgs]
+        self.outstanding_tasks += [asyncio.create_task(self.do_one(msg)) for msg in msgs if not self.filter(msg)]
 
     async def do_many_sequential(self, msgs):
         for msg in msgs:
-            await self.do_one(msg)
+            if not self.filter(msg):
+                await self.do_one(msg)
+
+    def filter(self, msg):
+        return msg.filter()
 
     def do_one(self, msg):
         raise NotImplementedError
@@ -47,3 +52,4 @@ class BaseAction:
 
     async def close(self):
         await self.wait_complete()
+
