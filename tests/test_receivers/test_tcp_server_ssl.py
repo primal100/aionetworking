@@ -34,3 +34,8 @@ class TestTCPServerBufferedFileStorage(BaseReceiverTestCase):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
         self.assertMultipleMessagesSameSenderOK(expected_file, directory)
+
+    def test_03_play_recording(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
+        directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        self.assertRecordingOK(expected_file, directory)

@@ -5,7 +5,12 @@ class Counter:
 
     def __init__(self):
         self.event = asyncio.Event()
+        self.event.set()
         self._value = 0
+
+    @property
+    def num(self):
+        return self._value
 
     def increment(self, num=1):
         if self._value == 0:

@@ -61,4 +61,4 @@ class TestTCPServerBufferedFileStorage(BaseReceiverTestCase):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
         path = Path(settings.TESTS_DIR, 'recordings', 'localhost.recording')
-        self.assertRecordingOK(path, expected_file, directory)
+        self.assertRecordingOK(expected_file, directory)

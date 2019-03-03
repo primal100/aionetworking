@@ -7,6 +7,7 @@ from .base import BaseReceiverTestCase
 
 
 class BaseDirectoryMonitorTestCase(BaseReceiverTestCase):
+
     async def send_one(self):
         msg = binascii.unhexlify(self.messages[0])
         path = Path(self.base_data_dir).joinpath('tmp/msg_0')
@@ -31,10 +32,10 @@ class TestDirectoryMonitorBufferedFileStorage(BaseDirectoryMonitorTestCase):
     config_file = 'directory_monitor_buffered_storage_test_setup.ini'
 
     def test_00_one_msg(self):
-        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'TCAP_MAP')
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
         self.assertSendOneMsgOk(expected_file)
 
-    def test_02_multiple_from_same_client(self):
-        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'TCAP_MAP')
-        directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+    def test_01_multiple(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        directory = Path(self.base_data_dir, 'Encoded')
         self.assertMultipleMessagesSameSenderOK(expected_file, directory)

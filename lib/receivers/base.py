@@ -16,7 +16,7 @@ else:
 
 class BaseReceiver:
     receiver_type: str = ''
-    configurable = {}
+    configurable = {'quiet': bool}
 
     @classmethod
     def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
@@ -28,7 +28,8 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, **config)
 
-    def __init__(self, manager, logger_name: str = 'receiver'):
+    def __init__(self, manager, quiet: bool=False, logger_name: str = 'receiver'):
+        self.quiet = quiet
         self.logger = logging.getLogger(logger_name)
         self.manager = manager
 
@@ -123,10 +124,11 @@ class BaseServer(BaseReceiver):
             return None
 
     def print_listening_message(self, sockets):
-        for socket in sockets:
-            sock_name = socket.getsockname()
-            listening_on = ':'.join([str(v) for v in sock_name])
-            print('Serving %s on %s' % (self.receiver_type, listening_on))
+        if not self.quiet:
+            for socket in sockets:
+                sock_name = socket.getsockname()
+                listening_on = ':'.join([str(v) for v in sock_name])
+                print('Serving %s on %s' % (self.receiver_type, listening_on))
 
     async def close(self):
         self.logger.info('Stopping %s running at %s', self.receiver_type, self.listening_on)

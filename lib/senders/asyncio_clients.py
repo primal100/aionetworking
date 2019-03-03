@@ -12,7 +12,7 @@ class BaseAsyncioMixin:
     async def close_connection(self):
         self.transport.close()
 
-    async def send_data(self, encoded_data):
+    async def send_data(self, encoded_data, **kwargs):
         self.connection_protocol.send_msg(encoded_data)
 
     async def open_connection(self):

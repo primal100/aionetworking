@@ -98,13 +98,13 @@ class BaseSender:
     async def response(self):
         await self.manager.wait_response()
 
-    async def send_data(self, msg_encoded: bytes):
+    async def send_data(self, msg_encoded: bytes, **kwargs):
         raise NotImplementedError
 
-    async def send_msg(self, msg_encoded: bytes):
+    async def send_msg(self, msg_encoded: bytes, **kwargs):
         self.logger.debug("Sending message to %s", self.dst)
         self.raw_log.debug(msg_encoded)
-        await self.send_data(msg_encoded)
+        await self.send_data(msg_encoded, **kwargs)
         self.logger.debug('Message sent')
 
     async def send_hex(self, hex_msg: AnyStr):
@@ -174,7 +174,7 @@ class BaseNetworkClient(BaseSender):
     async def close_connection(self):
         raise NotImplementedError
 
-    async def send_data(self, encoded_data:bytes):
+    async def send_data(self, encoded_data:bytes, **kwargs):
         raise NotImplementedError
 
     async def start(self):

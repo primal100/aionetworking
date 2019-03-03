@@ -22,6 +22,7 @@ class BaseTestCase(TestCase):
     maxDiff = None
     log_level = logging.CRITICAL
     base_data_dir = settings.TEST_DATA_DIR
+    base_recordings_dir = settings.TEST_RECORDINGS_DIR
 
     async def do_async(self, func, *args):
         await func(*args)
@@ -53,6 +54,7 @@ class BaseTestCase(TestCase):
         self.assertTrue(file_path.exists(), msg='%s does not exist' % file_path)
         with file_path.open(mode=mode) as f:
             actual_contents = f.read()
+            print(actual_contents)
             self.assertEqual(actual_contents, expected_contents)
 
     def assertBinaryFileContentsEqual(self, file_path: Path, expected_contents: bytes):

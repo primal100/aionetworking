@@ -13,19 +13,19 @@ class BaseSFTPTestCase(BaseReceiverTestCase):
         msgs = [TCAP_MAP_ASNProtocol.decode_one(binascii.unhexlify(msg)) for msg in self.messages]
         path = self.base_data_dir.joinpath('tmp')
         path.mkdir(parents=True, exist_ok=True)
-        self.messages = []
+        """self.messages = []
         for i, msg in enumerate(msgs):
             file_path = path.joinpath("msg_%s" % i)
             self.messages.append(file_path)
-            file_path.write_bytes(msg)
+            file_path.write_bytes(msg)"""
 
     async def send_three_clients(self, msg1, msg2, msg3):
         client1 = self.get_sender(srcip='127.0.0.1')
         client2 = self.get_sender(srcip='127.0.0.2')
         client3 = self.get_sender(srcip='127.0.0.3')
         async with client1, client2:
-            await client1.send_msg(msg1)
-            await client2.send_msg(msg2)
+            await client1.send_hex(msg1)
+            await client2.send_hex(msg2)
         try:
             await client3.start()
             raise AssertionError('ConnectionResetError not raised by client3')
@@ -33,10 +33,10 @@ class BaseSFTPTestCase(BaseReceiverTestCase):
             pass
         await asyncio.sleep(3)
 
-    async def send_multiple_messages(self):
+    """async def send_multiple_messages(self):
         client = self.get_sender(srcip='127.0.0.1')
         async with client:
-            await client.send_msgs(self.messages)
+            await client.send_msgs(self.messages)"""
 
 
 class TestSFTPServer(BaseSFTPTestCase):
@@ -72,3 +72,8 @@ class TestTCPServerBufferedFileStorage(BaseSFTPTestCase):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
         self.assertMultipleMessagesSameSenderOK(expected_file, directory)
+
+    def test_03_play_recording(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
+        directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        self.assertRecordingOK(expected_file, directory)

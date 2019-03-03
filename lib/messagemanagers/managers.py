@@ -31,6 +31,7 @@ class BaseMessageManager:
         'allowedsenders': tuple,
         'aliases': dict,
         'generate_timestamp': bool,
+        'timeout': int
     }
 
     @classmethod
@@ -52,7 +53,7 @@ class BaseMessageManager:
 
     def __init__(self, protocol: Type[BaseProtocol], actions: Sequence = (), pre_actions: Sequence = (),
                  generate_timestamp: bool = False, aliases: Mapping = None, allowedsenders: Sequence = (),
-                 logger_name: str = 'receiver'):
+                 timeout:int = 5, logger_name: str = 'receiver'):
         self.log = logging.getLogger(logger_name)
         self.raw_log = logging.getLogger("%s.raw" % logger_name)
         self.msg_log = logging.getLogger("%s.message" % logger_name)
@@ -62,6 +63,7 @@ class BaseMessageManager:
         self.pre_actions = pre_actions
         self.aliases = aliases or {}
         self.allowed_senders = allowedsenders
+        self.timeout = 5
         self.task_counter = TaskCounter()
 
     def get_alias(self, sender: str):
@@ -103,10 +105,15 @@ class BaseMessageManager:
         raise NotImplementedError
 
     async def close(self):
-        self.log.debug('Closing %s', self.name)
-        await self.task_counter.wait()
+        self.log.debug('Waiting for %s tasks to complete', self.name)
+        try:
+            await asyncio.wait_for(self.task_counter.wait(), self.timeout)
+        except asyncio.TimeoutError:
+            self.log.error("%s closed with %s tasks remaining", self.name, self.task_counter.num)
+        self.log.debug('Waiting for %s actions to complete', self.name)
         for action in self.actions:
             await action.close()
+        self.log.debug('Waiting for %s pre-actions to complete', self.name)
         for action in self.pre_actions:
             await action.close()
         self.log.debug('%s closed', self.name)

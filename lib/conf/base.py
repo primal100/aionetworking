@@ -20,7 +20,6 @@ class BaseConfigClass:
             'Userhome': settings.USER_HOME,
             "~": settings.USER_HOME,
             'Osdatadir': settings.OSDATA_DIR,
-            'timestamp': now_to_utc_string()
         }
         self.defaults.update({
             'appname': settings.APP_NAME.replace(' ', '').lower(),

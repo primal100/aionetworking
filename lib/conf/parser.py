@@ -12,8 +12,11 @@ class INIFileConfig(BaseConfigClass):
 
     def __init__(self, *file_names: Path, **kwargs):
         super(INIFileConfig, self).__init__(**kwargs)
-        self.config = ConfigParser(defaults=self.defaults, interpolation=ExtendedInterpolation())
+        self.config = ConfigParser(interpolation=ExtendedInterpolation())
+        self.config.read_dict({'Dirs': self.defaults})
         self.config.read(file_names)
+        additional_config_files = list(self.config['ConfigFiles'].values())
+        self.config.read(additional_config_files)
 
     @property
     def receiver(self) -> str:

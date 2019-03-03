@@ -11,6 +11,7 @@ logger = logging.getLogger(settings.LOGGER_NAME)
 class TestUDPServer(BaseReceiverTestCase):
     change_loop_policy = False
     config_file = 'udp_server_test_setup.ini'
+    delay = 0.2
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost_00000001.TCAP_MAP')
@@ -26,6 +27,7 @@ class TestUDPServer(BaseReceiverTestCase):
 class TestUDPServerBufferedFileStorage(BaseReceiverTestCase):
     config_file = 'udp_server_buffered_storage_test_setup.ini'
     change_loop_policy = False
+    delay = 0.2
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
@@ -40,10 +42,9 @@ class TestUDPServerBufferedFileStorage(BaseReceiverTestCase):
     def test_02_multiple_from_same_client(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
-        self.assertMultipleMessagesSameSenderOK(expected_file, directory, delay=0.2)
+        self.assertMultipleMessagesSameSenderOK(expected_file, directory)
 
     def test_03_play_recording(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP', 'localhost.TCAP_MAP')
         directory = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
-        path = Path(settings.TESTS_DIR, 'recordings', 'localhost.recording')
-        self.assertRecordingOK(path, expected_file, directory, delay=0.2)
+        self.assertRecordingOK(expected_file, directory)
