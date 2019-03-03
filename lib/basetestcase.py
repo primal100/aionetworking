@@ -54,7 +54,6 @@ class BaseTestCase(TestCase):
         self.assertTrue(file_path.exists(), msg='%s does not exist' % file_path)
         with file_path.open(mode=mode) as f:
             actual_contents = f.read()
-            print(actual_contents)
             self.assertEqual(actual_contents, expected_contents)
 
     def assertBinaryFileContentsEqual(self, file_path: Path, expected_contents: bytes):

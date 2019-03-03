@@ -28,8 +28,21 @@ class TestDirectoryMonitor(BaseDirectoryMonitorTestCase):
         self.assertSendOneMsgOk(expected_file)
 
 
-class TestDirectoryMonitorBufferedFileStorage(BaseDirectoryMonitorTestCase):
-    config_file = 'directory_monitor_buffered_storage_test_setup.ini'
+class TestDirectoryMonitorBufferedFileStorageFilenameSort(BaseDirectoryMonitorTestCase):
+    config_file = 'directory_monitor_buffered_storage_test_setup_sort_filename.ini'
+
+    def test_00_one_msg(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        self.assertSendOneMsgOk(expected_file)
+
+    def test_01_multiple(self):
+        expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')
+        directory = Path(self.base_data_dir, 'Encoded')
+        self.assertMultipleMessagesSameSenderOK(expected_file, directory)
+
+
+class TestDirectoryMonitorBufferedFileStorageCreatedSortConcatenate(BaseDirectoryMonitorTestCase):
+    config_file = 'directory_monitor_buffered_storage_test_setup_sort_created.ini'
 
     def test_00_one_msg(self):
         expected_file = Path(self.base_data_dir, 'Encoded', 'TCAP_MAP')

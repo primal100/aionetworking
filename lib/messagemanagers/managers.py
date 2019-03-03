@@ -80,10 +80,10 @@ class BaseMessageManager:
         for action in self.pre_actions:
             await action.do_one(buffer)
 
-    def handle_message(self, sender: str, data: AnyStr):
+    def handle_message(self, sender: str, data: AnyStr, timestamp=None):
         self.log.debug("Handling buffer from %s", sender, extra={'sender': sender})
         self.raw_log.debug(data, extra={'sender': sender})
-        timestamp = datetime.datetime.now()
+        timestamp = timestamp or datetime.datetime.now()
         if self.pre_actions:
             self.task_counter.create_task(self.do_pre_actions(sender, data, timestamp))
         msgs = self.make_messages(sender, data, timestamp)
