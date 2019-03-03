@@ -44,7 +44,7 @@ class SFTPClient(BaseNetworkClient):
         self.sftp_kwargs.update(sftp_kwargs)
         super(SFTPClient, self).__init__(*args, port=port, srcport=srcport, **kwargs)
         self.mode = 'ba' if self.manager.protocol.binary else 'a'
-        self.removetmpfiles = removetmpfiles
+        self.remove_tmp_files = removetmpfiles
 
     async def open_connection(self, **kwargs):
         self.conn, self.sftp_client = await asyncssh.create_connection(
@@ -88,5 +88,5 @@ class SFTPClient(BaseNetworkClient):
         with file_path.open(self.mode) as f:
             f.write(data)
         await self.put(file_path)
-        if self.removetmpfiles:
+        if self.remove_tmp_files:
             file_path.unlink()

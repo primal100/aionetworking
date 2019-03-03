@@ -110,10 +110,21 @@ class BaseSender:
     async def send_hex(self, hex_msg: AnyStr):
         await self.send_msg(binascii.unhexlify(hex_msg))
 
-    async def send_msgs(self, msgs:Sequence[bytes]):
+    async def send_msgs2(self, msgs:Sequence[bytes]):
         for msg in msgs:
             await self.send_msg(msg)
             await asyncio.sleep(0.001)
+
+    async def send_msgs(self, msgs: Sequence[bytes]):
+        tasks = []
+        for msg in msgs:
+            task = asyncio.create_task(self.send_msg(msg))
+            tasks.append(task)
+        await asyncio.wait(tasks)
+
+        #for msg in msgs:
+        #    await self.send_msg(msg)
+        #    await asyncio.sleep(0.001)
 
     async def send_hex_msgs(self, hex_msgs:Sequence[AnyStr]):
         await self.send_msgs([binascii.unhexlify(hex_msg) for hex_msg in hex_msgs])

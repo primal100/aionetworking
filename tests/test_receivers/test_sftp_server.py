@@ -13,11 +13,6 @@ class BaseSFTPTestCase(BaseReceiverTestCase):
         msgs = [TCAP_MAP_ASNProtocol.decode_one(binascii.unhexlify(msg)) for msg in self.messages]
         path = self.base_data_dir.joinpath('tmp')
         path.mkdir(parents=True, exist_ok=True)
-        """self.messages = []
-        for i, msg in enumerate(msgs):
-            file_path = path.joinpath("msg_%s" % i)
-            self.messages.append(file_path)
-            file_path.write_bytes(msg)"""
 
     async def send_three_clients(self, msg1, msg2, msg3):
         client1 = self.get_sender(srcip='127.0.0.1')
@@ -32,11 +27,6 @@ class BaseSFTPTestCase(BaseReceiverTestCase):
         except ConnectionResetError:
             pass
         await asyncio.sleep(3)
-
-    """async def send_multiple_messages(self):
-        client = self.get_sender(srcip='127.0.0.1')
-        async with client:
-            await client.send_msgs(self.messages)"""
 
 
 class TestSFTPServer(BaseSFTPTestCase):

@@ -11,10 +11,11 @@ from lib.utils import log_exception
 
 class DirectoryMonitor(BaseReceiver):
     configurable = {'directory': Path, 'glob': str, 'rglob': str, 'scan_interval': int,
-                    'check_finished': int, 'sort': str, 'concatenate': bool, 'timeout': int}
+                    'check_finished': int, 'sort': str, 'concatenate': bool, 'remove_tmp_files': bool,
+                    'timeout': int}
 
     def __init__(self, *args, directory, glob=None, rglob=None, scan_interval=0.005, check_finished=0.1,
-                 sort: str = None, timeout: int = 5, concatenate = False, remove_tmp_files: bool = False,**kwargs):
+                 sort: str = None, timeout: int = 5, concatenate = False, remove_tmp_files: bool = True,**kwargs):
         super(DirectoryMonitor, self).__init__(*args, **kwargs)
         self.method = directory.rglob if rglob else directory.glob if glob else directory.iterdir
         self.args = (rglob,) if rglob else (glob,) if glob else ()
@@ -61,6 +62,7 @@ class DirectoryMonitor(BaseReceiver):
             except FileNotFoundError:
                 pass
             await asyncio.sleep(self.check_finished)
+        self.logger.debug('Got data for file: %s. %s', path, stat)
         return {'path': path, 'ctime': stat.st_ctime, 'data': data}
 
     def find(self):
