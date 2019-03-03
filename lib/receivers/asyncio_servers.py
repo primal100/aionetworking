@@ -1,7 +1,7 @@
 import asyncio
 
 from .base import BaseServer
-from lib.connection_protocols.asyncio_protocols import TCPServerProtocol, UDPServerProtocol
+from lib.networking.asyncio_protocols import TCPServerProtocol, UDPServerProtocol
 from lib.conf import ConfigurationException
 
 

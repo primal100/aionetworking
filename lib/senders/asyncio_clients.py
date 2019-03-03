@@ -1,7 +1,7 @@
 import asyncio
 
 from lib.conf import ConfigurationException
-from lib.connection_protocols.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
+from lib.networking.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
 from .base import BaseNetworkClient, SSLSupportedNetworkClient
 
 

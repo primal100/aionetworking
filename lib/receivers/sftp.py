@@ -5,8 +5,8 @@ import logging
 from passlib.hash import pbkdf2_sha256
 
 from lib import settings
-from lib.wrappers.ordered_dict import DictQueue
-from lib.connection_protocols.asyncio_protocols import TCPServerProtocol
+from lib.wrappers.futures import NamedFutures
+from lib.networking.asyncio_protocols import TCPServerProtocol
 from .asyncio_servers import TCPServerReceiver
 from .exceptions import ServerException
 
@@ -15,10 +15,8 @@ from pathlib import Path
 
 
 class SFTPFactory(asyncssh.SFTPServer):
-    logger_name = 'receiver'
 
-    def __init__(self, conn, receiver):
-        self.logger = logging.getLogger(self.logger_name)
+    def __init__(self, conn, receiver, logger_name='receiver'):
         self.connection_protocol = conn._owner
         if receiver.chroot:
             root = receiver.base_upload_dir.joinpath(conn.get_extra_info('username'))
@@ -26,6 +24,7 @@ class SFTPFactory(asyncssh.SFTPServer):
             super().__init__(conn, chroot=root)
         else:
             super().__init__(conn)
+        self.logger = logging.getLogger(logger_name)
         self.receiver = receiver
         self.manager = receiver.manager
         self.remove_tmp_files = self.receiver.remove_tmp_files
@@ -34,7 +33,7 @@ class SFTPFactory(asyncssh.SFTPServer):
     def handle_file(self, name, data):
         path = Path(name)
         timestamp = datetime.datetime.fromtimestamp(path.stat().st_ctime)
-        self.connection_protocol.data_received(data, timestamp=timestamp)
+        self.connection_protocol.on_data_received(data, timestamp=timestamp)
         if self.remove_tmp_files:
             path.unlink()
             self.logger.debug('File %s removed', path)
@@ -46,49 +45,42 @@ class SFTPFactory(asyncssh.SFTPServer):
             data = f.read()
         return data
 
+    def on_close(self, file_obj, data):
+        self.handle_file(file_obj.name, data)
+
     def close(self, file_obj):
         super(SFTPFactory, self).close(file_obj)
         self.logger.debug('File upload complete: %s', file_obj.name)
         data = self.read_file(file_obj)
-        self.handle_file(file_obj.name, data)
+        self.on_close(file_obj, data)
 
 
 class OrderedSFTPFactory(SFTPFactory):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.concatenate = self.receiver.concatenate
-        self.sort = self.receiver.sort
-        self.futures = DictQueue()
+        self.futures = NamedFutures()
         self.process_task = asyncio.create_task(self.process_files())
 
     async def process_files(self):
-        name, fut = await self.futures.get_next()
-        data = await fut
-        self.handle_file(name, data)
+        name, result = await self.futures.wait_one()
+        self.handle_file(name, result)
         await self.process_files()
 
     def open(self, *args, **kwargs):
         file_obj = super(OrderedSFTPFactory, self).open(*args, **kwargs)
-        self.futures[file_obj.name] = asyncio.Future()
+        self.futures.new(file_obj.name)
         return file_obj
 
-    def close(self, file_obj):
-        super(OrderedSFTPFactory, self).close(file_obj)
-        data = self.read_file(file_obj)
-        self.futures[file_obj.name].set_result(data)
+    def on_close(self, file_obj, data):
+        self.futures.set_result(file_obj.name, data)
 
 
 class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
-    logger_name = 'receiver'
 
-    def __init__(self, receiver, logger=None):
-        super(SSHServer, self).__init__(receiver.manager, logger_name=self.logger_name)
+    def __init__(self, receiver):
+        super(SSHServer, self).__init__(receiver.manager, logger_name=receiver.logger_name)
         self.receiver = receiver
-        if logger:
-            self.logger = logger
-        else:
-            self.logger = logger.getLogger(self.logger_name)
 
     def send(self, msg):
         raise ServerException('Unable to send messages with this receiver')
@@ -140,9 +132,8 @@ class SFTPServer(TCPServerReceiver):
 
     def __init__(self, manager, *args, port=asyncssh.connection._DEFAULT_PORT, chroot: bool=True, sftploglevel=1,
                  baseuploaddir: Path = settings.HOME.joinpath('sftp'), remove_tmp_files: bool = True,
-                 order_by_file_open=False,
-                 allowscp: bool=False, hostkey: Path=(), passphrase: str = None, authorizedkeys: Path=None,
-                 sftp_kwargs=None, **kwargs):
+                 orderbyfileopen=False, allowscp: bool=False, hostkey: Path=(), passphrase: str = None,
+                 authorizedkeys: Path=None, sftp_kwargs=None, **kwargs):
         asyncssh.logging.set_debug_level(sftploglevel)
         self.chroot = chroot
         super(TCPServerReceiver, self).__init__(manager, *args, port=port, **kwargs)
@@ -155,7 +146,7 @@ class SFTPServer(TCPServerReceiver):
         self.public_key_auth_supported = bool(authorizedkeys)
         sftp_kwargs = sftp_kwargs or {}
         self.sftp_kwargs.update(sftp_kwargs)
-        self.order_by_file_open = order_by_file_open
+        self.order_by_file_open = orderbyfileopen
         self.allow_scp = allowscp
         self.base_upload_dir = baseuploaddir
         self.base_upload_dir.mkdir(parents=True, exist_ok=True)
@@ -168,7 +159,7 @@ class SFTPServer(TCPServerReceiver):
         return SFTPFactory
 
     async def get_server(self):
-        return await asyncssh.create_server(lambda: self.protocol(self, logger=self.logger), self.host, self.port,
+        return await asyncssh.create_server(lambda: self.protocol(self), self.host, self.port,
                                             sftp_factory=lambda conn: self.sftp_factory_cls(conn, self), **self.sftp_kwargs)
 
 

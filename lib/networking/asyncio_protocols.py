@@ -36,7 +36,7 @@ class BaseProtocolMixin:
     def __init__(self, manager: BaseMessageManager, logger_name=None):
         logger_name = logger_name or self.logger_name
         self.manager = manager
-        self.log = logging.getLogger(logger_name)
+        self.logger = logging.getLogger(logger_name)
         self.stats_log = logging.getLogger("%s.stats" % logger_name)
 
     @property
@@ -89,7 +89,7 @@ class BaseProtocolMixin:
         sock = self.transport.get_extra_info('sockname')
         connection_ok = self.define_sock_peer(sock, peer)
         if connection_ok:
-            self.log.info('New %s connection from %s to %s', self.name, self.client, self.server)
+            self.logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
     def define_sock_peer(self, sock, peer):
         self.peer_ip = peer[0]
@@ -108,11 +108,11 @@ class BaseProtocolMixin:
 
     def manage_error(self, exc):
         if exc:
-            self.log.error(log_exception(exc))
+            self.logger.error(log_exception(exc))
 
     def connection_lost(self, exc):
         self.manage_error(exc)
-        self.log.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
+        self.logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
         if self.stats_log.isEnabledFor(logging.INFO):
             self.check_last_message_processed()
 
@@ -145,14 +145,14 @@ class BaseProtocolMixin:
             if self.transport.is_closing():
                 self.check_last_message_processed()
 
-    def on_data_received(self, data):
-        self.log.debug("Received msg from %s", self.alias)
+    def on_data_received(self, data, timestamp=None):
+        self.logger.debug("Received msg from %s", self.alias)
         if self.stats_log.isEnabledFor(logging.INFO):
             if not self.first_message_received:
                 self.first_message_received = time.time()
             self.received_msgs += 1
             self.received_bytes += len(data)
-        task = self.manager.handle_message(self.alias, data)
+        task = self.manager.handle_message(self.alias, data, timestamp=timestamp)
         task.add_done_callback(self.task_callback)
 
 

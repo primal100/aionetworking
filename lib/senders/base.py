@@ -1,9 +1,10 @@
 import asyncio
 import binascii
 import logging
-import ssl
 
-from lib import utils, settings
+
+from lib import settings
+from lib.networking.ssl import get_client_context
 from lib.utils import Record
 
 from typing import TYPE_CHECKING, Sequence, AnyStr
@@ -110,21 +111,20 @@ class BaseSender:
     async def send_hex(self, hex_msg: AnyStr):
         await self.send_msg(binascii.unhexlify(hex_msg))
 
-    async def send_msgs2(self, msgs:Sequence[bytes]):
+    async def send_msgs_sequential(self, msgs:Sequence[bytes]):
         for msg in msgs:
             await self.send_msg(msg)
             await asyncio.sleep(0.001)
 
-    async def send_msgs(self, msgs: Sequence[bytes]):
+    async def send_msgs_parallel(self, msgs: Sequence[bytes]):
         tasks = []
         for msg in msgs:
             task = asyncio.create_task(self.send_msg(msg))
             tasks.append(task)
         await asyncio.wait(tasks)
 
-        #for msg in msgs:
-        #    await self.send_msg(msg)
-        #    await asyncio.sleep(0.001)
+    async def send_msgs(self, msgs):
+        await self.send_msgs_sequential(msgs)
 
     async def send_hex_msgs(self, hex_msgs:Sequence[AnyStr]):
         await self.send_msgs([binascii.unhexlify(hex_msg) for hex_msg in hex_msgs])
@@ -219,35 +219,5 @@ class SSLSupportedNetworkClient(BaseNetworkClient):
                 hostnamecheck: bool=True, sslhandshaketimeout: int=None, **kwargs):
         super(SSLSupportedNetworkClient, self).__init__(*args, **kwargs)
         self.ssl_handshake_timeout = sslhandshaketimeout
-        self.ssl = self.manage_ssl_params(ssl, sslcert, sslkey, sslkeypassword, servercertfile, servercertspath, servercertsdata,
-                                          certrequired, hostnamecheck)
-
-    def manage_ssl_params(self, context, cert: Path, key: Path, sslkeypassword: str, cafile: Path, capath: Path, cadata: str,
-                          certrequired: bool, hostnamecheck: bool):
-        if context:
-            self.logger.info("Setting up SSL")
-            if context is True:
-                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-
-                if cert and key:
-                    self.logger.info("Using SSL Cert: %s", cert)
-                    context.load_cert_chain(str(cert), str(key), password=sslkeypassword)
-
-                context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
-                context.check_hostname = hostnamecheck
-
-                if context.verify_mode != ssl.CERT_NONE:
-                    if cafile or capath or cadata:
-                        locations = {'cafile': str(cafile) if cafile else None,
-                                     'capath': str(capath) if capath else None,
-                                     'cadata': cadata}
-                        context.load_verify_locations(**locations)
-                        self.logger.info("Verifying SSL certs with: %s", locations)
-                    else:
-                        context.load_default_certs(ssl.Purpose.SERVER_AUTH)
-                        self.logger.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
-            self.logger.info("SSL Context loaded")
-            return context
-        else:
-            self.logger.info("SSL is not enabled")
-            return None
+        self.ssl = get_client_context(ssl, sslcert, sslkey, sslkeypassword, servercertfile, servercertspath,
+                                      servercertsdata, certrequired, hostnamecheck, self.logger)

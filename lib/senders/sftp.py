@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .base import BaseNetworkClient
 from lib import settings
-from lib.connection_protocols.asyncio_protocols import TCPClientProtocol
+from lib.networking.asyncio_protocols import TCPClientProtocol
 from lib.conf import RawStr
 from .exceptions import ClientException
 
@@ -90,3 +90,6 @@ class SFTPClient(BaseNetworkClient):
         await self.put(file_path)
         if self.remove_tmp_files:
             file_path.unlink()
+
+    async def send_msgs(self, msgs):
+        await self.send_msgs_sequential(msgs)
