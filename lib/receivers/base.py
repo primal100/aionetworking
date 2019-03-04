@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from lib import settings
+from lib.conf import RawStr
 from lib.networking.ssl import get_server_context
 from lib.conf import ConfigurationException
 
@@ -16,7 +17,13 @@ else:
 
 class BaseReceiver:
     receiver_type: str = ''
-    configurable = {'quiet': bool, 'stats_interval': int}
+    configurable = {
+        'quiet': bool,
+        'statsinterval': int,
+        'statsattrs': tuple,
+        'timestrf': RawStr,
+        'secondsdivideby': int
+    }
 
     @classmethod
     def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
@@ -28,11 +35,16 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, **config)
 
-    def __init__(self, manager, quiet: bool=False, stats_interval: int = 0, logger_name: str = 'receiver'):
+    def __init__(self, manager, quiet: bool=False, statsinterval: int = 0, statsattrs: tuple = (),
+                 timestrf:str = None, secondsdivideby: int = 1, logger_name: str = 'receiver'):
         self.quiet = quiet
         self.logger = logging.getLogger(logger_name)
-        self.stats_interval = stats_interval
         self.manager = manager
+        self.protocol_kwargs = {'stats_interval': statsinterval,
+                                'stats_attrs': statsattrs,
+                                'time_strf': timestrf,
+                                'seconds_divide_by': secondsdivideby,
+                                'logger_name': logger_name}
 
     async def started(self):
         return True

@@ -30,10 +30,12 @@ class BaseProtocolMixin:
     peer_port: int = 0
     transport = None
 
-    def __init__(self, manager: BaseMessageManager, stats_interval=0, logger_name=None):
+    def __init__(self, manager: BaseMessageManager, stats_interval=0, stats_attrs=None,
+                 time_strf=None, seconds_divide_by=1, logger_name=None):
         self.logger_name = logger_name or self.logger_name
+        self.stats_args = (stats_attrs,)
+        self.stats_kwargs = {'interval': stats_interval, 'time_strf': time_strf, 'seconds_divide_by': seconds_divide_by}
         self.manager = manager
-        self.stats_interval = stats_interval
 
     def get_logger_extra(self):
         return {'protocol_name': self.name,
@@ -47,7 +49,7 @@ class BaseProtocolMixin:
     def get_stats_logger(self, extra):
         logger = logging.getLogger("%s.stats" % self.logger_name)
         if logger.isEnabledFor(logging.INFO):
-            return StatsLogger(logger, extra, self.transport, interval=self.stats_interval)
+            return StatsLogger(logger, extra, *self.stats_args, self.transport, **self.stats_kwargs)
         return NoStatsLogger(logger, extra)
 
     def get_logger(self, extra):

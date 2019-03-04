@@ -20,7 +20,7 @@ class BaseAsyncioMixin:
         raise NotImplementedError
 
     def get_protocol(self):
-        return self.protocol_cls(self.manager, stats_interval=self.stats_interval)
+        return self.protocol_cls(self.manager, **self.protocol_kwargs)
 
 
 class TCPClient(BaseAsyncioMixin, SSLSupportedNetworkClient):

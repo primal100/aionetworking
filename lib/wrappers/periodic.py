@@ -8,15 +8,18 @@ def get_next_time(delay):
     start_time = datetime(now.year, now.month, now.day, hour, 0, 0)
     while start_time < now + timedelta(minutes=1):
         start_time += timedelta(minutes=delay)
-    return start_time
+    td = (start_time - now).total_seconds()
+    return td
 
 
-def _call_cb_at(start_time, delay, callback, *args):
-    asyncio.get_event_loop().call_at(start_time, _call_cb_now, delay, callback, True, *args)
+def _call_cb_at(seconds_from_now, delay, callback, *args):
+    loop = asyncio.get_event_loop()
+    start_time = loop.time() + seconds_from_now
+    loop.call_at(start_time, _call_cb_now, delay, callback, True, *args)
 
 
 def _call_cb_later(delay, callback, *args):
-    asyncio.get_event_loop().call_later(delay, _call_cb_now, delay, callback, *args)
+    asyncio.get_event_loop().call_later(delay * 60, _call_cb_now, delay, callback, *args)
 
 
 def _call_cb_now(delay, callback, first, *args):

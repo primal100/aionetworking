@@ -11,7 +11,7 @@ class TCPServerReceiver(BaseServer):
 
     async def get_server(self):
         return await asyncio.get_event_loop().create_server(
-            lambda: TCPServerProtocol(self.manager, stats_interval=self.stats_interval),
+            lambda: TCPServerProtocol(self.manager, **self.protocol_kwargs),
             self.host, self.port, ssl=self.ssl_context, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
     async def start_server(self):
@@ -42,7 +42,8 @@ class UDPServerReceiver(BaseServer):
         if loop.__class__.__name__ == 'ProactorEventLoop':
             raise ConfigurationException('UDP Server cannot be run on Windows Proactor Loop. Use Selector Loop instead')
         self.transport, self.protocol = await loop.create_datagram_endpoint(
-            lambda: UDPServerProtocol(self.manager, stats_interval=self.stats_interval), local_addr=(self.host, self.port))
+            lambda: UDPServerProtocol(self.manager, **self.protocol_kwargs),
+            local_addr=(self.host, self.port))
         self.print_listening_message([self.transport.get_extra_info('socket')])
         await self.protocol.check_senders_expired(self.expiry_minutes)
 

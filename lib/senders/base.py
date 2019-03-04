@@ -2,7 +2,7 @@ import asyncio
 import binascii
 import logging
 
-
+from lib.conf import RawStr
 from lib import settings
 from lib.networking.ssl import get_client_context
 from lib.utils import Record
@@ -19,7 +19,10 @@ class BaseSender:
     sender_type: str
     configurable = {
         'interval': float,
-        'stats_interval': int
+        'statsinterval': int,
+        'statsattrs': tuple,
+        'timestrf':RawStr,
+        'secondsdivideby': int
     }
 
     @classmethod
@@ -34,7 +37,8 @@ class BaseSender:
         return cls(manager, queue=queue, **config)
 
     def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0,
-                 stats_interval: int = 0, logger_name: str = 'sender'):
+                 statsinterval: int = 0, statsattrs: tuple=(), timestrf:str = None, secondsdivideby: int = 1,
+                 logger_name: str = 'sender'):
         self.logger_name = logger_name
         self.logger = logging.getLogger(logger_name)
         self.raw_log = logging.getLogger("%s.raw" % logger_name)
@@ -42,7 +46,11 @@ class BaseSender:
         self.protocol = manager.protocol
         self.queue = queue
         self.interval = interval
-        self.stats_interval = stats_interval
+        self.protocol_kwargs = {'stats_interval': statsinterval,
+                                'stats_attrs': statsattrs,
+                                'time_strf': timestrf,
+                                'seconds_divide_by': secondsdivideby,
+                                'logger_name': logger_name}
         if self.queue:
             self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
         else:
