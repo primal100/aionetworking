@@ -16,7 +16,7 @@ else:
 
 class BaseReceiver:
     receiver_type: str = ''
-    configurable = {'quiet': bool}
+    configurable = {'quiet': bool, 'stats_interval': int}
 
     @classmethod
     def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
@@ -28,9 +28,10 @@ class BaseReceiver:
         config.update(kwargs)
         return cls(manager, **config)
 
-    def __init__(self, manager, quiet: bool=False, logger_name: str = 'receiver'):
+    def __init__(self, manager, quiet: bool=False, stats_interval: int = 0, logger_name: str = 'receiver'):
         self.quiet = quiet
         self.logger = logging.getLogger(logger_name)
+        self.stats_interval = stats_interval
         self.manager = manager
 
     async def started(self):

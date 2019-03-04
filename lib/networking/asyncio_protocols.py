@@ -1,9 +1,11 @@
 import asyncio
 from asyncio import transports
 import logging
+from functools import partial
 import time
 
 from lib import messagemanagers
+from .logging import ConnectionLogger, StatsLogger, NoStatsLogger
 from lib.utils import log_exception, addr_tuple_to_str
 
 from typing import TYPE_CHECKING
@@ -19,25 +21,38 @@ else:
 class BaseProtocolMixin:
     name: str = ''
     logger_name: str = ''
+    logger: None
+    stats_logger = None
     alias: str = ''
     peer: str = ''
     sock = (None, None)
     peer_ip: str = None
     peer_port: int = 0
     transport = None
-    sent_msgs: int = 0
-    sent_bytes: int = 0
-    received_msgs: int = 0
-    received_bytes: int = 0
-    processed_msgs: int = 0
-    first_message_received: float = 0
-    last_message_processed: float = 0
 
-    def __init__(self, manager: BaseMessageManager, logger_name=None):
-        logger_name = logger_name or self.logger_name
+    def __init__(self, manager: BaseMessageManager, stats_interval=0, logger_name=None):
+        self.logger_name = logger_name or self.logger_name
         self.manager = manager
-        self.logger = logging.getLogger(logger_name)
-        self.stats_log = logging.getLogger("%s.stats" % logger_name)
+        self.stats_interval = stats_interval
+
+    def get_logger_extra(self):
+        return {'protocol_name': self.name,
+                'peer_ip': self.peer_ip,
+                'peer_port': self.peer_port,
+                'peer': self.peer,
+                'client': self.client,
+                'server': self.server,
+                'alias': self.alias}
+
+    def get_stats_logger(self, extra):
+        logger = logging.getLogger("%s.stats" % self.logger_name)
+        if logger.isEnabledFor(logging.INFO):
+            return StatsLogger(logger, extra, self.transport, interval=self.stats_interval)
+        return NoStatsLogger(logger, extra)
+
+    def get_logger(self, extra):
+        logger = logging.getLogger("%s.connection" % self.logger_name)
+        return ConnectionLogger(logger, extra)
 
     @property
     def client(self):
@@ -47,38 +62,12 @@ class BaseProtocolMixin:
     def server(self):
         raise NotImplementedError
 
-    @property
-    def sent_kbs(self):
-        return self.sent_bytes / 1024
-
-    @property
-    def received_kbs(self):
-        return self.received_bytes / 1024
-
-    @property
-    def sent_mbs(self):
-        return self.sent_kbs / 1024
-
-    @property
-    def received_mbs(self):
-        return self.received_kbs / 1024
-
-    @property
-    def processing_time(self):
-        return self.last_message_processed - self.first_message_received
-
-    @property
-    def rate(self):
-        return self.received_kbs / self.processing_time
-
     def send(self, msg):
         raise NotImplementedError
 
     def send_msg(self, msg):
         self.send(msg)
-        if self.stats_log.isEnabledFor(logging.INFO):
-            self.sent_msgs += 1
-            self.sent_bytes += len(msg)
+        self.stats_logger.on_msg_sent(msg)
 
     def check_other(self, peer_ip):
         return self.manager.check_sender(peer_ip)
@@ -88,6 +77,9 @@ class BaseProtocolMixin:
         peer = self.transport.get_extra_info('peername')
         sock = self.transport.get_extra_info('sockname')
         connection_ok = self.define_sock_peer(sock, peer)
+        extra = self.get_logger_extra()
+        self.logger = self.get_logger(extra)
+        self.stats_logger = self.get_stats_logger(extra)
         if connection_ok:
             self.logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
@@ -106,54 +98,28 @@ class BaseProtocolMixin:
     def close_connection(self):
         self.transport.close()
 
-    def manage_error(self, exc):
-        if exc:
-            self.logger.error(log_exception(exc))
-
     def connection_lost(self, exc):
-        self.manage_error(exc)
+        self.logger.manage_error(exc)
         self.logger.info('%s connection from %s to %s has been closed', self.name, self.client, self.server)
-        if self.stats_log.isEnabledFor(logging.INFO):
-            self.check_last_message_processed()
+        self.stats_logger.connection_finished()
 
     def send_msgs(self, msgs):
         for msg in msgs:
             self.send_msg(msg)
 
-    @property
-    def stats_extra(self):
-        return {'peer_ip': self.peer_port, 'peer_port': self.peer_port, 'peer': self.peer, 'sock': self.sock,
-                'alias': self.alias, 'first_message_received': self.first_message_received,
-                'received_msgs': self.received_msgs,
-                'received_bytes': self.received_bytes, 'processed_msgs': self.processed_msgs,
-                'last_message_processed': self.last_message_processed}
-
-    def check_last_message_processed(self):
-        if self.received_msgs and self.received_msgs == self.processed_msgs:
-            self.stats_log.info('', extra=self.stats_extra)
-            #self.stats_log.info('%s kb from %s were processed in %2.2f ms, %2.2f kb/s', self.received_kbs, self.alias, seconds * 1000, rate)
-
-    def task_callback(self, future):
+    def task_callback(self, num_bytes, future):
         exc = future.exception()
-        self.manage_error(exc)
+        self.logger.manage_error(exc)
         responses = future.result()
         if responses:
             self.send_msgs(responses)
-        self.last_message_processed = time.time()
-        if self.stats_log.isEnabledFor(logging.INFO):
-            self.processed_msgs += 1
-            if self.transport.is_closing():
-                self.check_last_message_processed()
+        self.stats_logger.on_msg_processed(num_bytes)
 
     def on_data_received(self, data, timestamp=None):
         self.logger.debug("Received msg from %s", self.alias)
-        if self.stats_log.isEnabledFor(logging.INFO):
-            if not self.first_message_received:
-                self.first_message_received = time.time()
-            self.received_msgs += 1
-            self.received_bytes += len(data)
+        self.stats_logger.on_msg_received(data)
         task = self.manager.handle_message(self.alias, data, timestamp=timestamp)
-        task.add_done_callback(self.task_callback)
+        task.add_done_callback(partial(self.task_callback, len(data)))
 
 
 class TCP(BaseProtocolMixin, asyncio.Protocol):
@@ -191,7 +157,7 @@ class UDP(BaseProtocolMixin, asyncio.DatagramProtocol):
         self.transport.sendto(msg)
 
     def error_received(self, exc):
-        self.manage_error(exc)
+        self.logger.manage_error(exc)
 
 
 class ClientProtocolMixin:
@@ -235,9 +201,8 @@ class UDPServerClientProtocol(ServerProtocolMixin, UDP):
         self.transport.sendto(msg, addr=(self.peer_ip, self.peer_port))
 
     def connection_lost(self, exc):
-        self.manage_error(exc)
-        if self.stats_log.isEnabledFor(logging.INFO):
-            self.check_last_message_processed()
+        self.logger.manage_error(exc)
+        self.stats_logger.connection_finished()
 
     def close_connection(self):
         pass
@@ -256,16 +221,17 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
 
     def manage_error(self, exc):
         if exc:
-            self.log.error(log_exception(exc))
+            self.logger.error(log_exception(exc))
 
     @property
     def server(self) -> str:
         return self.sock
 
-    def __init__(self, manager: BaseMessageManager, logger_name=None):
+    def __init__(self, manager: BaseMessageManager, stats_interval=0, logger_name=None):
         self.logger_name = logger_name or self.logger_name
+        self.stats_interval = stats_interval
         self.manager = manager
-        self.log = logging.getLogger(self.logger_name)
+        self.logger = logging.getLogger(self.logger_name)
         self.clients = {}
         self.closed_event = asyncio.Event()
 
@@ -288,11 +254,12 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
         self.manage_error(exc)
 
     def new_sender(self, addr, src):
-        connection_protocol = self.client_protocol_class(self.manager, logger_name=self.logger_name)
+        connection_protocol = self.client_protocol_class(self.manager, stats_interval=self.stats_interval,
+                                                         logger_name=self.logger_name)
         connection_ok = connection_protocol.define_sock_peer(self.sock, addr)
         if connection_ok:
             self.clients[src] = connection_protocol
-            self.log.info('%s on %s started receiving messages from %s', self.name, self.server, src)
+            self.logger.info('%s on %s started receiving messages from %s', self.name, self.server, src)
             return connection_protocol
         return False
 

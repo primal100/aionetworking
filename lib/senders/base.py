@@ -18,7 +18,8 @@ else:
 class BaseSender:
     sender_type: str
     configurable = {
-        'interval': float
+        'interval': float,
+        'stats_interval': int
     }
 
     @classmethod
@@ -32,7 +33,8 @@ class BaseSender:
         config['logger_name'] = cp.logger_name
         return cls(manager, queue=queue, **config)
 
-    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0, logger_name: str = 'sender'):
+    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0,
+                 stats_interval: int = 0, logger_name: str = 'sender'):
         self.logger_name = logger_name
         self.logger = logging.getLogger(logger_name)
         self.raw_log = logging.getLogger("%s.raw" % logger_name)
@@ -40,6 +42,7 @@ class BaseSender:
         self.protocol = manager.protocol
         self.queue = queue
         self.interval = interval
+        self.stats_interval = stats_interval
         if self.queue:
             self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
         else:
