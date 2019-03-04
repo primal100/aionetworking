@@ -19,10 +19,6 @@ class BaseSender:
     sender_type: str
     configurable = {
         'interval': float,
-        'statsinterval': int,
-        'statsattrs': tuple,
-        'timestrf':RawStr,
-        'secondsdivideby': int
     }
 
     @classmethod
@@ -36,21 +32,13 @@ class BaseSender:
         config['logger_name'] = cp.logger_name
         return cls(manager, queue=queue, **config)
 
-    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0,
-                 statsinterval: int = 0, statsattrs: tuple=(), timestrf:str = None, secondsdivideby: int = 1,
-                 logger_name: str = 'sender'):
-        self.logger_name = logger_name
+    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0, logger_name: str = 'sender'):
         self.logger = logging.getLogger(logger_name)
         self.raw_log = logging.getLogger("%s.raw" % logger_name)
         self.manager = manager
         self.protocol = manager.protocol
         self.queue = queue
         self.interval = interval
-        self.protocol_kwargs = {'stats_interval': statsinterval,
-                                'stats_attrs': statsattrs,
-                                'time_strf': timestrf,
-                                'seconds_divide_by': secondsdivideby,
-                                'logger_name': logger_name}
         if self.queue:
             self.process_queue_task = asyncio.get_event_loop().create_task(self.process_queue_later())
         else:

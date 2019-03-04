@@ -1,11 +1,11 @@
-from logging import LoggerAdapter
+import logging
 from datetime import datetime
 
 from lib.utils import  log_exception
 from lib.wrappers.periodic import call_cb_periodic
 
 
-class ConnectionLogger(LoggerAdapter):
+class ConnectionLogger(logging.LoggerAdapter):
 
     def manage_error(self, exc):
         if exc:
@@ -107,7 +107,7 @@ class StatsTracker(dict):
         self.start_time = datetime.now()
 
 
-class NoStatsLogger(LoggerAdapter):
+class NoStatsLogger(logging.LoggerAdapter):
 
     def connection_started(self): ...
 
@@ -124,9 +124,42 @@ class StatsLogger(NoStatsLogger):
     _total_received: int = 0
     _total_processed: int = 0
     _first: bool = True
+    configs = {}
+    loggers = {}
+    configurable = {
+        'interval': int,
+        'attrs': tuple,
+        'timestrf': str,
+        'secondsdivideby': int
+    }
 
-    def __init__(self, logger, extra, attrs, transport, interval=0, time_strf=None, seconds_divide_by=1):
-        stats = StatsTracker(extra, attrs, time_strf=time_strf, seconds_divide_by=seconds_divide_by)
+    @classmethod
+    def from_config(cls, logger_name, *args, cp=None, **kwargs):
+        if logger_name in cls.loggers:
+            logger = cls.loggers[logger_name]
+            config = cls.loggers[logger_name]
+        else:
+            logger = logging.getLogger("%s.stats" % logger_name)
+            handler_name = "%s_stats" % logger_name
+            cls.loggers[logger_name] = logger
+            if logger.isEnabledFor(logging.INFO):
+                from lib import settings
+                cp = cp or settings.CONFIG
+                config = cp.section_as_dict('handler_%s' % handler_name, **cls.configurable)
+                base_logger = logging.getLogger(logger_name)
+                base_logger.debug('Found config for %s stats', logger_name)
+                cls.configs[logger_name] = config
+            else:
+                config = cls.configs[logger_name] = {}
+        if logger.isEnabledFor(logging.INFO):
+            if kwargs:
+                kwargs.update(config)
+                config = kwargs
+            return cls(logger, *args, **config)
+        return NoStatsLogger(logger, {})
+
+    def __init__(self, logger, extra, transport, attrs=(), interval=0, timestrf=None, secondsdivideby=1):
+        stats = StatsTracker(extra, attrs, time_strf=timestrf, seconds_divide_by=secondsdivideby)
         super().__init__(logger, stats)
         self.transport = transport
         if interval:

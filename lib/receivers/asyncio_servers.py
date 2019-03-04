@@ -8,10 +8,17 @@ from lib.conf import ConfigurationException
 class TCPServerReceiver(BaseServer):
     receiver_type = "TCP Server"
     ssl_allowed = True
+    protocol_cls = TCPServerProtocol
+
+    @classmethod
+    def from_config(cls, *args, cp=None, **kwargs):
+        instance = super().from_config(*args, cp=cp, **kwargs)
+        cls.protocol_cls = cls.protocol_cls.set_config(cp=cp, logger=instance.logger)
+        return instance
 
     async def get_server(self):
         return await asyncio.get_event_loop().create_server(
-            lambda: TCPServerProtocol(self.manager, **self.protocol_kwargs),
+            lambda: self.protocol_cls(self.manager),
             self.host, self.port, ssl=self.ssl_context, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
     async def start_server(self):
@@ -30,8 +37,15 @@ class UDPServerReceiver(BaseServer):
     receiver_type = "UDP Server"
     transport = None
     protocol = None
+    protocol_cls = UDPServerProtocol
     configurable = BaseServer.configurable.copy()
     configurable.update({'expiryminutes': int})
+
+    @classmethod
+    def from_config(cls, *args, cp=None, **kwargs):
+        instance = super().from_config(*args, **kwargs)
+        cls.protocol.set_config(cp=cp, logger=instance.logger)
+        return instance
 
     def __init__(self, *args, expiryminutes=30, **kwargs):
         super(UDPServerReceiver, self).__init__(*args, **kwargs)
@@ -42,7 +56,7 @@ class UDPServerReceiver(BaseServer):
         if loop.__class__.__name__ == 'ProactorEventLoop':
             raise ConfigurationException('UDP Server cannot be run on Windows Proactor Loop. Use Selector Loop instead')
         self.transport, self.protocol = await loop.create_datagram_endpoint(
-            lambda: UDPServerProtocol(self.manager, **self.protocol_kwargs),
+            lambda: self.protocol_cls(self.manager),
             local_addr=(self.host, self.port))
         self.print_listening_message([self.transport.get_extra_info('socket')])
         await self.protocol.check_senders_expired(self.expiry_minutes)

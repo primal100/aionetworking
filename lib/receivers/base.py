@@ -19,10 +19,6 @@ class BaseReceiver:
     receiver_type: str = ''
     configurable = {
         'quiet': bool,
-        'statsinterval': int,
-        'statsattrs': tuple,
-        'timestrf': RawStr,
-        'secondsdivideby': int
     }
 
     @classmethod
@@ -36,15 +32,10 @@ class BaseReceiver:
         return cls(manager, **config)
 
     def __init__(self, manager, quiet: bool=False, statsinterval: int = 0, statsattrs: tuple = (),
-                 timestrf:str = None, secondsdivideby: int = 1, logger_name: str = 'receiver'):
+                 logger_name: str = 'receiver'):
         self.quiet = quiet
         self.logger = logging.getLogger(logger_name)
         self.manager = manager
-        self.protocol_kwargs = {'stats_interval': statsinterval,
-                                'stats_attrs': statsattrs,
-                                'time_strf': timestrf,
-                                'seconds_divide_by': secondsdivideby,
-                                'logger_name': logger_name}
 
     async def started(self):
         return True
