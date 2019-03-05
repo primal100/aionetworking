@@ -11,7 +11,7 @@ from .base import BaseNetworkClient
 class BaseAsyncioClient(BaseNetworkClient):
     transport = None
     protocol_cls = None
-    connection_protocol = None
+    conn = None
 
     @classmethod
     def from_config(cls, *args, cp=None, config=None, **kwargs):
@@ -23,7 +23,7 @@ class BaseAsyncioClient(BaseNetworkClient):
         self.transport.close()
 
     async def send_data(self, encoded_data, **kwargs):
-        self.connection_protocol.send_msg(encoded_data)
+        self.conn.send_msg(encoded_data)
 
     async def open_connection(self):
         raise NotImplementedError
@@ -34,7 +34,7 @@ class TCPClient(TCP, BaseAsyncioClient):
     ssl_section_name = 'SSLClient'
     transport = None
     protocol_cls = TCPClientProtocol
-    connection_protocol = None
+    conn = None
     ssl_cls = ClientSideSSL
     configurable = BaseAsyncioClient.configurable.copy()
     configurable.update(TCP.configurable)
@@ -45,7 +45,7 @@ class TCPClient(TCP, BaseAsyncioClient):
         self.ssl_handshake_timeout = sslhandshaketimeout
 
     async def open_connection(self):
-        self.transport, self.connection_protocol = await asyncio.get_event_loop().create_connection(
+        self.transport, self.conn = await asyncio.get_event_loop().create_connection(
             partial(self.protocol_cls, self.manager), self.host, self.port, ssl=self.ssl,
             local_addr=self.localaddr, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
@@ -54,11 +54,11 @@ class UDPClient(BaseAsyncioClient):
     sender_type = "UDP Client"
     transport = None
     protocol_cls = UDPClientProtocol
-    connection_protocol = None
+    conn = None
 
     async def open_connection(self):
         loop = asyncio.get_event_loop()
         if loop.__class__.__name__ == 'ProactorEventLoop':
             raise ConfigurationException('UDP Server cannot be run on Windows Proactor Loop. Use Selector Loop instead')
-        self.transport, self.connection_protocol = await asyncio.get_event_loop().create_datagram_endpoint(
+        self.transport, self.conn = await asyncio.get_event_loop().create_datagram_endpoint(
             partial(self.protocol_cls, self.manager), remote_addr=(self.host, self.port), local_addr=self.localaddr)

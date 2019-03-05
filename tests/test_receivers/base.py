@@ -44,11 +44,11 @@ class BaseReceiverTestCase(BaseTestCase):
         for e in [t.exception() for t in completed]:
             if e:
                 raise e
-        await coro
+        await asyncio.wait_for(coro, timeout=5)
         status_change.clear()
         await asyncio.sleep(self.delay)
         server_task.cancel()
-        await asyncio.wait(pending)
+        await asyncio.wait(pending, timeout=5)
 
     async def send_one(self):
         client = self.get_sender()

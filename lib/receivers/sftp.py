@@ -95,38 +95,39 @@ class OrderedSFTPFactory(SFTPFactory):
 
 class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
 
-    def __init__(self, manager, logins=None, public_key_auth_supported=False, logger=None):
-        super(SSHServer, self).__init__(manager, logger=logger)
+    def __init__(self, manager, logins=None, public_key_auth_supported=False, **kwargs):
+        super().__init__(manager, **kwargs)
         self._public_key_auth_supported = public_key_auth_supported
-        self.logins = logins
+
 
     def send(self, msg):
         raise ServerException('Unable to send messages with this receiver')
 
+    def public_key_auth_supported(self):
+        return self._public_key_auth_supported
 
-class SSHServerPswPublicAuth(SSHServer):
+
+class BaseSSHServerPswAuth(SSHServer):
     hash_algorithm = pbkdf2_sha256
 
     def get_password(self, username: str) -> str:
-        return self.logins.get(username, raw=True)
+        raise NotImplementedError
 
     def begin_auth(self, username: str) -> bool:
         return True
 
     def password_auth_supported(self) -> bool:
-        return bool(self.logins)
+        return True
 
     def hash_password(self, password: str) -> str:
         return self.hash_algorithm.hash(password)
 
     def validate_password(self, username: str, password: str) -> bool:
         self.logger.debug('Beginning password authentication for user %s', username)
-        user_allowed = username in self.logins
-        if not user_allowed:
-            self.logger.info('SFTP User %s does not exist', username)
+        pw_hash = self.get_password(username)
+        if not pw_hash:
             return False
         self.logger.debug('Authorizing SFTP user %s', username)
-        pw_hash = self.get_password(username)
         authorized = self.hash_algorithm.verify(password, pw_hash)
         if not authorized:
             self.logger.info('SFTP Login with user %s failed', username)
@@ -134,8 +135,17 @@ class SSHServerPswPublicAuth(SSHServer):
             self.logger.debug('SFTP User % successfully authorized', username)
         return authorized
 
-    def public_key_auth_supported(self):
-        return self._public_key_auth_supported
+
+class SSHServerPswAuthSectionLogins(BaseSSHServerPswAuth):
+    def __init__(self, *args, logins=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logins = logins
+
+    def get_password(self, username: str) -> str:
+        return self.logins.get(username, raw=True)
+
+    def password_auth_supported(self) -> bool:
+        return bool(self.logins)
 
 
 class SFTPServer(BaseTCPServerReceiver):
@@ -171,18 +181,18 @@ class SFTPServer(BaseTCPServerReceiver):
         self.allow_scp = allowscp
 
     async def get_server(self):
-        return await asyncssh.create_server(partial(self.protocol_cls, **self.connection_kwargs), self.host,
+        return await asyncssh.create_server(partial(self.protocol_cls, self.manager, **self.connection_kwargs), self.host,
                                             self.port, sftp_factory=self.factory, **self.sftp_kwargs)
 
 
-class SFTPServerPswPublicAuth(SFTPServer):
-    protocol = SSHServerPswPublicAuth
+class SFTPServerPswAuth(SFTPServer):
+    protocol_cls = SSHServerPswAuthSectionLogins
 
     configurable = SFTPServer.configurable.copy()
     configurable.update({'logins': dict})
 
     def __init__(self, manager, logins: Mapping[str, str]=None, *args, **kwargs):
-        super(SFTPServerPswPublicAuth, self).__init__(manager, *args, **kwargs)
+        super(SFTPServerPswAuth, self).__init__(manager, *args, **kwargs)
         self.connection_kwargs['logins'] = logins
 
 

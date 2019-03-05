@@ -1,9 +1,10 @@
 import asyncssh
 import os
 import binascii
+from functools import partial
 from pathlib import Path
 
-from .base import BaseNetworkClient
+from .asyncio_clients import BaseAsyncioClient
 from lib import settings
 from lib.networking.asyncio_protocols import TCPClientProtocol
 from lib.conf import RawStr
@@ -11,14 +12,16 @@ from .exceptions import ClientException
 
 
 class SSHClient(TCPClientProtocol, asyncssh.SSHClient):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def send(self, msg):
         raise ClientException('Cannot send from connection protocol')
 
 
-class SFTPClient(BaseNetworkClient):
-    connection_protocol = SSHClient
-    configurable = BaseNetworkClient.configurable.copy()
+class SFTPClient(BaseAsyncioClient):
+    protocol_cls = SSHClient
+    configurable = BaseAsyncioClient.configurable.copy()
     configurable.update({'basepath': Path, 'filename': RawStr, 'remotepath': Path, 'sftploglevel': int,
                          'knownhosts': Path, 'username': str, 'password': str, 'clientkeys': Path,
                          'passphrase': None, 'clientversion': RawStr, 'removetmpfiles': bool})
@@ -46,7 +49,7 @@ class SFTPClient(BaseNetworkClient):
 
     async def open_connection(self, **kwargs):
         self.conn, self.sftp_client = await asyncssh.create_connection(
-            lambda: self.connection_protocol(self.manager, logger_name=self.logger_name),
+            partial(self.protocol_cls, self.manager, logger=self.logger),
             self.host, self.port, local_addr=self.localaddr, **self.sftp_kwargs)
         self.sftp = await self.conn.start_sftp_client()
         self.cwd = await self.sftp.realpath('.')
