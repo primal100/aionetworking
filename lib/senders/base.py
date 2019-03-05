@@ -2,9 +2,7 @@ import asyncio
 import binascii
 import logging
 
-from lib.conf import RawStr
 from lib import settings
-from lib.networking.ssl import get_client_context
 from lib.utils import Record
 
 from typing import TYPE_CHECKING, Sequence, AnyStr
@@ -16,25 +14,33 @@ else:
 
 
 class BaseSender:
+    logger_name: str = 'sender'
     sender_type: str
     configurable = {
         'interval': float,
     }
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, **kwargs):
+    def get_config(cls, cp=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Sender', **cls.configurable)
-        config.update(cp.section_as_dict('Receiver'))
-        log = logging.getLogger(cp.logger_name)
-        log.debug('Found configuration for %s: %s', cls.sender_type, config)
+        logger = logging.getLogger(cp.logger_name)
+        logger.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
-        config['logger_name'] = cp.logger_name
+        config['logger'] = logger
+        return config
+
+    @classmethod
+    def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, config=None, **kwargs):
+        if not config:
+            config = cls.get_config(cp=cp, **kwargs)
         return cls(manager, queue=queue, **config)
 
-    def __init__(self, manager: BaseMessageManager, queue=None, interval: float=0, logger_name: str = 'sender'):
-        self.logger = logging.getLogger(logger_name)
-        self.raw_log = logging.getLogger("%s.raw" % logger_name)
+    def __init__(self, manager: BaseMessageManager, queue=None, interval: float = 0, logger=None):
+        self.logger = logger
+        if not self.logger:
+            logging.getLogger(self.logger_name)
+        self.raw_log = logging.getLogger("%s.raw" % self.logger.name)
         self.manager = manager
         self.protocol = manager.protocol
         self.queue = queue
@@ -153,7 +159,6 @@ class BaseSender:
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"
-    ssl_allowed: bool = False
 
     configurable = BaseSender.configurable.copy()
     configurable.update({
@@ -197,26 +202,3 @@ class BaseNetworkClient(BaseSender):
         await self.close_connection()
         self.logger.info("Connection closed")
 
-
-class SSLSupportedNetworkClient(BaseNetworkClient):
-    configurable = BaseNetworkClient.configurable.copy()
-    configurable.update({
-        'ssl': bool,
-        'sslcert': Path,
-        'sslkey': Path,
-        'sslkeypassword': str,
-        'certrequired': bool,
-        'hostnamecheck': bool,
-        'servercertfile': Path,
-        'servercertspath': Path,
-        'servercertsdata': str,
-        'sslhandshaketimeout': int
-    })
-
-    def __init__(self, *args, ssl: bool = False, sslcert: Path = None, sslkey: Path = None, sslkeypassword: str = None,
-                servercertfile: Path= None, servercertspath: Path=None, servercertsdata: str=None, certrequired: bool=True,
-                hostnamecheck: bool=True, sslhandshaketimeout: int=None, **kwargs):
-        super(SSLSupportedNetworkClient, self).__init__(*args, **kwargs)
-        self.ssl_handshake_timeout = sslhandshaketimeout
-        self.ssl = get_client_context(ssl, sslcert, sslkey, sslkeypassword, servercertfile, servercertspath,
-                                      servercertsdata, certrequired, hostnamecheck, self.logger)

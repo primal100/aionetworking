@@ -9,8 +9,6 @@ from lib.networking.asyncio_protocols import TCPClientProtocol
 from lib.conf import RawStr
 from .exceptions import ClientException
 
-from typing import AnyStr
-
 
 class SSHClient(TCPClientProtocol, asyncssh.SSHClient):
 

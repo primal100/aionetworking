@@ -1,12 +1,12 @@
 import asyncio
 from asyncio import transports
-import logging
 from functools import partial
+import logging
 import time
 
 from lib import messagemanagers
-from .logging import ConnectionLogger, StatsLogger
-from lib.utils import log_exception, addr_tuple_to_str
+from .logging import SimpleConnectionLogger, ConnectionLogger, StatsLogger
+from lib.utils import addr_tuple_to_str
 
 from typing import TYPE_CHECKING
 from typing import Optional, Union, Text, Tuple
@@ -32,16 +32,19 @@ class BaseProtocolMixin:
     transport = None
 
     @classmethod
-    def set_config(cls, cp=None, logger=None):
+    def with_config(cls, logger, cp=None, **kwargs):
         from lib import settings
         cp = cp or settings.CONFIG
-        cls.cp = cp
-        cls._logger = logger
-        return cls
+        connection_logger = logging.getLogger(f'{logger.name}.connection')
+        stats_logger_cls = cls.stats_cls.with_config(logger, cp=cp)
+        return partial(cls, logger=connection_logger, stats_logger_cls=stats_logger_cls, **kwargs)
 
-    def __init__(self, manager: BaseMessageManager, logger=None):
+    def __init__(self, manager: BaseMessageManager, logger=None, stats_logger_cls=None):
         self.manager = manager
-        self._logger = logger or self._logger
+        self.stats_logger_cls = stats_logger_cls or self.stats_logger_cls
+        self.logger = logger
+        if not self.logger:
+            self.logger = logging.getLogger(self.logger_name)
 
     def get_logger_extra(self):
         return {'protocol_name': self.name,
@@ -53,10 +56,10 @@ class BaseProtocolMixin:
                 'alias': self.alias}
 
     def get_stats_logger(self, extra):
-        return self.stats_cls.from_config(self.logger.name, extra, self.transport, cp=self.cp)
+        return self.stats_logger_cls(extra, self.transport)
 
     def get_logger(self, extra):
-        return ConnectionLogger(self._logger, extra)
+        return ConnectionLogger(self.logger, extra)
 
     @property
     def client(self):
@@ -80,20 +83,20 @@ class BaseProtocolMixin:
         self.transport = transport
         peer = self.transport.get_extra_info('peername')
         sock = self.transport.get_extra_info('sockname')
-        connection_ok = self.define_sock_peer(sock, peer)
-        extra = self.get_logger_extra()
-        self.logger = self.get_logger(extra)
-        self.stats_logger = self.get_stats_logger(extra)
+        connection_ok = self.initialize(sock, peer)
         if connection_ok:
             self.logger.info('New %s connection from %s to %s', self.name, self.client, self.server)
 
-    def define_sock_peer(self, sock, peer):
+    def initialize(self, sock, peer):
         self.peer_ip = peer[0]
         self.peer_port = peer[1]
         self.peer = ':'.join(str(prop) for prop in peer)
         self.sock = ':'.join(str(prop) for prop in sock)
         try:
             self.alias = self.check_other(self.peer_ip)
+            extra = self.get_logger_extra()
+            self.logger = self.get_logger(extra)
+            self.stats_logger = self.get_stats_logger(extra)
             return True
         except messagemanagers.MessageFromNotAuthorizedHost:
             self.close_connection()
@@ -224,19 +227,22 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
     client_protocol_class = UDPServerClientProtocol
 
     @classmethod
-    def set_config(cls, cp=None, logger=None):
-        cls.client_protocol_class.set_config(cp=cp, logger=logger)
+    def with_config(cls, logger, cp=None, **kwargs):
+        client_protocol_cls = cls.client_protocol_class.with_config(logger, cp=cp)
         cls._logger = logger or cls.logger_name
+        return partial(cls, client_protocol_cls=client_protocol_cls, logger=logger, **kwargs)
 
     @property
     def server(self) -> str:
         return self.sock
 
-    def __init__(self, manager: BaseMessageManager):
-        self.logger = ConnectionLogger(self._logger, {})
+    def __init__(self, manager: BaseMessageManager, client_protocol_cls=None, logger=None):
+        self.client_protocol_class = client_protocol_cls or self.client_protocol_class
         self.manager = manager
         self.clients = {}
         self.closed_event = asyncio.Event()
+        logger = logger or logging.getLogger(self.logger_name)
+        self.logger = SimpleConnectionLogger(logger, {})
 
     def connection_made(self, transport: transports.BaseTransport):
         self.transport = transport
@@ -254,16 +260,16 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
         await self.closed_event.wait()
 
     def error_received(self, exc: Exception):
-        self.manage_error(exc)
+        self.logger.manage_error(exc)
 
     def new_sender(self, addr, src):
         connection_protocol = self.client_protocol_class(self.manager)
-        connection_ok = connection_protocol.define_sock_peer(self.sock, addr)
+        connection_ok = connection_protocol.initialize(self.sock, addr)
         if connection_ok:
             self.clients[src] = connection_protocol
             self.logger.info('%s on %s started receiving messages from %s', self.name, self.server, src)
             return connection_protocol
-        return False
+        return None
 
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]):
         src = addr_tuple_to_str(addr)

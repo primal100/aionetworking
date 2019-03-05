@@ -2,12 +2,13 @@ import asyncssh
 import asyncio
 import datetime
 import logging
+from functools import partial
 from passlib.hash import pbkdf2_sha256
 
 from lib import settings
 from lib.wrappers.futures import NamedFutures
 from lib.networking.asyncio_protocols import TCPServerProtocol
-from .asyncio_servers import TCPServerReceiver
+from .asyncio_servers import BaseTCPServerReceiver
 from .exceptions import ServerException
 
 from typing import Mapping
@@ -15,19 +16,35 @@ from pathlib import Path
 
 
 class SFTPFactory(asyncssh.SFTPServer):
+    logger_name: str = 'receiver'
+    configurable = {'chroot': bool,
+                    'baseuploaddir': Path,
+                    'removetmpfiles': bool,
+                    'orderbyfileopen': bool}
 
-    def __init__(self, conn, receiver, logger_name='receiver'):
+    @classmethod
+    def with_config(cls, logger, cp=None, **kwargs):
+        config = cp.section_as_dict('Receiver', **cls.configurable)
+        logger.debug(f'Found config for SFTP Factory: {config}')
+        config.update(**kwargs)
+        order_by_file_open = config.pop('orderbyfileopen', False)
+        if order_by_file_open:
+            return partial(OrderedSFTPFactory, logger, **config)
+        return partial(cls, logger=logger, **config)
+
+    def __init__(self, conn, baseuploaddir: Path = settings.HOME.joinpath('sftp'), chroot=True,
+                 removetmpfiles=False, logger=None):
+        self.logger = logger
+        if not self.logger:
+            self.logger = logging.getLogger(self.logger_name)
         self.connection_protocol = conn._owner
-        if receiver.chroot:
-            root = receiver.base_upload_dir.joinpath(conn.get_extra_info('username'))
+        if chroot:
+            root = baseuploaddir.joinpath(conn.get_extra_info('username'))
             root.mkdir(parents=True, exist_ok=True)
             super().__init__(conn, chroot=root)
         else:
             super().__init__(conn)
-        self.logger = logging.getLogger(logger_name)
-        self.receiver = receiver
-        self.manager = receiver.manager
-        self.remove_tmp_files = self.receiver.remove_tmp_files
+        self.remove_tmp_files = removetmpfiles
         self.conn = conn
 
     def handle_file(self, name, data):
@@ -78,9 +95,10 @@ class OrderedSFTPFactory(SFTPFactory):
 
 class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
 
-    def __init__(self, receiver):
-        super(SSHServer, self).__init__(receiver.manager, logger_name=receiver.logger_name)
-        self.receiver = receiver
+    def __init__(self, manager, logins=None, public_key_auth_supported=False, logger=None):
+        super(SSHServer, self).__init__(manager, logger=logger)
+        self._public_key_auth_supported = public_key_auth_supported
+        self.logins = logins
 
     def send(self, msg):
         raise ServerException('Unable to send messages with this receiver')
@@ -90,20 +108,20 @@ class SSHServerPswPublicAuth(SSHServer):
     hash_algorithm = pbkdf2_sha256
 
     def get_password(self, username: str) -> str:
-        return self.receiver.logins.get(username, raw=True)
+        return self.logins.get(username, raw=True)
 
     def begin_auth(self, username: str) -> bool:
         return True
 
     def password_auth_supported(self) -> bool:
-        return bool(self.receiver.logins)
+        return bool(self.logins)
 
     def hash_password(self, password: str) -> str:
         return self.hash_algorithm.hash(password)
 
     def validate_password(self, username: str, password: str) -> bool:
         self.logger.debug('Beginning password authentication for user %s', username)
-        user_allowed = username in self.receiver.logins
+        user_allowed = username in self.logins
         if not user_allowed:
             self.logger.info('SFTP User %s does not exist', username)
             return False
@@ -117,50 +135,44 @@ class SSHServerPswPublicAuth(SSHServer):
         return authorized
 
     def public_key_auth_supported(self):
-        return self.receiver.public_key_auth_supported
+        return self._public_key_auth_supported
 
 
-class SFTPServer(TCPServerReceiver):
-    protocol = SSHServer
+class SFTPServer(BaseTCPServerReceiver):
+    protocol_cls = SSHServer
+    factory = SFTPFactory
     receiver_type = 'SFTP Server'
     logger_name = 'receiver'
 
-    configurable = TCPServerReceiver.configurable.copy()
-    configurable.update({'chroot': bool, 'sftploglevel': int, 'allowscp': bool,
-                         'baseuploaddir': Path, 'hostkey': Path, 'removetmpfiles': bool,
-                         'orderbyfileopen': bool, 'passphrase': str, 'authorizedkeys': Path})
+    @classmethod
+    def from_config(cls, *args, cp=None, config=None, **kwargs):
+        instance = super().from_config(*args, cp=cp, config=config, **kwargs)
+        instance.factory = cls.factory.with_config(cp=cp, logger=instance.logger)
+        return instance
 
-    def __init__(self, manager, *args, port=asyncssh.connection._DEFAULT_PORT, chroot: bool=True, sftploglevel=1,
-                 baseuploaddir: Path = settings.HOME.joinpath('sftp'), remove_tmp_files: bool = True,
-                 orderbyfileopen=False, allowscp: bool=False, hostkey: Path=(), passphrase: str = None,
+    configurable = BaseTCPServerReceiver.configurable.copy()
+    configurable.update({'sftploglevel': int, 'allowscp': bool, 'hostkey': Path,
+                         'passphrase': str, 'authorizedkeys': Path})
+
+    def __init__(self, manager, *args, port=asyncssh.connection._DEFAULT_PORT, sftploglevel=1,
+                 allowscp: bool=False, hostkey: Path=(), passphrase: str = None,
                  authorizedkeys: Path=None, sftp_kwargs=None, **kwargs):
         asyncssh.logging.set_debug_level(sftploglevel)
-        self.chroot = chroot
-        super(TCPServerReceiver, self).__init__(manager, *args, port=port, **kwargs)
+        super(SFTPServer, self).__init__(manager, *args, port=port, **kwargs)
         self.sftp_kwargs = {
             'allow_scp': allowscp,
             'server_host_keys': hostkey,
             'passphrase': passphrase,
             'authorized_client_keys': str(authorizedkeys) if authorizedkeys else None
         }
-        self.public_key_auth_supported = bool(authorizedkeys)
+        self.connection_kwargs = {'public_key_auth_supported': bool(authorizedkeys)}
         sftp_kwargs = sftp_kwargs or {}
         self.sftp_kwargs.update(sftp_kwargs)
-        self.order_by_file_open = orderbyfileopen
         self.allow_scp = allowscp
-        self.base_upload_dir = baseuploaddir
-        self.base_upload_dir.mkdir(parents=True, exist_ok=True)
-        self.remove_tmp_files = remove_tmp_files
-        self.sftp_factory_cls = self.get_sftp_factory()
-
-    def get_sftp_factory(self):
-        if self.order_by_file_open:
-            return OrderedSFTPFactory
-        return SFTPFactory
 
     async def get_server(self):
-        return await asyncssh.create_server(lambda: self.protocol(self), self.host, self.port,
-                                            sftp_factory=lambda conn: self.sftp_factory_cls(conn, self), **self.sftp_kwargs)
+        return await asyncssh.create_server(partial(self.protocol_cls, **self.connection_kwargs), self.host,
+                                            self.port, sftp_factory=self.factory, **self.sftp_kwargs)
 
 
 class SFTPServerPswPublicAuth(SFTPServer):
@@ -170,7 +182,7 @@ class SFTPServerPswPublicAuth(SFTPServer):
     configurable.update({'logins': dict})
 
     def __init__(self, manager, logins: Mapping[str, str]=None, *args, **kwargs):
-        self.logins = logins
         super(SFTPServerPswPublicAuth, self).__init__(manager, *args, **kwargs)
+        self.connection_kwargs['logins'] = logins
 
 

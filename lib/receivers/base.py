@@ -1,13 +1,10 @@
+
 import asyncio
 import logging
 
 from lib import settings
-from lib.conf import RawStr
-from lib.networking.ssl import get_server_context
-from lib.conf import ConfigurationException
 
-from typing import TYPE_CHECKING, Optional
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.messagemanagers import BaseMessageManager
@@ -17,24 +14,30 @@ else:
 
 class BaseReceiver:
     receiver_type: str = ''
+    logger_name: str = 'Receiver'
     configurable = {
         'quiet': bool,
     }
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
+    def get_config(cls, cp=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Receiver', **cls.configurable)
-        config['logger_name'] = cp.logger_name
         logger = logging.getLogger(cp.logger_name)
-        logger.debug('Found configuration for %s:%s', cls.receiver_type, config)
+        logger.debug('Found configuration for %s: %s', cls.receiver_type, config)
         config.update(kwargs)
-        return cls(manager, **config)
+        config['logger'] =logger
+        return config
 
-    def __init__(self, manager, quiet: bool=False, statsinterval: int = 0, statsattrs: tuple = (),
-                 logger_name: str = 'receiver'):
+    @classmethod
+    def from_config(cls, manager: BaseMessageManager, cp=None, config=None, **kwargs):
+        if not config:
+            config = cls.get_config(cp=cp)
+        return cls(manager, **config, **kwargs)
+
+    def __init__(self, manager, quiet: bool=False, logger=None):
         self.quiet = quiet
-        self.logger = logging.getLogger(logger_name)
+        self.logger = logger or logging.getLogger(self.logger_name)
         self.manager = manager
 
     async def started(self):
@@ -65,38 +68,15 @@ class BaseServer(BaseReceiver):
     configurable.update({
         'host': str,
         'port': int,
-        'ssl': bool,
-        'sslcert': Path,
-        'sslkey': Path,
-        'sslkeypassword': str,
-        'clientcertfile': Path,
-        'clientcertsdir': Path,
-        'clientcertsdata': str,
-        'certrequired': bool,
-        'hostnamecheck': bool,
-        'sslhandshaketimeout': int,
     })
-    ssl_allowed: bool = False
     receiver_type = 'Server'
     server = None
 
-    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, ssl=False, sslcert: Optional[Path] = None,
-                 sslkey: Optional[Path] = None, sslkeypassword: str = None, clientcertfile: Path = None, clientcertsdir: Path = None,
-                 clientcertsdata: str = None, certrequired: bool = False, hostnamecheck: bool = False,
-                 sslhandshaketimeout: int=None, **kwargs):
+    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, **kwargs):
         super(BaseServer, self).__init__(*args, **kwargs)
         self.host = host
         self.port = port
-        self.ssl_handshake_timeout = sslhandshaketimeout
         self.listening_on = '%s:%s' % (self.host, self.port)
-        if self.ssl_allowed:
-            self.ssl_context = get_server_context(ssl, sslcert, sslkey, sslkeypassword, clientcertfile, clientcertsdir,
-                                                  clientcertsdata, certrequired, hostnamecheck, self.logger)
-        elif ssl:
-            self.logger.error('SSL is not supported for %s', self.receiver_type)
-            raise ConfigurationException('SSL is not supported for' + self.receiver_type)
-        else:
-            self.ssl_context = None
 
     def print_listening_message(self, sockets):
         if not self.quiet:

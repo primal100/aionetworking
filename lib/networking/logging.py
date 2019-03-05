@@ -1,15 +1,18 @@
 import logging
 from datetime import datetime
+from functools import partial
 
 from lib.utils import  log_exception
 from lib.wrappers.periodic import call_cb_periodic
 
 
-class ConnectionLogger(logging.LoggerAdapter):
-
+class SimpleConnectionLogger(logging.LoggerAdapter):
     def manage_error(self, exc):
         if exc:
             self.error(log_exception(exc))
+
+
+class ConnectionLogger(SimpleConnectionLogger):...
 
 
 measures = {
@@ -134,6 +137,17 @@ class StatsLogger(NoStatsLogger):
     }
 
     @classmethod
+    def with_config(cls, logger, cp=None, **kwargs):
+        stats_logger = logging.getLogger(f'{logger.name}.stats')
+        if stats_logger.isEnabledFor(logging.INFO):
+            handler_name = "handler_%s_stats" % logger.name
+            config = cp.section_as_dict(handler_name, **cls.configurable)
+            logger.debug(f'Found config for {logger.name} stats: {config}')
+            config.update(**kwargs)
+            return partial(cls, stats_logger, **config)
+        return partial(cls, NoStatsLogger, stats_logger)
+
+    @classmethod
     def from_config(cls, logger_name, *args, cp=None, **kwargs):
         if logger_name in cls.loggers:
             logger = cls.loggers[logger_name]
@@ -162,9 +176,9 @@ class StatsLogger(NoStatsLogger):
         stats = StatsTracker(extra, attrs, time_strf=timestrf, seconds_divide_by=secondsdivideby)
         super().__init__(logger, stats)
         self.transport = transport
+        self.connection_started()
         if interval:
             call_cb_periodic(interval, self.periodic_log, fixed_start_time=True)
-        self.connection_started()
 
     def periodic_log(self, first):
         self.extra.end_time = datetime.now()
