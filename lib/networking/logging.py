@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from functools import partial
 
+from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
 from lib.utils import  log_exception
 from lib.wrappers.periodic import call_cb_periodic
 
@@ -15,99 +16,74 @@ class SimpleConnectionLogger(logging.LoggerAdapter):
 class ConnectionLogger(SimpleConnectionLogger):...
 
 
-measures = {
-    'byte': 1,
-    'kb': 1024,
-    'mb': 1048576,
-    'gb': 1073741824
-}
+class StatsTracker:
+    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed',
+             'processing_rate', 'receive_rate', 'interval', 'average_buffer', 'average_sent')
 
+    def reset(self):
+        return self.__class__(self.properties, self.datefmt)
 
-class StatsTracker(dict):
-    default_attrs = ('start_time', 'end_time', 'received_msgs', 'received_kb','processed_kb', 'processing_rate_kb')
-    sent_msgs: int = 0
-    sent_bytes: int = 0
-    received_msgs: int = 0
-    received_bytes: int = 0
-    processed_msgs: int = 0
-    processed_bytes: int = 0
-    start_time: datetime = None
-    end_time: datetime = None
-    first_message_received: datetime = None
-    first_message_sent: datetime = None
-    last_message_received: datetime = None
-    last_message_processed: datetime = None
+    def __init__(self, properties, datefmt="%Y-%M-%d %H:%M:%S"):
+        self.datefmt = datefmt
+        self.properties = properties
+        self.start = LoggingDatetime(datefmt=datefmt)
+        self.msgs = MsgsCount()
+        self.sent = BytesSize(0)
+        self.received = BytesSize(0)
+        self.processed = BytesSize(0)
+        self.test = BytesSize(10)
+        self.end = None
 
     @property
-    def percent_processed(self):
-        return self.processed_msgs / self.received_msgs
+    def processing_rate(self):
+        return self.processed.average(self.msgs.processing_time)
 
     @property
-    def processing_rate_bytes(self):
-        return self.processed_bytes / self.processing_time
+    def receive_rate(self):
+        return self.received.average(self.msgs.receive_interval)
 
     @property
-    def receive_rate_bytes(self):
-        return self.received_bytes / (self.last_message_received - self.last_message_processed).total_seconds()
+    def interval(self):
+        return LoggingTimeDelta(self.start, self.end)
 
     @property
-    def buffer_processing_rate(self):
-        return self.processed_msgs / self._processing_time
+    def average_buffer(self):
+        return self.received.average(self.msgs.received)
 
     @property
-    def buffer_receive_rate(self):
-        return self.received_msgs / (self.last_message_received - self.last_message_processed).total_seconds()
-
-    @property
-    def _processing_time(self):
-        return (self.last_message_processed - self.first_message_received).total_seconds()
-
-    @property
-    def processing_time(self):
-        return self._processing_time / self._seconds_divice_by
-
-    @property
-    def _interval_time(self):
-        return (self.end_time - self.start_time).total_seconds()
-
-    @property
-    def interval_time(self):
-        return self._interval_time / self._seconds_divice_by
-
-    @property
-    def average_buffer_bytes(self):
-        return self.received_bytes / self.received_msgs
-
-    @property
-    def average_sent_bytes(self):
-        return self.sent_bytes / self.sent_msgs
+    def average_sent(self):
+        return self.sent.average(self.msgs.sent)
 
     def __iter__(self):
-        for item in  super().__iter__():
+        for item in tuple(self.properties) + self.attrs:
             yield item
-        for attr in self.attrs:
-            yield attr
 
     def __getitem__(self, item):
-        if "__" in item:
-            attr, measure = item.split('__')
-            if measure == 'time':
-                dt = getattr(self, "%s_time" % attr)
-                return dt.strftime(self._time_strf)
-            else:
-                num_bytes = getattr(self, "%s_bytes" % attr)
-                return num_bytes / measures[measure]
+        if item in self.properties:
+            return self.properties[item]
         if item in self.attrs:
-            return getattr(self, item, None)
-        return super().__getitem__(item)
+            return getattr(self, item)
 
-    def __init__(self, properties, attrs, time_strf=None, seconds_divide_by=None):
-        super().__init__(properties)
-        self._time_strf = time_strf
-        self._seconds_divice_by = seconds_divide_by
-        self.properties = properties
-        self.attrs = attrs or self.default_attrs
-        self.start_time = datetime.now()
+    def on_msg_received(self, msg):
+        if not self.msgs.first_received:
+            self.msgs.first_received = LoggingDatetime(self.datefmt)
+        self.msgs.last_received = LoggingDatetime(self.datefmt)
+        self.msgs.received += 1
+        self.received += len(msg)
+
+    def on_msg_processed(self, num_bytes):
+        self.msgs.last_processed = datetime.now()
+        self.msgs.processed += 1
+        self.processed += num_bytes
+
+    def on_msg_sent(self, msg):
+        if not self.msgs.first_sent:
+            self.msgs.first_message_sent = datetime.now()
+        self.msgs.sent += 1
+        self.sent += len(msg)
+
+    def finish(self):
+        self.end = LoggingDatetime(self.datefmt)
 
 
 class NoStatsLogger(logging.LoggerAdapter):
@@ -129,52 +105,29 @@ class StatsLogger(NoStatsLogger):
     _first: bool = True
     configs = {}
     loggers = {}
-    configurable = {
+    logger_configurable = {
         'interval': int,
-        'attrs': tuple,
-        'timestrf': str,
-        'secondsdivideby': int
+    }
+    formatter_configurable = {
+        'datefmt': str
     }
 
     @classmethod
     def with_config(cls, logger, cp=None, **kwargs):
         stats_logger = logging.getLogger(f'{logger.name}.stats')
         if stats_logger.isEnabledFor(logging.INFO):
-            handler_name = "handler_%s_stats" % logger.name
-            config = cp.section_as_dict(handler_name, **cls.configurable)
+            logger_name = f"logger_{logger.name}.stats"
+            formatter_name = f"formatter_{logger.name}Stats"
+            config = cp.section_as_dict(logger_name, **cls.logger_configurable)
+            config.update(cp.section_as_dict(formatter_name, **cls.formatter_configurable))
             logger.debug(f'Found config for {logger.name} stats: {config}')
             config.update(**kwargs)
             return partial(cls, stats_logger, **config)
         return partial(cls, NoStatsLogger, stats_logger)
 
-    @classmethod
-    def from_config(cls, logger_name, *args, cp=None, **kwargs):
-        if logger_name in cls.loggers:
-            logger = cls.loggers[logger_name]
-            config = cls.loggers[logger_name]
-        else:
-            logger = logging.getLogger("%s.stats" % logger_name)
-            handler_name = "%s_stats" % logger_name
-            cls.loggers[logger_name] = logger
-            if logger.isEnabledFor(logging.INFO):
-                from lib import settings
-                cp = cp or settings.CONFIG
-                config = cp.section_as_dict('handler_%s' % handler_name, **cls.configurable)
-                base_logger = logging.getLogger(logger_name)
-                base_logger.debug('Found config for %s stats', logger_name)
-                cls.configs[logger_name] = config
-            else:
-                config = cls.configs[logger_name] = {}
-        if logger.isEnabledFor(logging.INFO):
-            if kwargs:
-                kwargs.update(config)
-                config = kwargs
-            return cls(logger, *args, **config)
-        return NoStatsLogger(logger, {})
-
-    def __init__(self, logger, extra, transport, attrs=(), interval=0, timestrf=None, secondsdivideby=1):
-        stats = StatsTracker(extra, attrs, time_strf=timestrf, seconds_divide_by=secondsdivideby)
-        super().__init__(logger, stats)
+    def __init__(self, logger, extra, transport, interval=0, datefmt="%Y-%M-%d %H:%M:%S"):
+        extra = StatsTracker(extra, datefmt=datefmt)
+        super().__init__(logger, extra)
         self.transport = transport
         self.connection_started()
         if interval:
@@ -185,39 +138,26 @@ class StatsLogger(NoStatsLogger):
         tag = 'NEW' if first else 'INTERVAL'
         self.info(tag)
         self._first = False
-        self._total_received += self.extra.received_msgs
-        self._total_processed += self.extra.processed_msgs
-        self.extra = StatsTracker(self.extra.properties, self.extra.attrs)
-
-    def connection_started(self):
-        self.extra.start_time = datetime.now()
+        self._total_received += self.extra.msgs.received
+        self._total_processed += self.extra.msgs.processed
+        self.extra = self.extra.reset()
 
     def on_msg_received(self, msg):
-        if not self.extra.first_message_received:
-            self.extra.first_message_received = datetime.now()
-        self.extra.last_message_received = datetime.now()
-        self.extra.received_msgs += 1
-        self.extra.received_bytes += len(msg)
+        self.extra.on_msg_received(msg)
 
     def on_msg_processed(self, num_bytes):
-        self.extra.last_message_processed = datetime.now()
-        self.extra.processed_msgs += 1
-        self.extra.processed_bytes += num_bytes
+        self.extra.on_msg_processed(num_bytes)
         if self.transport.is_closing():
             self.check_last_message_processed()
 
     def on_msg_sent(self, msg):
-        if not self.extra.first_message_sent:
-            self.extra.first_message_sent = datetime.now()
-        self.extra.sent_msgs += 1
-        self.extra.sent_bytes += len(msg)
+        self.extra.on_msg_sent(msg)
 
     def check_last_message_processed(self):
-        if (self._total_received + self.extra.received_msgs) == (self._total_processed + self.extra.processed_msgs):
-            self.extra.end_time = datetime.now()
+        if (self._total_received + self.extra.msgs.received) == (self._total_processed + self.extra.msgs.processed):
+            self.extra.finish()
             tag = 'ALL' if self._first else 'END'
             self.info(tag)
 
     def connection_finished(self):
-        self.extra.end_time = datetime.now()
         self.check_last_message_processed()
