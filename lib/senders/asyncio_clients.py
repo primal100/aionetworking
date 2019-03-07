@@ -19,6 +19,10 @@ class BaseAsyncioClient(BaseNetworkClient):
         instance.protocol_cls = cls.protocol_cls.with_config(cp=cp, logger=instance.logger)
         return instance
 
+    async def __aenter__(self):
+        await self.start()
+        return self.conn
+
     async def close_connection(self):
         self.transport.close()
 

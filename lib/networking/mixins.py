@@ -15,3 +15,28 @@ class TCP:
         self.ssl = ssl
         self.ssl_handshake_timeout = sslhandshaketimeout
 
+
+class ClientProtocolMixin:
+    logger_name = 'sender'
+
+    @property
+    def client(self) -> str:
+        return self.sock
+
+    @property
+    def server(self) -> str:
+        return self.peer
+
+
+class ServerProtocolMixin:
+    logger_name = 'receiver'
+
+    @property
+    def client(self) -> str:
+        if self.alias:
+            return '%s(%s)' % (self.alias, self.peer)
+        return self.peer
+
+    @property
+    def server(self) -> str:
+        return self.sock

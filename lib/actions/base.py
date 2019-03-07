@@ -1,9 +1,8 @@
 import asyncio
 import logging
-from pathlib import Path
 
 from lib import settings
-from lib.conf import RawStr
+
 
 class BaseAction:
     name = ''
@@ -25,16 +24,19 @@ class BaseAction:
         self.timeout = timeout
         self.outstanding_tasks = []
 
-    async def do_many(self, msgs):
-        await self.do_many_parallel(msgs)
+    def do_many(self, msgs):
+        return self.do_many_parallel(msgs)
 
-    async def do_many_parallel(self, msgs):
-        self.outstanding_tasks += [asyncio.create_task(self.do_one(msg)) for msg in msgs if not self.filter(msg)]
+    def do_many_parallel(self, msgs):
+        for msg in msgs:
+            task = asyncio.create_task(self.do_one(msg))
+            self.outstanding_tasks += task
+            yield task
 
-    async def do_many_sequential(self, msgs):
+    def do_many_sequential(self, msgs):
         for msg in msgs:
             if not self.filter(msg):
-                await self.do_one(msg)
+                yield self.do_one(msg)
 
     def filter(self, msg):
         return msg.filter()
@@ -44,7 +46,7 @@ class BaseAction:
 
     async def wait_complete(self, **logs_extra):
         if self.outstanding_tasks:
-            self.log .debug('Waiting for tasks to complete')
+            self.log.debug('Waiting for tasks to complete')
             try:
                 await asyncio.wait(self.outstanding_tasks, timeout=self.timeout)
             finally:

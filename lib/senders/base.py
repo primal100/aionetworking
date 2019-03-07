@@ -104,58 +104,6 @@ class BaseSender:
     async def response(self):
         await self.manager.wait_response()
 
-    async def send_data(self, msg_encoded: bytes, **kwargs):
-        raise NotImplementedError
-
-    async def send_msg(self, msg_encoded: bytes, **kwargs):
-        self.logger.debug("Sending message to %s", self.dst)
-        self.raw_log.debug(msg_encoded)
-        await self.send_data(msg_encoded, **kwargs)
-        self.logger.debug('Message sent')
-
-    async def send_hex(self, hex_msg: AnyStr):
-        await self.send_msg(binascii.unhexlify(hex_msg))
-
-    async def send_msgs_sequential(self, msgs:Sequence[bytes]):
-        for msg in msgs:
-            await self.send_msg(msg)
-            await asyncio.sleep(0.001)
-
-    async def send_msgs_parallel(self, msgs: Sequence[bytes]):
-        tasks = []
-        for msg in msgs:
-            task = asyncio.create_task(self.send_msg(msg))
-            tasks.append(task)
-        await asyncio.wait(tasks)
-
-    async def send_msgs(self, msgs):
-        await self.send_msgs_sequential(msgs)
-
-    async def send_hex_msgs(self, hex_msgs:Sequence[AnyStr]):
-        await self.send_msgs([binascii.unhexlify(hex_msg) for hex_msg in hex_msgs])
-
-    async def encode_and_send_msgs(self, decoded_msgs):
-        for decoded_msg in decoded_msgs:
-            await self.encode_and_send_msg(decoded_msg)
-
-    def encode_msg(self, msg_decoded):
-        msg_obj = self.manager.protocol.from_decoded(msg_decoded, sender=self.source)
-        return msg_obj.encoded
-
-    async def encode_and_send_msg(self, msg_decoded):
-        msg_encoded = self.encode_msg(msg_decoded)
-        await self.send_msg(msg_encoded)
-
-    async def play_recording(self, file_path: Path, hosts=(), timing: bool=True):
-        self.logger.debug("Playing recording from file %s", file_path)
-        for packet in Record.from_file(file_path):
-            if (not hosts or packet['host'] in hosts) and not packet['sent_by_server']:
-                if timing:
-                    await asyncio.sleep(packet['seconds'])
-                self.logger.debug('Sending msg with %s bytes', len(packet['data']))
-                await self.send_msg(packet['data'])
-        self.logger.debug("Recording finished")
-
 
 class BaseNetworkClient(BaseSender):
     sender_type = "Network client"

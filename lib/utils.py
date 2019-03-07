@@ -252,10 +252,11 @@ async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequen
 
 
 def plural(num, string, past=False):
-    s = '%s %ss' % (num, string) if num != 1 else '%s %s' % (num, string)
+    s = f"{num} {string}" + 's' if num !=1 else ''
     if past:
         s += ' were' if num != 1 else ' was'
     return s
+
 
 def addr_tuple_to_str(addr):
     return ':'.join(str(a) for a in addr)
