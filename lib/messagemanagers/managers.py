@@ -5,7 +5,7 @@ import logging
 from lib.utils import log_exception
 from lib.protocols.base import BufferProtocol
 from lib import settings
-from .exceptions import MessageFromNotAuthorizedHost
+
 
 from typing import TYPE_CHECKING, Sequence, Mapping, Type, AnyStr
 if TYPE_CHECKING:
@@ -14,24 +14,12 @@ else:
     BaseProtocol = None
 
 
-def raise_message_from_not_authorized_host(sender, allowed_senders, logger):
-    msg = "Received message from unauthorized host %s. Authorized hosts are: %s"
-    args = (sender, allowed_senders)
-    logger.error(msg, *args)
-    raise MessageFromNotAuthorizedHost(msg % args)
 
 
 class BaseMessageManager:
     name: str
 
-    configurable = {
-        'action': tuple,
-        'preaction': tuple,
-        'allowedsenders': tuple,
-        'aliases': dict,
-        'generate_timestamp': bool,
-        'timeout': int
-    }
+
 
     @classmethod
     def from_config(cls, protocol: Type[BaseProtocol], cp=None, **kwargs):

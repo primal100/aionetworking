@@ -87,6 +87,7 @@ class StatsTracker:
 
 
 class NoStatsLogger(logging.LoggerAdapter):
+    _is_closing: bool = False
 
     def connection_started(self): ...
 
@@ -97,6 +98,9 @@ class NoStatsLogger(logging.LoggerAdapter):
     def on_msg_sent(self, msg): ...
 
     def connection_finished(self): ...
+
+    def set_closing(self):
+        self._is_closing = True
 
 
 class StatsLogger(NoStatsLogger):
@@ -125,10 +129,9 @@ class StatsLogger(NoStatsLogger):
             return partial(cls, stats_logger, **config)
         return partial(cls, NoStatsLogger, stats_logger)
 
-    def __init__(self, logger, extra, transport, interval=0, datefmt="%Y-%M-%d %H:%M:%S"):
+    def __init__(self, logger, extra, interval=0, datefmt="%Y-%M-%d %H:%M:%S"):
         extra = StatsTracker(extra, datefmt=datefmt)
         super().__init__(logger, extra)
-        self.transport = transport
         self.connection_started()
         if interval:
             call_cb_periodic(interval, self.periodic_log, fixed_start_time=True)
@@ -147,7 +150,7 @@ class StatsLogger(NoStatsLogger):
 
     def on_msg_processed(self, num_bytes):
         self.extra.on_msg_processed(num_bytes)
-        if self.transport.is_closing():
+        if self._is_closing:
             self.check_last_message_processed()
 
     def on_msg_sent(self, msg):
@@ -161,3 +164,4 @@ class StatsLogger(NoStatsLogger):
 
     def connection_finished(self):
         self.check_last_message_processed()
+

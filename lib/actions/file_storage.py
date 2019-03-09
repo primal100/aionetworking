@@ -14,9 +14,9 @@ class ManagedFile:
 
     def __init__(self, base_path, path, files_dict, mode='ab', buffering=-1, timeout=5, logger=None,
                  attr='encoded', separator=''):
-        self.log = logger
-        if not self.log:
-            self.log = logging.getLogger('receiver')
+        self.logger = logger
+        if not self.logger:
+            self.logger = logging.getLogger('receiver')
         self.full_path = base_path.joinpath(path)
         self.full_path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
@@ -36,50 +36,50 @@ class ManagedFile:
         self.queue.put_nowait(msg)
 
     async def close(self):
-        self.log.debug('Closing file %s', self.path)
+        self.logger.debug('Closing file %s', self.path)
         await self.wait_writes_done()
         self.task.cancel()
         await self.task
-        self.log.debug('Closed file %s', self.path)
+        self.logger.debug('Closed file %s', self.path)
 
     def cleanup(self):
         del self.files_dict[self.path]
-        self.log.debug('Cleanup completed for %s', self.path)
+        self.logger.debug('Cleanup completed for %s', self.path)
 
     async def wait_writes_done(self):
-        self.log.debug('Waiting for writes to complete for %s', self.path)
+        self.logger.debug('Waiting for writes to complete for %s', self.path)
         await self.queue.join()
-        self.log .debug('Writes completed for %s', self.path)
+        self.logger .debug('Writes completed for %s', self.path)
 
     def get_data(self, msgs):
         return self.separator.join([getattr(msg, self.attr) for msg in msgs]) + self.separator
 
     async def manage(self):
-        self.log.info('Opening file %s', self.full_path)
+        self.logger.info('Opening file %s', self.full_path)
         async with FILE_OPENER(self.full_path, mode=self.mode, buffering=self.buffering) as f:
-            self.log.debug('File opened')
+            self.logger.debug('File opened')
             try:
                 while True:
-                    self.log.debug('Retrieving item from queue for file %s', self.path)
+                    self.logger.debug('Retrieving item from queue for file %s', self.path)
                     msgs = [await asyncio.wait_for(self.queue.get(), timeout=self.timeout)]
                     while not self.queue.empty():
                         try:
                             msgs += self.queue.get_nowait()
                         except asyncio.QueueEmpty:
-                            self.log.info('QueueEmpty error was caught for file %s', self.path)
+                            self.logger.info('QueueEmpty error was caught for file %s', self.path)
                     data = self.get_data(msgs)
-                    self.log.debug('Retrieved %s from queue. Writing to file %s.', plural(len(msgs), 'item'), self.path)
+                    self.logger.debug('Retrieved %s from queue. Writing to file %s.', plural(len(msgs), 'item'), self.path)
                     await f.write(data)
                     await f.flush()
-                    self.log.debug('%s written to file %s', plural(len(data), 'byte'), self.path)
+                    self.logger.debug('%s written to file %s', plural(len(data), 'byte'), self.path)
                     for msg in msgs:
                         msg.processed()
                         self.queue.task_done()
-                    self.log.debug('Task done set for %s on file %s', plural(len(msgs), 'item'), self.path)
+                    self.logger.debug('Task done set for %s on file %s', plural(len(msgs), 'item'), self.path)
             except asyncio.TimeoutError:
-                self.log.info('File %s closing due to timeout', self.path)
+                self.logger.info('File %s closing due to timeout', self.path)
             except asyncio.CancelledError:
-                self.log.info('File %s closing due to task being cancelled', self.path)
+                self.logger.info('File %s closing due to task being cancelled', self.path)
             finally:
                 self.cleanup()
 
@@ -160,7 +160,7 @@ class BufferedFileStorage(BaseFileStorage):
         if path not in self.files_with_outstanding_writes:
             self.files_with_outstanding_writes.append(path)
 
-    def get_file(self, path, **logs_extra):
+    def get_file(self, path):
         self.log.debug('Getting file %s', path)
         try:
             return self.files[path]
@@ -179,11 +179,11 @@ class BufferedFileStorage(BaseFileStorage):
         self.write_to_file(path, msg)
 
     def do_many(self, msgs):
-        self.do_many_sequential(msgs)
+        return self.do_many_sequential(msgs)
 
-    async def wait_complete(self, **logs_extra):
+    async def wait_complete(self):
         try:
-            self.log.debug('Waiting for outstanding writes to complete', extra=logs_extra)
+            self.log.debug('Waiting for outstanding writes to complete')
             self.log.debug(self.files_with_outstanding_writes)
             for path in self.files_with_outstanding_writes:
                 f = self.get_file(path)

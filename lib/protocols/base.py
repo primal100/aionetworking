@@ -21,7 +21,7 @@ class BaseProtocol:
     supports_responses = False
 
     @classmethod
-    async def read_file(cls, file_path: Path, log=root_logger):
+    async def read_file(cls, file_path: Path, logger=root_logger):
         read_mode = 'rb' if cls.binary else 'r'
         async with settings.FILE_OPENER(file_path, read_mode) as f:
             return await f.read()
@@ -29,7 +29,7 @@ class BaseProtocol:
     @classmethod
     async def from_file(cls, file_path: Path, sender='', log=root_logger, **kwargs):
         log.debug('Creating new %s message from %s', cls.protocol_name, file_path)
-        encoded = await asyncio.create_task(cls.read_file(file_path, log=log))
+        encoded = await asyncio.create_task(cls.read_file(file_path, logger=log))
         return cls.from_buffer(sender, encoded, log=log, **kwargs)
 
     @classmethod

@@ -1,0 +1,2 @@
+class MessageFromNotAuthorizedHost(Exception):
+    pass
