@@ -4,63 +4,82 @@ import logging
 from pathlib import Path
 from pprint import pformat
 
-from lib.utils import cached_property
 from lib import settings
 
 from typing import Sequence
 
 
-root_logger = logging.getLogger('root')
+class BaseCodec:
+    configurable = {}
+    codec_name = ''
+    read_mode = 'rb'
+    write_mode = 'wb'
+    append_mode = 'ab'
+    logger_name = 'receiver'
+
+    def __init__(self, msg_obj, logger=None):
+        self.msg_obj = msg_obj
+        self.logger = logger or logging.getLogger(self.logger_name)
+
+    async def read_file(self, file_path: Path):
+        async with settings.FILE_OPENER(file_path, self.read_mode) as f:
+            return await f.read()
+
+    async def from_file(self, file_path: Path, **kwargs):
+        self.logger.debug('Creating new %s message from %s', self.codec_name, file_path)
+        encoded = await asyncio.create_task(self.read_file(file_path))
+        return self.from_buffer(encoded, **kwargs)
+
+    def from_buffer(self, encoded, **kwargs) -> Sequence:
+        return [self.msg_obj(encoded, decoded, **kwargs) for encoded, decoded in self.decode(encoded)]
+
+    def from_decoded(self, decoded, **kwargs):
+        return self.msg_obj(self.encode(decoded), decoded, **kwargs)
+
+    def decode(self, encoded: bytes) -> Sequence:
+        yield [encoded, encoded]
+
+    def encode(self, decoded):
+        return decoded
 
 
-class BaseProtocol:
-    protocol_type = None
-    protocol_name = ""
+class EmbeddedDict(dict):
+    def __getattr__(self, item):
+        return self.get(item, None)
+
+
+class BaseMessageObject:
+    message_type = None
+    codec_name = ""
     binary = True
     configurable = {}
     supports_responses = False
+    codec_cls = BaseCodec
+    codec_args = ()
+    logger_name = 'receiver'
 
     @classmethod
-    async def read_file(cls, file_path: Path, logger=root_logger):
-        read_mode = 'rb' if cls.binary else 'r'
-        async with settings.FILE_OPENER(file_path, read_mode) as f:
-            return await f.read()
+    def get_codec(cls, **kwargs):
+        return cls.codec_cls(cls, *cls.codec_args, **kwargs)
 
-    @classmethod
-    async def from_file(cls, file_path: Path, sender='', log=root_logger, **kwargs):
-        log.debug('Creating new %s message from %s', cls.protocol_name, file_path)
-        encoded = await asyncio.create_task(cls.read_file(file_path, logger=log))
-        return cls.from_buffer(sender, encoded, log=log, **kwargs)
-
-    @classmethod
-    def from_buffer(cls, sender, encoded, log=root_logger, **kwargs) -> Sequence:
-        return [cls(sender, encoded, decoded, log=log, **kwargs) for encoded, decoded in cls.decode(encoded, log=log)]
-
-    @classmethod
-    def from_decoded(cls, decoded, sender='', log=root_logger, **kwargs):
-        return cls(sender, cls.encode(decoded, log=log), decoded, log=log, **kwargs)
-
-    @classmethod
-    def decode(cls, encoded: bytes, log=root_logger) -> Sequence:
-        return [encoded, encoded]
-
-    @classmethod
-    def encode(cls, decoded, log=root_logger):
-        return decoded
-
-    def __init__(self, sender, encoded, decoded=None, timestamp=None, log=root_logger):
-        self.sender = sender
+    def __init__(self, encoded, decoded=None, timestamp=None, logger=None, context=None):
         self.encoded = encoded
         self.decoded = decoded
-        self.log = log
+        self.context = context or {}
+        self.logger = logger
+        if not self.logger:
+            self.logger = logging.getLogger(self.logger_name)
         self.received_timestamp = timestamp
         if not self.received_timestamp:
             self.received_timestamp = datetime.datetime.now()
 
-    def get_protocol_name(self) -> str:
-        return self.protocol_name
+    def __getattr__(self, item):
+        val = self.encoded.get(item, None)
+        if isinstance(val, dict):
+            return EmbeddedDict(val)
+        return val
 
-    @cached_property
+    @property
     def uid(self):
         return ''
 
@@ -68,24 +87,20 @@ class BaseProtocol:
     def pformat(self) -> str:
         return pformat(self.decoded)
 
-    @cached_property
+    @property
     def timestamp(self) -> datetime.datetime:
         return self.received_timestamp
 
     def filter(self):
         return False
 
-    def filter_by_action(self, action, to_print: bool):
-        return False
+    def make_response(self, result): ...
 
-    def make_response(self, *tasks): ...
-
-    def make_response_invalid_request(self, task):
-        return self.make_response(task)
+    def make_response_on_exception(self, exception): ...
 
     def __str__(self):
-        return "%s message %s" % (self.protocol_name, id(self))
+        return "%s message %s" % (self.message_type, id(self))
 
 
-class BufferProtocol(BaseProtocol):
+class BufferObject(BaseMessageObject):
     pass

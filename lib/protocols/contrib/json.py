@@ -1,17 +1,26 @@
 import json
 
-from lib.protocols.base import BaseProtocol
+from lib.protocols.base import BaseCodec, BaseMessageObject
 
 
-class BaseJSONProtocol(BaseProtocol):
-    protocol_name = "json"
-    binary = False
-
+class JSONCodec(BaseCodec):
     """
-    Manage JSON messages
+    Decode & Encode JSON messages
     """
 
-    supported_actions = ("text", "decode", "prettify", "summaries")
+    def decode(self, encoded: bytes):
+        pos = 0
+        end = len(encoded)
+        while pos < end:
+            start = pos
+            msg, pos = json.JSONDecoder().raw_decode(encoded, idx=pos)
+            yield (encoded[start:pos], msg)
 
-    def decode(self) -> bytes:
-        return json.loads(self.encoded)
+    def encode(self, decoded):
+        return json.dumps(decoded)
+
+
+class JSONObject(BaseMessageObject):
+    codec_cls = JSONCodec
+
+

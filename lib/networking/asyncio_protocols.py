@@ -7,7 +7,7 @@ import logging
 from ipaddress import IPv4Network, IPv6Network, AddressValueError
 
 from lib.counters import TaskCounter
-from lib.protocols.base import BufferProtocol
+from lib.protocols.base import BufferObject
 from lib.utils import Record, plural
 from .exceptions import MessageFromNotAuthorizedHost
 from .logging import ConnectionLogger, StatsLogger
@@ -47,6 +47,10 @@ class BaseMessageManager:
     def with_config(cls, logger, cp=None, **kwargs):
         config = cls.get_config(logger, cp=cp, **kwargs)
         return partial(cls, **config)
+
+    def __getattr__(self, item):
+        if item in getattr(self.action, 'methods', ()) or item in getattr(self.action, 'notification_methods', ()):
+            return partial(getattr(self.action, item), self)
 
     def __init__(self, action=None, pre_action=None, aliases=None, allowedsenders=(),
                  timeout=5, logger=None, stats_logger_cls=None):
@@ -105,7 +109,7 @@ class BaseMessageManager:
 
     def manage_buffer(self, sender, buffer, timestamp):
         if self.pre_action:
-            buffer = BufferProtocol(sender, buffer, timestamp=timestamp, logger=self.logger)
+            buffer = BufferObject(sender, buffer, timestamp=timestamp, logger=self.logger)
             self.pre_action.do_one(buffer)
 
     def on_data_received(self, buffer, timestamp=None):
@@ -162,11 +166,8 @@ class BaseMessageManager:
     def send(self, msg_encoded):
         raise NotImplementedError
 
-    def decode_buffer(self, encoded, timestamp=None):
-        #include self.context in msg object (include sender in self.context only)
-        return encoded
-
-    def encode_msg(self, msg_obj):
+    def encode_msg(self, decoded):
+        msg_obj = self.codec.encode(decoded)
         return msg_obj.encoded
 
     def encode_exception(self, msg_obj, exception):...
@@ -178,7 +179,6 @@ class BaseMessageManager:
         if exception():
             self.logger.error(exception)
             return self.encode_exception(msg_obj, exception)
-
 
 
 class BaseNetworkProtocol(BaseMessageManager):
@@ -220,6 +220,9 @@ class BaseNetworkProtocol(BaseMessageManager):
 
     @property
     def server(self):
+        raise NotImplementedError
+
+    def send(self, msg_encoded):
         raise NotImplementedError
 
     def connection_made(self, transport):

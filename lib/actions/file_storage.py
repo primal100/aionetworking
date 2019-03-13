@@ -2,7 +2,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from .base import BaseAction
+from .base import BaseServerAction
 from lib.conf import RawStr
 from lib.utils import plural
 from lib.settings import FILE_OPENER
@@ -84,9 +84,9 @@ class ManagedFile:
                 self.cleanup()
 
 
-class BaseFileStorage(BaseAction):
+class BaseFileStorage(BaseServerAction):
 
-    configurable = BaseAction.configurable
+    configurable = BaseServerAction.configurable
     configurable.update({
         'basepath': Path,
         'path': RawStr,
