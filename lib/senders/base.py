@@ -21,19 +21,19 @@ class BaseSender:
     }
 
     @classmethod
-    def get_config(cls, cp=None, **kwargs):
+    def get_config(cls, cp=None, logger_name=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Sender', **cls.configurable)
-        logger = logging.getLogger(cp.logger_name)
+        logger_name = logger_name or cls.logger_name
+        logger = logging.getLogger(logger_name)
         logger.debug('Found configuration for %s: %s', cls.sender_type, config)
         config.update(kwargs)
         config['logger'] = logger
         return config
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, config=None, **kwargs):
-        if not config:
-            config = cls.get_config(cp=cp, **kwargs)
+    def from_config(cls, manager: BaseMessageManager, cp=None, queue=None, **kwargs):
+        config = cls.get_config(cp=cp, **kwargs)
         return cls(manager, queue=queue, **config)
 
     def __init__(self, manager: BaseMessageManager, queue=None, interval: float = 0, logger=None):

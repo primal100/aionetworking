@@ -3,7 +3,7 @@ from datetime import datetime
 from functools import partial
 
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
-from lib.utils import  log_exception
+from lib.utils import log_exception
 from lib.wrappers.periodic import call_cb_periodic
 
 
@@ -117,14 +117,15 @@ class StatsLogger(NoStatsLogger):
     }
 
     @classmethod
-    def with_config(cls, logger, cp=None, **kwargs):
-        stats_logger = logging.getLogger(f'{logger.name}.stats')
+    def with_config(cls, parent_logger, cp=None, **kwargs):
+        logger_name = f'{parent_logger.name}.stats'
+        stats_logger = logging.getLogger(logger_name)
         if stats_logger.isEnabledFor(logging.INFO):
-            logger_name = f"logger_{logger.name}.stats"
-            formatter_name = f"formatter_{logger.name}Stats"
-            config = cp.section_as_dict(logger_name, **cls.logger_configurable)
+            logger_config_name = f"logger_{logger_name}"
+            formatter_name = f"formatter_{parent_logger.name}Stats"
+            config = cp.section_as_dict(logger_config_name, **cls.logger_configurable)
             config.update(cp.section_as_dict(formatter_name, **cls.formatter_configurable))
-            logger.debug(f'Found config for {logger.name} stats: {config}')
+            parent_logger.debug(f'Found config for {parent_logger.name} stats: {config}')
             config.update(**kwargs)
             return partial(cls, stats_logger, **config)
         return partial(cls, NoStatsLogger, stats_logger)
@@ -148,7 +149,8 @@ class StatsLogger(NoStatsLogger):
     def on_msg_received(self, msg):
         self.extra.on_msg_received(msg)
 
-    def on_msg_processed(self, num_bytes):
+    def on_msg_processed(self, msg):
+        num_bytes = len(msg.encoded)
         self.extra.on_msg_processed(num_bytes)
         if self._is_closing:
             self.check_last_message_processed()

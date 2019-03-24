@@ -1,8 +1,8 @@
-
 import asyncio
-import logging
+from collections import ChainMap
 
 from lib import settings
+from lib.conf.logging import Logger
 
 from typing import TYPE_CHECKING
 
@@ -20,24 +20,24 @@ class BaseReceiver:
     }
 
     @classmethod
-    def get_config(cls, cp=None, **kwargs):
+    def get_config(cls, cp=None, logger_name=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict('Receiver', **cls.configurable)
-        logger = logging.getLogger(cp.logger_name)
+        logger_name = logger_name or cls.logger_name
+        logger = Logger(logger_name)
         logger.debug('Found configuration for %s: %s', cls.receiver_type, config)
         config.update(kwargs)
-        config['logger'] =logger
+        config['logger'] = logger
         return config
 
     @classmethod
-    def from_config(cls, manager: BaseMessageManager, cp=None, config=None, **kwargs):
-        if not config:
-            config = cls.get_config(cp=cp)
+    def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
+        config = cls.get_config(cp=cp)
         return cls(manager, **config, **kwargs)
 
     def __init__(self, manager, quiet: bool=False, logger=None):
         self.quiet = quiet
-        self.logger = logger or logging.getLogger(self.logger_name)
+        self.logger = logger or Logger(self.logger_name)
         self.manager = manager
 
     async def started(self):
@@ -64,8 +64,7 @@ class BaseReceiver:
 
 
 class BaseServer(BaseReceiver):
-    configurable = BaseReceiver.configurable.copy()
-    configurable.update({
+    configurable = ChainMap(BaseReceiver.configurable, {
         'host': str,
         'port': int,
     })

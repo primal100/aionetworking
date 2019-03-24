@@ -2,7 +2,7 @@ import datetime
 from pycrate_core.charpy import Charpy
 
 from lib.protocols.base import BaseCodec, BaseMessageObject
-from lib.utils import cached_property, adapt_asn_domain, asn_timestamp_to_datetime
+from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
 from typing import Sequence
 
@@ -31,6 +31,11 @@ class PyCrateAsnCodec(BaseCodec):
 
 class BaseAsnObject(BaseMessageObject):
     codec_cls = PyCrateAsnCodec
+    pycrate_asn_class = None
+
+    @classmethod
+    def get_codec_args(cls):
+        return cls.pycrate_asn_class,
 
     def get_event_type(self):
         return ''

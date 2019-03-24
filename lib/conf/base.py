@@ -1,6 +1,6 @@
-import logging
+from tempfile import TemporaryDirectory
 
-from lib.utils import cached_property, now_to_utc_string
+from lib.utils import cached_property
 
 from pathlib import Path
 
@@ -14,8 +14,10 @@ class BaseConfigClass:
     def __init__(self, logger_name='root'):
         self.logger_name = logger_name
         from lib import settings
+        tmp_dir = TemporaryDirectory(prefix=settings.APP_NAME)
         self.defaults = {
             'Testdir': settings.TESTS_DIR,
+            'Tmpdir': tmp_dir,
             'Develdir': settings.ROOT_DIR,
             'Userhome': settings.USER_HOME,
             "~": settings.USER_HOME,

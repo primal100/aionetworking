@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+from .logging import MessageLogger
 from pathlib import Path
 from pprint import pformat
 
@@ -21,6 +22,9 @@ class BaseCodec:
         self.msg_obj = msg_obj
         self.logger = logger or logging.getLogger(self.logger_name)
 
+    def set_logger(self, logger):
+        self.logger = logger
+
     async def read_file(self, file_path: Path):
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             return await f.read()
@@ -36,10 +40,14 @@ class BaseCodec:
     def from_decoded(self, decoded, **kwargs):
         return self.msg_obj(self.encode(decoded), decoded, **kwargs)
 
-    def decode(self, encoded: bytes) -> Sequence:
+    def create_msg(self, decoded, **kwargs):
+        encoded = self.encode(decoded, **kwargs)
+        return self.msg_obj(encoded, decoded=decoded, **kwargs)
+
+    def decode(self, encoded: bytes, **kwargs) -> Sequence:
         yield [encoded, encoded]
 
-    def encode(self, decoded):
+    def encode(self, decoded, **kwargs):
         return decoded
 
 
@@ -55,20 +63,21 @@ class BaseMessageObject:
     configurable = {}
     supports_responses = False
     codec_cls = BaseCodec
-    codec_args = ()
     logger_name = 'receiver'
+    id_attr = 'id'
 
     @classmethod
     def get_codec(cls, **kwargs):
-        return cls.codec_cls(cls, *cls.codec_args, **kwargs)
+        return cls.codec_cls(cls, *cls.get_codec_args(), **kwargs)
 
     def __init__(self, encoded, decoded=None, timestamp=None, logger=None, context=None):
         self.encoded = encoded
         self.decoded = decoded
         self.context = context or {}
-        self.logger = logger
-        if not self.logger:
-            self.logger = logging.getLogger(self.logger_name)
+        if not logger:
+            logger = logging.getLogger(self.logger_name)
+        self.conn_logger = logger
+        self.logger = logger.get_sibling('msg', extra={'msg_obj': self})
         self.received_timestamp = timestamp
         if not self.received_timestamp:
             self.received_timestamp = datetime.datetime.now()
@@ -79,9 +88,20 @@ class BaseMessageObject:
             return EmbeddedDict(val)
         return val
 
+    @classmethod
+    def get_codec_args(cls):
+        return ()
+
     @property
     def uid(self):
-        return ''
+        try:
+            return self.decoded[self.id_attr]
+        except KeyError:
+            return id(self)
+
+    @property
+    def request_id(self):
+        return self.uid
 
     @property
     def pformat(self) -> str:
@@ -94,12 +114,12 @@ class BaseMessageObject:
     def filter(self):
         return False
 
-    def make_response(self, result): ...
-
-    def make_response_on_exception(self, exception): ...
+    def processed(self):
+        if self.stats_logger:
+            self.stats_logger.on_message_processed(self)
 
     def __str__(self):
-        return "%s message %s" % (self.message_type, id(self))
+        return "%s message %s" % (self.message_type, self.uid)
 
 
 class BufferObject(BaseMessageObject):

@@ -3,14 +3,14 @@ import logging
 import time
 from functools import partial
 
-from .asyncio_protocols import BaseProtocolMixin
+from .asyncio_protocols import BaseNetworkProtocol
 from .mixins import ServerProtocolMixin, ClientProtocolMixin
 from .logging import SimpleConnectionLogger
 
 from lib.utils import addr_tuple_to_str
 
 
-class UDP(BaseProtocolMixin, asyncio.DatagramProtocol):
+class UDP(BaseNetworkProtocol, asyncio.DatagramProtocol):
 
     @property
     def client(self):
@@ -29,6 +29,7 @@ class UDP(BaseProtocolMixin, asyncio.DatagramProtocol):
 
 class UDPServerClientProtocol(ServerProtocolMixin, UDP):
     name = 'UDP Server'
+    parent_logger_name = 'receiver'
 
     def send(self, msg):
         self.transport.sendto(msg, addr=(self.peer_ip, self.peer_port))
@@ -43,11 +44,12 @@ class UDPServerClientProtocol(ServerProtocolMixin, UDP):
 
 class UDPClientProtocol(ClientProtocolMixin, UDP):
     name = 'UDP Client'
+    parent_logger_name = 'sender'
 
 
 class UDPServerProtocol(asyncio.DatagramProtocol):
     transport = None
-    logger_name = 'receiver'
+    parent_logger_name = 'receiver'
     sock = (None, None)
     name = "UDP Listener"
     client_protocol_class = UDPServerClientProtocol
@@ -55,7 +57,7 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
     @classmethod
     def with_config(cls, logger, cp=None, **kwargs):
         client_protocol_cls = cls.client_protocol_class.with_config(logger, cp=cp)
-        cls._logger = logger or cls.logger_name
+        cls._logger = logger or cls.parent_logger_name
         return partial(cls, client_protocol_cls=client_protocol_cls, logger=logger, **kwargs)
 
     @property
@@ -67,14 +69,14 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
         self.manager = manager
         self.clients = {}
         self.closed_event = asyncio.Event()
-        logger = logger or logging.getLogger(self.logger_name)
+        logger = logger or logging.getLogger(self.parent_logger_name)
         self.logger = SimpleConnectionLogger(logger, {})
 
-    def connection_made(self, transport: transports.BaseTransport):
+    def connection_made(self, transport):
         self.transport = transport
         self.sock = self.transport.get_extra_info('sockname')
 
-    def connection_lost(self, exc: Optional[Exception]):
+    def connection_lost(self, exc):
         self.logger.manage_error(exc)
         connections = list(self.clients.values())
         for conn in connections:

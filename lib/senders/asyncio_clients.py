@@ -2,7 +2,8 @@ import asyncio
 from functools import partial
 
 from lib.conf import ConfigurationException
-from lib.networking.asyncio_protocols import TCPClientProtocol, UDPClientProtocol
+from lib.networking.tcp import TCPClientProtocol
+from lib.networking.udp import UDPClientProtocol
 from lib.networking.mixins import TCP
 from lib.networking.ssl import ClientSideSSL
 from .base import BaseNetworkClient
@@ -10,14 +11,19 @@ from .base import BaseNetworkClient
 
 class BaseAsyncioClient(BaseNetworkClient):
     transport = None
-    protocol_cls = None
+    default_protocol_cls = None
+    logger_name = 'sender'
     conn = None
 
     @classmethod
-    def from_config(cls, *args, cp=None, config=None, **kwargs):
-        instance = super().from_config(*args, cp=cp, config=config, **kwargs)
-        instance.protocol_cls = cls.protocol_cls.with_config(cp=cp, logger=instance.logger)
-        return instance
+    def from_config(cls, *args, cp=None, **kwargs):
+        logger_name = kwargs.get('logger_name', cls.logger_name)
+        protocol_cls = cls.default_protocol_cls.with_config(cp=cp, logger_name=logger_name)
+        return super().from_config(*args, cp=cp, protocol_cls=protocol_cls, logger_name=logger_name, **kwargs)
+
+    def __init__(self, *args, protocol_cls=None, **kwargs):
+        self.protocol_cls = protocol_cls or self.default_protocol_cls
+        super().__init__(*args, **kwargs)
 
     async def __aenter__(self):
         await self.start()
@@ -37,7 +43,7 @@ class TCPClient(TCP, BaseAsyncioClient):
     sender_type = "TCP Client"
     ssl_section_name = 'SSLClient'
     transport = None
-    protocol_cls = TCPClientProtocol
+    default_protocol_cls = TCPClientProtocol
     conn = None
     ssl_cls = ClientSideSSL
     configurable = BaseAsyncioClient.configurable.copy()
@@ -57,7 +63,7 @@ class TCPClient(TCP, BaseAsyncioClient):
 class UDPClient(BaseAsyncioClient):
     sender_type = "UDP Client"
     transport = None
-    protocol_cls = UDPClientProtocol
+    default_protocol_cls = UDPClientProtocol
     conn = None
 
     async def open_connection(self):

@@ -44,4 +44,4 @@ LOG_FILTERS: Mapping[str, Type[BaseFilter]] = {
 }
 MESSAGE_MANAGER: Type[BaseMessageManager] = OneWayMessageManager
 CLIENT_MESSAGE_MANAGER: Type[BaseMessageManager] = ClientOneWayMessageManager
-PROTOCOLS: Mapping[str, Type[BaseProtocol]] = {}
+DATA_FORMATS: Mapping[str, Type[BaseProtocol]] = {}

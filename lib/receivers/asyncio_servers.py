@@ -1,21 +1,28 @@
 import asyncio
 from functools import partial
+from collections import ChainMap
 
 from .base import BaseServer
-from lib.networking.asyncio_protocols import TCPServerProtocol, UDPServerProtocol
+from lib.conf.logging import Logger
+from lib.networking.tcp import TCPServerProtocol
+from lib.networking.udp import UDPServerProtocol
 from lib.networking.mixins import TCP
 from lib.networking.ssl import ServerSideSSL
 from lib.conf import ConfigurationException
 
 
 class BaseAsyncioServer(BaseServer):
-    protocol_cls = None
+    default_protocol_cls = None
 
     @classmethod
-    def from_config(cls, *args, cp=None, config=None, **kwargs):
-        instance = super().from_config(*args, cp=cp, config=config, **kwargs)
-        instance.protocol_cls = cls.protocol_cls.with_config(cp=cp, logger=instance.logger)
-        return instance
+    def from_config(cls, *args, cp=None, logger_name=None, **kwargs):
+        logger = Logger(logger_name or cls.logger_name)
+        protocol_cls = cls.default_protocol_cls.with_config(cp=cp, logger=logger)
+        return super().from_config(*args, cp=cp, protocol_cls=protocol_cls, logger_name=logger_name, **kwargs)
+
+    def __init__(self, *args, protocol_cls=None, **kwargs):
+        self.protocol_cls = protocol_cls or self.default_protocol_cls
+        super().__init__(*args, **kwargs)
 
 
 class BaseTCPServerReceiver(BaseAsyncioServer):
@@ -39,12 +46,12 @@ class BaseTCPServerReceiver(BaseAsyncioServer):
 class TCPServerReceiver(TCP, BaseTCPServerReceiver):
     configurable = BaseTCPServerReceiver.configurable.copy()
     configurable.update(TCP.configurable)
-    protocol_cls = TCPServerProtocol
+    default_protocol_cls = TCPServerProtocol
     ssl_cls = ServerSideSSL
     ssl_section_name = 'SSLServer'
 
     async def get_server(self):
-        return await asyncio.get_event_loop().create_server(partial(self.protocol_cls, self.manager),
+        return await asyncio.get_event_loop().create_server(self.protocol_cls,
             self.host, self.port, ssl=self.ssl, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
@@ -52,9 +59,10 @@ class UDPServerReceiver(BaseAsyncioServer):
     receiver_type = "UDP Server"
     transport = None
     protocol = None
-    protocol_cls = UDPServerProtocol
-    configurable = BaseAsyncioServer.configurable.copy()
-    configurable.update({'expiryminutes': int})
+    default_protocol_cls = UDPServerProtocol
+    configurable = ChainMap(BaseAsyncioServer.configurable, {
+        {'expiryminutes': int}
+    })
 
     def __init__(self, *args, expiryminutes=30, **kwargs):
         super(UDPServerReceiver, self).__init__(*args, **kwargs)

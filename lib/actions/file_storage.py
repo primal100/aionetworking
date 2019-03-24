@@ -6,17 +6,17 @@ from .base import BaseServerAction
 from lib.conf import RawStr
 from lib.utils import plural
 from lib.settings import FILE_OPENER
-from lib import settings
 
 
 class ManagedFile:
+    logger_name = 'receiver.actions'
     f = None
 
     def __init__(self, base_path, path, files_dict, mode='ab', buffering=-1, timeout=5, logger=None,
                  attr='encoded', separator=''):
         self.logger = logger
         if not self.logger:
-            self.logger = logging.getLogger('receiver')
+            self.logger = logging.getLogger(self.logger_name)
         self.full_path = base_path.joinpath(path)
         self.full_path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
@@ -127,16 +127,16 @@ class FileStorage(BaseFileStorage):
     key = 'Filestorage'
 
     async def write_to_file(self, path, msg):
-        self.log.debug('Writing to file %s', path)
+        msg.logger.debug('Writing to file %s', path)
         data = self.get_data(msg)
         async with FILE_OPENER(path, self.mode) as f:
             await f.write(data)
-        self.log.debug('Data written to file %s', path)
+        msg.logger.debug('Data written to file %s', path)
         msg.processed()
         return path
 
     def do_one(self, msg):
-        self.log.debug('Processing message for action %s', self.name)
+        msg.logger.debug('Running action')
         path = self.get_full_path(msg)
         path.parent.mkdir(parents=True, exist_ok=True)
         return self.write_to_file(path, msg)
@@ -161,12 +161,12 @@ class BufferedFileStorage(BaseFileStorage):
             self.files_with_outstanding_writes.append(path)
 
     def get_file(self, path):
-        self.log.debug('Getting file %s', path)
+        self.logger.debug('Getting file %s', path)
         try:
             return self.files[path]
         except KeyError:
             return ManagedFile(self.base_path, path, self.files, mode=self.mode, buffering=self.buffering,
-                               timeout=self.timeout, logger=self.log, attr=self.attr, separator=self.separator)
+                               timeout=self.timeout, logger=self.logger, attr=self.attr, separator=self.separator)
 
     def write_to_file(self, path, msg):
         f = self.get_file(path)
@@ -174,7 +174,7 @@ class BufferedFileStorage(BaseFileStorage):
         self.set_outstanding_writes(path)
 
     def do_one(self, msg):
-        self.log.debug('Storing message')
+        msg.logger.debug('Storing message')
         path = self.get_path(msg)
         self.write_to_file(path, msg)
 
@@ -183,15 +183,15 @@ class BufferedFileStorage(BaseFileStorage):
 
     async def wait_complete(self):
         try:
-            self.log.debug('Waiting for outstanding writes to complete')
-            self.log.debug(self.files_with_outstanding_writes)
+            self.logger.debug('Waiting for outstanding writes to complete')
+            self.logger.debug(self.files_with_outstanding_writes)
             for path in self.files_with_outstanding_writes:
                 f = self.get_file(path)
                 await f.wait_writes_done()
-            self.log.debug('All outstanding writes have been completed', extra=logs_extra)
+            self.logger.debug('All outstanding writes have been completed')
         finally:
             self.files_with_outstanding_writes.clear()
-            self.log.debug(self.files_with_outstanding_writes)
+            self.logger.debug(self.files_with_outstanding_writes)
 
     async def close(self):
         files = list(self.files.values())

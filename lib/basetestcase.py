@@ -3,7 +3,8 @@ import logging
 from unittest import TestCase
 
 from lib.conf.parser import INIFileConfig
-from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
+from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
+from lib.formats.contrib.json import JSONObject
 from lib import definitions, settings
 
 from pathlib import Path
@@ -12,7 +13,7 @@ from typing import AnyStr
 settings.LOGGER_NAME = 'messagemanager'
 settings.DATA_DIR = settings.TEST_DATA_DIR
 settings.CONFIG_ARGS = settings.TEST_CONF_DIR.joinpath('tcp_server_test_setup.ini'),
-definitions.PROTOCOLS = {'TCAP': TCAP_MAP_ASNProtocol}
+definitions.DATA_FORMATS = {'TCAP': TCAPMAPASNObject, 'JSON': JSONObject}
 
 logger = logging.getLogger(settings.LOGGER_NAME)
 logger.setLevel(logging.CRITICAL)

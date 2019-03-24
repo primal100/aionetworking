@@ -1,6 +1,6 @@
 import json
 
-from lib.protocols.base import BaseCodec, BaseMessageObject
+from lib.formats.base import BaseCodec, BaseMessageObject
 
 
 class JSONCodec(BaseCodec):
@@ -8,7 +8,7 @@ class JSONCodec(BaseCodec):
     Decode & Encode JSON messages
     """
 
-    def decode(self, encoded: bytes):
+    def decode(self, encoded: bytes, **kwargs):
         pos = 0
         end = len(encoded)
         while pos < end:
@@ -16,11 +16,13 @@ class JSONCodec(BaseCodec):
             msg, pos = json.JSONDecoder().raw_decode(encoded, idx=pos)
             yield (encoded[start:pos], msg)
 
-    def encode(self, decoded):
+    def encode(self, decoded, **kwargs):
         return json.dumps(decoded)
 
 
 class JSONObject(BaseMessageObject):
     codec_cls = JSONCodec
+
+
 
 

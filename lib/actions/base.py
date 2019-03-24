@@ -11,17 +11,16 @@ class BaseServerAction:
     configurable = {'timeout': int}
 
     @classmethod
-    def from_config(cls, cp=None, **kwargs):
+    def from_config(cls, cp=None, logger=None, **kwargs):
         cp = cp or settings.CONFIG
         config = cp.section_as_dict(cls.key, **cls.configurable)
-        logger = logging.getLogger("%s.actions" % cp.logger_name)
         logger.info('Found configuration for %s:%s', cls.name, config)
         config.update(kwargs)
-        config['logger_name'] = cp.logger_name
-        return cls(**config)
+        return cls(logger=logger, **config)
 
     def __init__(self, timeout=10, logger=None):
-        self.logger = logger or logging.getLogger(self.logger_name)
+        logger = logger or logging.getLogger(self.logger_name)
+        self.logger = logger.get_child("actions")
         self.timeout = timeout
         self.outstanding_tasks = []
 
@@ -57,6 +56,10 @@ class BaseServerAction:
     async def close(self):
         await self.wait_complete()
 
+    def response_on_decode_error(self, data, exc): ...
+
+    def response_on_exception(self, msg, exc): ...
+
 
 class BaseClientAction:
     name = ''
@@ -76,14 +79,8 @@ class BaseClientAction:
         config['logger_name'] = cp.logger_name
         return cls(**config)
 
-    def __init__(self, conn, timeout=10, logger=None):
+    def __init__(self, conn, timeout=10, logger_name=None):
         self.conn = conn
-        self.logger = logger or logging.getLogger(self.logger_name)
+        logger_name = logger_name or self.logger_name
+        self.logger = logging.getLogger(logger_name)
         self.timeout = timeout
-
-    def send(self, msg):
-        self.conn.encode_and_send_msg(msg)
-
-    async def send_wait_response(self, msg):
-        self.send_msg(msg)
-        #await

@@ -1,11 +1,11 @@
 from pycrate_asn1dir import TCAP_MAP
-from lib.protocols.contrib.asn1 import BasePyCrateAsnProtocol
+from lib.formats.contrib.asn1 import BaseAsnObject
 from lib.utils import cached_property
 
 import binascii
 
 
-class TCAP_MAP_ASNProtocol(BasePyCrateAsnProtocol):
+class TCAPMAPASNObject(BaseAsnObject):
 
     pycrate_asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
     protocol_name = "TCAP_MAP"
