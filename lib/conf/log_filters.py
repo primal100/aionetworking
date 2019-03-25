@@ -8,23 +8,24 @@ from typing import Type, Callable
 
 
 class _BaseFilter(BaseSwappable):
-    pass
-
-
-class BaseFilter(_BaseFilter, logging.Filter):
     name = ''
     config_section = 'filter'
 
     #Dataclass fields
     loggers: ListLoggers = []
 
+    def __post_init__(self):
+        super().__init__()
+        super().__post_init__()
+        for logger in self.loggers:
+            logger.addFilter(self)
+
+
+class BaseFilter(_BaseFilter, logging.Filter):
+
     @classmethod
     def get_swappable(cls, name : str) -> Type[_BaseFilter]:
         return definitions.LOG_FILTERS[name]
-
-    def __post_init__(self):
-        for logger in self.loggers:
-            logger.addFilter(self)
 
 
 class SenderFilter(BaseFilter):

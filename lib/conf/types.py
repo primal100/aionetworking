@@ -27,9 +27,12 @@ class _BaseConfigurableType:
     #Dataclass Fields
     logger: Logger = None
 
+    def __post_init__(self):
+        pass
+
     @classmethod
     def get_configurable(cls) -> Iterable:
-        return filter(lambda f: not f.name.startswith('_'), fields(cls))
+        return filter(lambda f: f.metadata.get('configurable', True), fields(cls))
 
     @classmethod
     def get_config_section(cls, section_postfix):

@@ -12,6 +12,7 @@ class Recording(BufferedFileStorage):
     senders: tuple = ()
 
     def __post_init__(self):
+        super().__post_init__()
         self.record = Record()
 
     def filter(self, msg):

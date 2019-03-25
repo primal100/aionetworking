@@ -25,6 +25,7 @@ class BaseReceiverAction(BaseSwappable):
         return definitions.ACTIONS[name]
 
     def __post_init__(self):
+        super().__post_init__()
         self.logger = self.logger.get_child("actions")
         self._outstanding_tasks = []
 
@@ -82,5 +83,7 @@ class BaseSenderAction(BaseSwappable):
         return definitions.ACTIONS[name]
 
     def __post_init__(self):
+        super().__post_init__()
         self.logger = self.logger.get_child("actions")
+
 

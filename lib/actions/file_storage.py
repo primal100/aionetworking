@@ -144,6 +144,7 @@ class BufferedFileStorage(BaseFileStorage):
     buffering: int = -1
 
     def __post_init__(self):
+        super().__post_init__()
         self._files = {}
         self._files_with_outstanding_writes = []
 

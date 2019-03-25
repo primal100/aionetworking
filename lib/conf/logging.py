@@ -2,31 +2,37 @@ import logging
 from functools import partial
 from collections import ChainMap
 from datetime import datetime
+from dataclasses import field
 
+from .types import BaseConfigurable
 from lib.utils import log_exception
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
 from lib.wrappers.periodic import call_cb_periodic
 
 
-from typing import TYPE_CHECKING, Type, Optional, MutableMapping, NoReturn, AnyStr, Iterable, Generator, Any
+from typing import TYPE_CHECKING, Type, Optional, MutableMapping, Dict, NoReturn, AnyStr, Iterable, Generator, Any
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
     BaseMessageObject = None
 
 
-class _Logger(logging.LoggerAdapter):
+class _Logger(BaseConfigurable, logging.LoggerAdapter):
     pass
 
 
 class Logger(_Logger):
+    #Dataclass fields
+    logger = None
+    logger_name: str = ''
+    datefmt: str = '%Y-%M-%d %H:%M:%S'
+    extra: dict = field(default_factory=dict, metadata={'configurable': False})
 
-    def __init__(self, logger_name: str, extra: Optional[MutableMapping] = None, **kwargs):
-        self._extra = extra or {}
-        self._logger_name = logger_name
-        logger = logging.getLogger(self._logger_name)
-        super().__init__(logger, extra)
+    def __post_init__(self):
+        logger = logging.getLogger(self.logger_name)
+        super().__init__(logger, self.extra)
         self.connection_logger_cls = self.get_connection_logger_cls()
+        super().__post_init__()
 
     def get_connection_logger_cls(self) -> Type[_Logger]:
         if self.get_child('stats').isEnabledFor(logging.INFO):
@@ -41,7 +47,7 @@ class Logger(_Logger):
         return self.get_child(*args, name=name, cls=self.connection_logger_cls, **kwargs)
 
     def get_child(self, *args, name: str = '', **kwargs) -> _Logger:
-        logger_name = f"{self._logger_name}.{name}"
+        logger_name = f"{self.logger_name}.{name}"
         return self.get_logger(*args, name=logger_name, **kwargs)
 
     def get_sibling(self, *args, name: str = '', **kwargs) -> _Logger:
@@ -51,29 +57,15 @@ class Logger(_Logger):
     def get_logger(self, name: str = '', cls: Type[_Logger]=None, context: MutableMapping = None, **kwargs) -> _Logger:
         cls = cls or Logger
         context = context or {}
-        extra = ChainMap(context, self._extra)
+        extra = ChainMap(context, self.extra)
         return cls(name, extra, **kwargs)
 
 
 class ConnectionLogger(Logger):
     _is_closing: bool = False
-    configurable = {}
 
-    @classmethod
-    def get_config(cls, cp=None, **kwargs):
-        from lib import settings
-        cp = cp or settings.CONFIG
-        config = cp.section_as_dict('ConnectionLogger', **cls.configurable)
-        config.update(kwargs)
-        return config
-
-    @classmethod
-    def with_config(cls, *args, **kwargs):
-        config = cls.get_config(*args, **kwargs)
-        return partial(cls, **config)
-
-    def __init__(self, logger_name, *args, **kwargs):
-        super().__init__(logger_name, *args, **kwargs)
+    def __post_init__(self):
+        super().__post_init__()
         self._raw_received_logger = self.logger.get_sibling('raw_received')
         self._raw_sent_logger = self.logger.get_sibling('raw_sent')
         self._data_received_logger = self.logger.get_sibling('data_received')
@@ -109,11 +101,11 @@ class ConnectionLogger(Logger):
         self._raw_sent_logger.debug(data, *args, **kwargs)
 
     def _data_received(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> NoReturn:
-        extra = ChainMap({'data': msg_obj}, self._extra)
+        extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_received_logger.debug(msg, *args, extra=extra, **kwargs)
 
     def _data_sent(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> NoReturn:
-        extra = ChainMap({'data': msg_obj}, self._extra)
+        extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_sent_logger.debug(msg, *args, extra=extra, **kwargs)
 
     def new_connection(self) -> NoReturn:
@@ -151,7 +143,7 @@ class ConnectionLogger(Logger):
         self._is_closing = True
 
 
-class _StatsTracker(MutableMapping):
+class _StatsTracker(dict):
     pass
 
 
@@ -163,6 +155,7 @@ class StatsTracker(_StatsTracker):
         return self.__class__(self.properties, self.datefmt)
 
     def __init__(self, properties: MutableMapping, datefmt: str ="%Y-%M-%d %H:%M:%S"):
+        super().__init__()
         self.datefmt = datefmt
         self.properties = properties
         self.start = LoggingDatetime(datefmt=datefmt)
@@ -228,31 +221,26 @@ class StatsTracker(_StatsTracker):
 class StatsLogger(Logger):
     stats_cls = StatsTracker
 
-    def __init__(self, logger, extra, datefmt="%Y-%M-%d %H:%M:%S"):
-        extra = self.stats_cls(extra, datefmt=datefmt)
-        super().__init__(logger, extra)
+    def __post_init__(self):
+        self.extra = self.stats_cls(self.extra, datefmt=self.datefmt)
+        super().__post_init__()
 
     def reset(self):
         self.extra = self.extra.reset()
 
 
 class ConnectionLoggerStats(ConnectionLogger):
-    _total_received: int = 0
-    _total_processed: int = 0
-    _first: bool = True
+    _total_received = 0
+    _total_processed = 0
+    _first = True
     stats_cls = StatsLogger
-    configurable = ConnectionLogger.configurable.copy()
-    configurable.update({
-        'interval': int,
-        'datefmt': str
-    })
+    interval: int = 0
 
-    def __init__(self, *args, interval: int =0, datefmt: str ='%Y-%M-%d %H:%M:%S', **kwargs):
+    def __post_init__(self):
         self._stats_logger = self.logger.get_child('stats', cls=self.stats_cls)
-        super().__init__(*args, **kwargs)
-        self.datefmt = datefmt
-        if interval:
-            call_cb_periodic(interval, self.periodic_log, fixed_start_time=True)
+        super().__post_init__()
+        if self.interval:
+            call_cb_periodic(self.interval, self.periodic_log, fixed_start_time=True)
 
     def periodic_log(self, first: bool) -> NoReturn:
         self.extra.end_time = datetime.now()
