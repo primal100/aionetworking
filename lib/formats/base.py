@@ -1,11 +1,11 @@
 import asyncio
 import datetime
 import logging
-from .logging import MessageLogger
 from pathlib import Path
 from pprint import pformat
 
 from lib import settings
+from lib.utils import Record
 
 from typing import Sequence
 
@@ -55,6 +55,15 @@ class EmbeddedDict(dict):
     def __getattr__(self, item):
         return self.get(item, None)
 
+    def __getitem__(self, item):
+        return self.__getattr__(item)
+
+
+class MessageObject:
+    def __new__(cls, name):
+        from lib import definitions
+        return definitions.DATA_FORMATS[name]
+
 
 class BaseMessageObject:
     message_type = None
@@ -82,11 +91,18 @@ class BaseMessageObject:
         if not self.received_timestamp:
             self.received_timestamp = datetime.datetime.now()
 
+    @property
+    def sender(self):
+        return self.context['alias']
+
     def __getattr__(self, item):
-        val = self.encoded.get(item, None)
+        val = self.decoded.get(item, None)
         if isinstance(val, dict):
             return EmbeddedDict(val)
         return val
+
+    def __getitem__(self, item):
+        return self.__getattr__(item)
 
     @classmethod
     def get_codec_args(cls):
@@ -123,4 +139,11 @@ class BaseMessageObject:
 
 
 class BufferObject(BaseMessageObject):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._record = Record()
+
+    @property
+    def record(self):
+        return self._record.pack_client_msg(self)

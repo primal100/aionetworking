@@ -1,6 +1,10 @@
-from inspect import getfullargspec
+from .base import BaseReceiverAction, BaseSenderAction
+from typing import TYPE_CHECKING, MutableMapping, AnyStr, NoReturn
 
-from .base import BaseServerAction, BaseClientAction
+if TYPE_CHECKING:
+    from lib.formats.base import BaseMessageObject
+else:
+    BaseMessageObject = None
 
 
 class MethodNotFoundError(Exception):
@@ -11,16 +15,13 @@ class InvalidParamsError(Exception):
     pass
 
 
-class BaseJSONRPCMethod:
+class JSONRPCMethod:
     version = "2.0"
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
 
-    def run(self, conn, command):
-        conn.encode_and_send_msg(command)
-
-    def base_command(self, *args, **kwargs):
+    def base_command(self, *args, **kwargs) -> MutableMapping:
         command = {"jsonrpc": self.version, "method": self.name}
         if args:
             command['params'] = args
@@ -29,22 +30,7 @@ class BaseJSONRPCMethod:
         return command
 
 
-class JSONRPCMethodClient(BaseJSONRPCMethod):
-
-    async def __call__(self, conn, *args, **kwargs):
-        command = self.base_command(*args, **kwargs)
-        command['id'] = conn.context.get('next_request_id', 0)
-        conn.context['next_request_id'] = command['id'] + 1
-        self.run(conn, command)
-        #await response received
-
-
-class JSONRPCMethodNotification(BaseJSONRPCMethod):
-    def __call__(self, conn, *args, context=None, **kwargs):
-        self.run(conn, self.base_command(*args, **kwargs))
-
-
-class BaseJSONRPCServer(BaseServerAction):
+class BaseJSONRPCServer(BaseReceiverAction):
     version = '2.0'
     exception_codes = {
         'InvalidRequestError': {"code": -32600, "message": "Invalid Request"},
@@ -55,11 +41,11 @@ class BaseJSONRPCServer(BaseServerAction):
     }
 
     @staticmethod
-    def check_args(exc):
+    def check_args(exc: Exception) -> NoReturn:
         if "positional argument" or "keyword argument" in str(exc):
             raise InvalidParamsError
 
-    async def do_one(self, msg):
+    async def do_one(self, msg: BaseMessageObject) -> MutableMapping:
         request_id = msg.get('id', None)
         try:
             func = getattr(self, msg['method'])
@@ -79,26 +65,26 @@ class BaseJSONRPCServer(BaseServerAction):
         if request_id:
             return {'jsonrpc': self.version, 'result': result, 'id': request_id}
 
-    def response_on_decode_error(self, data, exc):
+    def response_on_decode_error(self, data: AnyStr, exc: Exception) -> MutableMapping:
         return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError'), "id": None}
 
-    def response_on_exception(self, msg_obj, exc):
+    def response_on_exception(self, msg_obj: BaseMessageObject, exc: Exception) -> MutableMapping:
         request_id = msg_obj.get('id', None)
-        error = self.exception_codes.get(exc.__class__._name__, self.exception_codes['InvalidRequest'])
+        error = self.exception_codes.get(exc.__class__.__name__, self.exception_codes['InvalidRequest'])
         return {"jsonrpc": self.version, "error": error, "id": request_id}
 
 
 class SampleJSONRPCServer(BaseJSONRPCServer):
 
     async def test(self, param):
-        return "Successfully processed {0}".format(param)
+        return f"Successfully processed {param}"
 
 
-class BaseJSONRPCClient(BaseClientAction):
+class BaseJSONRPCClient(BaseSenderAction):
     methods = 'test',
 
-    def __getattr__(self, item):
+    def __getattr__(self, item) -> JSONRPCMethod:
         if item in self.methods:
-            return JSONRPCMethodClient(item)
+            return JSONRPCMethod(item)
         if item in self.notification_methods:
-            return JSONRPCMethodNotification(item)
+            return JSONRPCMethod(item)

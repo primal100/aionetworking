@@ -1,5 +1,1 @@
-from .base import BaseConfigClass, ConfigurationException
-
-
-class RawStr(str):
-    pass
+from .base import BaseConfig, ConfigurationException

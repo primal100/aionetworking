@@ -1,17 +1,18 @@
-from . import RawStr
-from .base import BaseConfigClass
+from .types import RawStr, BaseSwappable
+from .base import BaseConfig
 from .log_filters import BaseFilter
 from configparser import ConfigParser, ExtendedInterpolation
 from logging.config import fileConfig
 
 from pathlib import Path
-from typing import Mapping
+from typing import MutableMapping, Iterable, Any, NoReturn
+from dataclasses import Field
 
 
-class INIFileConfig(BaseConfigClass):
+class INIFileConfig(BaseConfig):
 
     def __init__(self, *file_names: Path, **kwargs):
-        super(INIFileConfig, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.config = ConfigParser(interpolation=ExtendedInterpolation())
         self.config.read_dict({'Dirs': self.defaults})
         self.config.read(file_names)
@@ -23,18 +24,10 @@ class INIFileConfig(BaseConfigClass):
         return self.config.get('Receiver', 'Type')
 
     @property
-    def sender_type(self):
+    def sender_type(self) -> str:
         return self.config.get('Sender', 'Type')
 
-    @property
-    def run_as(self):
-        return self.config.get('MessageManager', 'run_as', fallback='asyncio')
-
-    @property
-    def message_manager_is_batch(self) -> bool:
-        return self.config.getboolean('MessageManager', 'Batch', fallback=False)
-
-    def get(self, section: str, option: str, data_type: type):
+    def get(self, section: str, option: str, data_type: type) -> Any:
         if data_type == dict:
             try:
                 return self.config[option.capitalize()]
@@ -49,38 +42,33 @@ class INIFileConfig(BaseConfigClass):
         if data_type == RawStr:
             return section.get(option, None, raw=True)
         value = section.get(option, None)
-        if data_type == tuple or data_type == list:
-            if value:
-                value = value.replace(', ', ',').split(',')
-            elif value == '':
-                value = ()
         if value is None or value == '':
             return None
+        if issubclass(data_type, BaseSwappable):
+            return data_type.swap_from_config(value)
         return data_type(value)
 
-    def section_as_dict(self, section, **options) -> Mapping:
+    def section_as_dict(self, section: str, fields=Iterable[Field]) -> MutableMapping[str, Any]:
         d = {}
-        for option, data_type in options.items():
-            value = self.get(section, option, data_type)
+        for field in fields:
+            type_depends_on = field.metadata.get('type_depends_on', None)
+            factory = field.metadata.get('factory', None)
+            if type_depends_on:
+                data_type = d[type_depends_on]
+            elif factory:
+                data_type = factory
+            else:
+                data_type = field.type
+            value = self.get(section, field.name, data_type)
             if value is not None:
-                d[option] = value
+                d[field.name] = value
         return d
 
     @property
     def protocol(self) -> str:
         return self.config.get('Protocol', 'Name')
 
-    def get_home(self) -> Path:
-        return Path(self.config.get('Dirs', 'Home'))
-
-    def get_data_home(self) -> Path:
-        return Path(self.config.get('Dirs', 'Data'))
-
-    def get_action_home(self, action_name, d):
-        return Path(
-            self.config.get('Actions', '%sHome' % action_name, fallback=self.get_data_home().joinpath(d)))
-
-    def configure_logging(self):
+    def configure_logging(self) -> NoReturn:
         configured = False
         while not configured:
             try:
@@ -89,4 +77,4 @@ class INIFileConfig(BaseConfigClass):
             except FileNotFoundError as e:
                 Path(e.filename).parent.mkdir(parents=True, exist_ok=True)
         for filter_name in self.get('filters', 'keys', tuple):
-            BaseFilter.from_config(filter_name, cp=self)
+            BaseFilter.from_config(section_postfix=filter_name, cp=self)

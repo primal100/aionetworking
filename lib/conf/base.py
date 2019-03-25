@@ -1,17 +1,16 @@
 from tempfile import TemporaryDirectory
 
-from lib.utils import cached_property
-
-from pathlib import Path
+from dataclasses import Field
+from typing import NoReturn, MutableMapping, Iterable
 
 
 class ConfigurationException(Exception):
     pass
 
 
-class BaseConfigClass:
+class BaseConfig:
 
-    def __init__(self, logger_name='root'):
+    def __init__(self, logger_name: str = 'root'):
         self.logger_name = logger_name
         from lib import settings
         tmp_dir = TemporaryDirectory(prefix=settings.APP_NAME)
@@ -27,49 +26,20 @@ class BaseConfigClass:
             'appname': settings.APP_NAME.replace(' ', '').lower(),
         })
 
-    @cached_property
+    @property
     def receiver(self):
         raise NotImplementedError
 
-    @cached_property
+    @property
     def sender_type(self):
         raise NotImplementedError
 
-    @cached_property
-    def message_manager_is_batch(self):
-        raise NotImplementedError
-
-    @cached_property
+    @property
     def protocol(self):
         raise NotImplementedError
 
-    def action_config(self, action_name: str, d: str, storage: bool=True):
-        return {
-            'home': self.path_for_action(action_name, d)
-        }
-
-    @cached_property
-    def home(self):
-        return self.get_home()
-
-    def get_home(self):
+    def configure_logging(self) -> NoReturn:
         raise NotImplementedError
 
-    def get_data_home(self):
+    def section_as_dict(self, section: str, fields=Iterable[Field]) -> MutableMapping:
         raise NotImplementedError
-
-    def get_action_home(self, action_name: str, d: str) -> Path:
-        raise NotImplementedError
-
-    def configure_logging(self):
-        raise NotImplementedError
-
-    @cached_property
-    def data_home(self) -> Path:
-        path = self.get_data_home()
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    def path_for_action(self, action_name: str, d: str) -> Path:
-        path = self.get_action_home(action_name, d)
-        return path

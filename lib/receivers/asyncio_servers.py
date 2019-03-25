@@ -1,6 +1,5 @@
 import asyncio
-from functools import partial
-from collections import ChainMap
+from dataclasses import field
 
 from .base import BaseServer
 from lib.conf.logging import Logger
@@ -44,8 +43,6 @@ class BaseTCPServerReceiver(BaseAsyncioServer):
 
 
 class TCPServerReceiver(TCP, BaseTCPServerReceiver):
-    configurable = BaseTCPServerReceiver.configurable.copy()
-    configurable.update(TCP.configurable)
     default_protocol_cls = TCPServerProtocol
     ssl_cls = ServerSideSSL
     ssl_section_name = 'SSLServer'
@@ -60,23 +57,21 @@ class UDPServerReceiver(BaseAsyncioServer):
     transport = None
     protocol = None
     default_protocol_cls = UDPServerProtocol
-    configurable = ChainMap(BaseAsyncioServer.configurable, {
-        {'expiryminutes': int}
-    })
 
-    def __init__(self, *args, expiryminutes=30, **kwargs):
-        super(UDPServerReceiver, self).__init__(*args, **kwargs)
-        self.expiry_minutes = expiryminutes
-        self.start_event = asyncio.Event()
+    #Dataclass fields
+    expiry_minutes: int = 30
+
+    #Non-configurable dataclass fields
+    _start_event: asyncio.Event = field(default_factory=asyncio.Event)
 
     async def start_server(self):
         loop = asyncio.get_event_loop()
         if loop.__class__.__name__ == 'ProactorEventLoop':
             raise ConfigurationException('UDP Server cannot be run on Windows Proactor Loop. Use Selector Loop instead')
         self.transport, self.protocol = await loop.create_datagram_endpoint(
-            partial(self.protocol_cls, self.manager), local_addr=(self.host, self.port))
+            self.protocol_cls, local_addr=(self.host, self.port))
         self.print_listening_message([self.transport.get_extra_info('socket')])
-        self.start_event.set()
+        self._start_event.set()
         await self.protocol.check_senders_expired(self.expiry_minutes)
 
     async def stop_server(self):
@@ -84,7 +79,7 @@ class UDPServerReceiver(BaseAsyncioServer):
             self.transport.close()
 
     async def started(self):
-        await self.start_event.wait()
+        await self._start_event.wait()
 
     async def stopped(self):
         if self.transport and self.transport.is_closing():

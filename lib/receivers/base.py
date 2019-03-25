@@ -1,44 +1,16 @@
 import asyncio
 from collections import ChainMap
-
-from lib import settings
+from lib.conf.types import BaseSwappable
 from lib.conf.logging import Logger
 
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from lib.messagemanagers import BaseMessageManager
-else:
-    BaseMessageManager = None
+class BaseReceiver(BaseSwappable):
+    config_section = 'receiver'
+    name = 'receiver'
+    default_logger_name = 'Receiver'
 
-
-class BaseReceiver:
-    receiver_type: str = ''
-    logger_name: str = 'Receiver'
-    configurable = {
-        'quiet': bool,
-    }
-
-    @classmethod
-    def get_config(cls, cp=None, logger_name=None, **kwargs):
-        cp = cp or settings.CONFIG
-        config = cp.section_as_dict('Receiver', **cls.configurable)
-        logger_name = logger_name or cls.logger_name
-        logger = Logger(logger_name)
-        logger.debug('Found configuration for %s: %s', cls.receiver_type, config)
-        config.update(kwargs)
-        config['logger'] = logger
-        return config
-
-    @classmethod
-    def from_config(cls, manager: BaseMessageManager, cp=None, **kwargs):
-        config = cls.get_config(cp=cp)
-        return cls(manager, **config, **kwargs)
-
-    def __init__(self, manager, quiet: bool=False, logger=None):
-        self.quiet = quiet
-        self.logger = logger or Logger(self.logger_name)
-        self.manager = manager
+    #Dataclass fields
+    quiet: bool = False
 
     async def started(self):
         return True
@@ -64,33 +36,31 @@ class BaseReceiver:
 
 
 class BaseServer(BaseReceiver):
-    configurable = ChainMap(BaseReceiver.configurable, {
-        'host': str,
-        'port': int,
-    })
-    receiver_type = 'Server'
+    name = 'Server'
     server = None
 
-    def __init__(self, *args, host: str = '0.0.0.0', port: int=4000, **kwargs):
-        super(BaseServer, self).__init__(*args, **kwargs)
-        self.host = host
-        self.port = port
-        self.listening_on = '%s:%s' % (self.host, self.port)
+    #Dataclass Fields
+    host: str = '0.0.0.0'
+    port: int = 4000
+
+    @property
+    def listening_on(self):
+        return f"{self.host}:{self.port}"
 
     def print_listening_message(self, sockets):
         if not self.quiet:
             for socket in sockets:
                 sock_name = socket.getsockname()
                 listening_on = ':'.join([str(v) for v in sock_name])
-                print('Serving %s on %s' % (self.receiver_type, listening_on))
+                print('Serving %s on %s' % (self.name, listening_on))
 
     async def close(self):
-        self.logger.info('Stopping %s running at %s', self.receiver_type, self.listening_on)
+        self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
         await self.stop_server()
-        self.logger.info('%s stopped', self.receiver_type)
+        self.logger.info('%s stopped', self.name)
 
     async def run(self):
-        self.logger.info('Starting %s on %s', self.receiver_type, self.listening_on)
+        self.logger.info('Starting %s on %s', self.name, self.listening_on)
         await self.start_server()
 
     async def stop_server(self):

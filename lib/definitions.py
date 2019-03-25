@@ -11,7 +11,7 @@ from lib.actions import FileStorage, BufferedFileStorage, Recording
 from typing import Mapping, Union, TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
-    from lib.actions import BaseServerAction
+    from lib.actions import BaseReceiverAction
     from lib.conf import BaseConfigClass
     from lib.messagemanagers import BaseMessageManager
     from lib.protocols import BaseProtocol
@@ -33,7 +33,7 @@ RECEIVERS: Mapping[str, Mapping[str, Union[Type[BaseReceiver], Type[BaseSender]]
     'SFTPServer':  {'receiver': SFTPServerPswAuth, 'sender': SFTPClient},
     'DirectoryMonitor': {'receiver': DirectoryMonitor},
 }
-ACTIONS: Mapping[str, Type[BaseServerAction]] = {
+ACTIONS: Mapping[str, Type[BaseReceiverAction]] = {
     'filestorage': FileStorage,
     'bufferedfilestorage': BufferedFileStorage,
     'record': Recording

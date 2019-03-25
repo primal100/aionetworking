@@ -16,9 +16,9 @@ else:
 class TCP(_BaseReceiver):
     ssl_section_name:str = None
     ssl_cls = None
-    configurable = {
-        'sslhandshaketimeout': int
-    }
+
+    #Dataclass fields
+    ssl_handshake_timeout: int
 
     @classmethod
     def from_config(cls, *args, logger=None, config=None, cp=None, **kwargs):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from lib.basetestcase import BaseTestCase
 from lib.protocols.contrib.TCAP_MAP import TCAP_MAP_ASNProtocol
-from lib.actions.base import BaseServerAction
+from lib.actions.base import BaseReceiverAction
 
 
 class BaseTCAPMAPActionTestCase(BaseTestCase):
@@ -17,12 +17,12 @@ class BaseTCAPMAPActionTestCase(BaseTestCase):
         b'643c4904571800006b2a2828060700118605010101a01d611b80020780a109060704000001000503a203020100a305a1030201006c08a30602010102010b'
     )
     protocol = TCAP_MAP_ASNProtocol
-    action_cls = BaseServerAction
+    action_cls = BaseReceiverAction
     sender = '10.10.10.10'
 
     def setUp(self):
         try:
-            shutil.rmtree(Path(self.base_data_dir, BaseServerAction.default_data_dir))
+            shutil.rmtree(Path(self.base_data_dir, BaseReceiverAction.default_data_dir))
         except OSError:
             pass
         self.action = self.action_cls()
@@ -38,7 +38,7 @@ class BaseTCAPMAPRawActionTestCase(BaseTCAPMAPActionTestCase):
     def setUp(self):
         self.enable_logging()
         try:
-            shutil.rmtree(Path(self.base_data_dir, BaseServerAction.default_data_dir))
+            shutil.rmtree(Path(self.base_data_dir, BaseReceiverAction.default_data_dir))
         except OSError:
             pass
         self.action = self.action_cls()
