@@ -11,7 +11,6 @@ from typing import Sequence
 
 
 class BaseCodec:
-    configurable = {}
     codec_name = ''
     read_mode = 'rb'
     write_mode = 'wb'
@@ -69,7 +68,6 @@ class BaseMessageObject:
     message_type = None
     codec_name = ""
     binary = True
-    configurable = {}
     supports_responses = False
     codec_cls = BaseCodec
     logger_name = 'receiver'

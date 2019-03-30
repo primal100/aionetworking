@@ -1,3 +1,5 @@
+inflect
+pydantic
 asyncssh
 paramiko
 passlib

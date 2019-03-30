@@ -1,1 +1,1 @@
-from .base import BaseProtocol
+from .base import BaseMessageObject

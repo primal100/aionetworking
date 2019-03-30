@@ -1,32 +1,76 @@
+import asyncio
 import datetime
 import os
 import struct
 import re
-import asyncio
 import traceback
 
-from pathlib import Path
 
-from typing import Sequence, Mapping, AnyStr, Tuple
+from typing import Sequence, List, AnyStr, Tuple, Union, NoReturn
+from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
+
+
+###Networking###
+
+def supernet_of(self, other: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]) -> bool:
+    return any(n.supernet_of(other) for n in self.data)
+
+
+###Future Python###
+
+class cached_property(object):
+    """
+    A property that is only computed once per instance and then replaces itself
+    with an ordinary attribute. Deleting the attribute resets the property.
+    Source: https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
+    """  # noqa
+
+    def __init__(self, func):
+        self.__doc__ = getattr(func, "__doc__")
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+
+        if asyncio and asyncio.iscoroutinefunction(self.func):
+            return self._wrap_in_coroutine(obj)
+
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        return value
+
+    def _wrap_in_coroutine(self, obj):
+
+        @asyncio.coroutine
+        def wrapper():
+            future = asyncio.ensure_future(self.func(obj))
+            obj.__dict__[self.func.__name__] = future
+            return future
+
+        return wrapper()
 
 
 class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
 
     # Class can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
 
-    def new_event_loop(self):
+    def new_event_loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.ProactorEventLoop()
 
 
-def set_loop_policy():
+def set_loop_policy() -> NoReturn:
     if os.name == 'nt':
         asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
 
 
-def log_exception(ex):
+###Logging###
+
+def log_exception(ex: Exception) -> Sequence[str]:
         return [line.rstrip('\n') for line in
                 traceback.format_exception(ex.__class__, ex, ex.__traceback__)]
 
+
+###Datetime utils###
 
 def timestamp_to_utc_string(dt) -> str:
     return datetime.datetime.strftime(dt, '%Y%m%d%H%M%S')
@@ -34,24 +78,6 @@ def timestamp_to_utc_string(dt) -> str:
 
 def now_to_utc_string() -> str:
     return timestamp_to_utc_string(datetime.datetime.now())
-
-
-def asn_timestamp_to_utc_string(timestamp: Sequence) -> str:
-    return ''.join(timestamp)
-
-
-def asn_timestamp_to_datetime(timestamp: Sequence) -> datetime.datetime:
-    year = int(timestamp[0] or 0)
-    month = int(timestamp[1] or 0)
-    day = int(timestamp[2] or 0)
-    hour = int(timestamp[3] or 0)
-    minute = int(timestamp[4] or 0)
-    second = int(timestamp[5] or 0)
-    if timestamp[6] is None:
-        microsecond = 0
-    else:
-        microsecond = int(timestamp[6].ljust(6, '0'))
-    return datetime.datetime(year, month, day, hour, minute, second, microsecond)
 
 
 def datetime_to_human_readable(dt: datetime.datetime, strf: str='%Y-%m-%d %H:%M:%S.%f') -> str:
@@ -65,21 +91,9 @@ def current_date() -> str:
     return datetime.datetime.now().strftime("%Y%m%d")
 
 
-def adapt_asn_domain(domain: Sequence) -> str:
-    return '.'.join([str(x) for x in domain])
+###Binary###
 
-
-def write_to_files(base_path: Path, write_mode: str, file_writes: Mapping[Path, AnyStr]):
-    """
-    Takes a dictionary containing filepaths (keys) and data to write to each one (values)
-    """
-    for file_name in file_writes.keys():
-        file_path = base_path.joinpath(file_name)
-        with file_path.open(write_mode) as f:
-            f.write(file_writes[file_name])
-
-
-def pack_variable_len_string(content:bytes) -> bytes:
+def pack_variable_len_string(content: bytes) -> bytes:
     return struct.pack("I", len(content)) + content
 
 
@@ -97,7 +111,7 @@ def unpack_variable_len_string(*args) -> (int, str):
     return end_byte, data.decode()
 
 
-def unpack_variable_len_strings(content: bytes) -> Sequence[bytes]:
+def unpack_variable_len_strings(content: bytes) -> List[AnyStr]:
     pos = 0
     bytes_list = []
     while pos < len(content):
@@ -105,6 +119,8 @@ def unpack_variable_len_strings(content: bytes) -> Sequence[bytes]:
         bytes_list.append(string)
     return bytes_list
 
+
+###Recording###
 
 class Record:
     first_msg_time = 0
@@ -156,44 +172,13 @@ def unpack_recorded_packets(content: bytes) -> Sequence[Tuple[int, AnyStr, bytes
         packets.append((seconds, sender, packet_data))
     return packets
 
-
+#Text
 def camel_case_to_title(string: str) -> str:
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1 \2', string)
     return re.sub('([a-z0-9])([A-Z])', r'\1 \2', s1).title()
 
 
-class cached_property(object):
-    """
-    A property that is only computed once per instance and then replaces itself
-    with an ordinary attribute. Deleting the attribute resets the property.
-    Source: https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
-    """  # noqa
-
-    def __init__(self, func):
-        self.__doc__ = getattr(func, "__doc__")
-        self.func = func
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-
-        if asyncio and asyncio.iscoroutinefunction(self.func):
-            return self._wrap_in_coroutine(obj)
-
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
-        return value
-
-    def _wrap_in_coroutine(self, obj):
-
-        @asyncio.coroutine
-        def wrapper():
-            future = asyncio.ensure_future(self.func(obj))
-            obj.__dict__[self.func.__name__] = future
-            return future
-
-        return wrapper()
-
-
+#Text formatting
 class Color:
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
@@ -215,24 +200,7 @@ def underline(text: str) -> str:
     return Color.UNDERLINE + text + Color.END
 
 
-def store_dicts(dicts: Sequence[Mapping]) -> str:
-    text = ""
-    for d in dicts:
-        for k, v in d.items():
-            text += "%s: %s\n" % (k.capitalize(), v)
-        text += '\n'
-    return text
-
-
-def print_dicts(dicts: Sequence[Mapping]) -> str:
-    text = ""
-    for d in dicts:
-        for k, v in d.items():
-            text += "%s: %s\n" % (bold(k.capitalize()), v)
-        text += '\n'
-    return text
-
-
+###Testing###
 async def run_and_wait(method, *args, interval: int=7, **kwargs):
     await method(*args, **kwargs)
     await asyncio.sleep(interval)
@@ -251,15 +219,32 @@ async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequen
     await message_manager.stop()
 
 
-def plural(num, string, past=False):
-    s = f"{num} {string}" + 's' if num !=1 else ''
-    if past:
-        s += ' were' if num != 1 else ' was'
-    return s
-
-
-def addr_tuple_to_str(addr):
+###ASN.1 PyCrate###
+def addr_tuple_to_str(addr: Sequence):
     return ':'.join(str(a) for a in addr)
 
-def addr_str_to_tuple(addr):
+
+def addr_str_to_tuple(addr: AnyStr):
     return tuple(addr.split(':'))
+
+
+def adapt_asn_domain(domain: Sequence) -> str:
+    return '.'.join([str(x) for x in domain])
+
+
+def asn_timestamp_to_utc_string(timestamp: Sequence) -> str:
+    return ''.join(timestamp)
+
+
+def asn_timestamp_to_datetime(timestamp: Sequence) -> datetime.datetime:
+    year = int(timestamp[0] or 0)
+    month = int(timestamp[1] or 0)
+    day = int(timestamp[2] or 0)
+    hour = int(timestamp[3] or 0)
+    minute = int(timestamp[4] or 0)
+    second = int(timestamp[5] or 0)
+    if timestamp[6] is None:
+        microsecond = 0
+    else:
+        microsecond = int(timestamp[6].ljust(6, '0'))
+    return datetime.datetime(year, month, day, hour, minute, second, microsecond)
