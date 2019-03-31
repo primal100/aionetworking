@@ -7,28 +7,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lib.networking.asyncio_protocols import BaseMessageManager as _BaseProtocol
-    from lib.receivers.asyncio_servers import BaseAsyncioServer as _BaseReceiver
 else:
     _Base = object
     _BaseReceiver = object
-
-
-class TCP(_BaseReceiver):
-    ssl_section_name:str = None
-    ssl_cls = None
-
-    #Dataclass fields
-    ssl_handshake_timeout: int
-
-    @classmethod
-    def from_config(cls, *args, logger=None, config=None, cp=None, **kwargs):
-        ssl = cls.ssl_cls.get_context('SSLServer', logger=logger, cp=cp)
-        return super().from_config(*args, cp=cp, config=config, ssl=ssl, **kwargs)
-
-    def __init__(self, *args, ssl: bool = None, sslhandshaketimeout: int=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ssl = ssl
-        self.ssl_handshake_timeout = sslhandshaketimeout
 
 
 class ClientProtocolMixin(_BaseProtocol):

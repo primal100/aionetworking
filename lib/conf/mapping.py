@@ -4,16 +4,19 @@ from pathlib import Path
 from .base import EnvironConfig, ConfigMap
 from .log_filters import BaseFilter
 
-from typing import Type, Any, Mapping, NoReturn
+from typing import Type, Any, Mapping, MutableMapping, NoReturn
 
 
 class MappingConfig(EnvironConfig):
     log_config = dictConfig
 
-    def __init__(self, config: Mapping, environ_priority: bool = True, **kwargs):
+    def __init__(self, config: MutableMapping, environ_priority: bool = True, **kwargs):
         super().__init__(**kwargs)
         self.config = config
         self.environ_priority = environ_priority
+
+    def add_mapping(self, mapping: Mapping):
+        self.config.update(mapping)
 
     def get_sections(self, cls: Type, section_name: Any) -> Mapping:
         environ = super().get_sections(cls, section_name)

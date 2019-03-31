@@ -1,100 +1,85 @@
 import asyncio
+from abc import ABC, abstractmethod
 import binascii
-from collections import ChainMap
-from functools import partial
 from datetime import datetime
+from dataclasses import dataclass, field, replace
+
+import inflect
 
 from lib.actions.base import Action
 from lib.conf.logging import Logger
-from lib.conf.types import ListIPNetworks
-from lib.formats.base import BufferObject, MessageObject
-from lib.utils import Record, plural
+from lib.formats.base import BufferObject, BaseMessageObject
+from lib.utils import Record
+from lib.conf.types import supernet_of
+from lib.conf.pydantic_future import IPvAnyNetwork
 from .exceptions import MessageFromNotAuthorizedHost
 
+from typing import Type, Tuple, Callable
 
-class BaseProtocolManager:
-    logger_cls = Logger
-    logger_name: str = ''
-    protocol_cls = None
-    connections = []
+
+_p = inflect.engine()
+
+
+class TmpStr:
+    def __init__(self, func: Callable, *args, **kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return self.func(*self.args, **self.kwargs)
+
+
+class TmpInflect:
+    def __getattr__(self, item):
+        return TmpStr(getattr(_p, item))
+
+
+p = TmpInflect()
+
+
+@dataclass
+class BaseProtocol(ABC):
     name = ''
 
-    configurable = {
-        'action': Action,
-        'preaction': Action,
-        'aliases': dict,
-        'timeout': int,
-        'dataformat': MessageObject
-    }
+    logger: Logger = None
+    protocol_cls: Type[asyncio.Protocol] = None
+    action: Action = None
+    preaction: Action = None
+    aliases: dict = field(default_factory={})
+    timeout: int = 0
+    dataformat: BaseMessageObject = None
+    _connection_closed: Callable = lambda: None
 
-    @classmethod
-    def get_config(cls, cp=None, logger=None, **kwargs):
-        from lib import settings
-        cp = cp or settings.CONFIG
-        config = cp.section_as_dict('Protocol', **cls.configurable)
-        config.update(kwargs)
-        config['logger'] = logger
-        logger.info('Found configuration for %s: %s', cls.name,  config)
-        config['action'] = config.pop('action').from_config(cp=cp, logger=logger)
-        config['pre_action'] = config.pop('preaction').from_config(cp=cp, logger=logger)
-        return config
+    def __post_init__(self):
+        self._connections = []
+        self.codec = self.dataformat.get_codec()
+        self.parent_logger = self.logger
+        self._context = {'protocol_name': self.name}
 
-    @classmethod
-    def from_config(cls, **kwargs):
-        config = cls.get_config(**kwargs)
-        return partial(cls, **config)
-
-    def __init__(self, dataformat, action=None, pre_action=None, aliases=None, allowedsenders=(), logger=None):
-        self.data_format = dataformat
-        self.action = action
-        self.pre_action = pre_action
-        self.logger = logger
-        if not self.logger:
-            self.logger = self.logger_cls(self.logger_name)
-        self.protocol_config = {'data_format': dataformat, 'action': action, 'pre_action': pre_action,
-                                'aliases':aliases, 'allowed_senders': allowedsenders, 'logger': self.logger,
-                                'connection_lost': self.connection_closed}
-
-    @property
-    def protocol_kwargs(self):
-        return self.protocol_config
+    def __call__(self, *args, **kwargs):
+        new_connection = replace(self, _connection_closed=self._connection_closed)
+        self._connections.append(new_connection)
+        self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
+                          p.no('active connection'))
 
     def connection_closed(self, conn):
-        self.connections.remove(conn)
-        self.logger.debug('Connection closed. There are now %s.', plural(len(self.connections), 'active connection'))
-
-    def get_connection(self):
-        conn = self.protocol_cls(**self.protocol_kwargs)
-        self.connections.append(conn)
-        self.logger.debug('Connection created. There are now %s.', plural(len(self.connections), 'active connection'))
-        return conn
+        self._connections.remove(conn)
+        self.logger.debug('Connection closed. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
+                          p.no('active connection'))
 
     async def close(self):
         self.logger.info('Closing actions')
-        await self.pre_action.close()
+        await self.preaction.close()
         await self.action.close()
 
-
-class BaseNetworkProtocolManager(BaseProtocolManager):
-    configurable = ChainMap({'allowedsenders': ListIPNetworks}, BaseProtocolManager.configurable)
-
-
-class BaseProtocol:
-    alias: str = ''
-    peer: str = ''
-    name: str = ''
-    logger = None
-
-    def __init__(self, dataformat, action, pre_action, logger, aliases=None, allowedsenders=(),
-                 connection_lost=lambda *args: None):
-        self.codec = dataformat.get_codec()
-        self.action = action
-        self.pre_action = pre_action
-        self.aliases = aliases
-        self.allowed_senders = allowedsenders
-        self.parent_logger = logger
-        self.connection_lost = connection_lost
-        self.context = {'protocol_name': self.name}
+    @property
+    def context(self):
+        return self._context
 
     def get_alias(self, sender: str):
         alias = self.aliases.get(str(sender), sender)
@@ -111,25 +96,26 @@ class BaseProtocol:
     def check_other(self, peer_ip):
         return self.check_sender(peer_ip)
 
-    def get_initial_context(self):
+    @property
+    def connection_context(self):
         return {}
 
     def set_logger(self):
-        self.context.update(self.get_initial_context())
+        self._context.update(self.connection_context)
         self.logger = self.get_logger()
         self.codec.set_logger(self.logger)
 
     def make_messages(self, encoded, timestamp: datetime):
         msgs = self.decode_buffer(encoded, timestamp=timestamp)
-        self.logger.debug('Buffer contains %s', plural(len(msgs), 'message'))
+        self.logger.debug('Buffer contains %s', p.no('message', msgs))
         self.logger.log_decoded_msgs(msgs)
         return msgs
 
     def manage_buffer(self, buffer, timestamp):
         self.logger.on_buffer_received(buffer)
-        if self.pre_action:
+        if self.preaction:
             buffer = BufferObject(buffer, timestamp=timestamp, logger=self.logger)
-            self.pre_action.do_one(buffer)
+            self.preaction.do_one(buffer)
 
     def decode_buffer(self, buffer, timestamp=None):
         return self.codec.from_buffer(buffer, timestamp=timestamp, context=self.context)
@@ -167,41 +153,33 @@ class BaseProtocol:
             if (not hosts or packet['host'] in hosts) and not packet['sent_by_server']:
                 if timing:
                     await asyncio.sleep(packet['seconds'])
-                self.logger.debug('Sending msg with %s bytes', len(packet['data']))
+                self.logger.debug('Sending msg with %s', p.no('byte', packet['data']))
                 self.send_msg(packet['data'])
         self.logger.debug("Recording finished")
 
-    def on_data_received(self, buffer, timestamp=None):
-        raise NotImplementedError
+    @abstractmethod
+    def on_data_received(self, buffer, timestamp=None): ...
 
-    def send(self, msg_encoded):
-        raise NotImplementedError
+    @abstractmethod
+    def send(self, msg_encoded): ...
 
 
-class BaseNetworkProtocol(BaseProtocol):
+class BaseNetworkProtocol(ABC, BaseProtocol):
     sock = (None, None)
-    own: str = ''
-    peer_ip: str = None
-    peer_port: int = 0
+    own: ''
+    alias = ''
+    peer = None
+    peer_ip = None
+    peer_port = 0
     transport = None
 
-    def __init__(self, *args, allowednetworks=(), **kwargs):
-        super().__init__(*args, **kwargs)
-        self.allowed_networks = allowednetworks
+    allowed_senders: Tuple[IPvAnyNetwork] = field(default_factory=())
 
-    @property
-    def client(self):
-        raise NotImplementedError
+    @abstractmethod
+    def client(self): ...
 
-    @property
-    def server(self):
-        raise NotImplementedError
-
-    def send(self, msg_encoded):
-        raise NotImplementedError
-
-    def on_data_received(self, buffer, timestamp=None):
-        raise NotImplementedError
+    @abstractmethod
+    def server(self): ...
 
     def connection_made(self, transport):
         self.transport = transport
@@ -212,12 +190,15 @@ class BaseNetworkProtocol(BaseProtocol):
             self.logger.new_connection()
 
     def close_connection(self):
-        self.transport.close()
+        pass
 
     def connection_lost(self, exc):
         self.logger.connection_finished(exc)
+        self.close_connection()
+        self._connection_closed()
 
-    def get_initial_context(self):
+    @property
+    def connection_context(self):
         return {'peer_ip': self.peer_ip,
                 'peer_port': self.peer_port,
                 'peer': self.peer,
@@ -240,15 +221,13 @@ class BaseNetworkProtocol(BaseProtocol):
             return False
 
     def raise_message_from_not_authorized_host(self, sender):
-        msg = f"Received message from unauthorized host {sender}. Authorized hosts are: {self.allowed_senders}. Allowed networks are: {self.allowed_networks}"
+        msg = f"Received message from unauthorized host {sender}"
         self.logger.error(msg)
         raise MessageFromNotAuthorizedHost(msg)
 
     def sender_valid(self, other_ip):
         if self.allowed_networks:
-            network = self.get_network(other_ip)
-            if all(not n.supernet_of(network) for n in self.allowed_networks):
-                return False
+            return any(n.supernet_of(other_ip) for n in self.allowed_networks)
         return True
 
     def check_sender(self, other_ip):

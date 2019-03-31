@@ -4,13 +4,14 @@ from collections import ChainMap
 from datetime import datetime
 from dataclasses import field
 
-from .types import BaseConfigurable
+from pydantic.dataclasses import dataclass
+
 from lib.utils import log_exception
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
 from lib.wrappers.periodic import call_cb_periodic
 
 
-from typing import TYPE_CHECKING, Type, Optional, MutableMapping, Dict, NoReturn, AnyStr, Iterable, Generator, Any
+from typing import TYPE_CHECKING, Type, Optional, MutableMapping, Union, NoReturn, AnyStr, Iterable, Generator, Any
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -22,11 +23,25 @@ class _Logger(BaseConfigurable, logging.LoggerAdapter):
 
 
 class Logger(_Logger):
-    #Dataclass fields
     logger = None
+    _instances = {}
     logger_name: str = ''
     datefmt: str = '%Y-%M-%d %H:%M:%S'
     extra: dict = field(default_factory=dict, metadata={'configurable': False})
+
+    @classmethod
+    def validate(cls, logger, *args, **kwargs) -> str:
+        if isinstance(logger, cls):
+            instance = logger
+            if not instance.logger_name in cls._instances:
+                cls._instances[instance.logger_name] = instance
+                return instance
+        else:
+            if logger in cls._instances:
+                return cls._instances[logger]
+            instance = cls(logger)
+            cls._instances[logger] = instance
+            return instance
 
     def __post_init__(self):
         logger = logging.getLogger(self.logger_name)

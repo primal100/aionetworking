@@ -1,21 +1,13 @@
 import asyncio
 from .asyncio_protocols import BaseNetworkProtocol
+from abc import ABC, abstractmethod
 from .mixins import ClientProtocolMixin, ServerProtocolMixin
 
 
-class TCP(BaseNetworkProtocol, asyncio.Protocol):
+class TCP(ABC, BaseNetworkProtocol, asyncio.Protocol):
 
-    def connection_lost(self, exc):
-        super(TCP, self).connection_lost(exc)
+    def close_connection(self):
         self.transport.close()
-
-    @property
-    def client(self):
-        raise NotImplementedError
-
-    @property
-    def server(self):
-        raise NotImplementedError
 
     def data_received(self, data):
         self.on_data_received(data)

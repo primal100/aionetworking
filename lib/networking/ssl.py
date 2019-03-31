@@ -1,83 +1,64 @@
-import ssl
-import logging
+from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths
+from lib.conf.logging import Logger
+
+from pydantic.dataclasses import dataclass
 
 from pathlib import Path
 from typing import Optional
 
 
-class BaseSSLManager:
-    purpose: str = None
-    logger_name: str = None
-    configurable = {
-        'ssl': bool,
-        'cert': Path,
-        'key': Path,
-        'keypassword': str,
-        'cafile': Path,
-        'capath': Path,
-        'cadata': str,
-        'certrequired': bool,
-        'hostnamecheck': bool}
+@dataclass
+class BaseSSLManager(SSLContext):
+    context: SSLContext = None
+    logger: Logger = None
+    ssl: bool = False,
+    cert: Path = None
+    key: Path = None,
+    key_password: str = None,
+    cafile: Path = None,
+    capath: Path = None,
+    cadata: str = None,
+    cert_required: bool = False,
+    hostname_check: bool = False
 
-    @classmethod
-    def from_config(cls, section, cp=None, logger=None, **kwargs):
-        if not logger:
-            logger = logging.getLogger(cls.logger_name)
-        from lib.settings import CONFIG
-        config = cp or CONFIG
-        config = config.section_as_dict(section, **cls.configurable)
-        config.update(**kwargs)
-        logger.debug(f'Found config for SSL context {section}: {config}')
-        return cls(logger=logger, **config)
+    def __post_init__(self):
+        if self.ssl and not self.context:
+            self.context = self.manage_ssl_params()
 
-    @classmethod
-    def get_context(cls, *args, **kwargs):
-        return cls.from_config(*args, **kwargs).context
+    def __call__(self, *args, **kwargs) -> Optional[SSLContext]:
+        return self.context
 
-    def __init__(self, ssl: bool = False, cert: Path=None, key: Path=None, sslkeypassword: str=None, cafile: Path=None,
-                 capath: Path = None, cadata: str = None, certrequired: bool=False, hostnamecheck: bool = False,
-                 logger=None):
-        if ssl:
-            self.logger = logger
-            if not logger:
-                self.logger = logging.getLogger(self.logger_name)
-            self.context = self.manage_ssl_params(cert, key, sslkeypassword, cafile, capath,
-                        cadata, certrequired, hostnamecheck)
-        else:
-            self.context = None
-
-    def manage_ssl_params(self, cert, key, sslkeypassword, cafile, capath, cadata, certrequired,
-                          hostnamecheck) -> Optional[ssl.SSLContext]:
+    def manage_ssl_params(self, ) -> Optional[SSLContext]:
         self.logger.info("Setting up SSL")
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-        if cert and key:
-            self.logger.info("Using SSL Cert: %s", cert)
-            context.load_cert_chain(str(cert), str(key), password=sslkeypassword)
-        context.verify_mode = ssl.CERT_REQUIRED if certrequired else ssl.CERT_NONE
-        context.check_hostname = hostnamecheck
+        context = SSLContext(PROTOCOL_TLS)
+        if self.cert and self.key:
+            self.logger.info("Using SSL Cert: %s", self.cert)
+            context.load_cert_chain(str(self.cert), str(self.key), password=self.key_password)
+        context.verify_mode = CERT_REQUIRED if self.certrequired else CERT_NONE
+        context.check_hostname = self.hostnamecheck
 
-        if context.verify_mode != ssl.CERT_NONE:
-             if cafile or capath or cadata:
+        if context.verify_mode != CERT_NONE:
+             if self.cafile or self.capath or self.cadata:
                 locations = {
-                    'cafile': str(cafile) if cafile else None,
-                    'capath': str(capath) if capath else None,
-                    'cadata': cadata
+                    'cafile': str(self.cafile) if self.cafile else None,
+                    'capath': str(self.capath) if self.capath else None,
+                    'cadata': self.cadata
                 }
                 context.load_verify_locations(**locations)
                 self.logger.info("Verifying SSL certs with: %s", locations)
              else:
                 context.load_default_certs(self.purpose)
-                self.logger.info("Verifying SSL certs with: %s", ssl.get_default_verify_paths())
+                self.logger.info("Verifying SSL certs with: %s", get_default_verify_paths())
         self.logger.info("SSL Context loaded")
         return context
 
 
 class ServerSideSSL(BaseSSLManager):
-    purpose = ssl.Purpose.CLIENT_AUTH
-    logger_name = 'receiver'
+    purpose = Purpose.CLIENT_AUTH
+    logger: Logger = Logger('receiver', {})
 
 
 class ClientSideSSL(BaseSSLManager):
-    purpose = ssl.Purpose.CLIENT_AUTH
-    logger_name = 'sender'
+    purpose = Purpose.CLIENT_AUTH
+    logger: Logger = Logger('sender', {})
 

@@ -4,9 +4,11 @@ import re
 from inspect import getfullargspec
 from collections import ChainMap
 from tempfile import TemporaryDirectory
-
 from dataclasses import dataclass, fields, Field, is_dataclass
-from typing import NoReturn, Mapping, MutableMapping, Any, Iterable, Type
+
+import pydantic
+
+from typing import NoReturn, Mapping, MutableMapping, Any, Iterable, Type, Union
 
 
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
@@ -24,6 +26,14 @@ class ConfigMap(ChainMap):
             except KeyError:
                 pass
         return None
+
+    def add_after(self, *args: Mapping):
+        for mapping in args:
+            self.maps.append(mapping)
+
+    def add_before(self, *args: Mapping):
+        for mapping in args:
+            self.maps.insert(0, mapping)
 
 
 @dataclass
@@ -72,18 +82,32 @@ class EnvironConfig:
     def get_value(self, sections: Mapping, option: str, **kwargs) -> Any:
         return sections.get(option, **kwargs)
 
+    def is_dataclass(self, cls: Type):
+        return is_dataclass(cls)
+
+    def is_model(self, cls: Type):
+        return isinstance(cls, pydantic.BaseModel)
+
+    def get_type(self, cls: Type, sections: Mapping):
+        return self.get_value(sections, 'type')
+
+    def swap(self, new_cls: Union[Type, str], cls: Type):
+        if hasattr(cls, 'swap_cls'):
+            if isinstance(new_cls, (int, float, str)):
+                return cls.swap_cls(new_cls)
+            return new_cls
+        return cls
+
     def get_value_for_field(self, sections: Mapping, field: Field, logger=None) -> Any:
+        if field.name.startswith('_'):
+            return None
         config_kwargs = field.type.get('config_kwargs', {})
         value = self.get_value(sections, field.name, **config_kwargs)
         if isinstance(value, (str, int, float)):
-            if is_dataclass(field.type):
-                if field.type.get('config_from_section', True):
-                    return self.configure_dataclass(field.type, value, logger=logger)
-                else:
-                    args = shlex.split(str(value))
-                    if logger and 'logger' in [f.name for f in fields(field.type)]:
-                        return field.type(*args, logger=logger)
-                    return field.type(*args)
+            if self.is_dataclass(field.type):
+                return self.configure_dataclass(field.type, value, logger=logger)
+            elif self.is_model(field.type):
+                return self.configure_model(field.type, value, logger=logger)
             elif issubclass(field.type, Iterable):
                 return str_to_list.split(str(value))
             elif issubclass(field.type, Mapping):
@@ -93,21 +117,32 @@ class EnvironConfig:
     def get_mapping(self, section_name: str) -> Mapping:
         return self.get_sections(Mapping, section_name)
 
-    def get_config_for_dataclass(self, cls, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
+    def get_config_for_fields(self, model_fields, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
         return {name: value for name, value in
-                [(field.name, self.get_value_for_field(sections, field, logger=logger)) for field in fields(cls)] if
+                [(field.name, self.get_value_for_field(sections, field, logger=logger)) for field in model_fields] if
                 value is not None}
 
-    def configure_dataclass(self, cls, section_name: str, logger=None, **kwargs) -> Any:
-        sections = ConfigMap(kwargs, self.get_sections(cls, section_name))
-        if hasattr(cls, 'swap_cls'):
-            cls = self.get_value(sections, 'type')
-            if isinstance(cls, str):
-                cls = cls.swap_cls(cls)
-        config = self.get_config_for_dataclass(cls, sections, logger=logger)
+    def get_config_for_dataclass(self, cls, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
+        dc_fields = fields(cls)
+        return self.get_config_for_fields(dc_fields, sections, logger=logger)
+
+    def get_config_for_model(self, cls: pydantic.BaseModel, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
+        model_fields = cls.fields.values()
+        return self.get_config_for_fields(model_fields, sections, logger=logger)
+
+    def configure_dataclass(self, cls, value: str, *args, logger=None, **kwargs) -> Any:
+        if getattr(cls, 'config_from_string', False):
+            args = shlex.split(str(value))
+        elif getattr(cls, 'swap_from_string', False):
+            cls = self.swap(value, cls)
+        else:
+            sections = ConfigMap(kwargs, self.get_sections(cls, value))
+            cls = self.swap(sections['type'], cls)
+            config = self.get_config_for_dataclass(cls, sections, logger=logger)
+            kwargs.update(config)
         if logger and 'logger' in [f.name for f in fields(cls)]:
-            config['logger'] = logger
-        return cls(**config)
+            kwargs['logger'] = logger
+        return cls(*args, **kwargs)
 
     def configure_logging(self) -> NoReturn:
         pass

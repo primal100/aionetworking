@@ -1,15 +1,13 @@
 import asyncio
-from collections import ChainMap
-from lib.conf.types import BaseSwappable
-from lib.conf.logging import Logger
+import logging
+from lib.conf.types import Logger, Port
+from abc import ABC, abstractmethod
 
 
-class BaseReceiver(BaseSwappable):
-    config_section = 'receiver'
+class BaseReceiver(ABC):
     name = 'receiver'
-    default_logger_name = 'Receiver'
+    logger: Logger = logging.getLogger('receiver')
 
-    #Dataclass fields
     quiet: bool = False
 
     async def started(self):
@@ -28,20 +26,19 @@ class BaseReceiver(BaseSwappable):
     async def close(self):
         pass
 
-    async def run(self):
-        raise NotImplementedError
-
     async def wait_stopped(self):
         pass
 
+    @abstractmethod
+    async def run(self): ...
 
-class BaseServer(BaseReceiver):
+
+class BaseServer(ABC, BaseReceiver):
     name = 'Server'
     server = None
 
-    #Dataclass Fields
     host: str = '0.0.0.0'
-    port: int = 4000
+    port: Port = 4000
 
     @property
     def listening_on(self):
@@ -59,16 +56,6 @@ class BaseServer(BaseReceiver):
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
 
-    async def run(self):
-        self.logger.info('Starting %s on %s', self.name, self.listening_on)
-        await self.start_server()
-
-    async def stop_server(self):
-        raise NotImplementedError
-
-    async def start_server(self):
-        raise NotImplementedError
-
     async def started(self):
         while not self.server or not self.server.is_serving():
             await asyncio.sleep(0.01)
@@ -76,3 +63,14 @@ class BaseServer(BaseReceiver):
     async def stopped(self):
         if self.server:
             await self.server.wait_closed()
+
+    async def run(self):
+        self.logger.info('Starting %s on %s', self.name, self.listening_on)
+        await self.start_server()
+
+    @abstractmethod
+    async def stop_server(self): ...
+
+    @abstractmethod
+    async def start_server(self): ...
+

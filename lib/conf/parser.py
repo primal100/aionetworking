@@ -12,7 +12,7 @@ class INIFileConfig(MappingConfig):
         config = ConfigParser(interpolation=ExtendedInterpolation())
         config.read_dict({'Dirs': self.defaults})
         config.read(file_names)
-        additional_config_files = list(self.config['ConfigFiles'].values())
+        additional_config_files = list(config['ConfigFiles'].values())
         config.read(additional_config_files)
         super().__init__(config, **kwargs)
 

@@ -1,13 +1,14 @@
-from abc import ABC, abstractmethod
-from pydantic import validator
+import logging
+from pydantic import validator, BaseModel
 from pydantic.types import conint
 from pydantic.dataclasses import dataclass
+from collections import ChainMap
 import builtins
 import operator
 
 from lib.conf.base import str_to_list
 
-from typing import Iterable, Callable, Type, Any
+from typing import Union, Callable, Iterable, Any
 
 
 def in_(a, b):
@@ -15,6 +16,14 @@ def in_(a, b):
 
 
 Port = conint(ge=0, le=65335)
+
+
+class Logger(logging.Logger):
+    @classmethod
+    def validate(cls, value: Union[str, logging.Logger]) -> logging.Logger:
+        if isinstance(value, str):
+            return logging.getLogger(value)
+        return value
 
 
 @dataclass
@@ -39,7 +48,7 @@ class CallableFromString(Callable):
 
 
 class Builtin(CallableFromString):
-    _strings_to_callables = builtins.__dict__
+    _strings_to_callables = ChainMap(builtins.__dict__, {'istr': str})
 
 
 class Operator(CallableFromString):
@@ -62,22 +71,17 @@ class Operator(CallableFromString):
     }
 
 
-class BaseSwappable(ABC):
-    @abstractmethod
-    def swap_cls(self, name) -> Type:
-        pass
-
-
 class RawStr(str):
     config_kwargs = {'raw': True}
 
 
-class Expression:
-    config_from_section = False
+class Expression(BaseModel):
+    config_from_string = True
     attr: str
     op: Operator
     value_type: Builtin
     value: Any
+    case_sensitive: bool = True
 
     @validator('value')
     def adapt_value(cls, v, values, **kwargs):
@@ -86,9 +90,22 @@ class Expression:
             v = str_to_list.split(v)
         return value_type(v)
 
-    def test(self, obj):
+    @validator('case_sensitive')
+    def case_sensitive(cls, v, values, **kwargs):
+        value_type = values['value_type']
+        if value_type == 'istr':
+            return False
+        return True
+
+    def __call__(self, obj):
         if not self.attr or self.attr == 'self':
             value = obj
         else:
             value = getattr(obj, self.attr)
+        if self.case_sensitive:
+            if isinstance(value, Iterable):
+                value = [v.lower() for v in value]
+            else:
+                value = value.lower()
+            return self.op(value, self.value.lower())
         return self.op(value, self.value)
