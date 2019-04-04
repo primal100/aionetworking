@@ -1,76 +1,88 @@
-import asyncio
-import logging
-from lib.conf.types import Logger, Port
 from abc import ABC, abstractmethod
+import asyncio
+
+from lib.conf.types import Logger, Port
+from lib.networking.asyncio_protocols import BaseNetworkProtocol
+
+from pydantic.dataclasses import dataclass
+
+from typing import NoReturn
 
 
+@dataclass
 class BaseReceiver(ABC):
     name = 'receiver'
-    logger: Logger = logging.getLogger('receiver')
+    logger: Logger = 'receiver'
 
     quiet: bool = False
 
-    async def started(self):
+    @property
+    def loop(self) -> asyncio.SelectorEventLoop:
+        return asyncio.get_event_loop()
+
+    async def started(self) -> bool:
         return True
 
-    async def stopped(self):
+    async def stopped(self) -> bool:
         return True
 
-    async def start(self):
+    async def start(self) -> NoReturn:
         try:
             await self.run()
         except asyncio.CancelledError:
             self.logger.debug('Receiver task cancelled')
             await self.close()
 
-    async def close(self):
+    async def close(self) -> NoReturn:
         pass
 
-    async def wait_stopped(self):
+    async def wait_stopped(self) -> NoReturn:
         pass
 
     @abstractmethod
-    async def run(self): ...
+    async def run(self) -> NoReturn: ...
 
 
+@dataclass
 class BaseServer(ABC, BaseReceiver):
     name = 'Server'
     server = None
 
     host: str = '0.0.0.0'
     port: Port = 4000
+    protocol:  BaseNetworkProtocol = None
 
     @property
-    def listening_on(self):
+    def listening_on(self) -> str:
         return f"{self.host}:{self.port}"
 
-    def print_listening_message(self, sockets):
+    def print_listening_message(self, sockets) -> NoReturn:
         if not self.quiet:
             for socket in sockets:
                 sock_name = socket.getsockname()
                 listening_on = ':'.join([str(v) for v in sock_name])
                 print('Serving %s on %s' % (self.name, listening_on))
 
-    async def close(self):
+    async def close(self) -> NoReturn:
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
 
-    async def started(self):
+    async def started(self) -> NoReturn:
         while not self.server or not self.server.is_serving():
             await asyncio.sleep(0.01)
 
-    async def stopped(self):
+    async def stopped(self) -> NoReturn:
         if self.server:
             await self.server.wait_closed()
 
-    async def run(self):
+    async def run(self) -> NoReturn:
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
         await self.start_server()
 
     @abstractmethod
-    async def stop_server(self): ...
+    async def stop_server(self) -> NoReturn: ...
 
     @abstractmethod
-    async def start_server(self): ...
+    async def start_server(self) -> NoReturn: ...
 

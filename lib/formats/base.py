@@ -1,13 +1,17 @@
 import asyncio
-import datetime
+from datetime import datetime
+from dataclasses import field, replace
 import logging
 from pathlib import Path
 from pprint import pformat
 
+from pydantic.dataclasses import dataclass
+
 from lib import settings
+from lib.conf.logging import Logger
 from lib.utils import Record
 
-from typing import Sequence
+from typing import Any, AnyStr, Sequence
 
 
 class BaseCodec:
@@ -17,8 +21,9 @@ class BaseCodec:
     append_mode = 'ab'
     logger_name = 'receiver'
 
-    def __init__(self, msg_obj, logger=None):
+    def __init__(self, msg_obj, context = None, logger=None):
         self.msg_obj = msg_obj
+        self.context = context or context
         self.logger = logger or logging.getLogger(self.logger_name)
 
     def set_logger(self, logger):
@@ -58,36 +63,31 @@ class EmbeddedDict(dict):
         return self.__getattr__(item)
 
 
-class MessageObject:
-    def __new__(cls, name):
-        from lib import definitions
-        return definitions.DATA_FORMATS[name]
-
-
+@dataclass
 class BaseMessageObject:
-    message_type = None
-    codec_name = ""
+    name = None
     binary = True
     supports_responses = False
     codec_cls = BaseCodec
-    logger_name = 'receiver'
     id_attr = 'id'
+
+    encoded: AnyStr
+    decoded: Any = None
+    context: dict = field(default_factory=dict)
+    logger: Logger = 'receiver'
+    received_timestamp: datetime = field(default_factory=datetime.now)
+
+    @classmethod
+    def swap_cls(cls, name):
+        from lib import definitions
+        return definitions.DATA_FORMATS[name]
 
     @classmethod
     def get_codec(cls, **kwargs):
         return cls.codec_cls(cls, *cls.get_codec_args(), **kwargs)
 
-    def __init__(self, encoded, decoded=None, timestamp=None, logger=None, context=None):
-        self.encoded = encoded
-        self.decoded = decoded
-        self.context = context or {}
-        if not logger:
-            logger = logging.getLogger(self.logger_name)
-        self.conn_logger = logger
-        self.logger = logger.get_sibling('msg', extra={'msg_obj': self})
-        self.received_timestamp = timestamp
-        if not self.received_timestamp:
-            self.received_timestamp = datetime.datetime.now()
+    def __call__(self, **kwargs):
+        return replace(self, **kwargs)
 
     @property
     def sender(self):
@@ -122,7 +122,7 @@ class BaseMessageObject:
         return pformat(self.decoded)
 
     @property
-    def timestamp(self) -> datetime.datetime:
+    def timestamp(self) -> datetime:
         return self.received_timestamp
 
     def filter(self):
@@ -143,5 +143,5 @@ class BufferObject(BaseMessageObject):
         self._record = Record()
 
     @property
-    def record(self):
+    def record(self) -> bytes:
         return self._record.pack_client_msg(self)

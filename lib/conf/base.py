@@ -105,7 +105,7 @@ class EnvironConfig:
         value = self.get_value(sections, field.name, **config_kwargs)
         if isinstance(value, (str, int, float)):
             if self.is_dataclass(field.type):
-                return self.configure_dataclass(field.type, value, logger=logger)
+                return self.configure_model(field.type, value, logger=logger, model=field.type.__pydantic__model)
             elif self.is_model(field.type):
                 return self.configure_model(field.type, value, logger=logger)
             elif issubclass(field.type, Iterable):
@@ -122,15 +122,11 @@ class EnvironConfig:
                 [(field.name, self.get_value_for_field(sections, field, logger=logger)) for field in model_fields] if
                 value is not None}
 
-    def get_config_for_dataclass(self, cls, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
-        dc_fields = fields(cls)
-        return self.get_config_for_fields(dc_fields, sections, logger=logger)
-
     def get_config_for_model(self, cls: pydantic.BaseModel, sections: Mapping, logger=None) -> MutableMapping[str, Any]:
         model_fields = cls.fields.values()
         return self.get_config_for_fields(model_fields, sections, logger=logger)
 
-    def configure_dataclass(self, cls, value: str, *args, logger=None, **kwargs) -> Any:
+    def configure_model(self, cls, value: str, *args, logger=None, model=None, **kwargs) -> Any:
         if getattr(cls, 'config_from_string', False):
             args = shlex.split(str(value))
         elif getattr(cls, 'swap_from_string', False):
@@ -138,7 +134,8 @@ class EnvironConfig:
         else:
             sections = ConfigMap(kwargs, self.get_sections(cls, value))
             cls = self.swap(sections['type'], cls)
-            config = self.get_config_for_dataclass(cls, sections, logger=logger)
+            model = model or cls.__pydantic__model
+            config = self.get_config_for_model(model, sections, logger=logger)
             kwargs.update(config)
         if logger and 'logger' in [f.name for f in fields(cls)]:
             kwargs['logger'] = logger

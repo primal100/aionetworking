@@ -4,42 +4,15 @@ import binascii
 from datetime import datetime
 from dataclasses import dataclass, field, replace
 
-import inflect
-
 from lib.actions.base import Action
 from lib.conf.logging import Logger
 from lib.formats.base import BufferObject, BaseMessageObject
 from lib.utils import Record
-from lib.conf.types import supernet_of
+from lib.utils_logging import p
 from lib.conf.pydantic_future import IPvAnyNetwork
 from .exceptions import MessageFromNotAuthorizedHost
 
-from typing import Type, Tuple, Callable
-
-
-_p = inflect.engine()
-
-
-class TmpStr:
-    def __init__(self, func: Callable, *args, **kwargs):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def __str__(self):
-        return self.func(*self.args, **self.kwargs)
-
-
-class TmpInflect:
-    def __getattr__(self, item):
-        return TmpStr(getattr(_p, item))
-
-
-p = TmpInflect()
+from typing import Type, ClassVar, Tuple
 
 
 @dataclass
@@ -47,30 +20,19 @@ class BaseProtocol(ABC):
     name = ''
 
     logger: Logger = None
-    protocol_cls: Type[asyncio.Protocol] = None
     action: Action = None
     preaction: Action = None
-    aliases: dict = field(default_factory={})
+    aliases: dict = field(default_factory=dict)
     timeout: int = 0
-    dataformat: BaseMessageObject = None
-    _connection_closed: Callable = lambda: None
+    dataformat: Type[BaseMessageObject] = None
 
     def __post_init__(self):
-        self._connections = []
         self.codec = self.dataformat.get_codec()
         self.parent_logger = self.logger
         self._context = {'protocol_name': self.name}
 
-    def __call__(self, *args, **kwargs):
-        new_connection = replace(self, _connection_closed=self._connection_closed)
-        self._connections.append(new_connection)
-        self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
-                          p.no('active connection'))
-
-    def connection_closed(self, conn):
-        self._connections.remove(conn)
-        self.logger.debug('Connection closed. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
-                          p.no('active connection'))
+    def __call__(self):
+        return replace(self)
 
     async def close(self):
         self.logger.info('Closing actions')
@@ -164,6 +126,7 @@ class BaseProtocol(ABC):
     def send(self, msg_encoded): ...
 
 
+@dataclass
 class BaseNetworkProtocol(ABC, BaseProtocol):
     sock = (None, None)
     own: ''
@@ -173,11 +136,14 @@ class BaseNetworkProtocol(ABC, BaseProtocol):
     peer_port = 0
     transport = None
 
+    _connections: ClassVar = {}
     allowed_senders: Tuple[IPvAnyNetwork] = field(default_factory=())
 
+    @property
     @abstractmethod
     def client(self): ...
 
+    @property
     @abstractmethod
     def server(self): ...
 
@@ -188,6 +154,9 @@ class BaseNetworkProtocol(ABC, BaseProtocol):
         connection_ok = self.initialize(sock, peer)
         if connection_ok:
             self.logger.new_connection()
+            self._connections[self.peer] = self
+            self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
+                              p.no('active connection'))
 
     def close_connection(self):
         pass
@@ -195,7 +164,7 @@ class BaseNetworkProtocol(ABC, BaseProtocol):
     def connection_lost(self, exc):
         self.logger.connection_finished(exc)
         self.close_connection()
-        self._connection_closed()
+        self._connections.pop(self.peer, None)
 
     @property
     def connection_context(self):

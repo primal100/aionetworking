@@ -1,10 +1,16 @@
 import asyncio
+from abc import ABC
+from pydantic.dataclasses import dataclass
+
 from .asyncio_protocols import BaseNetworkProtocol
-from abc import ABC, abstractmethod
-from .mixins import ClientProtocolMixin, ServerProtocolMixin
+from .mixins import ClientProtocolMixin, ServerProtocolMixin, OneWayServerProtocolMixin
 
 
-class TCP(ABC, BaseNetworkProtocol, asyncio.Protocol):
+from typing import ClassVar
+
+
+@dataclass
+class OneWayTCP(ABC, BaseNetworkProtocol, asyncio.Protocol):
 
     def close_connection(self):
         self.transport.close()
@@ -12,15 +18,27 @@ class TCP(ABC, BaseNetworkProtocol, asyncio.Protocol):
     def data_received(self, data):
         self.on_data_received(data)
 
+
+@dataclass
+class TCP(ABC, OneWayTCP):
+
     def send(self, msg):
         self.transport.write(msg)
 
 
+@dataclass
+class TCPOneWayServerProtocol(OneWayServerProtocolMixin, OneWayTCP):
+    name = 'TCP Server'
+    _connections: ClassVar = {}
+
+
+@dataclass
 class TCPServerProtocol(ServerProtocolMixin, TCP):
     name = 'TCP Server'
-    parent_logger_name = 'receiver'
+    _connections: ClassVar = {}
 
 
+@dataclass
 class TCPClientProtocol(ClientProtocolMixin, TCP):
     name = 'TCP Client'
-    parent_logger_name = 'sender'
+    _connections: ClassVar = {}

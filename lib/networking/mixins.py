@@ -1,27 +1,28 @@
+from abc import ABC
 import asyncio
 from datetime import datetime
+from dataclasses import field
 from functools import partial
+
+from pydantic.dataclasses import dataclass
+
 from .exceptions import MethodNotFoundError
+from lib.conf.logging import Logger
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lib.networking.asyncio_protocols import BaseMessageManager as _BaseProtocol
+    from lib.networking.asyncio_protocols import BaseNetworkProtocol as _BaseProtocol
 else:
     _Base = object
     _BaseReceiver = object
 
 
-class ClientProtocolMixin(_BaseProtocol):
-    logger_name = 'sender'
-    futures = {}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.notification_queue = asyncio.Queue()
-
-    def send(self, msg_encoded):
-        raise NotImplementedError
+@dataclass
+class ClientProtocolMixin(ABC, _BaseProtocol):
+    logger: Logger = 'sender'
+    _futures: dict = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)
+    _notification_queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
 
     @property
     def client(self) -> str:
@@ -43,25 +44,25 @@ class ClientProtocolMixin(_BaseProtocol):
         self.encode_and_send_msg(msg_decoded)
 
     async def wait_notification(self):
-        return await self.notification_queue.get()
+        return await self._notification_queue.get()
 
     def get_notification(self):
-        return self.notification_queue.get_nowait()
+        return self._notification_queue.get_nowait()
 
     async def wait_notifications(self):
-        for item in await self.notification_queue.get():
+        for item in await self._notification_queue.get():
             yield item
 
     def get_all_notifications(self):
-        for i in range(0, self.notification_queue.qsize()):
-            yield self.notification_queue.get_nowait()
+        for i in range(0, self._notification_queue.qsize()):
+            yield self._notification_queue.get_nowait()
 
     async def send_and_wait(self, request_id, encoded):
         fut = asyncio.Future()
-        self.futures[request_id] = fut
+        self._futures[request_id] = fut
         self.send_msg(encoded)
         await fut
-        del self.futures[request_id]
+        del self._futures[request_id]
         return fut
 
     async def send_msg_and_wait(self, msg_obj):
@@ -79,18 +80,16 @@ class ClientProtocolMixin(_BaseProtocol):
         timestamp = timestamp or datetime.now()
         msgs = self.make_messages(buffer, timestamp)
         for msg in msgs:
-            fut = self.futures.get(msg.request_id, None)
+            fut = self._futures.get(msg.request_id, None)
             if fut:
                 fut.set_result(msg)
             else:
-                self.notification_queue.put_nowait(msg)
+                self._notification_queue.put_nowait(msg)
 
 
-class BaseServerProtocolMixin(_BaseProtocol):
-    logger_name = 'receiver'
-
-    def send(self, msg_encoded):
-        raise NotImplementedError
+@dataclass
+class BaseServerProtocolMixin(ABC, _BaseProtocol):
+    logger: Logger = 'sender'
 
     @property
     def client(self) -> str:
@@ -103,10 +102,11 @@ class BaseServerProtocolMixin(_BaseProtocol):
         return self.sock
 
 
+@dataclass
 class OneWayServerProtocolMixin(BaseServerProtocolMixin):
 
     def send(self, msg_encoded):
-        raise NotImplementedError
+        raise NotImplementedError('Not able to send messages with one-way server')
 
     def on_data_received(self, buffer, timestamp=None):
         timestamp = timestamp or datetime.now()
@@ -115,10 +115,8 @@ class OneWayServerProtocolMixin(BaseServerProtocolMixin):
         self.action.do_many(msgs)
 
 
-class ServerProtocolMixin(_BaseProtocol):
-
-    def send(self, msg_encoded):
-        raise NotImplementedError
+@dataclass
+class ServerProtocolMixin(BaseServerProtocolMixin):
 
     def on_task_complete(self, msg_obj, future):
         response = self.process_result(msg_obj, future)

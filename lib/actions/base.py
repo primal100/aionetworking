@@ -1,7 +1,8 @@
+from abc import ABC
 import asyncio
 
-from lib.conf.types import BaseSwappable
 from lib import definitions
+
 
 from typing import TYPE_CHECKING, Sequence, Generator, Any, AnyStr, NoReturn, Type
 if TYPE_CHECKING:
@@ -12,7 +13,11 @@ else:
     BaseConfigurable = None
 
 
-class BaseReceiverAction(BaseSwappable):
+class Action(ABC):
+    pass
+
+
+class BaseReceiverAction(ABC):
     name = 'receiver action'
     key = 'ReceiverAction'
     default_logger_name = 'receiver'
@@ -68,7 +73,7 @@ class BaseReceiverAction(BaseSwappable):
         pass
 
 
-class BaseSenderAction(BaseSwappable):
+class BaseSenderAction(ABC):
     name = 'sender'
     key = 'SenderAction'
     default_logger_name = 'sender'
