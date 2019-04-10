@@ -3,7 +3,7 @@ import asyncio
 
 from pydantic.dataclasses import dataclass
 
-from lib.conf.types import Logger
+from lib.types import Logger
 from lib.networking.mixins import ClientProtocolMixin
 from lib.networking.asyncio_protocols import BaseNetworkProtocol
 
@@ -47,7 +47,8 @@ class BaseNetworkClient(ABC, BaseSender):
     @abstractmethod
     async def open_connection(self) -> ClientProtocolMixin: ...
 
-    async def close_connection(self): ...
+    async def close_connection(self):
+        pass
 
     async def start(self) -> ClientProtocolMixin:
         self.logger.info("Opening %s connection to %s", self.sender_type, self.dst)

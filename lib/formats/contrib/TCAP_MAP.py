@@ -1,8 +1,7 @@
+import binascii
 from pycrate_asn1dir import TCAP_MAP
 from lib.formats.contrib.asn1 import BaseAsnObject
 from lib.utils import cached_property
-
-import binascii
 
 
 class TCAPMAPASNObject(BaseAsnObject):

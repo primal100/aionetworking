@@ -1,15 +1,16 @@
-from abc import ABC
-import asyncio
+from abc import ABC, abstractmethod
 from datetime import datetime
 from dataclasses import field
 from functools import partial
 
 from pydantic.dataclasses import dataclass
+from pydantic.types import IPvAnyNetwork
 
-from .exceptions import MethodNotFoundError
+from .exceptions import MessageFromNotAuthorizedHost
 from lib.conf.logging import Logger
+from .asyncio_protocols import BaseReceiverProtocol, BaseSenderProtocol
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, List
 
 if TYPE_CHECKING:
     from lib.networking.asyncio_protocols import BaseNetworkProtocol as _BaseProtocol
@@ -19,10 +20,70 @@ else:
 
 
 @dataclass
-class ClientProtocolMixin(ABC, _BaseProtocol):
-    logger: Logger = 'sender'
-    _futures: dict = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)
-    _notification_queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
+class NetworkProtocolMixin(ABC, _BaseProtocol):
+    sock = (None, None)
+    own: ''
+    alias = ''
+    peer = None
+    peer_ip = None
+    peer_port = 0
+    transport = None
+
+    _connections: ClassVar = {}
+
+    @property
+    @abstractmethod
+    def client(self): ...
+
+    @property
+    @abstractmethod
+    def server(self): ...
+
+    def connection_made(self, transport):
+        self.transport = transport
+        peer = self.transport.get_extra_info('peername')
+        sock = self.transport.get_extra_info('sockname')
+        connection_ok = self.initialize(sock, peer)
+        if connection_ok:
+            self.logger.new_connection()
+            self._connections[self.peer] = self
+            self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
+                              p.no('active connection'))
+
+    def close_connection(self):
+        pass
+
+    def connection_lost(self, exc):
+        self.logger.connection_finished(exc)
+        self.close_connection()
+        self._connections.pop(self.peer, None)
+
+    @property
+    def connection_context(self):
+        return {'peer_ip': self.peer_ip,
+                'peer_port': self.peer_port,
+                'peer': self.peer,
+                'client': self.client,
+                'server': self.server,
+                'alias': self.alias}
+
+    def initialize(self, sock, peer):
+        self.peer_ip = peer[0]
+        self.peer_port = peer[1]
+        self.peer = ':'.join(str(prop) for prop in peer)
+        self.own = ':'.join(str(prop) for prop in sock)
+        self.sock = sock
+        try:
+            self.alias = self.check_other(self.peer_ip)
+            self.configure_context()
+            return True
+        except MessageFromNotAuthorizedHost:
+            self.close_connection()
+            return False
+
+
+@dataclass
+class BaseClientProtocol(ABC, NetworkProtocolMixin, BaseSenderProtocol):
 
     @property
     def client(self) -> str:
@@ -32,91 +93,46 @@ class ClientProtocolMixin(ABC, _BaseProtocol):
     def server(self) -> str:
         return self.peer
 
-    def __getattr__(self, item):
-        if item in getattr(self.action, 'methods', ()):
-            return partial(self._send_and_wait, getattr(self.action, item))
-        if item in getattr(self.action, 'notification_methods', ()):
-            return partial(self._send_request, getattr(self.action, item))
-        raise MethodNotFoundError(f'{item} method was not found')
-
-    def _send_request(self, method, *args, **kwargs):
-        msg_decoded = method(*args, **kwargs)
-        self.encode_and_send_msg(msg_decoded)
-
-    async def wait_notification(self):
-        return await self._notification_queue.get()
-
-    def get_notification(self):
-        return self._notification_queue.get_nowait()
-
-    async def wait_notifications(self):
-        for item in await self._notification_queue.get():
-            yield item
-
-    def get_all_notifications(self):
-        for i in range(0, self._notification_queue.qsize()):
-            yield self._notification_queue.get_nowait()
-
-    async def send_and_wait(self, request_id, encoded):
-        fut = asyncio.Future()
-        self._futures[request_id] = fut
-        self.send_msg(encoded)
-        await fut
-        del self._futures[request_id]
-        return fut
-
-    async def send_msg_and_wait(self, msg_obj):
-        return await self.send_and_wait(msg_obj.request_id, msg_obj.encoded)
-
-    async def encode_send_wait(self, decoded):
-        msg_obj = self.encode_msg(decoded)
-        return await self.send_msg_and_wait(msg_obj)
-
-    async def _send_and_wait(self, method, *args, **kwargs):
-        msg_decoded = method(*args, **kwargs)
-        return await self.encode_send_wait(msg_decoded)
-
-    def on_data_received(self, buffer, timestamp=None):
-        timestamp = timestamp or datetime.now()
-        msgs = self.make_messages(buffer, timestamp)
-        for msg in msgs:
-            fut = self._futures.get(msg.request_id, None)
-            if fut:
-                fut.set_result(msg)
-            else:
-                self._notification_queue.put_nowait(msg)
-
 
 @dataclass
-class BaseServerProtocolMixin(ABC, _BaseProtocol):
+class BaseServerProtocol(ABC, NetworkProtocolMixin, BaseReceiverProtocol):
     logger: Logger = 'sender'
+    allowed_senders: List[IPvAnyNetwork] = field(default_factory=())
 
     @property
     def client(self) -> str:
         if self.alias:
-            return '%s(%s)' % (self.alias, self.peer)
+            return f"{self.alias}({self.peer})"
         return self.peer
 
     @property
     def server(self) -> str:
         return self.sock
 
+    def raise_message_from_not_authorized_host(self, sender):
+        msg = f"Received message from unauthorized host {sender}"
+        self.logger.error(msg)
+        raise MessageFromNotAuthorizedHost(msg)
+
+    def sender_valid(self, other_ip):
+        if self.allowed_networks:
+            return any(n.supernet_of(other_ip) for n in self.allowed_networks)
+        return True
+
+    def check_other(self, other_ip):
+        if self.sender_valid(other_ip):
+            return super().check_other(other_ip)
+        self.raise_message_from_not_authorized_host(other_ip)
+
 
 @dataclass
-class OneWayServerProtocolMixin(BaseServerProtocolMixin):
-
+class BaseOneWayServerProtocol(ABC, BaseServerProtocol, BaseReceiverProtocol):
     def send(self, msg_encoded):
-        raise NotImplementedError('Not able to send messages with one-way server')
-
-    def on_data_received(self, buffer, timestamp=None):
-        timestamp = timestamp or datetime.now()
-        self.manage_buffer(self.alias, buffer, timestamp)
-        msgs = self.make_messages(buffer, timestamp)
-        self.action.do_many(msgs)
+        raise NotImplementedError(f"Not possible to send messages with {self.name}")
 
 
 @dataclass
-class ServerProtocolMixin(BaseServerProtocolMixin):
+class BaseTwoWayServerProtocol(ABC, BaseServerProtocol, BaseReceiverProtocol):
 
     def on_task_complete(self, msg_obj, future):
         response = self.process_result(msg_obj, future)

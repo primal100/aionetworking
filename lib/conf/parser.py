@@ -1,6 +1,6 @@
 from configparser import ConfigParser, ExtendedInterpolation
 from logging.config import fileConfig
-from pathlib import Path
+from pydantic.types import FilePath
 
 from .mapping import MappingConfig
 
@@ -8,7 +8,7 @@ from .mapping import MappingConfig
 class INIFileConfig(MappingConfig):
     log_config = fileConfig
 
-    def __init__(self, *file_names: Path, **kwargs):
+    def __init__(self, *file_names: FilePath, **kwargs):
         config = ConfigParser(interpolation=ExtendedInterpolation())
         config.read_dict({'Dirs': self.defaults})
         config.read(file_names)

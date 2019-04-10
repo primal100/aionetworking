@@ -1,3 +1,4 @@
+pytest
 inflect
 pydantic
 asyncssh

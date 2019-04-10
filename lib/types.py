@@ -1,18 +1,41 @@
 import logging
-from pydantic import validator, BaseModel
-from pydantic.types import conint
-from pydantic.dataclasses import dataclass
-from collections import ChainMap
+from collections import ChainMap#
+from pathlib import Path
 import builtins
 import operator
 
+from pydantic import validator, errors, BaseModel, ValidationError
+from pydantic.dataclasses import dataclass
+from pydantic.types import conint
+from pydantic.validators import path_validator
+from pydantic.utils import AnyCallable
+
 from lib.conf.base import str_to_list
 
-from typing import Union, Callable, Iterable, Any
+from typing import TYPE_CHECKING, Union, Generator, Callable, Iterable, Any
 
 
-def in_(a, b):
-    return a in b
+if TYPE_CHECKING:
+    from typing import Type
+    CallableGenerator = Generator[AnyCallable, None, None]
+else:
+    class Type:
+        base_cls = None
+
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+        @classmethod
+        def validate(cls, value):
+            if isinstance(value, str):
+                return cls.base_cls.swap_cls(str)
+            if issubclass(value, cls.base_cls):
+                return cls.base_cls
+            raise ValidationError(f"{value} is not a subclass of {cls.base_cls}")
+
+        def __class_getitem__(cls, item):
+            return type(f"{item.__name__}Type", (cls,), {'base_cls': item})
 
 
 Port = conint(ge=0, le=65335)
@@ -42,13 +65,17 @@ class CallableFromString(Callable):
                 return cls._strings_to_callables[v]
             except KeyError:
                 raise TypeError(f"{v} not found")
-        if not hasattr(cls._obj, v):
+        if v not in cls._strings_to_callables.values():
             raise TypeError(f"{v} not a valid {name}")
         return v
 
 
 class Builtin(CallableFromString):
     _strings_to_callables = ChainMap(builtins.__dict__, {'istr': str})
+
+
+def in_(a, b) -> bool:
+    return a in b
 
 
 class Operator(CallableFromString):
@@ -84,20 +111,20 @@ class Expression(BaseModel):
     case_sensitive: bool = True
 
     @validator('value')
-    def adapt_value(cls, v, values, **kwargs):
+    def adapt_value(cls, v: Any, values: dict) -> Any:
         value_type = values['value_type']
         if issubclass(value_type, Iterable) and isinstance(v, str):
             v = str_to_list.split(v)
         return value_type(v)
 
     @validator('case_sensitive')
-    def case_sensitive(cls, v, values, **kwargs):
+    def case_sensitive(cls, v: bool, values: dict) -> bool:
         value_type = values['value_type']
         if value_type == 'istr':
             return False
         return True
 
-    def __call__(self, obj):
+    def __call__(self, obj: Any) -> bool:
         if not self.attr or self.attr == 'self':
             value = obj
         else:
@@ -109,3 +136,33 @@ class Expression(BaseModel):
                 value = value.lower()
             return self.op(value, self.value.lower())
         return self.op(value, self.value)
+
+
+class FilePathNewOK(Path):
+    @classmethod
+    def __get_validators__(cls) -> 'CallableGenerator':
+        yield path_validator
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value: Path) -> Path:
+        if not value.exists():
+            value.parent.mkdir(exists_ok=True, parents=True)
+        if not value.is_file():
+            raise errors.PathNotAFileError(path=value)
+        return value
+
+
+class DirectoryPathNewOK(Path):
+    @classmethod
+    def __get_validators__(cls) -> 'CallableGenerator':
+        yield path_validator
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value: Path) -> Path:
+        if not value.exists():
+            value.parent.mkdir(exists_ok=True, parents=True)
+        if not value.is_dir():
+            raise errors.PathNotADirectoryError(path=value)
+        return value

@@ -2,43 +2,46 @@ import asyncio
 from abc import ABC
 from pydantic.dataclasses import dataclass
 
-from .asyncio_protocols import BaseNetworkProtocol
-from .mixins import ClientProtocolMixin, ServerProtocolMixin, OneWayServerProtocolMixin
+from .mixins import BaseClientProtocol, BaseOneWayServerProtocol, BaseTwoWayServerProtocol
 
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, AnyStr, ClassVar
+if TYPE_CHECKING:
+    from .mixins import NetworkProtocolMixin
+else:
+    NetworkProtocolMixin = object
 
 
 @dataclass
-class OneWayTCP(ABC, BaseNetworkProtocol, asyncio.Protocol):
+class OneWayTCPMixin(ABC, NetworkProtocolMixin, asyncio.Protocol):
 
     def close_connection(self):
         self.transport.close()
 
-    def data_received(self, data):
+    def data_received(self, data: AnyStr):
         self.on_data_received(data)
 
 
 @dataclass
-class TCP(ABC, OneWayTCP):
+class TCPMixin(ABC, OneWayTCPMixin):
 
-    def send(self, msg):
+    def send(self, msg: AnyStr):
         self.transport.write(msg)
 
 
 @dataclass
-class TCPOneWayServerProtocol(OneWayServerProtocolMixin, OneWayTCP):
+class TCPOneWayServerProtocol(OneWayTCPMixin, BaseOneWayServerProtocol):
     name = 'TCP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class TCPServerProtocol(ServerProtocolMixin, TCP):
+class TCPServerProtocol(TCPMixin, BaseTwoWayServerProtocol):
     name = 'TCP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class TCPClientProtocol(ClientProtocolMixin, TCP):
+class TCPClientProtocol(TCPMixin, BaseClientProtocol):
     name = 'TCP Client'
     _connections: ClassVar = {}

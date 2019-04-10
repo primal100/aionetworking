@@ -1,20 +1,22 @@
-import logging
+from logging import Filter, Logger, LogRecord
 
 from dataclasses import field
 from pydantic.dataclasses import dataclass
-from pydantic.utils import AnyCallable
-from lib.conf.types import Logger, Expression
+from lib.types import Expression
 
 from lib import definitions
-from typing import Type, List, Generator
+from typing import Type, List
 
 
-CallableGenerator = Generator[AnyCallable, None, None]
+@dataclass
+class BaseFilter(Filter):
 
+    loggers: List[Logger] = field(default_factory=list)
 
-class BaseFilter(logging.Filter):
-
-    loggers: List[Logger] = []
+    def __init__(self, *args, loggers: List[Logger] = (), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loggers = loggers
+        self.__post_init__()
 
     def __post_init__(self):
         for logger in self.loggers:
@@ -29,7 +31,11 @@ class BaseFilter(logging.Filter):
 class SenderFilter(BaseFilter):
     senders: List[str] = field(default_factory=list)
 
-    def filter(self, record: logging.LogRecord) -> bool:
+    def __init__(self, *args, senders: List[str] = (), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.senders = senders
+
+    def filter(self, record: LogRecord) -> bool:
         sender = getattr(record, 'sender', None)
         if not sender:
             msg_obj = getattr(record, 'msg_obj', None)
@@ -45,7 +51,7 @@ class MessageFilter(BaseFilter):
 
     expr: Expression
 
-    def filter(self, record: logging.LogRecord) -> bool:
+    def filter(self, record: LogRecord) -> bool:
         msg_obj = getattr(record, 'msg_obj', None)
         if msg_obj:
             return self.expr(msg_obj)

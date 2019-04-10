@@ -1,5 +1,5 @@
-from .base import BaseReceiverAction, BaseSenderAction
-from typing import TYPE_CHECKING, MutableMapping, AnyStr, NoReturn
+from lib.actions.base import BaseAction
+from typing import TYPE_CHECKING, Any, MutableMapping, AnyStr, NoReturn
 
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
@@ -15,22 +15,7 @@ class InvalidParamsError(Exception):
     pass
 
 
-class JSONRPCMethod:
-    version = "2.0"
-
-    def __init__(self, name: str):
-        self.name = name
-
-    def base_command(self, *args, **kwargs) -> MutableMapping:
-        command = {"jsonrpc": self.version, "method": self.name}
-        if args:
-            command['params'] = args
-        elif kwargs:
-            command['params'] = kwargs
-        return command
-
-
-class BaseJSONRPCServer(BaseReceiverAction):
+class BaseJSONRPCServer(BaseAction):
     version = '2.0'
     exception_codes = {
         'InvalidRequestError': {"code": -32600, "message": "Invalid Request"},
@@ -46,12 +31,12 @@ class BaseJSONRPCServer(BaseReceiverAction):
             raise InvalidParamsError
 
     async def do_one(self, msg: BaseMessageObject) -> MutableMapping:
-        request_id = msg.get('id', None)
+        request_id = msg.get('id')
         try:
             func = getattr(self, msg['method'])
         except KeyError:
             raise MethodNotFoundError
-        params = msg.get('params', None)
+        params = msg.get('params')
         try:
             if isinstance(params, (tuple, list)):
                 result = await func(*params)
@@ -76,15 +61,5 @@ class BaseJSONRPCServer(BaseReceiverAction):
 
 class SampleJSONRPCServer(BaseJSONRPCServer):
 
-    async def test(self, param):
+    async def test(self, param: Any):
         return f"Successfully processed {param}"
-
-
-class BaseJSONRPCClient(BaseSenderAction):
-    methods = 'test',
-
-    def __getattr__(self, item) -> JSONRPCMethod:
-        if item in self.methods:
-            return JSONRPCMethod(item)
-        if item in self.notification_methods:
-            return JSONRPCMethod(item)

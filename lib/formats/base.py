@@ -1,6 +1,7 @@
+from abc import ABC
 import asyncio
 from datetime import datetime
-from dataclasses import field, replace
+from dataclasses import field
 import logging
 from pathlib import Path
 from pprint import pformat
@@ -9,50 +10,11 @@ from pydantic.dataclasses import dataclass
 
 from lib import settings
 from lib.conf.logging import Logger
+from lib.types import Type
 from lib.utils import Record
 
-from typing import Any, AnyStr, Sequence
+from typing import Any, AnyStr, MutableMapping, Sequence
 
-
-class BaseCodec:
-    codec_name = ''
-    read_mode = 'rb'
-    write_mode = 'wb'
-    append_mode = 'ab'
-    logger_name = 'receiver'
-
-    def __init__(self, msg_obj, context = None, logger=None):
-        self.msg_obj = msg_obj
-        self.context = context or context
-        self.logger = logger or logging.getLogger(self.logger_name)
-
-    def set_logger(self, logger):
-        self.logger = logger
-
-    async def read_file(self, file_path: Path):
-        async with settings.FILE_OPENER(file_path, self.read_mode) as f:
-            return await f.read()
-
-    async def from_file(self, file_path: Path, **kwargs):
-        self.logger.debug('Creating new %s message from %s', self.codec_name, file_path)
-        encoded = await asyncio.create_task(self.read_file(file_path))
-        return self.from_buffer(encoded, **kwargs)
-
-    def from_buffer(self, encoded, **kwargs) -> Sequence:
-        return [self.msg_obj(encoded, decoded, **kwargs) for encoded, decoded in self.decode(encoded)]
-
-    def from_decoded(self, decoded, **kwargs):
-        return self.msg_obj(self.encode(decoded), decoded, **kwargs)
-
-    def create_msg(self, decoded, **kwargs):
-        encoded = self.encode(decoded, **kwargs)
-        return self.msg_obj(encoded, decoded=decoded, **kwargs)
-
-    def decode(self, encoded: bytes, **kwargs) -> Sequence:
-        yield [encoded, encoded]
-
-    def encode(self, decoded, **kwargs):
-        return decoded
 
 
 class EmbeddedDict(dict):
@@ -64,11 +26,11 @@ class EmbeddedDict(dict):
 
 
 @dataclass
-class BaseMessageObject:
+class BaseMessageObject(ABC):
     name = None
     binary = True
     supports_responses = False
-    codec_cls = BaseCodec
+    codec_cls = None
     id_attr = 'id'
 
     encoded: AnyStr
@@ -85,9 +47,6 @@ class BaseMessageObject:
     @classmethod
     def get_codec(cls, **kwargs):
         return cls.codec_cls(cls, *cls.get_codec_args(), **kwargs)
-
-    def __call__(self, **kwargs):
-        return replace(self, **kwargs)
 
     @property
     def sender(self):
@@ -133,7 +92,7 @@ class BaseMessageObject:
             self.stats_logger.on_message_processed(self)
 
     def __str__(self):
-        return "%s message %s" % (self.message_type, self.uid)
+        return f"{self.message_type} message {self.uid}"
 
 
 class BufferObject(BaseMessageObject):
@@ -145,3 +104,46 @@ class BufferObject(BaseMessageObject):
     @property
     def record(self) -> bytes:
         return self._record.pack_client_msg(self)
+
+
+class BaseCodec:
+    codec_name = ''
+    read_mode = 'rb'
+    write_mode = 'wb'
+    append_mode = 'ab'
+    logger_name = 'receiver'
+
+    def __init__(self, msg_obj: Type[BaseMessageObject], context: MutableMapping = None, logger=None):
+        self.msg_obj = msg_obj
+        self.context = context or {}
+        self.logger = logger or logging.getLogger(self.logger_name)
+
+    def set_context(self, context, logger=None):
+        self.context.update(context)
+        if logger:
+            self.logger = logger
+
+    async def read_file(self, file_path: Path):
+        async with settings.FILE_OPENER(file_path, self.read_mode) as f:
+            return await f.read()
+
+    async def from_file(self, file_path: Path, **kwargs):
+        self.logger.debug('Creating new %s message from %s', self.codec_name, file_path)
+        encoded = await asyncio.create_task(self.read_file(file_path))
+        return self.from_buffer(encoded, **kwargs)
+
+    def from_buffer(self, encoded, **kwargs) -> Sequence:
+        return [self.msg_obj(encoded, decoded, **kwargs) for encoded, decoded in self.decode(encoded)]
+
+    def from_decoded(self, decoded, **kwargs):
+        return self.msg_obj(self.encode(decoded), decoded, **kwargs)
+
+    def create_msg(self, decoded, **kwargs):
+        encoded = self.encode(decoded, **kwargs)
+        return self.msg_obj(encoded, decoded=decoded, **kwargs)
+
+    def decode(self, encoded: bytes, **kwargs) -> Sequence:
+        yield [encoded, encoded]
+
+    def encode(self, decoded, **kwargs):
+        return decoded

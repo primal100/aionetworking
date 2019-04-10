@@ -1,41 +1,36 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 import asyncio
+from dataclasses import field
+
+from pydantic.dataclasses import dataclass
 
 from lib import definitions
+from lib.conf.logging import Logger
 
-
-from typing import TYPE_CHECKING, Sequence, Generator, Any, AnyStr, NoReturn, Type
+from typing import TYPE_CHECKING, Sequence, List, Tuple, Generator, Any, AnyStr, NoReturn
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
-    from lib.conf.types import BaseConfigurable
 else:
     BaseMessageObject = None
-    BaseConfigurable = None
 
 
-class Action(ABC):
-    pass
-
-
-class BaseReceiverAction(ABC):
+@dataclass
+class BaseAction(ABC):
     name = 'receiver action'
-    key = 'ReceiverAction'
-    default_logger_name = 'receiver'
+    logger: Logger = 'receiver'
 
-    #Dataclass fields
     timeout: int = 5
+    _outstanding_tasks: List = field(default_factory=list)
 
     @classmethod
-    def get_swappable(cls, name: str) -> Type[BaseConfigurable]:
+    def swap_cls(cls, name: str):
         return definitions.ACTIONS[name]
 
     def __post_init__(self):
-        super().__post_init__()
-        self.logger = self.logger.get_child("actions")
-        self._outstanding_tasks = []
+        self.logger = self.logger.get_child(name='actions')
 
-    async def do_one(self, msg: BaseMessageObject) -> Any:
-        raise NotImplementedError
+    @abstractmethod
+    async def do_one(self, msg: BaseMessageObject) -> Any: ...
 
     def do_many(self, msgs: Sequence[BaseMessageObject]) -> Generator[Sequence[BaseMessageObject, asyncio.Task], None, None]:
         return self.do_many_parallel(msgs)
@@ -47,7 +42,7 @@ class BaseReceiverAction(ABC):
                 self._outstanding_tasks += task
                 yield msg, task
 
-    def do_many_sequential(self, msgs: Sequence[BaseMessageObject]) -> Generator[Sequence[BaseMessageObject, Any], None, None]:
+    def do_many_sequential(self, msgs: Sequence[BaseMessageObject]) -> Generator[Tuple[BaseMessageObject, Any], None, None]:
         for msg in msgs:
             if not self.filter(msg):
                 yield msg, self.do_one(msg)
@@ -72,23 +67,5 @@ class BaseReceiverAction(ABC):
     def response_on_exception(self, msg: BaseMessageObject, exc: Exception) -> Any:
         pass
 
-
-class BaseSenderAction(ABC):
-    name = 'sender'
-    key = 'SenderAction'
-    default_logger_name = 'sender'
-    methods = ()
-    notification_methods = ()
-
-    #Dataclass fields
-    timeout: int = 5
-
-    @classmethod
-    def get_swappable(cls, name: str) -> Type[BaseConfigurable]:
-        return definitions.ACTIONS[name]
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.logger = self.logger.get_child("actions")
 
 

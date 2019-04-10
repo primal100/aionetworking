@@ -1,3 +1,5 @@
+from ssl import SSLContext
+
 from pydantic.dataclasses import dataclass
 
 from lib.conf.exceptions import ConfigurationException
@@ -13,11 +15,16 @@ class TCPClient(BaseNetworkClient):
 
     protocol: TCPClientProtocol = TCPClientProtocol()
     ssl: ClientSideSSL = ClientSideSSL()
+    ssl_context: SSLContext = None
     ssl_handshake_timeout: int = 0
+
+    def __post_init__(self):
+        if self.ssl and not self.ssl_context:
+            self.ssl_context = self.ssl.context
 
     async def open_connection(self) -> TCPClientProtocol:
         self.transport, self.conn = await self.loop.create_connection(
-            self.protocol, self.host, self.port, ssl=self.ssl,
+            self.protocol, self.host, self.port, ssl=self.ssl_context,
             local_addr=self.localaddr, ssl_handshake_timeout=self.ssl_handshake_timeout)
         return self.conn
 

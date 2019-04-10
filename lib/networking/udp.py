@@ -5,23 +5,36 @@ import time
 
 from pydantic.dataclasses import dataclass
 
-from .asyncio_protocols import BaseNetworkProtocol
-from .mixins import OneWayServerProtocolMixin, BaseServerProtocolMixin, ServerProtocolMixin, ClientProtocolMixin
+from .mixins import BaseOneWayServerProtocol, BaseClientProtocol, BaseTwoWayServerProtocol
 from lib.utils import addr_tuple_to_str
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, AnyStr, ClassVar
+
+if TYPE_CHECKING:
+    from .mixins import NetworkProtocolMixin
+else:
+    NetworkProtocolMixin = object
 
 
 @dataclass
-class UDPServerMixin(ABC, BaseServerProtocolMixin):
+class OneWayUDPMixin(ABC, NetworkProtocolMixin, asyncio.DatagramProtocol):
     expiry_minutes: int = 30
 
-    def connection_lost(self, exc):
+    def __call__(self):
+        return self
+
+    def error_received(self, exc):
+        self.logger.manage_error(exc)
+
+    def finish_connection(self, exc:Exception):
+        super().connection_lost(exc)
+
+    def connection_lost(self, exc: Exception):
         super().connection_lost(exc)
         for conn in self.clients.values():
-            conn.connection_lost(None)
+            conn.finish_connection(exc)
 
-    def new_sender(self, addr, src):
+    def new_sender(self, addr: str, src: str):
         connection_protocol = replace(self)
         connection_ok = connection_protocol.initialize(self.sock, addr)
         if connection_ok:
@@ -30,7 +43,7 @@ class UDPServerMixin(ABC, BaseServerProtocolMixin):
             return connection_protocol
         return None
 
-    def datagram_received(self, data, addr):
+    def datagram_received(self, data: AnyStr, addr: str):
         src = addr_tuple_to_str(addr)
         connection_protocol = self.clients.get(src, None)
         if connection_protocol:
@@ -51,35 +64,25 @@ class UDPServerMixin(ABC, BaseServerProtocolMixin):
 
 
 @dataclass
-class OneWayUDP(ABC, BaseNetworkProtocol, asyncio.DatagramProtocol):
-
-    def __call__(self):
-        return self
-
-    def error_received(self, exc):
-        self.logger.manage_error(exc)
-
-
-@dataclass
-class UDP(ABC, OneWayUDP):
+class UDPMixin(ABC, OneWayUDPMixin):
 
     def send(self, msg):
         self.transport.sendto(msg, addr=(self.peer_ip, self.peer_port))
 
 
 @dataclass
-class UDPServerOneWayProtocol(OneWayServerProtocolMixin, UDPServerMixin, UDP):
+class UDPServerOneWayProtocol(OneWayUDPMixin, BaseOneWayServerProtocol):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPServerProtocol(ServerProtocolMixin, UDP):
+class UDPServerProtocol(UDPMixin, BaseTwoWayServerProtocol):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPClientProtocol(ClientProtocolMixin, UDP):
+class UDPClientProtocol(UDPMixin, BaseClientProtocol):
     name = 'UDP Client'
     _connections: ClassVar = {}

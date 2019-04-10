@@ -1,9 +1,11 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
 import logging
 from collections import ChainMap
 from datetime import datetime
 from dataclasses import field
 
-from pydantic.dataclasses import dataclass
+from pydantic import ValidationError
 
 from lib.utils import log_exception
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
@@ -17,9 +19,8 @@ else:
     BaseMessageObject = None
 
 
-class Logger(logging.LoggerAdapter):
+class BaseLogger(ABC, logging.LoggerAdapter):
     logger = None
-    _loggers: ClassVar = {}
 
     logger_name: str
     datefmt: str = '%Y-%M-%d %H:%M:%S'
@@ -30,47 +31,90 @@ class Logger(logging.LoggerAdapter):
         self.datefmt = datefmt
         self.extra = extra or {}
         logger = logging.getLogger(logger_name)
-        self.connection_logger_cls = self.get_connection_logger_cls()
         super().__init__(logger, extra)
-
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, logger) -> 'Logger':
-        if isinstance(logger, cls):
-            if logger.logger_name not in cls._loggers:
-                cls._loggers[logger.logger_name] = logger
-                return logger
-        elif logger in cls._loggers:
-                return cls._loggers[logger]
-        else:
-            instance = cls(logger)
-            cls._loggers[logger] = instance
-            return instance
-
-    def get_connection_logger_cls(self) -> Type['Logger']:
-        if self.get_child('stats').isEnabledFor(logging.INFO):
-            return ConnectionLoggerStats
-        return ConnectionLogger
+        self.connection_logger_cls = self.get_connection_logger_cls()
 
     def manage_error(self, exc: Exception) -> NoReturn:
         if exc:
             self.error(log_exception(exc))
 
-    def get_connection_logger(self, *args, name: str = 'connection', **kwargs) -> 'Logger':
-        return self.get_child(*args, name=name, cls=self.connection_logger_cls, **kwargs)
+    @classmethod
+    @abstractmethod
+    def __get_validators__(cls): ...
 
-    def get_child(self, *args, name: str = '', **kwargs) -> 'Logger':
+    @classmethod
+    @abstractmethod
+    def validate_keep(cls, logger): ...
+
+    @classmethod
+    @abstractmethod
+    def validate_new(cls, logger): ...
+
+    @abstractmethod
+    def get_connection_logger_cls(self) -> Type: ...
+
+    @abstractmethod
+    def get_connection_logger(self, name: str = 'connection', **kwargs): ...
+
+    @abstractmethod
+    def get_child(self, name: str = '', **kwargs) -> BaseLogger: ...
+
+    @abstractmethod
+    def get_sibling(self, name: str = '', **kwargs) -> BaseLogger: ...
+
+    @abstractmethod
+    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, context: MutableMapping = None, **kwargs) -> Any: ...
+
+
+class Logger(BaseLogger):
+    _loggers: ClassVar = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_keep
+
+    @classmethod
+    def validate_keep(cls, logger) -> BaseLogger:
+        if isinstance(logger, cls):
+            if logger.logger_name not in cls._loggers:
+                cls._loggers[logger.logger_name] = logger
+                return logger
+        elif logger in cls._loggers:
+            return cls._loggers[logger]
+        elif isinstance(logger, str):
+            instance = cls(logger)
+            cls._loggers[logger] = instance
+            return instance
+        raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
+
+    @classmethod
+    def validate_new(cls, logger) -> BaseLogger:
+        if isinstance(logger, cls):
+            return logger
+        if isinstance(logger, str):
+            return cls(logger)
+        raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
+
+    def get_connection_logger_cls(self) -> Type[BaseLogger]:
+        if self.get_child('stats').isEnabledFor(logging.INFO):
+            return ConnectionLoggerStats
+        return ConnectionLogger
+
+    def get_connection_logger(self, name: str = 'connection', **kwargs) -> Any:
+        return self.get_child(name=name, cls=self.connection_logger_cls, **kwargs)
+
+    def get_child(self, name: str = '', **kwargs) -> Any:
         logger_name = f"{self.logger_name}.{name}"
-        return self.get_logger(*args, name=logger_name, **kwargs)
+        return self.get_logger(name=logger_name, **kwargs)
 
-    def get_sibling(self, *args, name: str = '', **kwargs) -> 'Logger':
+    def get_sibling(self, *args, name: str = '', **kwargs) -> Any:
         name = f'{self.logger.parent.name}.{name}'
         return self.get_logger(*args, name=name, **kwargs)
 
-    def get_logger(self, name: str = '', cls: Type['Logger']=None, context: MutableMapping = None, **kwargs) -> 'Logger':
+    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, context: MutableMapping = None, **kwargs) -> Any:
         cls = cls or self.__class__
         context = context or {}
         extra = ChainMap(context, self.extra)
@@ -87,7 +131,11 @@ class ConnectionLogger(Logger):
         self._data_received_logger = self.get_sibling('data_received')
         self._data_sent_logger = self.get_sibling('data_sent')
 
-    def msg_logger(self, msg: BaseMessageObject) -> 'Logger':
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_new
+
+    def msg_logger(self, msg: BaseMessageObject) -> BaseLogger:
         return self.get_sibling('msg', context={'msg_obj': msg})
 
     @property
@@ -155,7 +203,7 @@ class ConnectionLogger(Logger):
         self.manage_error(exc)
         self.info('%s connection from %s to %s has been closed', self.connection_type, self.client, self.server)
 
-    def set_closing(self)-> NoReturn:
+    def set_closing(self) -> NoReturn:
         self._is_closing = True
 
 
@@ -234,14 +282,18 @@ class StatsTracker(_StatsTracker):
 
 
 class StatsLogger(Logger):
-    stats_cls = StatsTracker
+    stats_cls: Type[StatsTracker] = StatsTracker
+    extra: StatsTracker = StatsTracker({})
 
-    def __init__(self, *args, **kwargs):
-        extra = self.stats_cls(self.extra, datefmt=self.datefmt)
-        super().__init__(*args, extra=extra, **kwargs)
+    def __init__(self, extra, *args, **kwargs):
+        stats = self.stats_cls(extra, datefmt=self.datefmt)
+        super().__init__(*args, extra=stats, **kwargs)
 
     def reset(self):
         self.extra.update(self.extra.reset())
+
+    def __getattr__(self, item):
+        return getattr(self.extra, item, None)
 
 
 class ConnectionLoggerStats(ConnectionLogger):
@@ -266,7 +318,7 @@ class ConnectionLoggerStats(ConnectionLogger):
         self.stats(tag)
         self._first = False
         self._total_received += self._stats_logger.received
-        self._total_processed += self.stats_logger.processed
+        self._total_processed += self._stats_logger.processed
         self._stats_logger.reset()
 
     def stats(self, tag: str) -> NoReturn:

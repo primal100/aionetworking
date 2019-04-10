@@ -1,7 +1,7 @@
 import datetime
 from pycrate_core.charpy import Charpy
 
-from lib.protocols.base import BaseCodec, BaseMessageObject
+from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
 from typing import Sequence
@@ -17,7 +17,7 @@ class PyCrateAsnCodec(BaseCodec):
         super().__init__(*args, **kwargs)
         self.pycrate_asn_class = pycrate_asn_class
 
-    def decode(self, encoded: bytes) -> Sequence:
+    def decode(self, encoded: bytes, **kwargs) -> Sequence:
         char = Charpy(encoded)
         while char._cur < char._len_bit:
             start = int(char._cur / 8)
@@ -25,7 +25,7 @@ class PyCrateAsnCodec(BaseCodec):
             end = int(char._cur / 8)
             yield (encoded[start:end], self.pycrate_asn_class())
 
-    def encode(self, decoded):
+    def encode(self, decoded, **kwargs):
         return self.pycrate_asn_class.to_ber(decoded)
 
 

@@ -1,17 +1,21 @@
 import asyncio
 from abc import ABC, abstractmethod
-from dataclasses import field
+from ssl import SSLContext
 
 from pydantic.dataclasses import dataclass
 
 from .base import BaseServer
 from lib.conf.exceptions import ConfigurationException
-from lib.networking.tcp import TCPServerProtocol
-from lib.networking.udp import UDPServerProtocol
+from lib.networking.tcp import TCPServerProtocol, TCPOneWayServerProtocol
+from lib.networking.udp import UDPServerProtocol, UDPServerOneWayProtocol
 from lib.networking.ssl import ServerSideSSL
 
 
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
+if TYPE_CHECKING:
+    from asyncio.base_events import Server
+else:
+    Server = None
 
 
 @dataclass
@@ -19,7 +23,7 @@ class BaseTCPServerReceiver(ABC, BaseServer):
     server = None
 
     @abstractmethod
-    async def get_server(self): ...
+    async def get_server(self) -> Server: ...
 
     async def start_server(self) -> NoReturn:
         self.server = await self.get_server()
@@ -32,25 +36,26 @@ class BaseTCPServerReceiver(ABC, BaseServer):
             self.server.close()
 
 
-class TCPServerReceiver(BaseTCPServerReceiver):
-    receiver_type = "TCP Server"
+@dataclass
+class BaseTCPServer(ABC, BaseTCPServerReceiver):
 
-    protocol: TCPServerProtocol = TCPServerProtocol()
     ssl: ServerSideSSL = ServerSideSSL()
+    ssl_context: SSLContext = None
     ssl_handshake_timeout: int = 0
 
-    async def get_server(self) -> asyncio.AbstractServer:
+    def __post_init__(self):
+        if self.ssl and not self.ssl_context:
+            self.ssl_context = self.ssl.context
+
+    async def get_server(self) -> Server:
         return await self.loop.create_server(self.protocol,
-            self.host, self.port, ssl=self.ssl, ssl_handshake_timeout=self.ssl_handshake_timeout)
+            self.host, self.port, ssl=self.ssl_context, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
-class UDPServerReceiver(BaseServer):
+@dataclass
+class BaseUDPServer(ABC, BaseServer):
     receiver_type = "UDP Server"
     transport = None
-
-    protocol: UDPServerProtocol = UDPServerProtocol()
-
-    _start_event: asyncio.Event = field(default_factory=asyncio.Event, repr=False, init=False, hash=False, compare=False)
 
     async def start_server(self) -> NoReturn:
         if self.loop.__class__.__name__ == 'ProactorEventLoop':
@@ -71,3 +76,25 @@ class UDPServerReceiver(BaseServer):
     async def stopped(self) -> NoReturn:
         if self.transport and self.transport.is_closing():
             await self.protocol.wait_closed()
+
+
+@dataclass
+class OneWayTCPServer(BaseTCPServerReceiver):
+    protocol: TCPOneWayServerProtocol = TCPOneWayServerProtocol()
+
+
+@dataclass
+class TCPServer(BaseTCPServerReceiver):
+    receiver_type = "TCP Server"
+
+    protocol: TCPServerProtocol = TCPServerProtocol()
+
+
+@dataclass
+class UDPServer(BaseUDPServer):
+    protocol: UDPServerProtocol = UDPServerProtocol()
+
+
+@dataclass
+class UDPOneWayServer(BaseUDPServer):
+    protocol: UDPServerOneWayProtocol = UDPServerOneWayProtocol()

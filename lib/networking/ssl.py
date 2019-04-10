@@ -1,17 +1,15 @@
 from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths
 from lib.conf.logging import Logger
 
-from pydantic import BaseModel
-from pydantic.main import DictStrAny
-from pydantic.types import CallableGenerator
+from pydantic.dataclasses import dataclass
 
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import Optional
 
 
-class BaseSSLContext(BaseModel):
-    context: SSLContext = None
-    logger: Logger = None
+@dataclass
+class BaseSSLContext:
+    logger: Logger = 'receiver'
     ssl: bool = False,
     cert: Path = None
     key: Path = None,
@@ -22,16 +20,11 @@ class BaseSSLContext(BaseModel):
     cert_required: bool = False,
     hostname_check: bool = False
 
-    @classmethod
-    def validate(cls: Type['BaseSSLContext'], value: Union['DictStrAny', 'BaseSSLContext']) -> Optional[SSLContext]:
-        instance = super().validate(value)
-        if instance.ssl and not instance.context:
-            return instance.manage_ssl_params()
-        elif instance.ssl and instance.context:
-            return instance.context
-        return None
+    @property
+    def context(self):
+        return self.create_context()
 
-    def manage_ssl_params(self, ) -> Optional[SSLContext]:
+    def create_context(self, ) -> Optional[SSLContext]:
         self.logger.info("Setting up SSL")
         context = SSLContext(PROTOCOL_TLS)
         if self.cert and self.key:
@@ -58,10 +51,10 @@ class BaseSSLContext(BaseModel):
 
 class ServerSideSSL(BaseSSLContext):
     purpose = Purpose.CLIENT_AUTH
-    logger: Logger = Logger('receiver', {})
+    logger: Logger = 'receiver', {}
 
 
 class ClientSideSSL(BaseSSLContext):
     purpose = Purpose.CLIENT_AUTH
-    logger: Logger = Logger('sender', {})
+    logger: Logger = 'sender'
 

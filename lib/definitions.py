@@ -1,7 +1,6 @@
 from lib.conf.parser import INIFileConfig
 from lib.conf.log_filters import BaseFilter, SenderFilter, MessageFilter
-from lib.messagemanagers.managers import OneWayMessageManager, ClientOneWayMessageManager
-from lib.receivers.asyncio_servers import TCPServerReceiver, UDPServerReceiver
+from lib.receivers.asyncio_servers import TCPServer, UDPServer
 from lib.receivers.directory_monitor import DirectoryMonitor
 from lib.receivers.sftp import SFTPServerPswAuth
 from lib.senders.sftp import SFTPClient
@@ -12,10 +11,10 @@ from typing import Mapping, Union, TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
     from lib.actions import BaseReceiverAction
-    from lib.conf import BaseConfigClass
-    from lib.messagemanagers import BaseMessageManager
-    from lib.protocols import BaseProtocol
+    from lib.conf.base import BaseConfig
+    from lib.formats.base import BaseMessageObject
     from lib.receivers import BaseReceiver
+    from lib.requesters.base import BaseRequester
     from lib.senders import BaseSender
 else:
     BaseAction = None
@@ -23,13 +22,14 @@ else:
     BaseMessageManager = None
     BaseProtocol = None
     BaseReceiver = None
+    BaseRequester = None
     BaseSender = None
     Queue = None
 
-CONFIG_CLS: Type[BaseConfigClass] = INIFileConfig
+CONFIG_CLS: Type[BaseConfig] = INIFileConfig
 RECEIVERS: Mapping[str, Mapping[str, Union[Type[BaseReceiver], Type[BaseSender]]]] = {
-    'TCPServer': {'receiver': TCPServerReceiver, 'sender': TCPClient},
-    'UDPServer': {'receiver': UDPServerReceiver, 'sender': UDPClient},
+    'TCPServer': {'receiver': TCPServer, 'sender': TCPClient},
+    'UDPServer': {'receiver': UDPServer, 'sender': UDPClient},
     'SFTPServer':  {'receiver': SFTPServerPswAuth, 'sender': SFTPClient},
     'DirectoryMonitor': {'receiver': DirectoryMonitor},
 }
@@ -42,6 +42,5 @@ LOG_FILTERS: Mapping[str, Type[BaseFilter]] = {
     'sender_filter': SenderFilter,
     'message_filter': MessageFilter
 }
-MESSAGE_MANAGER: Type[BaseMessageManager] = OneWayMessageManager
-CLIENT_MESSAGE_MANAGER: Type[BaseMessageManager] = ClientOneWayMessageManager
-DATA_FORMATS: Mapping[str, Type[BaseProtocol]] = {}
+DATA_FORMATS: Mapping[str, Type[BaseMessageObject]] = {}
+REQUESTERS: Mapping[str, Type[BaseRequester]] = {}

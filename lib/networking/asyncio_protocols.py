@@ -1,33 +1,38 @@
-import asyncio
 from abc import ABC, abstractmethod
+import asyncio
 import binascii
 from datetime import datetime
-from dataclasses import dataclass, field, replace
+from dataclasses import field, replace
+from functools import partial
 
-from lib.actions.base import Action
+from .exceptions import MethodNotFoundError
+from lib.actions.base import BaseAction
 from lib.conf.logging import Logger
-from lib.formats.base import BufferObject, BaseMessageObject
+from lib.formats.base import BaseMessageObject, BufferObject
+from lib.requesters.base import BaseRequester
+from lib.types import Type
 from lib.utils import Record
 from lib.utils_logging import p
-from lib.conf.pydantic_future import IPvAnyNetwork
-from .exceptions import MessageFromNotAuthorizedHost
 
-from typing import Type, ClassVar, Tuple
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from pydantic.dataclasses import dataclass
+else:
+    from dataclasses import dataclass
 
 
 @dataclass
 class BaseProtocol(ABC):
     name = ''
+    codec = None
 
     logger: Logger = None
-    action: Action = None
-    preaction: Action = None
     aliases: dict = field(default_factory=dict)
     timeout: int = 0
     dataformat: Type[BaseMessageObject] = None
 
     def __post_init__(self):
-        self.codec = self.dataformat.get_codec()
+        self.codec = self.dataformat.get_codec(logger=self.logger)
         self.parent_logger = self.logger
         self._context = {'protocol_name': self.name}
 
@@ -35,49 +40,38 @@ class BaseProtocol(ABC):
         return replace(self)
 
     async def close(self):
-        self.logger.info('Closing actions')
-        await self.preaction.close()
-        await self.action.close()
+        pass
 
     @property
     def context(self):
         return self._context
 
-    def get_alias(self, sender: str):
-        alias = self.aliases.get(str(sender), sender)
-        if alias != sender:
-            self.parent_logger.debug('Alias found for %s: %s', sender, alias)
+    def get_alias(self, peer: str):
+        alias = self.aliases.get(str(peer), peer)
+        if alias != peer:
+            self.parent_logger.debug('Alias found for %s: %s', peer, alias)
         return alias
-
-    def check_sender(self, other_ip):
-        return self.get_alias(other_ip)
 
     def get_logger(self):
         return self.parent_logger.get_connection_logger(context=self.context)
 
-    def check_other(self, peer_ip):
-        return self.check_sender(peer_ip)
+    def check_other(self, peer: str):
+        return self.get_alias(peer)
 
     @property
     def connection_context(self):
         return {}
 
-    def set_logger(self):
+    def configure_context(self):
         self._context.update(self.connection_context)
         self.logger = self.get_logger()
-        self.codec.set_logger(self.logger)
+        self.codec.set_context(self.context, logger=self.logger)
 
     def make_messages(self, encoded, timestamp: datetime):
         msgs = self.decode_buffer(encoded, timestamp=timestamp)
         self.logger.debug('Buffer contains %s', p.no('message', msgs))
         self.logger.log_decoded_msgs(msgs)
         return msgs
-
-    def manage_buffer(self, buffer, timestamp):
-        self.logger.on_buffer_received(buffer)
-        if self.preaction:
-            buffer = BufferObject(buffer, timestamp=timestamp, logger=self.logger)
-            self.preaction.do_one(buffer)
 
     def decode_buffer(self, buffer, timestamp=None):
         return self.codec.from_buffer(buffer, timestamp=timestamp, context=self.context)
@@ -127,79 +121,89 @@ class BaseProtocol(ABC):
 
 
 @dataclass
-class BaseNetworkProtocol(ABC, BaseProtocol):
-    sock = (None, None)
-    own: ''
-    alias = ''
-    peer = None
-    peer_ip = None
-    peer_port = 0
-    transport = None
+class BaseReceiverProtocol(ABC, BaseProtocol):
+    action: BaseAction = None
+    preaction: BaseAction = None
 
-    _connections: ClassVar = {}
-    allowed_senders: Tuple[IPvAnyNetwork] = field(default_factory=())
+    async def close(self):
+        self.logger.info('Closing actions')
+        await self.preaction.close()
+        await self.action.close()
 
-    @property
-    @abstractmethod
-    def client(self): ...
+    def manage_buffer(self, buffer, timestamp):
+        self.logger.on_buffer_received(buffer)
+        if self.preaction:
+            buffer = BufferObject(buffer, timestamp=timestamp, logger=self.logger)
+            self.preaction.do_one(buffer)
 
-    @property
-    @abstractmethod
-    def server(self): ...
+    def on_data_received(self, buffer, timestamp=None):
+        timestamp = timestamp or datetime.now()
+        self.manage_buffer(buffer, timestamp)
+        msgs = self.make_messages(buffer, timestamp)
+        self.action.do_many(msgs)
 
-    def connection_made(self, transport):
-        self.transport = transport
-        peer = self.transport.get_extra_info('peername')
-        sock = self.transport.get_extra_info('sockname')
-        connection_ok = self.initialize(sock, peer)
-        if connection_ok:
-            self.logger.new_connection()
-            self._connections[self.peer] = self
-            self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self._connections))),
-                              p.no('active connection'))
+    def send(self, msg_encoded):
+        raise NotImplementedError(f"Not able to send messages with {self.name}")
 
-    def close_connection(self):
-        pass
 
-    def connection_lost(self, exc):
-        self.logger.connection_finished(exc)
-        self.close_connection()
-        self._connections.pop(self.peer, None)
+@dataclass
+class BaseSenderProtocol(ABC, BaseProtocol):
+    requestor: BaseRequester = None
+    logger: Logger = 'sender'
 
-    @property
-    def connection_context(self):
-        return {'peer_ip': self.peer_ip,
-                'peer_port': self.peer_port,
-                'peer': self.peer,
-                'client': self.client,
-                'server': self.server,
-                'alias': self.alias}
+    _futures: dict = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)
+    _notification_queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
 
-    def initialize(self, sock, peer):
-        self.peer_ip = peer[0]
-        self.peer_port = peer[1]
-        self.peer = ':'.join(str(prop) for prop in peer)
-        self.own = ':'.join(str(prop) for prop in sock)
-        self.sock = sock
-        try:
-            self.alias = self.check_other(self.peer_ip)
-            self.set_logger()
-            return True
-        except MessageFromNotAuthorizedHost:
-            self.close_connection()
-            return False
+    def __getattr__(self, item):
+        if item in getattr(self.action, 'methods', ()):
+            return partial(self._send_and_wait, getattr(self.action, item))
+        if item in getattr(self.action, 'notification_methods', ()):
+            return partial(self._send_request, getattr(self.action, item))
+        raise MethodNotFoundError(f'{item} method was not found')
 
-    def raise_message_from_not_authorized_host(self, sender):
-        msg = f"Received message from unauthorized host {sender}"
-        self.logger.error(msg)
-        raise MessageFromNotAuthorizedHost(msg)
+    def _send_request(self, method, *args, **kwargs):
+        msg_decoded = method(*args, **kwargs)
+        self.encode_and_send_msg(msg_decoded)
 
-    def sender_valid(self, other_ip):
-        if self.allowed_networks:
-            return any(n.supernet_of(other_ip) for n in self.allowed_networks)
-        return True
+    async def wait_notification(self):
+        return await self._notification_queue.get()
 
-    def check_sender(self, other_ip):
-        if self.sender_valid(other_ip):
-            return super(BaseNetworkProtocol,self).check_sender(other_ip)
-        self.raise_message_from_not_authorized_host(other_ip)
+    def get_notification(self):
+        return self._notification_queue.get_nowait()
+
+    async def wait_notifications(self):
+        for item in await self._notification_queue.get():
+            yield item
+
+    def get_all_notifications(self):
+        for i in range(0, self._notification_queue.qsize()):
+            yield self._notification_queue.get_nowait()
+
+    async def send_and_wait(self, request_id, encoded):
+        fut = asyncio.Future()
+        self._futures[request_id] = fut
+        self.send_msg(encoded)
+        await fut
+        del self._futures[request_id]
+        return fut
+
+    async def send_msg_and_wait(self, msg_obj):
+        return await self.send_and_wait(msg_obj.request_id, msg_obj.encoded)
+
+    async def encode_send_wait(self, decoded):
+        msg_obj = self.encode_msg(decoded)
+        return await self.send_msg_and_wait(msg_obj)
+
+    async def _send_and_wait(self, method, *args, **kwargs):
+        msg_decoded = method(*args, **kwargs)
+        return await self.encode_send_wait(msg_decoded)
+
+    def on_data_received(self, buffer, timestamp=None):
+        timestamp = timestamp or datetime.now()
+        msgs = self.make_messages(buffer, timestamp)
+        for msg in msgs:
+            fut = self._futures.get(msg.request_id, None)
+            if fut:
+                fut.set_result(msg)
+            else:
+                self._notification_queue.put_nowait(msg)
