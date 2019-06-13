@@ -5,20 +5,21 @@ import builtins
 import operator
 
 from pydantic import validator, errors, BaseModel, ValidationError
-from pydantic.dataclasses import dataclass
 from pydantic.types import conint
 from pydantic.validators import path_validator
 from pydantic.utils import AnyCallable
 
-from lib.conf.base import str_to_list
+from lib.utils import str_to_list
 
 from typing import TYPE_CHECKING, Union, Generator, Callable, Iterable, Any
 
 
 if TYPE_CHECKING:
+    from dataclasses import dataclass
     from typing import Type
     CallableGenerator = Generator[AnyCallable, None, None]
 else:
+    from pydantic.dataclasses import dataclass
     class Type:
         base_cls = None
 
@@ -102,7 +103,8 @@ class RawStr(str):
     config_kwargs = {'raw': True}
 
 
-class Expression(BaseModel):
+@dataclass
+class Expression:
     config_from_string = True
     attr: str
     op: Operator

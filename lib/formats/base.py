@@ -33,7 +33,7 @@ class BaseMessageObject(ABC):
     codec_cls = None
     id_attr = 'id'
 
-    encoded: AnyStr
+    encoded: bytes
     decoded: Any = None
     context: dict = field(default_factory=dict)
     logger: Logger = 'receiver'

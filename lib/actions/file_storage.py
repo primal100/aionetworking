@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 import asyncio
 from dataclasses import field
 from pathlib import Path
@@ -111,10 +111,10 @@ def default_data_dir():
 
 
 @dataclass
-class BaseFileStorage(ABC, BaseAction):
+class BaseFileStorage(BaseAction, ABC):
 
     base_path: Path = field(default_factory=default_data_dir)
-    path: RawStr = ''
+    path: str = ''
     attr: str = 'encoded'
     mode: str = 'wb'
     separator: str = ''

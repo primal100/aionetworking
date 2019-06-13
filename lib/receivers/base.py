@@ -5,9 +5,12 @@ from lib.types import Logger, Port
 from lib.networking.asyncio_protocols import BaseReceiverProtocol
 from lib.networking.mixins import BaseServerProtocol
 
-from pydantic.dataclasses import dataclass
+from typing import TYPE_CHECKING, NoReturn
 
-from typing import NoReturn
+if TYPE_CHECKING:
+    from dataclasses import dataclass
+else:
+    from pydantic.dataclasses import dataclass
 
 
 @dataclass

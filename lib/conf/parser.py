@@ -16,3 +16,5 @@ class INIFileConfig(MappingConfig):
         config.read(additional_config_files)
         super().__init__(config, **kwargs)
 
+    def add_mapping(self, mapping):
+        raise NotImplementedError

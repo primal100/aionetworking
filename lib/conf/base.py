@@ -1,6 +1,6 @@
 import os
-import shlex
 import re
+import shlex
 from inspect import getfullargspec
 from collections import ChainMap
 from tempfile import TemporaryDirectory
@@ -10,11 +10,9 @@ import pydantic
 
 from lib.receivers.base import BaseReceiver
 from lib.senders.base import BaseSender
+from lib.utils import str_to_list
 
 from typing import NoReturn, Mapping, MutableMapping, Any, Iterable, Type, Union, Optional
-
-
-str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 
 class ConfigMap(ChainMap):

@@ -10,6 +10,9 @@ from typing import Sequence, List, AnyStr, Tuple, Union, NoReturn
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
+str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
+
+
 ###Networking###
 
 def supernet_of(self, other: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]) -> bool:

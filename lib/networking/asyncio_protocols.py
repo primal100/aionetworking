@@ -6,19 +6,21 @@ from dataclasses import field, replace
 from functools import partial
 
 from .exceptions import MethodNotFoundError
-from lib.actions.base import BaseAction
-from lib.conf.logging import Logger
-from lib.formats.base import BaseMessageObject, BufferObject
-from lib.requesters.base import BaseRequester
+from lib.formats.base import BufferObject
 from lib.types import Type
 from lib.utils import Record
 from lib.utils_logging import p
 
+from lib.actions.base import BaseAction
+from lib.formats.base import BaseMessageObject
+from lib.conf.logging import Logger
+from lib.requesters.base import BaseRequester
+
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from pydantic.dataclasses import dataclass
-else:
     from dataclasses import dataclass
+else:
+    from pydantic.dataclasses import dataclass
 
 
 @dataclass
@@ -26,10 +28,10 @@ class BaseProtocol(ABC):
     name = ''
     codec = None
 
+    dataformat: Type[BaseMessageObject]
     logger: Logger = None
     aliases: dict = field(default_factory=dict)
     timeout: int = 0
-    dataformat: Type[BaseMessageObject] = None
 
     def __post_init__(self):
         self.codec = self.dataformat.get_codec(logger=self.logger)
@@ -121,7 +123,7 @@ class BaseProtocol(ABC):
 
 
 @dataclass
-class BaseReceiverProtocol(ABC, BaseProtocol):
+class BaseReceiverProtocol(BaseProtocol, ABC):
     action: BaseAction = None
     preaction: BaseAction = None
 
@@ -147,8 +149,8 @@ class BaseReceiverProtocol(ABC, BaseProtocol):
 
 
 @dataclass
-class BaseSenderProtocol(ABC, BaseProtocol):
-    requestor: BaseRequester = None
+class BaseSenderProtocol(BaseProtocol, ABC):
+    requester: BaseRequester = None
     logger: Logger = 'sender'
 
     _futures: dict = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)

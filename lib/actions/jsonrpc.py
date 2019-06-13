@@ -1,10 +1,13 @@
 from lib.actions.base import BaseAction
+
 from typing import TYPE_CHECKING, Any, MutableMapping, AnyStr, NoReturn
 
 if TYPE_CHECKING:
+    from dataclasses import dataclass
     from lib.formats.base import BaseMessageObject
 else:
-    BaseMessageObject = None
+    from pydantic.dataclasses import dataclass
+    BaseMessageObject = object
 
 
 class MethodNotFoundError(Exception):
@@ -59,6 +62,7 @@ class BaseJSONRPCServer(BaseAction):
         return {"jsonrpc": self.version, "error": error, "id": request_id}
 
 
+@dataclass
 class SampleJSONRPCServer(BaseJSONRPCServer):
 
     async def test(self, param: Any):

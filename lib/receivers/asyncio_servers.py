@@ -79,7 +79,7 @@ class BaseUDPServer(ABC, BaseServer):
 
 
 @dataclass
-class OneWayTCPServer(BaseTCPServerReceiver):
+class TCPServerOneWay(BaseTCPServerReceiver):
     protocol: TCPOneWayServerProtocol = TCPOneWayServerProtocol()
 
 

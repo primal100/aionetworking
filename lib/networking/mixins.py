@@ -3,7 +3,6 @@ from datetime import datetime
 from dataclasses import field
 from functools import partial
 
-from pydantic.dataclasses import dataclass
 from pydantic.types import IPvAnyNetwork
 
 from .exceptions import MessageFromNotAuthorizedHost
@@ -13,16 +12,15 @@ from .asyncio_protocols import BaseReceiverProtocol, BaseSenderProtocol
 from typing import TYPE_CHECKING, ClassVar, List
 
 if TYPE_CHECKING:
-    from lib.networking.asyncio_protocols import BaseNetworkProtocol as _BaseProtocol
+    from dataclasses import dataclass
 else:
-    _Base = object
-    _BaseReceiver = object
+    from pydantic.dataclasses import dataclass
 
 
 @dataclass
-class NetworkProtocolMixin(ABC, _BaseProtocol):
+class NetworkProtocolMixin(ABC):
     sock = (None, None)
-    own: ''
+    own = ''
     alias = ''
     peer = None
     peer_ip = None
@@ -82,8 +80,7 @@ class NetworkProtocolMixin(ABC, _BaseProtocol):
             return False
 
 
-@dataclass
-class BaseClientProtocol(ABC, NetworkProtocolMixin, BaseSenderProtocol):
+class BaseClientProtocol(BaseSenderProtocol, NetworkProtocolMixin, ABC):
 
     @property
     def client(self) -> str:
@@ -95,7 +92,7 @@ class BaseClientProtocol(ABC, NetworkProtocolMixin, BaseSenderProtocol):
 
 
 @dataclass
-class BaseServerProtocol(ABC, NetworkProtocolMixin, BaseReceiverProtocol):
+class BaseServerProtocol(BaseReceiverProtocol, NetworkProtocolMixin, ABC):
     logger: Logger = 'sender'
     allowed_senders: List[IPvAnyNetwork] = field(default_factory=())
 
@@ -125,14 +122,12 @@ class BaseServerProtocol(ABC, NetworkProtocolMixin, BaseReceiverProtocol):
         self.raise_message_from_not_authorized_host(other_ip)
 
 
-@dataclass
-class BaseOneWayServerProtocol(ABC, BaseServerProtocol, BaseReceiverProtocol):
+class BaseOneWayServerProtocol(BaseServerProtocol, ABC):
     def send(self, msg_encoded):
         raise NotImplementedError(f"Not possible to send messages with {self.name}")
 
 
-@dataclass
-class BaseTwoWayServerProtocol(ABC, BaseServerProtocol, BaseReceiverProtocol):
+class BaseTwoWayServerProtocol(BaseServerProtocol, ABC):
 
     def on_task_complete(self, msg_obj, future):
         response = self.process_result(msg_obj, future)

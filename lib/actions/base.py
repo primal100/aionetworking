@@ -1,17 +1,19 @@
 from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import field
+import warnings
 
-from pydantic.dataclasses import dataclass
-
-from lib import definitions
 from lib.conf.logging import Logger
+from lib.formats.base import BaseMessageObject
 
 from typing import TYPE_CHECKING, Sequence, List, Tuple, Generator, Any, AnyStr, NoReturn
 if TYPE_CHECKING:
-    from lib.formats.base import BaseMessageObject
+    from dataclasses import dataclass
 else:
-    BaseMessageObject = None
+    from pydantic.dataclasses import dataclass
+
+
+warnings.filterwarnings("ignore", message="fields may not start with an underscore")
 
 
 @dataclass
@@ -20,11 +22,12 @@ class BaseAction(ABC):
     logger: Logger = 'receiver'
 
     timeout: int = 5
-    _outstanding_tasks: List = field(default_factory=list)
+    _outstanding_tasks: List = field(default_factory=list, init=False, repr=False, hash=False)
 
     @classmethod
     def swap_cls(cls, name: str):
-        return definitions.ACTIONS[name]
+        from lib.definitions import ACTIONS
+        return ACTIONS[name]
 
     def __post_init__(self):
         self.logger = self.logger.get_child(name='actions')
@@ -32,10 +35,10 @@ class BaseAction(ABC):
     @abstractmethod
     async def do_one(self, msg: BaseMessageObject) -> Any: ...
 
-    def do_many(self, msgs: Sequence[BaseMessageObject]) -> Generator[Sequence[BaseMessageObject, asyncio.Task], None, None]:
+    def do_many(self, msgs: Sequence[BaseMessageObject]) -> Generator[Tuple[BaseMessageObject, asyncio.Task], None, None]:
         return self.do_many_parallel(msgs)
 
-    def do_many_parallel(self, msgs: Sequence[BaseMessageObject]) -> Generator[Sequence[BaseMessageObject, asyncio.Task], None, None]:
+    def do_many_parallel(self, msgs: Sequence[BaseMessageObject]) -> Generator[Tuple[BaseMessageObject, asyncio.Task], None, None]:
         for msg in msgs:
             if not self.filter(msg):
                 task = asyncio.create_task(self.do_one(msg))

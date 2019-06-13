@@ -8,16 +8,11 @@ from pydantic.dataclasses import dataclass
 from .mixins import BaseOneWayServerProtocol, BaseClientProtocol, BaseTwoWayServerProtocol
 from lib.utils import addr_tuple_to_str
 
-from typing import TYPE_CHECKING, AnyStr, ClassVar
-
-if TYPE_CHECKING:
-    from .mixins import NetworkProtocolMixin
-else:
-    NetworkProtocolMixin = object
+from typing import AnyStr, ClassVar
 
 
 @dataclass
-class OneWayUDPMixin(ABC, NetworkProtocolMixin, asyncio.DatagramProtocol):
+class OneWayUDPMixin(asyncio.DatagramProtocol, ABC):
     expiry_minutes: int = 30
 
     def __call__(self):
@@ -64,25 +59,25 @@ class OneWayUDPMixin(ABC, NetworkProtocolMixin, asyncio.DatagramProtocol):
 
 
 @dataclass
-class UDPMixin(ABC, OneWayUDPMixin):
+class UDPMixin(OneWayUDPMixin, ABC):
 
-    def send(self, msg):
+    def send(self, msg: AnyStr):
         self.transport.sendto(msg, addr=(self.peer_ip, self.peer_port))
 
 
 @dataclass
-class UDPServerOneWayProtocol(OneWayUDPMixin, BaseOneWayServerProtocol):
+class UDPServerOneWayProtocol(BaseOneWayServerProtocol, OneWayUDPMixin):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPServerProtocol(UDPMixin, BaseTwoWayServerProtocol):
+class UDPServerProtocol(BaseTwoWayServerProtocol, UDPMixin):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPClientProtocol(UDPMixin, BaseClientProtocol):
+class UDPClientProtocol(BaseClientProtocol, UDPMixin):
     name = 'UDP Client'
     _connections: ClassVar = {}
