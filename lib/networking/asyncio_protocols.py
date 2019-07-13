@@ -28,7 +28,7 @@ class BaseProtocol(ABC):
     name = ''
     codec = None
 
-    dataformat: Type[BaseMessageObject]
+    dataformat: Type[BaseMessageObject] = None
     logger: Logger = None
     aliases: dict = field(default_factory=dict)
     timeout: int = 0

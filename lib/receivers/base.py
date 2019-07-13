@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 import asyncio
 
-from lib.types import Logger, Port
+from lib.types import Port
+from lib.conf.logging import Logger
 from lib.networking.asyncio_protocols import BaseReceiverProtocol
 from lib.networking.mixins import BaseServerProtocol
 
@@ -49,7 +50,7 @@ class BaseReceiver(ABC):
 
 
 @dataclass
-class BaseServer(ABC, BaseReceiver):
+class BaseServer(BaseReceiver, ABC):
     name = 'Server'
     server = None
 

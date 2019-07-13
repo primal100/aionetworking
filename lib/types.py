@@ -44,6 +44,10 @@ Port = conint(ge=0, le=65335)
 
 class Logger(logging.Logger):
     @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
     def validate(cls, value: Union[str, logging.Logger]) -> logging.Logger:
         if isinstance(value, str):
             return logging.getLogger(value)

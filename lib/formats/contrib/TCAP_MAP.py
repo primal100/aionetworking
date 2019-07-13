@@ -6,21 +6,22 @@ from lib.utils import cached_property
 
 class TCAPMAPASNObject(BaseAsnObject):
 
-    pycrate_asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
-    protocol_name = "TCAP_MAP"
+    asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
+    name = "TCAP_MAP"
 
     """
     Sample implementation of interface for ASN.1 messages via pycrate library
     """
 
-    def get_event_type(self) -> str:
-        return self.decoded[0]
-
-    def get_asn_domain(self):
+    def _get_asn_domain(self):
         if 'dialoguePortion' in self.decoded[1]:
             return self.decoded[1]['dialoguePortion']['direct-reference']
         else:
             return ''
+
+    @property
+    def event_type(self) -> str:
+        return self.decoded[0]
 
     @cached_property
     def otid(self) -> bytes:

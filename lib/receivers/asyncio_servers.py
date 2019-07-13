@@ -11,7 +11,7 @@ from lib.networking.udp import UDPServerProtocol, UDPServerOneWayProtocol
 from lib.networking.ssl import ServerSideSSL
 
 
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, NoReturn, Union
 if TYPE_CHECKING:
     from asyncio.base_events import Server
 else:
@@ -19,7 +19,7 @@ else:
 
 
 @dataclass
-class BaseTCPServerReceiver(ABC, BaseServer):
+class BaseTCPServerReceiver(BaseServer, ABC):
     server = None
 
     @abstractmethod
@@ -37,23 +37,23 @@ class BaseTCPServerReceiver(ABC, BaseServer):
 
 
 @dataclass
-class BaseTCPServer(ABC, BaseTCPServerReceiver):
+class BaseTCPServer(BaseTCPServerReceiver, ABC):
+    receiver_type = "TCP Server"
 
     ssl: ServerSideSSL = ServerSideSSL()
-    ssl_context: SSLContext = None
     ssl_handshake_timeout: int = 0
 
     def __post_init__(self):
-        if self.ssl and not self.ssl_context:
-            self.ssl_context = self.ssl.context
+        if isinstance(self.ssl, SSLContext):
+            self.ssl = ServerSideSSL(_context=self.ssl)
 
     async def get_server(self) -> Server:
         return await self.loop.create_server(self.protocol,
-            self.host, self.port, ssl=self.ssl_context, ssl_handshake_timeout=self.ssl_handshake_timeout)
+            self.host, self.port, ssl=self.ssl.context, ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
 @dataclass
-class BaseUDPServer(ABC, BaseServer):
+class BaseUDPServer(BaseServer, ABC):
     receiver_type = "UDP Server"
     transport = None
 
@@ -78,23 +78,11 @@ class BaseUDPServer(ABC, BaseServer):
             await self.protocol.wait_closed()
 
 
-@dataclass
-class TCPServerOneWay(BaseTCPServerReceiver):
-    protocol: TCPOneWayServerProtocol = TCPOneWayServerProtocol()
-
-
-@dataclass
+@dataclass(config={'arbitrary_types_allowed': True})
 class TCPServer(BaseTCPServerReceiver):
-    receiver_type = "TCP Server"
-
-    protocol: TCPServerProtocol = TCPServerProtocol()
+    protocol: Union[TCPOneWayServerProtocol, TCPServerProtocol] = None
 
 
-@dataclass
+@dataclass(config={'arbitrary_types_allowed': True})
 class UDPServer(BaseUDPServer):
-    protocol: UDPServerProtocol = UDPServerProtocol()
-
-
-@dataclass
-class UDPOneWayServer(BaseUDPServer):
-    protocol: UDPServerOneWayProtocol = UDPServerOneWayProtocol()
+    protocol: Union[UDPServerOneWayProtocol, UDPServerProtocol] = None

@@ -1,9 +1,9 @@
 import json
 
-from lib.formats.base import BaseCodec, BaseMessageObject
+from lib.formats.base import BaseTextCodec, BaseMessageObject
 
 
-class JSONCodec(BaseCodec):
+class JSONCodec(BaseTextCodec):
     """
     Decode & Encode JSON messages
     """
@@ -21,6 +21,7 @@ class JSONCodec(BaseCodec):
 
 
 class JSONObject(BaseMessageObject):
+    name = 'JSON'
     codec_cls = JSONCodec
 
 

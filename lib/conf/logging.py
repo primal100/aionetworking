@@ -26,13 +26,15 @@ class BaseLogger(ABC, logging.LoggerAdapter):
     datefmt: str = '%Y-%M-%d %H:%M:%S'
     extra: dict = field(default_factory=dict)
 
-    def __init__(self, logger_name, datefmt='%Y-%M-%d %H:%M:%S', extra=None):
+    def __init__(self, logger_name, datefmt='%Y-%M-%d %H:%M:%S', extra=None, connection_logger_cls=None):
         self.logger_name = logger_name
         self.datefmt = datefmt
         self.extra = extra or {}
         logger = logging.getLogger(logger_name)
         super().__init__(logger, extra)
-        self.connection_logger_cls = self.get_connection_logger_cls()
+        self.connection_logger_cls = connection_logger_cls
+        if not self.connection_logger_cls:
+            self.connection_logger_cls = self.get_connection_logger_cls()
 
     def manage_error(self, exc: Exception) -> NoReturn:
         if exc:
@@ -99,9 +101,13 @@ class Logger(BaseLogger):
         raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
 
     def get_connection_logger_cls(self) -> Type[BaseLogger]:
-        if self.get_child('stats').isEnabledFor(logging.INFO):
+        if self.get_child_logger('stats').isEnabledFor(logging.INFO):
             return ConnectionLoggerStats
         return ConnectionLogger
+
+    def get_child_logger(self, name):
+        child_name = f"{self.name}.{name}"
+        return logging.getLogger(child_name)
 
     def get_connection_logger(self, name: str = 'connection', **kwargs) -> Any:
         return self.get_child(name=name, cls=self.connection_logger_cls, **kwargs)
@@ -118,7 +124,7 @@ class Logger(BaseLogger):
         cls = cls or self.__class__
         context = context or {}
         extra = ChainMap(context, self.extra)
-        return cls(name, extra, **kwargs)
+        return cls(name, extra, connection_logger_cls=self.connection_logger_cls, **kwargs)
 
 
 class ConnectionLogger(Logger):

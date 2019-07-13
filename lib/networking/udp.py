@@ -66,18 +66,18 @@ class UDPMixin(OneWayUDPMixin, ABC):
 
 
 @dataclass
-class UDPServerOneWayProtocol(BaseOneWayServerProtocol, OneWayUDPMixin):
+class UDPServerOneWayProtocol(OneWayUDPMixin, BaseOneWayServerProtocol):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPServerProtocol(BaseTwoWayServerProtocol, UDPMixin):
+class UDPServerProtocol(UDPMixin, BaseTwoWayServerProtocol):
     name = 'UDP Server'
     _connections: ClassVar = {}
 
 
 @dataclass
-class UDPClientProtocol(BaseClientProtocol, UDPMixin):
+class UDPClientProtocol(UDPMixin, BaseClientProtocol):
     name = 'UDP Client'
     _connections: ClassVar = {}

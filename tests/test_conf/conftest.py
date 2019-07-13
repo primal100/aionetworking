@@ -3,14 +3,12 @@ import pytest
 from lib.conf.mapping import MappingConfig
 from lib.actions.file_storage import FileStorage, BufferedFileStorage
 from lib.actions.jsonrpc import SampleJSONRPCServer
-from lib.formats.contrib.json import JSONCodec
 from lib.formats.contrib.json import JSONObject
-from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.networking.tcp import TCPServerProtocol, TCPOneWayServerProtocol, TCPClientProtocol
 from lib.networking.udp import UDPServerProtocol, UDPServerOneWayProtocol, UDPClientProtocol
-from lib.receivers.asyncio_servers import TCPServer, TCPServerOneWay
-from lib.receivers.asyncio_servers import UDPServer, UDPOneWayServer
+from lib.receivers.asyncio_servers import TCPServer
+from lib.receivers.asyncio_servers import UDPServer
 from lib.requesters.jsonrpc import SampleJSONRPCClient
 from lib.senders.asyncio_clients import TCPClient, UDPClient
 
@@ -73,7 +71,7 @@ def udp_server(udp_protocol):
 
 @pytest.fixture
 def udp_one_way_server(udp_one_way_protocol):
-    receiver = UDPOneWayServer(protocol=udp_one_way_protocol)
+    receiver = UDPServer(protocol=udp_one_way_protocol)
     yield receiver
 
 

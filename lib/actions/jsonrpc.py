@@ -18,6 +18,10 @@ class InvalidParamsError(Exception):
     pass
 
 
+class InvalidRequestError(Exception):
+    pass
+
+
 class BaseJSONRPCServer(BaseAction):
     version = '2.0'
     exception_codes = {
@@ -34,7 +38,9 @@ class BaseJSONRPCServer(BaseAction):
             raise InvalidParamsError
 
     async def do_one(self, msg: BaseMessageObject) -> MutableMapping:
-        request_id = msg.get('id')
+        if msg['jsonrpc'] != '2.0':
+            raise InvalidRequestError
+        request_id = msg.request_id
         try:
             func = getattr(self, msg['method'])
         except KeyError:
