@@ -32,7 +32,7 @@ class BaseAction(ABC):
         for msg in msgs:
             if not self.filter(msg):
                 task = asyncio.create_task(self.do_one(msg))
-                self._outstanding_tasks += task
+                self._outstanding_tasks.append(task)
                 yield msg, task
 
     def _do_many_sequential(self, msgs: Sequence[BaseMessageObject]) -> Generator[Tuple[BaseMessageObject, Any], None, None]:
@@ -63,10 +63,6 @@ class BaseAction(ABC):
     @abstractmethod
     async def do_one(self, msg: BaseMessageObject) -> Any: ...
 
-    def do_many(self, msgs: Sequence[BaseMessageObject]) -> Generator[Tuple[BaseMessageObject, asyncio.Task], None, None]:
-        return self._do_many_parallel(msgs)
+    def do_many(self, msgs: Sequence[BaseMessageObject]) -> Sequence[Tuple[BaseMessageObject, asyncio.Task]]:
+        return list(self._do_many_parallel(msgs))
 
-    async def do_many_and_close(self, msgs: Sequence[BaseMessageObject]):
-        result = list(self.do_many(msgs))
-        await self.close()
-        return result

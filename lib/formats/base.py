@@ -57,12 +57,15 @@ class BaseMessageObject(ABC):
     def uid(self):
         try:
             return self.decoded[self.id_attr]
-        except KeyError:
+        except (AttributeError, KeyError):
             return id(self)
 
     @property
     def request_id(self):
-        return self.uid
+        try:
+            return self.decoded.get(self.id_attr)
+        except (AttributeError, KeyError):
+            return None
 
     @property
     def pformat(self) -> str:
@@ -129,6 +132,10 @@ class BaseCodec:
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
         return self.from_buffer(encoded, **kwargs)
+
+    async def one_from_file(self, file_path: Path, **kwargs):
+        objects = await self.from_file(file_path, **kwargs)
+        return objects[0]
 
 
 class BaseTextCodec(BaseCodec):

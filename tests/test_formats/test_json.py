@@ -1,4 +1,4 @@
-import asyncio
+import pytest
 
 from lib.formats.contrib.json import JSONObject
 
@@ -28,8 +28,9 @@ class TestJsonCodec:
         obj = json_codec.create_msg(json_rpc_request, received_timestamp=timestamp)
         assert obj == json_object
 
-    def test_06_from_file(self, json_codec, file_containing_json, json_object, timestamp):
-        obj = asyncio.run(json_codec.from_file(file_containing_json, received_timestamp=timestamp))[0]
+    @pytest.mark.asyncio
+    async def test_06_from_file(self, json_codec, file_containing_json, json_object, timestamp):
+        obj = await json_codec.one_from_file(file_containing_json, received_timestamp=timestamp)
         assert obj == json_object
 
 

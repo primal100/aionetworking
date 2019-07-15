@@ -1,13 +1,13 @@
+from dataclasses import dataclass
+
 from lib.actions.base import BaseAction
 
 from typing import TYPE_CHECKING, Any, MutableMapping, AnyStr, NoReturn
 
 if TYPE_CHECKING:
-    from dataclasses import dataclass
-    from lib.formats.base import BaseMessageObject
+    from lib.formats.contrib.json import JSONObject
 else:
-    from pydantic.dataclasses import dataclass
-    BaseMessageObject = object
+    JSONObject = object
 
 
 class MethodNotFoundError(Exception):
@@ -37,13 +37,18 @@ class BaseJSONRPCServer(BaseAction):
         if "positional argument" or "keyword argument" in str(exc):
             raise InvalidParamsError
 
-    async def do_one(self, msg: BaseMessageObject) -> MutableMapping:
-        if msg['jsonrpc'] != '2.0':
+    async def do_one(self, msg: JSONObject) -> MutableMapping:
+        try:
+            if msg['jsonrpc'] != self.version:
+                raise InvalidRequestError
+        except KeyError:
             raise InvalidRequestError
         request_id = msg.request_id
         try:
             func = getattr(self, msg['method'])
         except KeyError:
+            raise InvalidRequestError
+        except AttributeError:
             raise MethodNotFoundError
         params = msg.get('params')
         try:
@@ -56,15 +61,15 @@ class BaseJSONRPCServer(BaseAction):
         except TypeError as exc:
             self.check_args(exc)
             raise exc
-        if request_id:
+        if request_id is not None:
             return {'jsonrpc': self.version, 'result': result, 'id': request_id}
 
     def response_on_decode_error(self, data: AnyStr, exc: Exception) -> MutableMapping:
-        return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError'), "id": None}
+        return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError')}
 
-    def response_on_exception(self, msg_obj: BaseMessageObject, exc: Exception) -> MutableMapping:
+    def response_on_exception(self, msg_obj: JSONObject, exc: Exception) -> MutableMapping:
         request_id = msg_obj.get('id', None)
-        error = self.exception_codes.get(exc.__class__.__name__, self.exception_codes['InvalidRequest'])
+        error = self.exception_codes.get(exc.__class__.__name__, self.exception_codes['InvalidRequestError'])
         return {"jsonrpc": self.version, "error": error, "id": request_id}
 
 

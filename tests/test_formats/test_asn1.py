@@ -1,4 +1,4 @@
-import asyncio
+import pytest
 
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 
@@ -28,8 +28,9 @@ class TestASN1Codec:
         obj = asn_codec.create_msg(asn_one_decoded, received_timestamp=timestamp)
         assert obj == asn_object
 
-    def test_06_from_file(self, asn_codec, file_containing_asn, asn_object, timestamp):
-        obj = asyncio.run(asn_codec.from_file(file_containing_asn, received_timestamp=timestamp))[0]
+    @pytest.mark.asyncio
+    async def test_06_from_file(self, asn_codec, file_containing_asn, asn_object, timestamp):
+        obj = await asn_codec.one_from_file(file_containing_asn, received_timestamp=timestamp)
         assert obj == asn_object
 
 
@@ -42,7 +43,7 @@ class TestASN1Object:
         assert asn_object.sender == '127.0.0.1'
         assert asn_object.otid == b'00000001'
         assert asn_object.uid == '00000001'
-        assert asn_object.request_id == '00000001'
+        assert asn_object.request_id is None
         assert asn_object.event_type == 'begin'
         assert asn_object.domain == '0.0.17.773.1.1.1'
         assert asn_object.timestamp == timestamp

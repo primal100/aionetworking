@@ -4,7 +4,7 @@ import binascii
 from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
 from pathlib import Path
 
-from lib.actions.file_storage import FileStorage, BufferedFileStorage
+from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
 from lib.actions.jsonrpc import SampleJSONRPCServer
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
@@ -98,24 +98,54 @@ def json_rpc_action():
 
 
 @pytest.fixture
-def managed_file_path(tmp_path):
-    return tmp_path/'managed_file1'
+async def managed_file_binary(tmp_path):
+    path = tmp_path/'managed_file1'
+    f = ManagedFile.get_file(path, timeout=None, mode='ab', separator=b'')
+    yield f
+    await f.close()
 
 
 @pytest.fixture
-def file_storage_action(tmp_path):
-    return FileStorage(base_path=tmp_path,
+async def managed_file_text(tmp_path):
+    path = tmp_path/'managed_file1'
+    f = ManagedFile.get_file(path, timeout=None, mode='a', separator='')
+    yield f
+    await f.close()
+
+
+@pytest.fixture
+async def managed_file_short_timeout(tmp_path):
+    path = tmp_path/'managed_file1'
+    f = ManagedFile.get_file(path, timeout=0.0001)
+    yield f
+    await f.close()
+
+
+@pytest.fixture
+def file_storage_action_binary(tmp_path):
+    return FileStorage(base_path=tmp_path, binary=True,
                       path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
 
 
 @pytest.fixture
-def buffered_file_storage_action(tmp_path):
-    return BufferedFileStorage(base_path=tmp_path, path='Encoded/{msg.name}')
+def buffered_file_storage_action_binary(tmp_path):
+    return BufferedFileStorage(base_path=tmp_path, binary=True, path='Encoded/{msg.sender}_{msg.name}.{msg.name}')
+
+
+@pytest.fixture
+def file_storage_action_text(tmp_path):
+    return FileStorage(base_path=tmp_path, binary=False,
+                      path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
+
+
+@pytest.fixture
+def buffered_file_storage_action_text(tmp_path):
+    return BufferedFileStorage(base_path=tmp_path, binary=False, path='Encoded/{msg.sender}_{msg.name}.{msg.name}')
 
 
 @pytest.fixture
 def json_one_encoded():
-    return '{"jsonrpc": 2.0, "id": 0, "method": "test", "params": ["abcd"]}'
+    return '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}'
 
 
 @pytest.fixture
@@ -127,28 +157,37 @@ def file_containing_json(tmpdir, json_one_encoded):
 
 @pytest.fixture
 def json_buffer():
-    return '{"jsonrpc": 2.0, "id": 0, "method": "test", "params": ["abcd"]}{"jsonrpc": 2.0, "id": 1, "method": "test", "params": ["efgh"]}'
-
+    return '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}{"jsonrpc": "2.0", "id": 1, "method": "test", "params": ["efgh"]}'
 
 @pytest.fixture
 def json_encoded_multi():
     return [
-        '{"jsonrpc": 2.0, "id": 0, "method": "test", "params": ["abcd"]}',
-        '{"jsonrpc": 2.0, "id": 1, "method": "test", "params": ["efgh"]}'
+        '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}',
+        '{"jsonrpc": "2.0", "id": 1, "method": "test", "params": ["efgh"]}'
     ]
+
+
+@pytest.fixture
+def json_encoded_one(json_encoded_multi):
+    return json_encoded_multi[0]
+
+
+@pytest.fixture
+def invalid_json(json_encoded_multi):
+    return '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}'
 
 
 @pytest.fixture
 def json_decoded_multi():
     return [
-        {'jsonrpc': 2.0, 'id': 0, 'method': 'test', 'params': ['abcd']},
-        {'jsonrpc': 2.0, 'id': 1, 'method': 'test', 'params': ['efgh']}
+        {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': ['abcd']},
+        {'jsonrpc': "2.0", 'id': 1, 'method': 'test', 'params': ['efgh']}
     ]
 
 
 @pytest.fixture
 def json_rpc_request():
-    return {'jsonrpc': 2.0, 'id': 0, 'method': 'test', 'params': ['abcd']}
+    return {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': ['abcd']}
 
 
 @pytest.fixture
@@ -165,34 +204,49 @@ def json_objects(json_encoded_multi, json_decoded_multi, timestamp):
 
 @pytest.fixture
 def json_rpc_result():
-    return {'jsonrpc': 2.0, 'id': 0, 'result': "Successfully processed abcd"}
+    return {'jsonrpc': "2.0", 'id': 0, 'result': "Successfully processed abcd"}
+
+
+@pytest.fixture
+def json_rpc_notification_encoded():
+    return '{"jsonrpc": "2.0", "method": "test", "params": ["abcd"]}'
 
 
 @pytest.fixture
 def json_rpc_notification():
-    return {'jsonrpc': 2.0, 'method': 'test', 'params': ['abcd']}
+    return {'jsonrpc': "2.0", 'method': 'test', 'params': ['abcd']}
 
 
 @pytest.fixture
-def json_rpc_no_version():
-    return {'id': 0, 'method': 'help', 'params': ['abcd']}
+def json_rpc_notification_object(json_rpc_notification_encoded, json_rpc_notification, timestamp):
+    return JSONObject(json_one_encoded, json_rpc_notification, context={'sender': '127.0.0.1'}, received_timestamp=timestamp)
 
 
 @pytest.fixture
-def json_rpc_wrong_method():
-    return {'jsonrpc': 2.0, 'id': 0, 'method': 'help', 'params': ['1']}
+def json_rpc_error_request(request):
+    if request.param == 'no_version':
+        return {'id': 0, 'method': 'help', 'params': ['abcd']}
+    if request.param == 'wrong_method':
+        return {'jsonrpc': "2.0", 'id': 0, 'method': 'help', 'params': ['1']}
+    if request.param == 'invalid_params':
+        return {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': {'a': 2}}
 
 
 @pytest.fixture
-def json_rpc_invalid_params():
-    return {'jsonrpc': 2.0, 'method': 'test', 'params': {'a': 2}}
+def json_rpc_error_response(request):
+    if request.param == 'no_version':
+        return {"jsonrpc":  "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": 0}
+    if request.param == 'wrong_method':
+        return {"jsonrpc":  "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": 0}
+    if request.param == 'invalid_params':
+        return {"jsonrpc":  "2.0", "error": {"code": -32602, "message": "Invalid params"}, "id": 0}
 
 
 @pytest.fixture
 def json_rpc_parse_error_response():
-    return {'jsonrpc': 2.0, 'error':{"code": -32700, "message": "Parse error"}}
+    return {'jsonrpc': "2.0", 'error':{"code": -32700, "message": "Parse error"}}
 
 
 @pytest.fixture
 def json_rpc_invalid_params_response():
-    return {'jsonrpc': 2.0, 'id': 0, 'error': {"code": -32600, "message": "Invalid Request"}}
+    return {'jsonrpc': "2.0", 'id': 0, 'error': {"code": -32600, "message": "Invalid Request"}}
