@@ -12,29 +12,32 @@ def get_next_time(delay):
     return td
 
 
-def _call_cb_at(seconds_from_now, delay, callback, *args):
+def _call_cb_at(seconds_from_now, delay, callback, cancel_event, *args):
     loop = asyncio.get_event_loop()
     start_time = loop.time() + seconds_from_now
-    loop.call_at(start_time, _call_cb_now, delay, callback, True, *args)
+    return loop.call_at(start_time, _call_cb_now, delay, callback, True, cancel_event, *args)
 
 
-def _call_cb_later(delay, callback, *args):
-    asyncio.get_event_loop().call_later(delay * 60, _call_cb_now, delay, callback, *args)
+def _call_cb_later(delay, callback, first, cancel_event, *args):
+    return asyncio.get_event_loop().call_later(delay * 60, _call_cb_now, delay, callback, first, cancel_event, *args)
 
 
-def _call_cb_now(delay, callback, first, *args):
-    callback(first, *args)
-    _call_cb_later(delay, callback, False, *args)
+def _call_cb_now(delay, callback, first, cancel_event, *args):
+    if not cancel_event.is_set():
+        callback(first, *args)
+        return _call_cb_later(delay, callback, False, cancel_event, *args)
 
 
 def call_cb_periodic(delay, callback, *args, fixed_start_time=None, immediate=False):
+    cancel_event = asyncio.Event()
     if fixed_start_time:
         start_time = get_next_time(delay)
-        _call_cb_at(start_time, delay, callback, *args)
+        _call_cb_at(start_time, delay, callback, cancel_event, *args)
     elif immediate:
-        _call_cb_now(delay, callback, *args)
+        _call_cb_now(delay, callback, cancel_event, *args)
     else:
-        _call_cb_later(delay, callback, *args)
+        _call_cb_later(delay, callback, cancel_event, *args)
+    return cancel_event
 
 
 async def _call_coro_later(delay, coro, *args):

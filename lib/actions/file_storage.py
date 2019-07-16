@@ -1,6 +1,6 @@
 from abc import ABC
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 
 from .base import BaseAction
@@ -9,7 +9,7 @@ from lib import settings
 from lib.utils_logging import p
 from lib.settings import FILE_OPENER
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Sequence, List, Tuple, AnyStr, Generator, NoReturn
+from typing import TYPE_CHECKING, ClassVar, Iterable, Sequence, List, Tuple, AnyStr, NoReturn
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -128,11 +128,11 @@ class BaseFileStorage(BaseAction, ABC):
     path: str = ''
     attr: str = 'encoded'
     mode: str = 'w'
-    separator: str = ''
-    binary: bool = False
+    separator: AnyStr = ''
+    binary: InitVar[bool] = False
 
-    def __post_init__(self):
-        if self.binary:
+    def __post_init__(self, binary):
+        if binary:
             self.mode += 'b'
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
