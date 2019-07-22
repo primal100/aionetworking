@@ -1,6 +1,6 @@
 async def send_msg(client, msg):
     async with client:
-        await client.send_msg(msg)
+        await client.send_data(msg)
 
 
 async def send_msgs(client, msgs):
@@ -34,7 +34,7 @@ async def send_repeated_msg(client, hex_msg, num=1000, interval=0.001):
     msg = binascii.unhexlify(hex_msg)
     async with client:
         for i in range(0, num):
-            await client.send_msg(msg)
+            await client.send_data(msg)
             await asyncio.sleep(interval)
         await asyncio.sleep(3)
 
@@ -44,7 +44,7 @@ async def send_incremented_msgs(client, num=1000, interval=0.001):
     async with client:
         for i in range(0, num):
             msg = bytes(str(i), 'utf-8')
-            await client.send_msg(msg)
+            await client.send_data(msg)
             await asyncio.sleep(interval)
         await asyncio.sleep(3)
 

@@ -3,12 +3,15 @@ import json
 from lib.formats.base import BaseTextCodec, BaseMessageObject
 
 
+from typing import AnyStr, Any
+
+
 class JSONCodec(BaseTextCodec):
     """
     Decode & Encode JSON messages
     """
 
-    def decode(self, encoded: bytes, **kwargs):
+    def decode(self, encoded: bytes, **kwargs) -> [AnyStr, Any]:
         pos = 0
         end = len(encoded)
         while pos < end:
@@ -16,7 +19,7 @@ class JSONCodec(BaseTextCodec):
             msg, pos = json.JSONDecoder().raw_decode(encoded, idx=pos)
             yield (encoded[start:pos], msg)
 
-    def encode(self, decoded, **kwargs):
+    def encode(self, decoded, **kwargs) -> AnyStr:
         return json.dumps(decoded)
 
 
@@ -26,7 +29,7 @@ class JSONObject(BaseMessageObject):
 
     def get(self, item, default=None):
         try:
-            return self[item]
+            return self.decoded[item]
         except KeyError:
             return default
 

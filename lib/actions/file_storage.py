@@ -9,7 +9,7 @@ from lib import settings
 from lib.utils_logging import p
 from lib.settings import FILE_OPENER
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Sequence, List, Tuple, AnyStr, NoReturn
+from typing import TYPE_CHECKING, ClassVar, Iterable, Sequence, List, Tuple, AnyStr
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -40,7 +40,7 @@ class ManagedFile:
             return f
 
     @classmethod
-    async def close_all(cls) -> NoReturn:
+    async def close_all(cls) -> None:
         files = list(cls._open_files.values())
         for f in files:
             await f.close()
@@ -57,17 +57,17 @@ class ManagedFile:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._task = asyncio.create_task(self.manage())
 
-    def _cleanup(self) -> NoReturn:
+    def _cleanup(self) -> None:
         del self._open_files[self.path]
         self.logger.debug('Cleanup completed for %s', self.path)
 
     def _get_data(self, msgs : Iterable[BaseMessageObject]) -> AnyStr:
         return self.separator.join([getattr(msg, self.attr) for msg in msgs]) + self.separator
 
-    def write(self, msg: BaseMessageObject) -> NoReturn:
+    def write(self, msg: BaseMessageObject) -> None:
         self._queue.put_nowait(msg)
 
-    async def close(self) -> NoReturn:
+    async def close(self) -> None:
         self.logger.debug('Closing file %s', self.path)
         if not self._task.done():
             await self._task_started.wait()
@@ -78,7 +78,7 @@ class ManagedFile:
             self.logger.debug('File %s already closed', self.path)
         self.logger.debug('Closed file %s', self.path)
 
-    async def wait_writes_done(self) -> NoReturn:
+    async def wait_writes_done(self) -> None:
         self.logger.debug('Waiting for writes to complete for %s', self.path)
         done, pending = await asyncio.wait([self._queue.join(), self._task], return_when=asyncio.FIRST_COMPLETED)
         for d in done:
@@ -86,7 +86,7 @@ class ManagedFile:
                 self.logger.error(d.exception())
         self.logger.debug('Writes completed for %s', self.path)
 
-    async def manage(self) -> NoReturn:
+    async def manage(self) -> None:
         try:
             self._task_started.set()
             self.logger.info('Opening file %s', self.path)
@@ -163,7 +163,7 @@ class FileStorage(BaseFileStorage):
         msg.processed()
         return path
 
-    async def do_one(self, msg: BaseMessageObject):
+    async def async_do_one(self, msg: BaseMessageObject):
         msg.logger.debug('Running action')
         path = self._get_full_path(msg)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -178,7 +178,7 @@ class BufferedFileStorage(BaseFileStorage):
     buffering: int = -1
     _files_with_outstanding_writes: List = field(default_factory=list)
 
-    def _set_outstanding_writes(self, path: Path) -> NoReturn:
+    def _set_outstanding_writes(self, path: Path) -> None:
         if path not in self._files_with_outstanding_writes:
             self._files_with_outstanding_writes.append(path)
 
@@ -188,20 +188,17 @@ class BufferedFileStorage(BaseFileStorage):
         return ManagedFile.get_file(full_path, mode=self.mode, buffering=self.buffering,
                                     timeout=self.timeout, logger=self.logger, attr=self.attr, separator=self.separator)
 
-    def _write_to_file(self, path: Path, msg: BaseMessageObject) -> NoReturn:
+    def _write_to_file(self, path: Path, msg: BaseMessageObject) -> None:
         f = self._get_file(path)
         f.write(msg)
         self._set_outstanding_writes(path)
 
-    def do_one(self, msg: BaseMessageObject) -> NoReturn:
+    def do_one(self, msg: BaseMessageObject) -> None:
         msg.logger.debug('Storing message')
         path = self._get_path(msg)
         self._write_to_file(path, msg)
 
-    def do_many(self, msgs: Sequence[BaseMessageObject]) -> List[Tuple[BaseMessageObject, None]]:
-        return list(self._do_many_sequential(msgs))
-
-    async def wait_complete(self) -> NoReturn:
+    """async def wait_complete(self) -> None:
         try:
             self.logger.debug('Waiting for outstanding writes to complete')
             self.logger.debug(self._files_with_outstanding_writes)
@@ -211,7 +208,7 @@ class BufferedFileStorage(BaseFileStorage):
             self.logger.debug('All outstanding writes have been completed')
         finally:
             self._files_with_outstanding_writes.clear()
-            self.logger.debug(self._files_with_outstanding_writes)
+            self.logger.debug(self._files_with_outstanding_writes)"""
 
-    async def close(self) -> NoReturn:
+    async def close(self) -> None:
         await ManagedFile.close_all()

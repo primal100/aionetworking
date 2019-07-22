@@ -12,7 +12,7 @@ from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, Msgs
 from lib.wrappers.periodic import call_cb_periodic
 
 
-from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, NoReturn, AnyStr, Iterable, Generator, Any
+from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, AnyStr, Iterable, Generator, Any
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -36,7 +36,7 @@ class BaseLogger(ABC, logging.LoggerAdapter):
         if not self.connection_logger_cls:
             self.connection_logger_cls = self.get_connection_logger_cls()
 
-    def manage_error(self, exc: Exception) -> NoReturn:
+    def manage_error(self, exc: Exception) -> None:
         if exc:
             self.error(log_exception(exc))
 
@@ -130,8 +130,10 @@ class Logger(BaseLogger):
 class ConnectionLogger(Logger):
     _is_closing = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, is_receiver: bool = False, context: MutableMapping = None, *args, **kwargs):
+        context = context or {}
+        extra = self.get_extra(context, is_receiver)
+        super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received')
         self._raw_sent_logger = self.get_sibling('raw_sent')
         self._data_received_logger = self.get_sibling('data_received')
@@ -140,6 +142,23 @@ class ConnectionLogger(Logger):
     @classmethod
     def __get_validators__(cls):
         yield cls.validate_new
+
+    @staticmethod
+    def get_extra(context: MutableMapping, is_server: bool):
+        alias, peer, sock = context.get('alias', None), context['peer'], context['sock']
+        peer_str = ':'.join(peer)
+        sock_str = ':'.join(sock)
+        if alias:
+            peer_str = f"{alias}({peer_str})"
+        context.update({
+            'peer_ip': peer[0],
+            'peer_port': peer[1],
+            'peer': peer_str,
+            'sock': sock_str,
+            'server': sock_str if is_server else peer_str,
+            'client': peer_str if is_server else sock_str
+        })
+        return context
 
     def msg_logger(self, msg: BaseMessageObject) -> BaseLogger:
         return self.get_sibling('msg', context={'msg_obj': msg})
@@ -164,52 +183,56 @@ class ConnectionLogger(Logger):
     def peer(self) -> str:
         return self.extra['peer']
 
-    def _raw_received(self, data: AnyStr, *args, **kwargs) -> NoReturn:
+    def _raw_received(self, data: AnyStr, *args, **kwargs) -> None:
         self._raw_received_logger.debug(data, *args, **kwargs)
 
-    def _raw_sent(self, data: AnyStr, *args, **kwargs) -> NoReturn:
+    def _raw_sent(self, data: AnyStr, *args, **kwargs) -> None:
         self._raw_sent_logger.debug(data, *args, **kwargs)
 
-    def _data_received(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> NoReturn:
+    def _data_received(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> None:
         extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_received_logger.debug(msg, *args, extra=extra, **kwargs)
 
-    def _data_sent(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> NoReturn:
+    def _data_sent(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> None:
         extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_sent_logger.debug(msg, *args, extra=extra, **kwargs)
 
-    def new_connection(self) -> NoReturn:
+    def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
 
-    def on_buffer_received(self, data: AnyStr) -> NoReturn:
+    def on_buffer_received(self, data: AnyStr) -> None:
         self.debug("Received msg from %s", self.alias)
         self._raw_received(data)
 
-    def on_msg_decoded(self, msg_obj: BaseMessageObject) -> NoReturn:
+    def on_msg_decoded(self, msg_obj: BaseMessageObject) -> None:
         self._data_received(msg_obj)
 
-    def log_decoded_msgs(self, msgs: Iterable[BaseMessageObject]) -> NoReturn:
+    def log_decoded_msgs(self, msgs: Iterable[BaseMessageObject]) -> None:
         for msg_obj in msgs:
             self.on_msg_decoded(msg_obj)
 
-    def on_sending_decoded_msg(self, msg_obj: BaseMessageObject) -> NoReturn:
+    def log_buffer(self, msgs: Iterable[BaseMessageObject]) -> None:
+        self.logger.debug('Buffer contains %s', p.no('message', msgs))
+        self.logger.log_decoded_msgs(msgs)
+
+    def on_sending_decoded_msg(self, msg_obj: BaseMessageObject) -> None:
         self._data_sent(msg_obj)
 
-    def on_sending_encoded_msg(self, data: AnyStr) -> NoReturn:
+    def on_sending_encoded_msg(self, data: AnyStr) -> None:
         self.debug("Sending message to %s", self.peer)
         self._raw_sent(data)
 
-    def on_msg_sent(self, data: AnyStr) -> NoReturn:
+    def on_msg_sent(self, data: AnyStr) -> None:
         self.debug('Message sent')
 
-    def on_msg_processed(self, msg: int) -> NoReturn:
+    def on_msg_processed(self, msg: int) -> None:
         pass
 
-    def connection_finished(self, exc: Optional[Exception] = None) -> NoReturn:
+    def connection_finished(self, exc: Optional[Exception] = None) -> None:
         self.manage_error(exc)
         self.info('%s connection from %s to %s has been closed', self.connection_type, self.client, self.server)
 
-    def set_closing(self) -> NoReturn:
+    def set_closing(self) -> None:
         self._is_closing = True
 
 
@@ -265,25 +288,25 @@ class StatsTracker(_StatsTracker):
         if item in self.attrs:
             return getattr(self, item)
 
-    def on_buffer_received(self, msg: AnyStr) -> NoReturn:
+    def on_buffer_received(self, msg: AnyStr) -> None:
         if not self.msgs.first_received:
             self.msgs.first_received = LoggingDatetime(self.datefmt)
         self.msgs.last_received = LoggingDatetime(self.datefmt)
         self.msgs.received += 1
         self.received += len(msg)
 
-    def on_msg_processed(self, num_bytes: int) -> NoReturn:
+    def on_msg_processed(self, num_bytes: int) -> None:
         self.msgs.last_processed = datetime.now()
         self.msgs.processed += 1
         self.processed += num_bytes
 
-    def on_msg_sent(self, msg: AnyStr) -> NoReturn:
+    def on_msg_sent(self, msg: AnyStr) -> None:
         if not self.msgs.first_sent:
             self.msgs.first_message_sent = datetime.now()
         self.msgs.sent += 1
         self.sent += len(msg)
 
-    def finish(self) -> NoReturn:
+    def finish(self) -> None:
         self.end = LoggingDatetime(self.datefmt)
 
 
@@ -318,7 +341,7 @@ class ConnectionLoggerStats(ConnectionLogger):
     def get_stats_logger(self) -> StatsLogger:
         return self.get_sibling('stats', cls=self.stats_cls)
 
-    def periodic_log(self, first: bool) -> NoReturn:
+    def periodic_log(self, first: bool) -> None:
         self.extra.end_time = datetime.now()
         tag = 'NEW' if first else 'INTERVAL'
         self.stats(tag)
@@ -327,30 +350,30 @@ class ConnectionLoggerStats(ConnectionLogger):
         self._total_processed += self._stats_logger.processed
         self._stats_logger.reset()
 
-    def stats(self, tag: str) -> NoReturn:
+    def stats(self, tag: str) -> None:
         self._stats_logger.info(tag)
 
-    def on_buffer_received(self, msg: AnyStr) -> NoReturn:
+    def on_buffer_received(self, msg: AnyStr) -> None:
         super().on_buffer_received(msg)
         self._stats_logger.on_buffer_received(msg)
 
-    def on_msg_processed(self, num_bytes: int) -> NoReturn:
+    def on_msg_processed(self, num_bytes: int) -> None:
         super().on_msg_processed(num_bytes)
         self._stats_logger.on_msg_processed(num_bytes)
         if self._is_closing:
             self.check_last_message_processed()
 
-    def on_msg_sent(self, msg: AnyStr) -> NoReturn:
+    def on_msg_sent(self, msg: AnyStr) -> None:
         super().on_msg_sent(msg)
         self._stats_logger.on_msg_sent(msg)
 
-    def check_last_message_processed(self) -> NoReturn:
+    def check_last_message_processed(self) -> None:
         if (self._total_received + self._stats_logger.msgs.received) == (self._total_processed + self._stats_logger.msgs.processed):
             self._stats_logger.finish()
             tag = 'ALL' if self._first else 'END'
             self.stats(tag)
 
-    def connection_finished(self, exc: Optional[Exception] = None) -> NoReturn:
+    def connection_finished(self, exc: Optional[Exception] = None) -> None:
         super().connection_finished(exc=exc)
         self.set_closing()
         self.check_last_message_processed()

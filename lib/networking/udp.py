@@ -1,18 +1,16 @@
 from abc import ABC
 import asyncio
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import time
 
-from pydantic.dataclasses import dataclass
-
-from .mixins import BaseOneWayServerProtocol, BaseClientProtocol, BaseTwoWayServerProtocol
+from .mixins import BaseServerProtocol, BaseClientProtocol, BaseTwoWayServerProtocol
 from lib.utils import addr_tuple_to_str
 
-from typing import AnyStr, ClassVar
+from typing import AnyStr, Sequence
 
 
 @dataclass
-class OneWayUDPMixin(asyncio.DatagramProtocol, ABC):
+class UDPMixin(asyncio.DatagramProtocol, ABC):
     expiry_minutes: int = 30
 
     def __call__(self):
@@ -57,27 +55,23 @@ class OneWayUDPMixin(asyncio.DatagramProtocol, ABC):
                 del self.clients[conn.peer]
         await asyncio.sleep(60)
 
+    def send(self, data: AnyStr):
+        self.transport.sendto(data, addr=(self.peer_ip, self.peer_port))
+
 
 @dataclass
-class UDPMixin(OneWayUDPMixin, ABC):
+class UDPServerOneWayProtocol(UDPMixin, BaseServerProtocol):
+    name = 'UDP Server'
 
     def send(self, msg: AnyStr):
-        self.transport.sendto(msg, addr=(self.peer_ip, self.peer_port))
-
-
-@dataclass
-class UDPServerOneWayProtocol(OneWayUDPMixin, BaseOneWayServerProtocol):
-    name = 'UDP Server'
-    _connections: ClassVar = {}
+        raise NotImplementedError
 
 
 @dataclass
 class UDPServerProtocol(UDPMixin, BaseTwoWayServerProtocol):
     name = 'UDP Server'
-    _connections: ClassVar = {}
 
 
 @dataclass
 class UDPClientProtocol(UDPMixin, BaseClientProtocol):
     name = 'UDP Client'
-    _connections: ClassVar = {}

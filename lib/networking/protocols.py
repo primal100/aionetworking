@@ -15,7 +15,7 @@ class BaseProtocol(ABC):
     logger = None
     transport = None
     sock = None
-    _connections: ClassVar = {}
+    connections: ClassVar = {}
 
     def __call__(self):
         return replace(self)
@@ -44,7 +44,7 @@ class BaseNetworkProtocol(BaseProtocol, ABC):
         self.initialize(self.sock, self.peer)
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
-        self._adaptor.connection_lost(exc)
+        self._adaptor.close(exc)
         self.transport.close()
 
     def on_data_received(self, data: bytes) -> None:

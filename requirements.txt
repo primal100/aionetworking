@@ -5,4 +5,5 @@ asyncssh
 paramiko
 passlib
 aiofile
+typing-extensions
 git+https://github.com/P1sec/pycrate.git#egg=pycrate

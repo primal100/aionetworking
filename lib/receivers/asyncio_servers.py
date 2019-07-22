@@ -27,9 +27,7 @@ class BaseTCPServerReceiver(BaseServer, ABC):
 
     async def start_server(self) -> NoReturn:
         self.server = await self.get_server()
-        async with self.server:
-            self.print_listening_message(self.server.sockets)
-            await self.server.serve_forever()
+        self.print_listening_message(self.server.sockets)
 
     async def stop_server(self) -> NoReturn:
         if self.server:

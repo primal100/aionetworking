@@ -1,11 +1,11 @@
 import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pycrate_core.charpy import Charpy
 
 from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
-from typing import Type, Sequence
+from typing import Generator, Sequence, AnyStr, Any
 
 
 @dataclass
@@ -14,9 +14,9 @@ class PyCrateAsnCodec(BaseCodec):
     """
     Decode & Encode ASN.1 messages via pycrate library
     """
-    asn_class: Type[BaseMessageObject] = None
+    asn_class = None
 
-    def decode(self, encoded: bytes, **kwargs) -> Sequence:
+    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         char = Charpy(encoded)
         while char._cur < char._len_bit:
             start = int(char._cur / 8)
@@ -24,7 +24,7 @@ class PyCrateAsnCodec(BaseCodec):
             end = int(char._cur / 8)
             yield (encoded[start:end], self.asn_class())
 
-    def encode(self, decoded, **kwargs):
+    def encode(self, decoded, **kwargs) -> AnyStr:
         return self.asn_class.to_ber(decoded)
 
 
@@ -34,11 +34,11 @@ class BaseAsnObject(BaseMessageObject):
     asn_class = None
 
     @classmethod
-    def _get_codec_kwargs(cls):
+    def _get_codec_kwargs(cls) -> dict:
         return {'asn_class': cls.asn_class}
 
     @property
-    def event_type(self):
+    def event_type(self) -> str:
         return ''
 
     @property
@@ -49,7 +49,7 @@ class BaseAsnObject(BaseMessageObject):
         return ()
 
     @property
-    def timestamp(self):
+    def timestamp(self) -> datetime:
         timestamp = self._get_timestamp()
         if timestamp:
             return asn_timestamp_to_datetime(self._get_timestamp())
