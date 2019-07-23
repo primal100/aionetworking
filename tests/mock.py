@@ -1,5 +1,5 @@
 from asyncio.transports import Transport, DatagramTransport
-from collections import deque
+import collections
 
 from typing import Any
 
@@ -16,10 +16,10 @@ class MockTransportMixin:
 
 class MockTCPTransport(MockTransportMixin, Transport):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, deque: collections.deque, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._peername = kwargs.get('extra', {}).get('peername')
-        self.queue = deque()
+        self.queue = deque
 
     def write(self, data: Any) -> None:
         if not self._is_closing:
@@ -28,10 +28,10 @@ class MockTCPTransport(MockTransportMixin, Transport):
 
 class MockDatagramTransport(MockTransportMixin, DatagramTransport):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, deque: collections.deque, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._peername = kwargs.get('extra', {}).get('peername')
-        self.queue = deque()
+        self.queue = deque
 
     def sendto(self, data, addr=None):
         if not self._is_closing:

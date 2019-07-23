@@ -1,4 +1,5 @@
 import pytest
+import json
 from json.decoder import JSONDecodeError
 
 from lib.actions.jsonrpc import InvalidParamsError, MethodNotFoundError, InvalidRequestError
@@ -31,7 +32,10 @@ class TestJsonRPC:
         assert json_rpc_action.filter(json_object) is False
 
     def test_04_response_on_decode_error(self, json_rpc_action, invalid_json, json_rpc_parse_error_response):
-        result = json_rpc_action.response_on_decode_error(invalid_json, JSONDecodeError)
+        try:
+            result = json.loads(invalid_json)
+        except JSONDecodeError as e:
+            result = json_rpc_action.response_on_decode_error(invalid_json, e)
         assert result == json_rpc_parse_error_response
 
     @pytest.mark.parametrize("json_rpc_error_request,json_rpc_error_response, exception", [

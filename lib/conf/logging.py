@@ -12,7 +12,7 @@ from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, Msgs
 from lib.wrappers.periodic import call_cb_periodic
 
 
-from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, AnyStr, Iterable, Generator, Any
+from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, AnyStr, Iterable, Generator, Any, Tuple
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -124,37 +124,41 @@ class Logger(BaseLogger):
         cls = cls or self.__class__
         context = context or {}
         extra = ChainMap(context, self.extra)
-        return cls(name, extra, connection_logger_cls=self.connection_logger_cls, **kwargs)
+        return cls(name, connection_logger_cls=self.connection_logger_cls, extra=extra, **kwargs)
 
 
 class ConnectionLogger(Logger):
     _is_closing = False
 
-    def __init__(self, is_receiver: bool = False, context: MutableMapping = None, *args, **kwargs):
-        context = context or {}
-        extra = self.get_extra(context, is_receiver)
+    def __init__(self, *args, is_receiver: bool = False, extra: MutableMapping = None, **kwargs):
+        extra = extra or {}
+        extra = self.get_extra(extra, is_receiver)
         super().__init__(*args, extra=extra, **kwargs)
-        self._raw_received_logger = self.get_sibling('raw_received')
-        self._raw_sent_logger = self.get_sibling('raw_sent')
-        self._data_received_logger = self.get_sibling('data_received')
-        self._data_sent_logger = self.get_sibling('data_sent')
+        self._raw_received_logger = self.get_sibling(name='raw_received', cls=Logger)
+        self._raw_sent_logger = self.get_sibling(name='raw_sent', cls=Logger)
+        self._data_received_logger = self.get_sibling(name='data_received', cls=Logger)
+        self._data_sent_logger = self.get_sibling(name='data_sent', cls=Logger)
 
     @classmethod
     def __get_validators__(cls):
         yield cls.validate_new
 
+
     @staticmethod
-    def get_extra(context: MutableMapping, is_server: bool):
-        alias, peer, sock = context.get('alias', None), context['peer'], context['sock']
-        peer_str = ':'.join(peer)
-        sock_str = ':'.join(sock)
-        if alias:
+    def tuple_to_str(t: Tuple[Any, Any]):
+        return ':'.join([str(s) for s in t])
+
+    def get_extra(self, context: MutableMapping, is_server: bool):
+        alias, peer, sock = context.get('alias', ''), context.get('peer', ('', '')), context.get('sock', ('', ''))
+        peer_str = self.tuple_to_str(peer)
+        sock_str = self.tuple_to_str(sock)
+        if alias and alias not in peer_str:
             peer_str = f"{alias}({peer_str})"
         context.update({
             'peer_ip': peer[0],
             'peer_port': peer[1],
-            'peer': peer_str,
-            'sock': sock_str,
+            'other': peer_str,
+            'own': sock_str,
             'server': sock_str if is_server else peer_str,
             'client': peer_str if is_server else sock_str
         })
@@ -377,3 +381,7 @@ class ConnectionLoggerStats(ConnectionLogger):
         super().connection_finished(exc=exc)
         self.set_closing()
         self.check_last_message_processed()
+
+
+def connection_logger_receiver():
+    return ConnectionLogger('receiver.connection', is_receiver=True, context={})

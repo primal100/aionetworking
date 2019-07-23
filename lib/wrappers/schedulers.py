@@ -14,7 +14,7 @@ class TaskScheduler:
     def __post_init__(self):
         self._finished.set()
 
-    def task_done(self):
+    def task_done(self, future: asyncio.Future) -> None:
         if self._unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
         self._unfinished_tasks -= 1
@@ -36,12 +36,11 @@ class TaskScheduler:
         self._increment_unfinished()
         fut = asyncio.Future()
         self._futures[id_] = fut
-        self._unfinished_tasks += 1
         return fut
 
     def future_done(self, id_: Any) -> None:
-        del self._futures[id_]
-        self._unfinished_tasks -= 1
+        fut = self._futures.pop(id_)
+        self.task_done(fut)
 
     def set_result(self, id_: Any, result: Any) -> None:
         self._futures[id_].set_result(result)
@@ -49,28 +48,29 @@ class TaskScheduler:
     def set_exception(self, id_: Any, exception: BaseException) -> None:
         self._futures[id_].set_exception(exception)
 
-    async def join(self):
+    async def join(self) -> None:
         if self._unfinished_tasks > 0:
             await self._finished.wait()
 
-    async def close(self, timeout: int = None):
+    async def close(self, timeout: Union[int, float] = None):
         for task in self._periodic_tasks:
             task.cancel()
-        await asyncio.wait([self.join] + self._periodic_tasks, timeout=timeout)
+        futs = [self.join()] + self._periodic_tasks
+        return await asyncio.wait(futs, timeout=timeout)
 
     @staticmethod
-    def get_next_time(delay: Union[int, float]) -> float:
-        now = datetime.now()
+    def get_next_time(delay: Union[int, float], current_time: datetime = None) -> float:
+        now = current_time or datetime.now()
         hour = now.hour if delay <= 60 else 0
         start_time = datetime(now.year, now.month, now.day, hour, 0, 0)
         while start_time < now + timedelta(minutes=1):
-            start_time += timedelta(minutes=delay)
+            start_time += timedelta(seconds=delay)
         td = (start_time - now).total_seconds()
         return td
 
-    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float]):
+    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float], current_time: datetime = None):
         if fixed_start_time:
-            return self.get_next_time(delay)
+            return self.get_next_time(delay, current_time=current_time)
         elif immediate:
             return 0
         else:

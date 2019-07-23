@@ -21,7 +21,7 @@ from lib.conf.logging import Logger, ConnectionLogger
 from lib.requesters.base import BaseRequester
 
 from typing import Any, AnyStr, Callable, Iterator, MutableMapping, Sequence, AsyncGenerator, Generator, Tuple, \
-    TypeVar
+    TypeVar, Union
 
 
 ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
@@ -37,21 +37,25 @@ def not_implemented_callable(*args, **kwargs) -> None:
 class BaseProtocol(ABC):
     name = ''
     is_receiver = True
-    _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     connection_logger_cls = ConnectionLogger
+    initialize_logger_immediately = True
+
+    _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default=None, init=False, hash=False, compare=False, repr=False)
     context: MutableMapping = field(default_factory=dict)
-    dataformat: InitVar[Type[MessageObjectType]] = None
+    dataformat: Type[MessageObjectType] = None
     codec: BaseCodec = None
     preaction: BaseAction = None
-    parent_logger: Logger = None
+    parent_logger: Logger = Logger('receiver')
     parent: int = None
-    timeout: int = 5
+    timeout: Union[int, float] = 5
 
-    def __post_init__(self, dataformat: MessageObjectType = None) -> None:
-        if dataformat and not self.codec:
-            self.codec: BaseCodec[dataformat] = dataformat.get_codec(logger=self.parent_logger)
+    def __post_init__(self) -> None:
+        if self.dataformat and not self.codec:
+            self.codec: BaseCodec = self.dataformat.get_codec(logger=self.parent_logger)
         self.context['protocol_name'] = self.name
+        if self.initialize_logger_immediately:
+            self._configure_context()
 
     def __call__(self, **kwargs):
         return self._clone(**kwargs)
@@ -108,7 +112,7 @@ class BaseProtocol(ABC):
     def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
         timestamp = timestamp or datetime.now()
         self._manage_buffer(buffer, timestamp)
-        msgs = self.codec.decode_buffer(buffer, timestamp)
+        msgs = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
         self.process_msgs(msgs, buffer)
 
     @abstractmethod
@@ -139,7 +143,6 @@ class BaseReceiverProtocol(BaseProtocol, ABC):
 class BaseSenderProtocol(BaseProtocol, ABC):
     is_receiver = False
     requester: BaseRequester = None
-    logger: Logger = Logger('sender')
 
     _futures: MutableMapping = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)
     _notification_queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)

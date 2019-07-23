@@ -64,7 +64,7 @@ class BaseJSONRPCServer(BaseAction):
         if request_id is not None:
             return {'jsonrpc': self.version, 'result': result, 'id': request_id}
 
-    def response_on_decode_error(self, data: AnyStr, exc: Exception) -> MutableMapping:
+    def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> MutableMapping:
         return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError')}
 
     def response_on_exception(self, msg_obj: JSONObject, exc: Exception) -> MutableMapping:

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC
 import asyncio
 from dataclasses import dataclass, field, InitVar
@@ -31,7 +32,7 @@ class ManagedFile:
     _open_files: ClassVar = {}
 
     @classmethod
-    def get_file(cls, path, *args, **kwargs):
+    def get_file(cls, path, *args, **kwargs) -> ManagedFile:
         try:
             return cls._open_files[path]
         except KeyError:
@@ -198,7 +199,7 @@ class BufferedFileStorage(BaseFileStorage):
         path = self._get_path(msg)
         self._write_to_file(path, msg)
 
-    """async def wait_complete(self) -> None:
+    async def wait_complete(self) -> None:
         try:
             self.logger.debug('Waiting for outstanding writes to complete')
             self.logger.debug(self._files_with_outstanding_writes)
@@ -208,7 +209,8 @@ class BufferedFileStorage(BaseFileStorage):
             self.logger.debug('All outstanding writes have been completed')
         finally:
             self._files_with_outstanding_writes.clear()
-            self.logger.debug(self._files_with_outstanding_writes)"""
+            self.logger.debug(self._files_with_outstanding_writes)
 
     async def close(self) -> None:
+        await self.wait_complete()
         await ManagedFile.close_all()

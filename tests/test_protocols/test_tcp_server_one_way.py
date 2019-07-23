@@ -1,24 +1,44 @@
 import pytest
-import asyncio
 from pathlib import Path
 
 from lib.actions.file_storage import ManagedFile
+from lib.networking.mixins import NetworkProtocolMixin
 from lib.utils import alist
 
 
-class TestASNFileStorage:
+class TestTCPServerOneWay:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, file_storage_action_binary, asn_object, asn_one_encoded, asn_codec):
-        await file_storage_action_binary.async_do_one(asn_object)
-        expected_file = Path(tmp_path/'Encoded/TCAP_MAP/127.0.0.1_00000001.TCAP_MAP')
+    async def test_00_connection_made_lost(self, tcp_server_protocol_one_way, tcp_transport, peername, peer_str, sock, asn_codec):
+        assert not tcp_transport.is_closing()
+        assert len(NetworkProtocolMixin.connections) == 0
+        assert tcp_server_protocol_one_way.logger is None
+        assert tcp_server_protocol_one_way.transport is None
+        tcp_server_protocol_one_way.connection_made(tcp_transport)
+        assert not tcp_transport.is_closing()
+        assert tcp_server_protocol_one_way.codec == asn_codec
+        assert tcp_server_protocol_one_way.peer == peername
+        assert tcp_server_protocol_one_way.sock == sock
+        assert tcp_server_protocol_one_way.logger is not None
+        assert tcp_server_protocol_one_way.transport == tcp_transport
+        assert NetworkProtocolMixin.connections == {peer_str: tcp_server_protocol_one_way}
+        tcp_server_protocol_one_way.connection_lost(None)
+        assert NetworkProtocolMixin.connections == {}
+        assert tcp_transport.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_01_do_one(self, tmp_path, tcp_server_protocol_one_way_connected, asn_one_encoded, asn_codec, asn_object):
+        assert not tcp_server_protocol_one_way_connected.transport.is_closing()
+        tcp_server_protocol_one_way_connected.data_received(asn_one_encoded)
+        tcp_server_protocol_one_way_connected.connection_lost(None)
+        expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
         assert expected_file.exists()
         assert expected_file.read_bytes() == asn_one_encoded
-        obj = await asn_codec.one_from_file(expected_file)
-        assert obj == asn_object
+        msg = await asn_codec.one_from_file(expected_file)
+        assert msg == asn_object
 
     @pytest.mark.asyncio
-    async def test_01_do_many_close(self, tmp_path, file_storage_action_binary, asn_objects, asn_encoded_multi,
+    async def test_02_do_many_close(self, tmp_path, file_storage_action_binary, asn_objects, asn_encoded_multi,
                                     task_scheduler):
         for asn_object in asn_objects:
             task = task_scheduler.create_task(file_storage_action_binary.async_do_one(asn_object),
@@ -77,12 +97,12 @@ class TestManagedFileASN:
 class TestASNBufferedFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_binary, asn_object, asn_one_encoded, asn_codec):
+    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_binary, asn_object, asn_encoded_multi, asn_codec):
         buffered_file_storage_action_binary.do_many([asn_object])
         await buffered_file_storage_action_binary.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
         assert expected_file.exists()
-        assert expected_file.read_bytes() == asn_one_encoded
+        assert expected_file.read_bytes() == asn_encoded_multi[0]
         msg = await asn_codec.one_from_file(expected_file)
         assert msg == asn_object
 
@@ -100,11 +120,11 @@ class TestASNBufferedFileStorage:
 class TestJsonFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, file_storage_action_text, json_object, json_one_encoded, json_codec):
+    async def test_00_do_one(self, tmp_path, file_storage_action_text, json_object, json_encoded_multi, json_codec):
         await file_storage_action_text.async_do_one(json_object)
         expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_0.JSON')
         assert expected_file.exists()
-        assert expected_file.read_text() == json_one_encoded
+        assert expected_file.read_text() == json_encoded_multi[0]
         msg = await json_codec.one_from_file(expected_file)
         assert msg == json_object
 
@@ -139,12 +159,12 @@ class TestManagedFileJSON:
 class TestJsonBufferedFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_text, json_object, json_one_encoded, json_codec):
+    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_text, json_object, json_encoded_multi, json_codec):
         buffered_file_storage_action_text.do_many([json_object])
         await buffered_file_storage_action_text.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
-        assert expected_file.read_text() == json_one_encoded
+        assert expected_file.read_text() == json_encoded_multi[0]
         obj = await json_codec.one_from_file(expected_file)
         assert obj == json_object
 

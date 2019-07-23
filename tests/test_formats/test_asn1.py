@@ -1,6 +1,7 @@
 import pytest
 
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
+from lib.utils import alist
 
 
 class TestASN1Codec:
@@ -18,18 +19,27 @@ class TestASN1Codec:
 
     def test_03_from_buffer(self, asn_codec, asn_buffer, asn_objects, timestamp):
         decoded = asn_codec.from_buffer(asn_buffer, received_timestamp=timestamp)
+        assert list(decoded) == asn_objects
+
+    def test_04_decode_buffer(self, asn_codec, asn_buffer, asn_objects, timestamp):
+        decoded = list(asn_codec.decode_buffer(asn_buffer, received_timestamp=timestamp))
         assert decoded == asn_objects
 
-    def test_04_from_decoded(self, asn_codec, asn_one_decoded, asn_object, timestamp):
+    def test_05_from_decoded(self, asn_codec, asn_one_decoded, asn_object, timestamp):
         encoded = asn_codec.from_decoded(asn_one_decoded, received_timestamp=timestamp)
         assert encoded == asn_object
 
-    def test_05_create_msg(self, asn_codec, asn_one_decoded, asn_object, timestamp):
+    def test_06_create_msg(self, asn_codec, asn_one_decoded, asn_object, timestamp):
         obj = asn_codec.create_msg(asn_one_decoded, received_timestamp=timestamp)
         assert obj == asn_object
 
     @pytest.mark.asyncio
-    async def test_06_from_file(self, asn_codec, file_containing_asn, asn_object, timestamp):
+    async def test_07_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
+        objects = asn_codec.from_file(file_containing_multi_asn, received_timestamp=timestamp)
+        assert await alist(objects) == asn_objects
+
+    @pytest.mark.asyncio
+    async def test_08_from_file_one(self, asn_codec, file_containing_asn, asn_object, timestamp):
         obj = await asn_codec.one_from_file(file_containing_asn, received_timestamp=timestamp)
         assert obj == asn_object
 

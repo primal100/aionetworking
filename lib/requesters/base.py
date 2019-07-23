@@ -15,8 +15,7 @@ class BaseRequester(ABC):
     methods = ()
     notification_methods = ()
 
-    timeout: int = 5
-    logger: Logger ='sender'
+    logger: Logger = Logger('sender')
 
     @classmethod
     def swap_cls(cls, name: str):

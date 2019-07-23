@@ -11,7 +11,7 @@ class JSONCodec(BaseTextCodec):
     Decode & Encode JSON messages
     """
 
-    def decode(self, encoded: bytes, **kwargs) -> [AnyStr, Any]:
+    def decode(self, encoded: AnyStr, **kwargs) -> [AnyStr, Any]:
         pos = 0
         end = len(encoded)
         while pos < end:
@@ -19,7 +19,7 @@ class JSONCodec(BaseTextCodec):
             msg, pos = json.JSONDecoder().raw_decode(encoded, idx=pos)
             yield (encoded[start:pos], msg)
 
-    def encode(self, decoded, **kwargs) -> AnyStr:
+    def encode(self, decoded: Any, **kwargs) -> AnyStr:
         return json.dumps(decoded)
 
 

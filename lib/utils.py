@@ -6,11 +6,26 @@ import re
 import traceback
 
 
-from typing import Sequence, List, AnyStr, Tuple, Union, NoReturn
+from typing import Sequence, List, AnyStr, Tuple, Union, AsyncGenerator, Any
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
+
+
+###Async Generators###
+async def aone(generator: AsyncGenerator) -> Any:
+    item = await generator.__anext__()
+    await generator.aclose()
+    return item
+
+
+async def anext(generator: AsyncGenerator) -> Any:
+    return await generator.__anext__()
+
+
+async def alist(generator: AsyncGenerator) -> List[Any]:
+    return [i async for i in generator]
 
 
 ###Networking###
@@ -61,7 +76,7 @@ class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
         return asyncio.ProactorEventLoop()
 
 
-def set_loop_policy() -> NoReturn:
+def set_loop_policy() -> None:
     if os.name == 'nt':
         asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
 

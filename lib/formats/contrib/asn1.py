@@ -1,3 +1,4 @@
+from abc import ABC
 import datetime
 from dataclasses import dataclass
 from pycrate_core.charpy import Charpy
@@ -5,7 +6,16 @@ from pycrate_core.charpy import Charpy
 from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
-from typing import Generator, Sequence, AnyStr, Any
+from typing import Generator, Tuple, AnyStr, Any, Type
+from typing_extensions import Protocol
+
+
+class ASNProtocol(Protocol):
+    @classmethod
+    def from_ber(cls, char, single: bool = False): ...
+
+    @classmethod
+    def to_ber(cls, decoded: AnyStr) -> AnyStr: ...
 
 
 @dataclass
@@ -14,9 +24,9 @@ class PyCrateAsnCodec(BaseCodec):
     """
     Decode & Encode ASN.1 messages via pycrate library
     """
-    asn_class = None
+    asn_class: Type[ASNProtocol] = None
 
-    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
+    def decode(self, encoded: bytes, **kwargs) -> Generator[Tuple[AnyStr, Any], None, None]:
         char = Charpy(encoded)
         while char._cur < char._len_bit:
             start = int(char._cur / 8)
@@ -28,7 +38,7 @@ class PyCrateAsnCodec(BaseCodec):
         return self.asn_class.to_ber(decoded)
 
 
-class BaseAsnObject(BaseMessageObject):
+class BaseAsnObject(BaseMessageObject, ABC):
     name = 'ASN.1'
     codec_cls = PyCrateAsnCodec
     asn_class = None
@@ -57,5 +67,5 @@ class BaseAsnObject(BaseMessageObject):
             return self.received_timestamp
         return datetime.datetime.now()
 
-    def get_asn_domain(self) -> tuple:
+    def _get_asn_domain(self) -> tuple:
         raise NotImplementedError

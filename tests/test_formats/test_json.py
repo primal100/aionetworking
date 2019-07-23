@@ -1,6 +1,7 @@
 import pytest
 
 from lib.formats.contrib.json import JSONObject
+from lib.utils import alist
 
 
 class TestJsonCodec:
@@ -20,16 +21,25 @@ class TestJsonCodec:
         decoded = json_codec.from_buffer(json_buffer, received_timestamp=timestamp)
         assert decoded == json_objects
 
-    def test_04_from_decoded(self, json_codec, json_rpc_request, json_object, timestamp):
+    def test_04_decode_buffer(self, json_codec, json_buffer, json_objects, timestamp):
+        decoded = list(json_codec.decode_buffer(json_buffer, received_timestamp=timestamp))
+        assert decoded == json_objects
+
+    def test_05_from_decoded(self, json_codec, json_rpc_request, json_object, timestamp):
         encoded = json_codec.from_decoded(json_rpc_request, received_timestamp=timestamp)
         assert encoded == json_object
 
-    def test_05_create_msg(self, json_codec, json_rpc_request, json_object, timestamp):
+    def test_06_create_msg(self, json_codec, json_rpc_request, json_object, timestamp):
         obj = json_codec.create_msg(json_rpc_request, received_timestamp=timestamp)
         assert obj == json_object
 
     @pytest.mark.asyncio
-    async def test_06_from_file(self, json_codec, file_containing_json, json_object, timestamp):
+    async def test_07_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
+        objects = asn_codec.from_file(file_containing_multi_asn, received_timestamp=timestamp)
+        assert await alist(objects) == asn_objects
+
+    @pytest.mark.asyncio
+    async def test_08_from_file(self, json_codec, file_containing_json, json_object, timestamp):
         obj = await json_codec.one_from_file(file_containing_json, received_timestamp=timestamp)
         assert obj == json_object
 

@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import dataclass, field
 
@@ -14,9 +14,11 @@ from typing import Iterator, Tuple, AnyStr, ClassVar, MutableMapping
 class NetworkProtocolMixin(ABC):
     connections: ClassVar[MutableMapping[str, ProtocolType]] = {}
     aliases: dict = field(default_factory=dict)
-    sock = (None, None)
+    initialize_logger_immediately = False
+    sock = ('', '')
+    peer = ('', '')
+    peer_str = ''
     alias = ''
-    peer = None
     transport = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -26,7 +28,8 @@ class NetworkProtocolMixin(ABC):
         connection_ok = self.initialize(sock, peer)
         if connection_ok:
             self.logger.new_connection()
-            self.connections[''.join(peer)] = self
+            self.peer_str = self.logger.tuple_to_str(peer)
+            self.connections[self.peer_str] = self
             self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self.connections))),
                               p.no('active connection'))
 
@@ -36,7 +39,7 @@ class NetworkProtocolMixin(ABC):
     def connection_lost(self, exc) -> None:
         self.logger.connection_finished(exc)
         self._close_connection()
-        self.connections.pop(self.peer, None)
+        self.connections.pop(self.peer_str)
 
     def _get_alias(self, peer: Tuple[str, int]) -> str:
         host = peer[0]
@@ -57,7 +60,7 @@ class NetworkProtocolMixin(ABC):
         self.peer = peer
         self.sock = sock
         try:
-            self.alias = self._check_peer(self.peer[0])
+            self.alias = self._check_peer(self.peer)
             self.update_context_with_connection_details()
             self._configure_context()
             return True
@@ -71,7 +74,7 @@ class BaseClientProtocol(BaseSenderProtocol, NetworkProtocolMixin, ABC):
 
 
 @dataclass
-class BaseServerProtocol(BaseReceiverProtocol, NetworkProtocolMixin, ABC):
+class BaseServerProtocol(NetworkProtocolMixin, BaseReceiverProtocol, ABC):
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
     def _raise_message_from_not_authorized_host(self, sender):
@@ -107,7 +110,7 @@ class BaseTwoWayServerProtocol(BaseServerProtocol, ABC):
         response = self.process_result(future)
         if response:
             self.send(response)
-        self._scheduler.task_done()
+        self._scheduler.task_done(future)
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
