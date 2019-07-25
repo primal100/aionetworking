@@ -328,6 +328,7 @@ async def udp_transport(deque, extra) -> asyncio.DatagramTransport:
 
 @pytest.fixture
 async def tcp_server_protocol_one_way(buffered_file_storage_action_binary) -> TCPOneWayServerProtocol:
+    print(TCPOneWayServerProtocol.__mro__)
     yield TCPOneWayServerProtocol(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary, timeout=0.5)()
 
 

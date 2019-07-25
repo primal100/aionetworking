@@ -6,11 +6,22 @@ import re
 import traceback
 
 
-from typing import Sequence, List, AnyStr, Tuple, Union, AsyncGenerator, Any
+from typing import Sequence, List, AnyStr, Tuple, Union, AsyncGenerator, Any, TYPE_CHECKING
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
+
+
+###Typing###
+def on_type_checking_only(arg):
+    """Decorator for protocols/ABCs which are only to be used for
+    type checking on subclasses but not at runtime.
+    Used to add type hints for dynamic attributes (__getattr__, etc)
+    """
+    if TYPE_CHECKING:
+        return arg
+    return object
 
 
 ###Async Generators###

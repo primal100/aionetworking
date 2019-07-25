@@ -1,15 +1,16 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from dataclasses import dataclass
 import asyncio
 
-from .mixins import BaseClientProtocol, BaseServerProtocol, BaseTwoWayServerProtocol
+from .mixins import BaseClientProtocol, BaseServerProtocol, BaseTwoWayServerProtocol, NetworkProtocolMixin
 
 
 from typing import AnyStr, Sequence
 
 
-class TCPMixin(asyncio.Protocol, ABC):
+class TCPMixin(NetworkProtocolMixin, asyncio.Protocol, ABC):
 
-    def close_connection(self) -> None:
+    def _close_connection(self) -> None:
         self.transport.close()
 
     def data_received(self, data: AnyStr) -> None:
@@ -22,7 +23,7 @@ class TCPMixin(asyncio.Protocol, ABC):
         self.transport.writelines(data_list)
 
 
-class TCPOneWayServerProtocol(BaseServerProtocol, TCPMixin):
+class TCPOneWayServerProtocol(TCPMixin, BaseServerProtocol):
     name = 'TCP Server'
 
     def send(self, data: AnyStr) -> None:

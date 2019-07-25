@@ -35,10 +35,11 @@ def not_implemented_callable(*args, **kwargs) -> None:
 
 @dataclass
 class BaseProtocol(ABC):
+    adaptor: Any
     name = ''
     is_receiver = True
     connection_logger_cls = ConnectionLogger
-    initialize_logger_immediately = True
+    initialize_adaptor_immediately = True
 
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default=None, init=False, hash=False, compare=False, repr=False)
@@ -54,8 +55,13 @@ class BaseProtocol(ABC):
         if self.dataformat and not self.codec:
             self.codec: BaseCodec = self.dataformat.get_codec(logger=self.parent_logger)
         self.context['protocol_name'] = self.name
-        if self.initialize_logger_immediately:
+        if self.initialize_adaptor_immediately:
             self._configure_context()
+            self._configure_adaptor()
+
+    @abstractmethod
+    def _configure_adaptor(self):
+        raise NotImplementedError
 
     def __call__(self, **kwargs):
         return self._clone(**kwargs)
@@ -71,6 +77,7 @@ class BaseProtocol(ABC):
         return connection.parent == id(self)
 
     async def close(self) -> None:
+        await self.adaptor.close()
         await self._scheduler.close(timeout=self.timeout)
 
     def set_logger(self) -> None:
@@ -125,26 +132,75 @@ class BaseProtocol(ABC):
 
 
 @dataclass
-class BaseReceiverProtocol(BaseProtocol, ABC):
+class BaseAdaptor(ABC):
+    is_receiver = True
+    _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
+    logger: ConnectionLogger
+    task_callback: Callable
+    preaction: BaseAction = None
+
+    def close(self):
+        await self._scheduler.close()
+
+    def task_callback(self, fut: asyncio.Future):
+        self.task_callback(fut)
+        self._scheduler.task_done(fut)
+
+
+@dataclass
+class BaseOneWayReceiverAdaptor(BaseAdaptor):
     is_receiver = True
     action: BaseAction = None
 
     async def close(self) -> None:
-        self.logger.info('Closing actions')
-        await super().close()
-        await self.preaction.close()
-        await self.action.close()
+        self.logger.info('Closing Adaptor')
+        super().close()
+        if self.preaction:
+            await self.preaction.close()
+        if self.action:
+            await self.action.close()
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         self.action.do_many(msgs)
 
 
 @dataclass
-class BaseSenderProtocol(BaseProtocol, ABC):
+class BaseReceiverAdaptor(BaseOneWayReceiverAdaptor):
+
+    def encode_exception(self, msg_obj: MessageObjectType, exc: BaseException) -> MessageObjectType:
+        return self.action.response_on_exception(msg_obj, exc)
+
+    def process_result(self, future: asyncio.Future) -> MessageObjectType:
+        result, exception = future.result(), future.exception()
+        if result:
+            return self.encode_msg(result)
+        if exception:
+            self.logger.error(exception)
+            return self.encode_exception(msg_obj_cv.get(), exception)
+
+    def on_task_complete(self, future: asyncio.Future) -> None:
+        response = self.process_result(future)
+        if response:
+            self.send(response)
+        self._scheduler.task_done(future)
+
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
+        try:
+            for msg in msgs:
+                msg_obj_cv.set(msg)
+                self._scheduler.create_task(self.action.do_one(msg), callback=self.on_task_complete)
+        except Exception as e:
+            self.logger.error(e)
+            response = self.action.response_on_decode_error(buffer, e)
+            if response:
+                self.encode_and_send_msg(response)
+
+
+@dataclass
+class BaseSenderAdaptor(ABC):
     is_receiver = False
     requester: BaseRequester = None
 
-    _futures: MutableMapping = field(default_factory=dict, init=False, repr=False, hash=False, compare=False)
     _notification_queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
 
     def __getattr__(self, item):

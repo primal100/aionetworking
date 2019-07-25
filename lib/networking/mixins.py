@@ -7,7 +7,7 @@ from lib.utils_logging import p
 from .asyncio_protocols import BaseReceiverProtocol, BaseSenderProtocol, MessageObjectType, ProtocolType, msg_obj_cv
 
 from socket import socket
-from typing import Iterator, Tuple, AnyStr, ClassVar, MutableMapping
+from typing import Iterator, Tuple, AnyStr, ClassVar, MutableMapping, NoReturn
 
 
 @dataclass
@@ -51,7 +51,7 @@ class NetworkProtocolMixin(ABC):
     def _check_peer(self, peer: Tuple[str, int]) -> str:
         return self._get_alias(peer)
 
-    def update_context_with_connection_details(self):
+    def _update_context_with_connection_details(self):
         self.context['peer'] = self.peer
         self.context['sock'] = self.sock
         self.context['alias'] = self.alias
@@ -61,7 +61,7 @@ class NetworkProtocolMixin(ABC):
         self.sock = sock
         try:
             self.alias = self._check_peer(self.peer)
-            self.update_context_with_connection_details()
+            self._update_context_with_connection_details()
             self._configure_context()
             return True
         except MessageFromNotAuthorizedHost:
@@ -77,7 +77,7 @@ class BaseClientProtocol(BaseSenderProtocol, NetworkProtocolMixin, ABC):
 class BaseServerProtocol(NetworkProtocolMixin, BaseReceiverProtocol, ABC):
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
-    def _raise_message_from_not_authorized_host(self, sender):
+    def _raise_message_from_not_authorized_host(self, sender) -> NoReturn:
         msg = f"Received message from unauthorized host {sender}"
         self.logger.error(msg)
         raise MessageFromNotAuthorizedHost(msg)
