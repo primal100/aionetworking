@@ -6,10 +6,7 @@ from typing_extensions import Protocol
 from pathlib import Path
 
 from lib.formats.base import MessageObjectType
-from lib.utils import on_type_checking_only
-
-
-ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
+from lib.utils import inherit_on_type_checking_only
 
 
 class DataProtocol(Protocol):
@@ -42,8 +39,8 @@ class DataProtocol(Protocol):
     def send(self, data: AnyStr) -> None: ...
 
 
-@on_type_checking_only
-class DataProtocolGetattr(DataProtocol):
+@inherit_on_type_checking_only
+class DataProtocolGetattr(DataProtocol, Protocol):
 
     def check_peer(self, other_ip) -> str: ...
 
@@ -64,10 +61,7 @@ class DataProtocolGetattr(DataProtocol):
     def send(self, data: AnyStr) -> None: ...
 
 
-class NetworkProtocol(DataProtocol, Protocol):
-
-    @abstractmethod
-    def check_peer(self, other_ip) -> str: ...
+class NetworkProtocol(Protocol):
 
     @abstractmethod
     def close_connection(self) -> None: ...
@@ -82,10 +76,8 @@ class NetworkProtocol(DataProtocol, Protocol):
     def connection_lost(self, exc) -> None: ...
 
 
-@on_type_checking_only
-class NetworkProtocolGetattr(DataProtocolGetattr, NetworkProtocol):
-
-    def check_peer(self, other_ip) -> str: ...
+@inherit_on_type_checking_only
+class NetworkProtocolGetattr(NetworkProtocol, Protocol):
 
     def close_connection(self) -> None: ...
 
@@ -96,43 +88,41 @@ class NetworkProtocolGetattr(DataProtocolGetattr, NetworkProtocol):
     def connection_lost(self, exc) -> None: ...
 
 
-class TCPProtocol(NetworkProtocol, Protocol):
+class TCPProtocol(Protocol):
 
     @abstractmethod
     def data_received(self, data: AnyStr) -> None: ...
 
 
-class TCPProtocolGetattr(NetworkProtocolGetattr, TCPProtocol):
+@inherit_on_type_checking_only
+class TCPProtocolGetattr(NetworkProtocolGetattr, TCPProtocol, Protocol):
 
     def data_received(self, data: AnyStr) -> None: ...
 
 
-class UDPProtocol(NetworkProtocol, Protocol):
+class UDPProtocol(Protocol):
 
     @abstractmethod
     def datagram_received(self, data: AnyStr, addr: str): ...
 
 
-class UDPProtocolGetattr(NetworkProtocolGetattr, UDPProtocol):
+@inherit_on_type_checking_only
+class UDPProtocolGetattr(NetworkProtocolGetattr, UDPProtocol, Protocol):
 
     def datagram_received(self, data: AnyStr, addr: str): ...
 
 
-class Adaptor(Protocol):
+class AdaptorProtocol(Protocol):
+
     @abstractmethod
     def on_data_received(self, buffer: AnyStr) -> None: ...
-
-
-class ReceiverAdaptor(Adaptor, Protocol):
-
-    @abstractmethod
-    def on_task_complete(self, future: asyncio.Future) -> None: ...
 
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
-class SenderAdaptor(Protocol):
+class SenderAdaptorProtocol(AdaptorProtocol, Protocol):
+
     @abstractmethod
     async def wait_notification(self) -> MessageObjectType: ...
 
@@ -163,20 +153,13 @@ class SenderAdaptor(Protocol):
     @abstractmethod
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None: ...
 
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
-
-class ServerAdaptor(Protocol):
-
-    @abstractmethod
-    def check_peer(self, other_ip) -> str: ...
+class ServerAdaptorProtocol(Protocol):
 
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
-class TwoWayServerAdaptor(ServerAdaptor, Protocol):
-
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
+ProtocolType = TypeVar('ProtocolType', bound=DataProtocol)
+SenderAdaptorType = TypeVar('SenderAdaptorType', bound=SenderAdaptorProtocol)
+ServerAdaptorType = TypeVar('ServerAdaptorType', bound=ServerAdaptorProtocol)

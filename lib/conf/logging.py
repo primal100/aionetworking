@@ -36,7 +36,7 @@ class BaseLogger(ABC, logging.LoggerAdapter):
         if not self.connection_logger_cls:
             self.connection_logger_cls = self.get_connection_logger_cls()
 
-    def manage_error(self, exc: Exception) -> None:
+    def manage_error(self, exc: BaseException) -> None:
         if exc:
             self.error(log_exception(exc))
 
@@ -232,7 +232,7 @@ class ConnectionLogger(Logger):
     def on_msg_processed(self, msg: int) -> None:
         pass
 
-    def connection_finished(self, exc: Optional[Exception] = None) -> None:
+    def connection_finished(self, exc: Optional[BaseException] = None) -> None:
         self.manage_error(exc)
         self.info('%s connection from %s to %s has been closed', self.connection_type, self.client, self.server)
 

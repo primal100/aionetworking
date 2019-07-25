@@ -1,6 +1,5 @@
 from __future__ import annotations
 from abc import abstractmethod
-from dataclasses import dataclass, field
 import warnings
 
 from lib.conf.logging import Logger
@@ -13,42 +12,29 @@ from typing_extensions import Protocol      #3.8
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")
 
 
-ActionType = TypeVar('ActionType', bound='BaseAction')
+ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 
 
-@dataclass
 class BaseActionProtocol(Protocol):
-    name = 'receiver action'
-    logger: Logger = Logger('receiver')
 
-    timeout: int = 5
-    _outstanding_tasks: List = field(default_factory=list, init=False, repr=False, hash=False)
+    @abstractmethod
+    def filter(self, msg: BaseMessageObject) -> bool: ...
 
-    @classmethod
-    def swap_cls(cls, name: str) -> Type[ActionType]:
-        from lib.definitions import ACTIONS
-        return ACTIONS[name]
-
-    def __post_init__(self) -> None:
-        self.logger = self.logger.get_child(name='actions')
-
-    def filter(self, msg: BaseMessageObject) -> bool:
-        return msg.filter()
-
+    @abstractmethod
     async def close(self) -> None: ...
-
-    def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Any:
-        pass
-
-    def response_on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any:
-        pass
 
 
 class ParallelAction(BaseActionProtocol, Protocol):
     async def asnyc_do_one(self, msg: BaseMessageObject) -> Any: ...
 
+    @abstractmethod
+    def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Any: ...
 
-class SequentialAction(BaseActionProtocol, Protocol):
+    @abstractmethod
+    def response_on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any: ...
+
+
+class OneWaySequentialAction(BaseActionProtocol, Protocol):
     def do_one(self, msg: BaseMessageObject) -> Any: ...
 
     def do_many(self, msgs: Iterator[BaseMessageObject]):

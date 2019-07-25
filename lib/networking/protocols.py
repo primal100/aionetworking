@@ -1,12 +1,12 @@
 from __future__ import annotations
 import asyncio
 from abc import abstractmethod
-from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, Sequence, TypeVar, Tuple
+from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, List, Sequence, TypeVar, Tuple
 from typing_extensions import Protocol
 from pathlib import Path
 
 from lib.formats.base import MessageObjectType
-from lib.utils import on_type_checking_only
+from lib.utils import inherit_on_type_checking_only
 
 
 ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
@@ -15,7 +15,28 @@ ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
 class DataProtocol(Protocol):
 
     @abstractmethod
-    def check_peer(self, other_ip) -> str: ...
+    def send(self, data: AnyStr) -> None: ...
+
+    @abstractmethod
+    def send_many(self, data_list: List[AnyStr]) -> None: ...
+
+
+class NetworkProtocol(Protocol):
+
+    @abstractmethod
+    def connection_made(self, transport) -> None: ...
+
+    @abstractmethod
+    def close_connection(self) -> None: ...
+
+    @abstractmethod
+    def connection_lost(self, exc: BaseException) -> None: ...
+
+    @abstractmethod
+    def initialize(self, sock: Tuple[str, int], peer: Tuple[str, int]) -> bool: ...
+
+
+class AdaptorProtocol(Protocol):
 
     @abstractmethod
     def send_data(self, msg_encoded: AnyStr) -> None: ...
@@ -36,30 +57,36 @@ class DataProtocol(Protocol):
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
 
     @abstractmethod
-    def send_many(self, data_list: Sequence[AnyStr]): ...
+    async def close(self) -> None: ...
+
+
+@inherit_on_type_checking_only
+class AdaptorProtocolGetattr(AdaptorProtocol, Protocol):
+
+    def send_data(self, msg_encoded: AnyStr) -> None: ...
+
+    def send_hex(self, hex_msg: AnyStr) -> None: ...
+
+    def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None: ...
+
+    def encode_msg(self, decoded: Any) -> MessageObjectType: ...
+
+    def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
+
+    def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
+
+    async def close(self) -> None: ...
+
+
+class ReceiverAdaptor(AdaptorProtocol, Protocol):
 
     @abstractmethod
-    def send(self, data: AnyStr) -> None: ...
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
-class NetworkProtocol(Protocol):
+@inherit_on_type_checking_only
+class ReceiverAdaptorGetattr(ReceiverAdaptor, Protocol):
 
-    @abstractmethod
-    def check_peer(self, other_ip) -> str: ...
-
-    @abstractmethod
-    def close_connection(self) -> None: ...
-
-    @abstractmethod
-    def initialize(self, sock: Tuple[str, int], peer: Tuple[str, int]) -> bool: ...
-
-
-class ReceiverAdaptor(Protocol):
-
-    @abstractmethod
-    def on_task_complete(self, future: asyncio.Future) -> None: ...
-
-    @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
@@ -98,7 +125,7 @@ class SenderAdaptor(Protocol):
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
-@on_type_checking_only
+@inherit_on_type_checking_only
 class SenderAdaptorGetattr(SenderAdaptor):
     async def wait_notification(self) -> MessageObjectType: ...
 
@@ -124,9 +151,6 @@ class SenderAdaptorGetattr(SenderAdaptor):
 
 
 class BaseServerProtocol:
-
-    @abstractmethod
-    def check_peer(self, other_ip) -> str: ...
 
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...

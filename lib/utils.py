@@ -14,9 +14,9 @@ str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 
 ###Typing###
-def on_type_checking_only(arg):
-    """Decorator for protocols/ABCs which are only to be used for
-    type checking on subclasses but not at runtime.
+def inherit_on_type_checking_only(arg):
+    """Decorator for protocols/ABC classes who's methods can be used for
+    type checking on subclasses but are not available at runtime.
     Used to add type hints for dynamic attributes (__getattr__, etc)
     """
     if TYPE_CHECKING:
@@ -94,7 +94,7 @@ def set_loop_policy() -> None:
 
 ###Logging###
 
-def log_exception(ex: Exception) -> Sequence[str]:
+def log_exception(ex: BaseException) -> Sequence[str]:
         return [line.rstrip('\n') for line in
                 traceback.format_exception(ex.__class__, ex, ex.__traceback__)]
 

@@ -1,6 +1,6 @@
-class MessageFromNotAuthorizedHost(Exception):
+class MessageFromNotAuthorizedHost(BaseException):
     pass
 
 
-class MethodNotFoundError(Exception):
+class MethodNotFoundError(BaseException):
     pass

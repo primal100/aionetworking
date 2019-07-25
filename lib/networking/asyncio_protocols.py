@@ -16,15 +16,14 @@ from lib.utils_logging import p
 from lib.wrappers.schedulers import TaskScheduler
 
 from lib.actions.base import BaseAction
-from lib.formats.base import BaseMessageObject, BaseCodec, MessageObjectType
+from lib.formats.base import BaseCodec, MessageObjectType
 from lib.conf.logging import Logger, ConnectionLogger
 from lib.requesters.base import BaseRequester
 
-from typing import Any, AnyStr, Callable, Iterator, MutableMapping, Sequence, AsyncGenerator, Generator, Tuple, \
-    TypeVar, Union
+from .protocols import DataProtocol, ProtocolType
 
+from typing import Any, AnyStr, Callable, Iterator, MutableMapping, Sequence, AsyncGenerator, Generator, Union
 
-ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
 
 msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
@@ -34,8 +33,7 @@ def not_implemented_callable(*args, **kwargs) -> None:
 
 
 @dataclass
-class BaseProtocol(ABC):
-    adaptor: Any
+class BaseProtocol(DataProtocol):
     name = ''
     is_receiver = True
     connection_logger_cls = ConnectionLogger
