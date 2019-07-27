@@ -3,37 +3,27 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, MutableMapping
 
+from .counters import Counter
+
 
 @dataclass
 class TaskScheduler:
-    _unfinished_tasks = 0
-    _finished: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+    _counter: Counter = field(default_factory=Counter, init=False)
     _futures: MutableMapping[Any, asyncio.Future] = field(default_factory=dict, init=False)
     _periodic_tasks: List[asyncio.Future] = field(default_factory=list, init=False)
 
-    def __post_init__(self):
-        self._finished.set()
-
     def task_done(self, future: asyncio.Future) -> None:
-        if self._unfinished_tasks <= 0:
-            raise ValueError('task_done() called too many times')
-        self._unfinished_tasks -= 1
-        if self._unfinished_tasks == 0:
-            self._finished.set()
-
-    def _increment_unfinished(self):
-        self._finished.clear()
-        self._unfinished_tasks += 1
+        self._counter.increment()
 
     def create_task(self, coro: Awaitable, callback: Callable = None) -> asyncio.Future:
-        self._increment_unfinished()
+        self._counter.increment()
         task = asyncio.ensure_future(coro)
         callback = callback or self.task_done
         task.add_done_callback(callback)
         return task
 
     def create_future(self, id_: Any) -> asyncio.Future:
-        self._increment_unfinished()
+        self._counter.increment()
         fut = asyncio.Future()
         self._futures[id_] = fut
         return fut
@@ -49,8 +39,7 @@ class TaskScheduler:
         self._futures[id_].set_exception(exception)
 
     async def join(self) -> None:
-        if self._unfinished_tasks > 0:
-            await self._finished.wait()
+        await self._counter.wait_zero()
 
     async def close(self, timeout: Union[int, float] = None):
         for task in self._periodic_tasks:

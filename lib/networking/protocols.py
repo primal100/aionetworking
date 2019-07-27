@@ -1,7 +1,8 @@
 from __future__ import annotations
 import asyncio
 from abc import abstractmethod
-from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, List, Sequence, TypeVar, Tuple
+from datetime import datetime
+from typing import Any, AnyStr, AsyncGenerator, Generator, List, Optional, Sequence, TypeVar, Tuple, Union
 from typing_extensions import Protocol
 from pathlib import Path
 
@@ -9,10 +10,23 @@ from lib.formats.base import MessageObjectType
 from lib.utils import inherit_on_type_checking_only
 
 
-ProtocolType = TypeVar('ProtocolType', bound='BaseProtocol')
+class ConnectionGeneratorProtocol(Protocol):
+
+    @abstractmethod
+    def __call__(self) -> Union[ConnectionGeneratorProtocol, NetworkConnectionProtocol]: ...
+
+    @abstractmethod
+    def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
+
+    @abstractmethod
+    async def close(self, timeout: Union[int, float] = None) -> None: ...
 
 
-class DataProtocol(Protocol):
+ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound=ConnectionGeneratorProtocol)
+
+
+class ConnectionProtocol(Protocol):
+    parent: int
 
     @abstractmethod
     def send(self, data: AnyStr) -> None: ...
@@ -20,23 +34,47 @@ class DataProtocol(Protocol):
     @abstractmethod
     def send_many(self, data_list: List[AnyStr]) -> None: ...
 
-
-class NetworkProtocol(Protocol):
+    @abstractmethod
+    def clone(self: ConnectionType, *args, **kwargs) -> ConnectionType: ...
 
     @abstractmethod
-    def connection_made(self, transport) -> None: ...
+    def is_child(self, parent_id: int) -> bool: ...
 
     @abstractmethod
-    def close_connection(self) -> None: ...
+    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task: ...
 
     @abstractmethod
-    def connection_lost(self, exc: BaseException) -> None: ...
+    async def close_wait(self, exc: Optional[BaseException]) -> asyncio.Task: ...
+
+
+ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
+
+
+class NetworkConnectionMixinProtocol(Protocol):
+    peer_str: str
 
     @abstractmethod
-    def initialize(self, sock: Tuple[str, int], peer: Tuple[str, int]) -> bool: ...
+    def initialize_connection(self, peer: Tuple[str, int], sock:  Tuple[str, int], ) -> bool: ...
 
 
-class AdaptorProtocol(Protocol):
+class NetworkConnectionProtocol(NetworkConnectionMixinProtocol, ConnectionProtocol, Protocol): ...
+
+
+NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=NetworkConnectionProtocol)
+
+
+class UDPConnectionMixinProtocol(Protocol):
+    def set_transport(self, transport: asyncio.DatagramTransport): ...
+
+
+class UDPConnectionProtocol(UDPConnectionMixinProtocol, NetworkConnectionProtocol, Protocol):  ...
+
+
+UDPConnectionType = TypeVar('UDPConnectionType', bound=UDPConnectionProtocol)
+
+
+class BaseAdaptorProtocol(Protocol):
+    is_receiver: bool
 
     @abstractmethod
     def send_data(self, msg_encoded: AnyStr) -> None: ...
@@ -57,11 +95,20 @@ class AdaptorProtocol(Protocol):
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
 
     @abstractmethod
-    async def close(self) -> None: ...
+    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None: ...
+
+
+class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
+
+    @abstractmethod
+    async def close(self, exc: Optional[BaseException], timeout: Union[int, float]) -> None: ...
+
+
+AdaptorProtocolType = TypeVar('AdaptorProtocolType', bound=AdaptorProtocol)
 
 
 @inherit_on_type_checking_only
-class AdaptorProtocolGetattr(AdaptorProtocol, Protocol):
+class AdaptorProtocolGetattr(BaseAdaptorProtocol, Protocol):
 
     def send_data(self, msg_encoded: AnyStr) -> None: ...
 
@@ -75,22 +122,10 @@ class AdaptorProtocolGetattr(AdaptorProtocol, Protocol):
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
 
-    async def close(self) -> None: ...
+    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None: ...
 
 
-class ReceiverAdaptor(AdaptorProtocol, Protocol):
-
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
-
-
-@inherit_on_type_checking_only
-class ReceiverAdaptorGetattr(ReceiverAdaptor, Protocol):
-
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
-
-
-class SenderAdaptor(Protocol):
+class SenderAdaptorMixinProtocol(Protocol):
     @abstractmethod
     async def wait_notification(self) -> MessageObjectType: ...
 
@@ -113,20 +148,17 @@ class SenderAdaptor(Protocol):
     async def encode_send_wait(self, decoded: Any) -> asyncio.Future: ...
 
     @abstractmethod
-    def run_method(self, method: Callable, *args, **kwargs) -> None: ...
-
-    @abstractmethod
-    async def run_method_and_wait(self, method: Callable, *args, **kwargs) -> asyncio.Future: ...
-
-    @abstractmethod
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None: ...
 
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
+
+class SenderAdaptorProtocol(ConnectionProtocol, NetworkConnectionMixinProtocol, Protocol): ...
+
+
+SenderAdaptorProtocolType = TypeVar('SenderAdaptorProtocolType', bound=SenderAdaptorProtocol)
 
 
 @inherit_on_type_checking_only
-class SenderAdaptorGetattr(SenderAdaptor):
+class SenderAdaptorGetattr(SenderAdaptorMixinProtocol, Protocol):
     async def wait_notification(self) -> MessageObjectType: ...
 
     def get_notification(self) -> MessageObjectType: ...
@@ -141,22 +173,4 @@ class SenderAdaptorGetattr(SenderAdaptor):
 
     async def encode_send_wait(self, decoded: Any) -> asyncio.Future: ...
 
-    def run_method(self, method: Callable, *args, **kwargs) -> None: ...
-
-    async def run_method_and_wait(self, method: Callable, *args, **kwargs) -> asyncio.Future: ...
-
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None: ...
-
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
-
-
-class BaseServerProtocol:
-
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
-
-
-class BaseTwoWayServerProtocol(Protocol):
-
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...

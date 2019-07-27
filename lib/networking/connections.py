@@ -1,112 +1,162 @@
 from __future__ import annotations
 import asyncio
 import contextvars
-from datetime import datetime
 from dataclasses import dataclass, field, replace
 
 from .exceptions import MessageFromNotAuthorizedHost
-from lib.actions.protocols import OneWaySequentialAction
-from lib.formats.base import BufferObject
-from lib.types import Type
-from lib.utils_logging import p
-from lib.wrappers.schedulers import TaskScheduler
 
-from lib.formats.base import BaseCodec, BaseMessageObject
+from lib.formats.base import BaseMessageObject
 from lib.conf.logging import Logger, ConnectionLogger
 
-from .protocols import DataProtocol, NetworkProtocol, ProtocolType, AdaptorProtocol, AdaptorProtocolGetattr
+from .network_connections import connections_manager
+from .protocols import ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol, \
+    ConnectionGeneratorType, SenderAdaptorProtocolType, UDPConnectionMixinProtocol, \
+    AdaptorProtocolType
 
-from typing import  AnyStr, ClassVar, MutableMapping, List, NoReturn, Tuple, TypeVar, Union
+from typing import AnyStr, MutableMapping, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
 from typing_extensions import Protocol
 
 
 msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
+def details_to_str(details: Tuple[str, int]):
+    return ':'.join([str(s) for s in details])
+
 
 @dataclass
-class BaseConnectionProtocol(DataProtocol, AdaptorProtocolGetattr, Protocol):
-    name = ''
-    connection_logger_cls = ConnectionLogger
-    start_immediately = True
+class ConnectionGenerator(ConnectionGeneratorProtocol):
+    connection: NetworkConnectionProtocol
+    logger: Logger = Logger('receiver')
 
-    _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger: ConnectionLogger = field(default=None, init=False, hash=False, compare=False, repr=False)
-    context: MutableMapping = field(default_factory=dict)
-    adaptor: AdaptorProtocol = field(default=None)
+    def __call__(self) -> NetworkConnectionProtocol:
+        return self.connection.clone()
+
+    def is_owner(self, connection: NetworkConnectionProtocol) -> bool:
+        return connection.is_child(id(self))
+
+    async def close(self, timeout: Union[int, float] = None) -> None:
+        await connections_manager.wait_all_connections_closed(id(self), timeout=timeout)
+
+
+@dataclass
+class UDPConnectionGenerator(asyncio.DatagramProtocol, ConnectionGenerator):
+    transport = None
+    sock = None
+
+    def __call__(self: ConnectionGeneratorType) -> ConnectionGeneratorType:
+        return self
+
+    def connection_made(self, transport: asyncio.DatagramTransport) -> None:
+        self.transport = transport
+        self.sock = self.transport.get_extra_info('sockname')
+
+    def connection_lost(self, exc: Optional[Exception]) -> None:
+        self.logger.manage_error(exc)
+        for conn in filter(self.is_owner, connections_manager):
+            conn.finish_connection(exc)
+
+    def error_received(self, exc: Optional[Exception]) -> None:
+        self.logger.manage_error(exc)
+
+    def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
+        conn = connections_manager.get(details_to_str(addr), None)
+        if conn:
+            conn.on_data_received(data)
+        else:
+            conn = self.connection.clone()
+            conn.initialize_connection(addr, self.sock)
+            conn.set_transport(self.transport)
+            conn.on_data_received(data)
+
+
+@dataclass
+class BaseConnectionProtocol(AdaptorProtocolType, ConnectionProtocol, Protocol):
+    name = ''
+    adaptor_cls: Type[AdaptorProtocolType] = None
+    action = None
+    requester = None
     dataformat: Type[BaseMessageObject] = None
-    codec: BaseCodec = None
-    preaction: OneWaySequentialAction = None
-    parent_logger: Logger = Logger('receiver')
+    adaptor: AdaptorProtocolType = field(default=None)
+    context: MutableMapping = field(default_factory=dict)
+    logger: Logger = Logger('receiver')
     parent: int = None
     timeout: Union[int, float] = 5
-
-    def __post_init__(self) -> None:
-        self.context['protocol_name'] = self.name
-        if self.dataformat and not self.codec:
-            self.codec: BaseCodec = self.dataformat.get_codec(logger=self.parent_logger, context=self.context)
-        if self.start_immediately:
-            self._initialize()
 
     def __getattr__(self, item):
         if self.adaptor:
             return getattr(self.adaptor, item)
 
-    def _initialize(self) -> None:
-        self.configure_context()
-        self.adaptor = self._configure_adaptor()
+    def update_context(self):
+        self.context['protocol_name'] = self.name
 
-    def __call__(self, **kwargs):
-        return self._clone(**kwargs)
+    def initialize(self):
+        self.update_context()
+        self.set_adaptor()
+        connections_manager.add_connection(self)
+        self.logger.log_num_connections('opened', self.parent)
 
-    def _clone(self: ProtocolType, **kwargs) -> ProtocolType:
-        return replace(self, parent=id(self), **kwargs)
+    def set_adaptor(self) -> None:
+        kwargs = {
+            'connection_logger': self.get_connection_logger(),
+            'context': self.context,
+            'dataformat': self.dataformat,
+            'preaction': self.preaction,
+            'timeout': self.timeout,
+            'send': self.send
+        }
+        if self.adaptor_cls.is_receiver:
+            self.adaptor = self._get_receiver_adaptor(**kwargs)
+        else:
+            self.adaptor = self._get_sender_adaptor(**kwargs)
 
-    def _configure_context(self) -> None:
-        self.set_logger()
-        self.codec.set_context(self.context, logger=self.logger)
+    def _get_receiver_adaptor(self, **kwargs) -> AdaptorProtocolType:
+        return self.adaptor_cls(action=self.action, **kwargs)
 
-    def is_owner(self, connection: ProtocolType) -> bool:
-        return connection.parent == id(self)
+    def _get_sender_adaptor(self, **kwargs) -> SenderAdaptorProtocolType:
+        return self.adaptor_cls(requester=self.requester, **kwargs)
 
-    async def close(self) -> None:
-        await self.adaptor.close()
-        await self._scheduler.close(timeout=self.timeout)
+    def clone(self: ConnectionType) -> ConnectionType:
+        return replace(self)
 
-    def set_logger(self) -> None:
-        self.logger = self.parent_logger.get_connection_logger(is_receiver=self.is_receiver, context=self.context)
+    def is_child(self, parent_id: int) -> bool:
+        return parent_id == self.parent
 
-    def _manage_buffer(self, buffer: AnyStr, timestamp: datetime = None) -> None:
-        self.logger.on_buffer_received(buffer)
-        if self.preaction:
-            buffer = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
-            self.preaction.do_many([buffer])
+    def get_connection_logger(self) -> ConnectionLogger:
+        return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, context=self.context)
 
-    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
-        timestamp = timestamp or datetime.now()
-        self._manage_buffer(buffer, timestamp)
-        msgs = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        self.process_msgs(msgs, buffer)
+    def delete_connection(self, fut: asyncio.Future) -> None:
+        connections_manager.remove_connection(self)
+        self.logger.log_num_connections('closed', self.parent)
+
+    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task:
+        task = asyncio.create_task(self.adaptor.close(exc, timeout=self.timeout))
+        task.add_done_callback(self.delete_connection)
+        return task
+
+    async def close_wait(self, exc: Optional[BaseException]) -> asyncio.Task:
+        task = self.finish_connection(exc)
+        await task
+        return task
 
 
 TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
 
 
 @dataclass
-class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkProtocol, Protocol):
-    start_immediately = False
+class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinProtocol, Protocol):
     sock = ('', 0)
     peer = ('', 0)
     peer_str = ''
+    sock_str = ''
     alias = ''
     transport: TransportType = None
 
-    connections: ClassVar[MutableMapping[str, ProtocolType]] = {}
     aliases: dict = field(default_factory=dict)
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
-    def _raise_message_from_not_authorized_host(self, sender) -> NoReturn:
-        msg = f"Received message from unauthorized host {sender}"
+    def _raise_message_from_not_authorized_host(self, peer: Tuple[str, int]) -> NoReturn:
+        msg = f"Received message from unauthorized host {self.details_to_str(peer)}"
         self.logger.error(msg)
         raise MessageFromNotAuthorizedHost(msg)
 
@@ -119,67 +169,68 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkProtocol, Protoco
         host = peer[0]
         alias = self.aliases.get(host, host)
         if alias != host:
-            self.parent_logger.debug('Alias found for %s: %s', host, alias)
+            self.logger.debug('Alias found for %s: %s', host, alias)
         return alias
 
-    def _check_peer(self, other_ip):
-        if self._sender_valid(other_ip):
-            return self._get_alias(other_ip)
-        self._raise_message_from_not_authorized_host(other_ip)
+    def _check_peer(self, peer: Tuple[str, int]) -> str:
+        if self._sender_valid(peer):
+            return self._get_alias(peer)
+        self._raise_message_from_not_authorized_host(peer)
 
-    def finish_connection(self, exc: BaseException) -> None:
-        self.logger.connection_finished(exc)
-        self.connections.pop(self.peer_str, None)
-        self.close_connection()
-
-    def _update_context_with_connection_details(self):
-        self.context['peer'] = self.peer
-        self.context['sock'] = self.sock
+    def update_context(self):
+        super().update_context()
+        self.context['peer'] = self.peer_str
+        self.context['sock'] = self.sock_str
         self.context['alias'] = self.alias
 
-    def initialize(self, sock:  Tuple[str, int], peer: Tuple[str, int]) -> bool:
+    def initialize_connection(self, peer: Tuple[str, int], sock:  Tuple[str, int], ) -> bool:
         self.peer = peer
         self.sock = sock
+        self.peer_str = details_to_str(peer)
+        self.sock_str = details_to_str(sock)
         try:
             self.alias = self._check_peer(self.peer)
-            self._update_context_with_connection_details()
-            self._configure_context()
+            self.initialize()
             return True
         except MessageFromNotAuthorizedHost as exc:
             self.finish_connection(exc)
             return False
 
-    def initialize_connection(self) -> None:
-        peer = self.transport.get_extra_info('peername')
-        sock = self.transport.get_extra_info('sockname')
-        connection_ok = self.initialize(sock, peer)
-        if connection_ok:
-            self.logger.new_connection()
-            self.peer_str = self.logger.tuple_to_str(peer)
-            self.connections[self.peer_str] = self
-            self.logger.debug('Connection opened. There %s now %s.', p.plural_verb('is', p.num(len(self.connections))),
-                              p.no('active connection'))
 
-
-@dataclass
 class TCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
     transport: asyncio.Transport = None
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
-        self.initialize_connection()
+        peer = self.transport.get_extra_info('peername')
+        sock = self.transport.get_extra_info('sockname')
+        self.initialize_connection(peer, sock)
 
-    def connection_lost(self, exc: BaseException) -> None:
+    def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.finish_connection(exc)
 
-    def data_received(self, data: AnyStr) -> None:
-        self.on_data_received(data)
-
-    def close_connection(self) -> None:
+    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task:
         self.transport.close()
+        return super().finish_connection(exc)
+
+    def data_received(self, data: AnyStr) -> None:
+        self.adaptor.on_data_received(data)
 
     def send(self, msg: AnyStr) -> None:
         self.transport.write(msg)
 
-    def send_many(self, data_list: List[AnyStr]) -> None:
+    def send_many(self, data_list: List[bytes]) -> None:
         self.transport.writelines(data_list)
+
+
+class UDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
+
+    def set_transport(self, transport: asyncio.DatagramTransport):
+        self.transport = transport
+
+    def send(self, msg: AnyStr) -> None:
+        self.transport.sendto(msg, self.peer)
+
+    def send_many(self, data_list: List[bytes]) -> None:
+        data = b''.join(data_list)
+        self.send(data)

@@ -7,12 +7,15 @@ from dataclasses import field
 
 from pydantic import ValidationError
 
+from lib.networking.network_connections import connections_manager
 from lib.utils import log_exception
-from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount
+from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.periodic import call_cb_periodic
 
 
 from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, AnyStr, Iterable, Generator, Any, Tuple
+from typing_extensions import Literal
+
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -125,6 +128,11 @@ class Logger(BaseLogger):
         context = context or {}
         extra = ChainMap(context, self.extra)
         return cls(name, connection_logger_cls=self.connection_logger_cls, extra=extra, **kwargs)
+
+    def log_num_connections(self, action: str, parent_id: int):
+        self.logger.debug('Connection %s. There %s now %s.', action,
+                          p.plural_verb('is', p.num(connections_manager.num_connections(parent_id))),
+                          p.no('active connection'))
 
 
 class ConnectionLogger(Logger):

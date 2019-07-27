@@ -6,7 +6,7 @@ import re
 import traceback
 
 
-from typing import Sequence, List, AnyStr, Tuple, Union, AsyncGenerator, Any, TYPE_CHECKING
+from typing import Sequence, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
@@ -22,6 +22,15 @@ def inherit_on_type_checking_only(arg):
     if TYPE_CHECKING:
         return arg
     return object
+
+
+###Iterators###
+def has_items(generator: Iterator) -> bool:
+    try:
+        next(generator)
+        return True
+    except StopIteration:
+        return False
 
 
 ###Async Generators###

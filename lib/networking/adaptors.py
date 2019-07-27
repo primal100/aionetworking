@@ -1,19 +1,24 @@
+from abc import abstractmethod
 import asyncio
+import binascii
 import contextvars
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError
-from lib.actions.protocols import OneWaySequentialAction, ParallelAction
-from lib.conf.logging import Logger
-from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
+from lib.actions.protocols import BaseActionProtocol, OneWaySequentialAction, ParallelAction
+from lib.conf.logging import ConnectionLogger
+from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
 from lib.requesters.base import BaseRequester
 from lib.utils import Record
+from lib.utils_logging import p
 from lib.wrappers.schedulers import TaskScheduler
 
-from .protocols import AdaptorProtocol, ProtocolType
-from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, MutableMapping, Sequence, Type, Union
+from .protocols import AdaptorProtocol
+
+from pathlib import Path
+from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, MutableMapping, Sequence, Type, Optional, Union
 from typing_extensions import Protocol
 
 
@@ -25,24 +30,66 @@ def not_implemented_callable(*args, **kwargs) -> None:
 
 
 @dataclass
-class BaseAdaptor( Protocol):
+class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
+    dataformat: Type[BaseMessageObject]
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger = None
+    logger: ConnectionLogger = None
     context: MutableMapping = field(default_factory=dict)
-    dataformat: Type[BaseMessageObject] = None
-    codec: BaseCodec = None
     preaction: OneWaySequentialAction = None
-    parent_logger: Logger = Logger('receiver')
-    parent: int = None
-    timeout: Union[int, float] = 5
     send: Callable = not_implemented_callable
 
-    async def close(self) -> None:
-        await self._scheduler.close(timeout=self.timeout)
+    def __post_init__(self) -> None:
+        self.codec: BaseCodec = self.dataformat.get_codec(logger=self.logger, context=self.context)
+        self.logger.new_connection()
+
+    def send_data(self, msg_encoded: AnyStr) -> None:
+        self.logger.on_sending_encoded_msg(msg_encoded)
+        self.send(msg_encoded)
+        self.logger.on_msg_sent(msg_encoded)
+
+    def send_hex(self, hex_msg: AnyStr) -> None:
+        self.send_data(binascii.unhexlify(hex_msg))
+
+    def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None:
+        for msg in hex_msgs:
+            self.send(binascii.unhexlify(msg))
+
+    def encode_msg(self, decoded: Any) -> MessageObjectType:
+        return self.codec.encode(decoded)
+
+    def encode_and_send_msg(self, msg_decoded: Any) -> None:
+        self.logger.on_sending_decoded_msg(msg_decoded)
+        msg_obj = self.encode_msg(msg_decoded)
+        self.send_data(msg_obj.encoded)
+
+    def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None:
+        for decoded_msg in decoded_msgs:
+            self.encode_and_send_msg(decoded_msg)
+
+    def _manage_buffer(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+        self.logger.on_buffer_received(buffer)
+        if self.preaction:
+            buffer = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
+            self.preaction.do_many([buffer])
+
+    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+        timestamp = timestamp or datetime.now()
+        self._manage_buffer(buffer, timestamp)
+        msgs = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
+        self.process_msgs(msgs, buffer)
+
+    @abstractmethod
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
+
+    async def close(self, exc: Optional[BaseException], timeout: Union[int, float]) -> None:
+        self.logger.connection_finished(exc)
+        if self.preaction:
+            await self.preaction.close()
+        await self._scheduler.close(timeout=timeout)
 
 
 @dataclass
-class ClientAdaptor(BaseAdaptor):
+class SenderAdaptor(BaseAdaptorProtocol):
     is_receiver = False
     requester: BaseRequester = None
 
@@ -111,23 +158,26 @@ class ClientAdaptor(BaseAdaptor):
 
 
 @dataclass
-class OneWayServerAdaptor(BaseAdaptor):
+class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
     is_receiver = True
-    action: OneWaySequentialAction = None
+    action: BaseActionProtocol = None
 
-    async def close(self) -> None:
-        self.logger.info('Closing Adaptor')
-        if self.preaction:
-            await self.preaction.close()
+    async def close(self, exc: Optional[BaseException], timeout: Union[int, float] = None) -> None:
+        await super().close(exc, timeout=timeout)
         if self.action:
             await self.action.close()
+
+
+@dataclass
+class OneWayReceiverAdaptor(BaseReceiverAdaptor):
+    action: OneWaySequentialAction = None
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         self.action.do_many(msgs)
 
 
 @dataclass
-class ServerAdaptor(OneWayServerAdaptor):
+class ReceiverAdaptor(OneWayReceiverAdaptor):
     action: ParallelAction = None
 
     def on_exception(self, msg_obj: MessageObjectType, exc: BaseException) -> MessageObjectType:
@@ -142,10 +192,12 @@ class ServerAdaptor(OneWayServerAdaptor):
             return self.on_exception(msg_obj_cv.get(), exception)
 
     def on_task_complete(self, future: asyncio.Future) -> None:
-        response = self.process_result(future)
-        if response:
-            self.encode_and_send_msg(response)
-        self._scheduler.task_done(future)
+        try:
+            response = self.process_result(future)
+            if response:
+                self.encode_and_send_msg(response)
+        finally:
+            self._scheduler.task_done(future)
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
