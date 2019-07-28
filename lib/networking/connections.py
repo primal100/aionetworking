@@ -12,7 +12,7 @@ from lib.conf.types import ConnectionLoggerType
 from .network_connections import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
 from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol,
-                        AdaptorProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol)
+                        AdaptorProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
 from .types import ConnectionGeneratorType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
 from typing import Any, AnyStr, Dict, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
@@ -252,7 +252,7 @@ class TCPServer(BaseTCPConnection):
     adaptor_cls = ReceiverAdaptor
 
 
-class TCPClient(BaseTCPConnection):
+class TCPClient(SenderAdaptorGetattr, BaseTCPConnection):
     adaptor_cls = SenderAdaptor
 
 
@@ -264,5 +264,5 @@ class UDPServer(BaseUDPConnection):
     adaptor_cls = ReceiverAdaptor
 
 
-class UDPClient(BaseUDPConnection):
+class UDPClient(SenderAdaptorGetattr, BaseUDPConnection):
     adaptor_cls = SenderAdaptor

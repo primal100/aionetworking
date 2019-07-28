@@ -3,7 +3,7 @@ from abc import ABC
 
 from .base import BaseRequester
 
-from typing import MutableMapping
+from typing import Any, Dict
 
 
 class JSONRPCMethod:
@@ -12,7 +12,7 @@ class JSONRPCMethod:
     def __init__(self, name: str):
         self.name = name
 
-    def base_command(self, *args, **kwargs) -> MutableMapping:
+    def base_command(self, *args, **kwargs) -> Dict[str, Any]:
         command = {"jsonrpc": self.version, "method": self.name}
         if args:
             command['params'] = args
@@ -31,4 +31,5 @@ class BaseJSONRPCClient(ABC, BaseRequester):
 
 
 class SampleJSONRPCClient(BaseJSONRPCClient):
-    methods = ('test',)
+    methods = ('login', 'authenticate', 'logout', 'create', 'delete', 'get', 'list')
+    notification_methods = ('subscribe_to_user', 'unsubscribe_from_user')
