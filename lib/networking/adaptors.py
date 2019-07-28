@@ -8,7 +8,7 @@ from functools import partial
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import BaseActionProtocol, OneWaySequentialAction, ParallelAction
-from lib.conf.logging import ConnectionLogger
+from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
 from lib.requesters.base import BaseRequester
 from lib.utils import Record
@@ -18,7 +18,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, AnyStr, AsyncGenerator, Callable, Generator, Iterator, MutableMapping, Sequence, Type, Optional, Union
+from typing import Any, AnyStr, Awaitable, AsyncGenerator, Callable, Generator, Iterator, List, Dict, Sequence, Type, Optional, Union
 from typing_extensions import Protocol
 
 
@@ -33,10 +33,10 @@ def not_implemented_callable(*args, **kwargs) -> None:
 class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     dataformat: Type[BaseMessageObject]
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger: ConnectionLogger = None
-    context: MutableMapping = field(default_factory=dict)
+    logger: ConnectionLogger = field(default_factory=connection_logger_receiver)
+    context: Dict[str, Any] = field(default_factory=dict)
     preaction: OneWaySequentialAction = None
-    send: Callable = not_implemented_callable
+    send: Callable[[AnyStr], None] = not_implemented_callable
 
     def __post_init__(self) -> None:
         self.codec: BaseCodec = self.dataformat.get_codec(logger=self.logger, context=self.context)
@@ -55,7 +55,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.send(binascii.unhexlify(msg))
 
     def encode_msg(self, decoded: Any) -> MessageObjectType:
-        return self.codec.encode(decoded)
+        return self.codec.from_decoded(decoded)
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None:
         self.logger.on_sending_decoded_msg(msg_decoded)
@@ -81,11 +81,15 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
-    async def close(self, exc: Optional[BaseException], timeout: Union[int, float]) -> None:
-        self.logger.connection_finished(exc)
+    def get_close_tasks(self) -> List[Awaitable]:
+        tasks = [self._scheduler.close()]
         if self.preaction:
-            await self.preaction.close()
-        await self._scheduler.close(timeout=timeout)
+            tasks.append(self.preaction.close())
+        return tasks
+
+    async def close(self, exc: Optional[BaseException], timeout: Union[int, float] = None) -> None:
+        await asyncio.wait(self.get_close_tasks(), timeout=timeout)
+        self.logger.connection_finished(exc)
 
 
 @dataclass
@@ -117,12 +121,8 @@ class SenderAdaptor(BaseAdaptorProtocol):
         for i in range(0, self._notification_queue.qsize()):
             yield self._notification_queue.get_nowait()
 
-    async def send_data_and_wait(self, request_id: Any, encoded: AnyStr) -> asyncio.Future:
-        fut = self._scheduler.create_future(request_id)
-        self.send_data(encoded)
-        await fut
-        self._scheduler.future_done(request_id)
-        return fut
+    async def send_data_and_wait(self, request_id: Any, encoded: AnyStr) -> Any:
+        return self._scheduler.run_wait_fut(request_id, self.send_data, encoded)
 
     async def send_msg_and_wait(self, msg_obj: MessageObjectType) -> asyncio.Future:
         return await self.send_data_and_wait(msg_obj.request_id, msg_obj.encoded)
@@ -162,10 +162,11 @@ class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
     is_receiver = True
     action: BaseActionProtocol = None
 
-    async def close(self, exc: Optional[BaseException], timeout: Union[int, float] = None) -> None:
-        await super().close(exc, timeout=timeout)
+    def get_close_tasks(self) -> List[Awaitable]:
+        tasks = super().get_close_tasks()
         if self.action:
-            await self.action.close()
+            tasks.append(self.action.close())
+        return tasks
 
 
 @dataclass
@@ -180,32 +181,25 @@ class OneWayReceiverAdaptor(BaseReceiverAdaptor):
 class ReceiverAdaptor(OneWayReceiverAdaptor):
     action: ParallelAction = None
 
-    def on_exception(self, msg_obj: MessageObjectType, exc: BaseException) -> MessageObjectType:
-        return self.action.response_on_exception(msg_obj, exc)
+    def on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
+        self.logger.manage_error(exc)
+        response = self.action.response_on_exception(msg_obj, exc)
+        self.encode_and_send_msg(response)
 
-    def process_result(self, future: asyncio.Future) -> MessageObjectType:
-        result, exception = future.result(), future.exception()
+    def on_success(self, result, msg_obj: MessageObjectType = None) -> None:
         if result:
-            return result
-        if exception:
-            self.logger.error(exception)
-            return self.on_exception(msg_obj_cv.get(), exception)
+            self.encode_and_send_msg(result)
 
-    def on_task_complete(self, future: asyncio.Future) -> None:
-        try:
-            response = self.process_result(future)
-            if response:
-                self.encode_and_send_msg(response)
-        finally:
-            self._scheduler.task_done(future)
+    def on_decoding_error(self, buffer: AnyStr, exc: BaseException):
+        self.logger.manage_error(exc)
+        response = self.action.response_on_decode_error(buffer, exc)
+        if response:
+            self.encode_and_send_msg(response)
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
             for msg in msgs:
-                msg_obj_cv.set(msg)
-                self._scheduler.create_task(self.action.asnyc_do_one(msg), callback=self.on_task_complete)
-        except Exception as e:
-            self.logger.error(e)
-            response = self.action.response_on_decode_error(buffer, e)
-            if response:
-                self.encode_and_send_msg(response)
+                self._scheduler.create_promise(self.action.asnyc_do_one(msg), self.on_success, self.on_exception,
+                                               msg_obj=msg)
+        except Exception as exc:
+            self.on_decoding_error(buffer, exc)

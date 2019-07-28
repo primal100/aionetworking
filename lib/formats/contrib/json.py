@@ -1,11 +1,13 @@
+from __future__ import annotations
 import json
+from dataclasses import dataclass
 
 from lib.formats.base import BaseTextCodec, BaseMessageObject
-
 
 from typing import AnyStr, Any
 
 
+@dataclass
 class JSONCodec(BaseTextCodec):
     """
     Decode & Encode JSON messages
@@ -23,6 +25,7 @@ class JSONCodec(BaseTextCodec):
         return json.dumps(decoded)
 
 
+@dataclass
 class JSONObject(BaseMessageObject):
     name = 'JSON'
     codec_cls = JSONCodec

@@ -6,7 +6,7 @@ from lib.conf.logging import Logger
 from lib.formats.base import BaseMessageObject
 
 from typing import Iterator, List, Any, AnyStr, TypeVar, Type
-from typing_extensions import Protocol      #3.8
+from typing_extensions import Protocol
 
 
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")

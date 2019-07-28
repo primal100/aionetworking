@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC
 from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,25 +7,29 @@ from pprint import pformat
 
 from lib import settings
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
+from lib.conf.types import ConnectionLoggerType
+from lib.networking.network_connections import connections_manager
 from lib.types import Type
 from lib.utils import Record, aone
 
-from typing import AsyncGenerator, Generator, Any, AnyStr, MutableMapping, Sequence, Generic, TypeVar
+from .protocols import MessageObject, Codec
+from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence
+from typing_extensions import Protocol
+from .types import MessageObjectType, CodecType
 
 
 @dataclass
-class BaseMessageObject(ABC):
+class BaseMessageObject(MessageObject, Protocol):
     name = None
     binary = True
-    supports_responses = False
     codec_cls = None
     id_attr = 'id'
     stats_logger = None
 
     encoded: AnyStr
     decoded: Any = None
-    context: MutableMapping = field(default_factory=dict)
-    logger: ConnectionLogger = field(default=connection_logger_receiver, compare=False, hash=False, repr=False)
+    context: Dict[str, Any] = field(default_factory=dict)
+    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
     received_timestamp: datetime = field(default_factory=datetime.now, compare=False)
 
     @classmethod
@@ -35,7 +38,7 @@ class BaseMessageObject(ABC):
         return definitions.DATA_FORMATS[name]
 
     @classmethod
-    def _get_codec_kwargs(cls) -> MutableMapping:
+    def _get_codec_kwargs(cls) -> Dict:
         return {}
 
     @classmethod
@@ -46,6 +49,19 @@ class BaseMessageObject(ABC):
     @property
     def sender(self) -> str:
         return self.context['alias']
+
+    @property
+    def full_sender(self) -> str:
+        return self.context['peer']
+
+    def is_subscribed(self, subscribe_key: Any) -> bool:
+        return connections_manager.peer_is_subscribed(self.full_sender, subscribe_key)
+
+    def subscribe(self, subscribe_key: Any) -> None:
+        connections_manager.subscribe(self.full_sender, subscribe_key)
+
+    def unsubscribe(self, subscribe_key: Any) -> None:
+        connections_manager.unsubscribe(self.full_sender, subscribe_key)
 
     @property
     def uid(self) -> Any:
@@ -89,21 +105,18 @@ class BufferObject(BaseMessageObject):
         return self._record.pack_client_msg(self)
 
 
-MessageObjectType = TypeVar('MessageObjectType', bound=BaseMessageObject)
-
-
 @dataclass
-class BaseCodec(Generic[MessageObjectType]):
+class BaseCodec(Codec):
     codec_name = ''
     read_mode = 'rb'
     write_mode = 'wb'
     append_mode = 'ab'
 
     msg_obj: Type[MessageObjectType]
-    context: MutableMapping = field(default_factory=dict)
-    logger: ConnectionLogger = field(default=connection_logger_receiver, compare=False, hash=False, repr=False)
+    context: Dict[str, Any] = field(default_factory=dict)
+    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
 
-    def set_context(self, context, logger=None):
+    def set_context(self, context, logger: ConnectionLoggerType = None) -> None:
         self.context.update(context)
         if logger:
             self.logger = logger
@@ -111,30 +124,26 @@ class BaseCodec(Generic[MessageObjectType]):
     def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         yield (encoded, encoded)
 
-    def encode(self, decoded, **kwargs):
+    def encode(self, decoded: Any, **kwargs) -> AnyStr:
         return decoded
 
-    def from_buffer(self, encoded, **kwargs) -> Generator[MessageObjectType, None, None]:
+    def _from_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
         for encoded, decoded in self.decode(encoded):
             yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
 
     def decode_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
-        for msg in self.from_buffer(encoded, **kwargs):
+        for msg in self._from_buffer(encoded, **kwargs):
             self.logger.on_msg_decoded(msg)
             yield msg
 
-    def from_decoded(self, decoded, **kwargs) -> MessageObjectType:
+    def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
         return self.msg_obj(self.encode(decoded), decoded, context=self.context, **kwargs)
-
-    def create_msg(self, decoded, **kwargs):
-        encoded = self.encode(decoded, **kwargs)
-        return self.msg_obj(encoded, decoded=decoded, context=self.context, **kwargs)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         self.logger.debug('Creating new %s message from %s', self.codec_name, file_path)
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
-        for item in self.from_buffer(encoded, **kwargs):
+        for item in self.decode_buffer(encoded, **kwargs):
             yield item
 
     async def one_from_file(self, file_path: Path, **kwargs) -> MessageObjectType:
@@ -146,5 +155,3 @@ class BaseTextCodec(BaseCodec):
     write_mode = 'w'
     append_mode = 'a'
 
-
-CodecType = TypeVar('CodecType', bound=BaseCodec)

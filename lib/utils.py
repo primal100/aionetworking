@@ -4,6 +4,7 @@ import os
 import struct
 import re
 import traceback
+import time
 
 
 from typing import Sequence, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING
@@ -11,6 +12,13 @@ from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
+
+
+###Coroutines###
+async def time_coro(coro):
+    start_time = time.time()
+    await coro
+    return time.time() - start_time
 
 
 ###Typing###
@@ -174,8 +182,12 @@ class Record:
             pos += bool_size
             seconds = struct.unpack("f", content[pos:pos + float_size])[0]
             pos += float_size
+            is_bytes = struct.unpack("?", content[pos:pos + bool_size])[0]
+            pos += bool_size
             pos, peer = unpack_variable_len_string(pos, content)
             pos, packet_data = unpack_variable_len_bytes(pos, content)
+            if not is_bytes:
+                packet_data = packet_data.decode()
             yield ({'sent_by_server': sent_by_server,
                     'seconds': seconds,
                     'peer': peer,
@@ -194,8 +206,14 @@ class Record:
         else:
             self.first_msg_time = msg.received_timestamp
             seconds = 0
-        return struct.pack('?', sent_by_server) + struct.pack('f', seconds) + pack_variable_len_string(
-            msg.sender.encode()) + pack_variable_len_string(msg.encoded)
+        if isinstance(msg.encoded, bytes):
+            is_bytes = True
+            encoded = msg.encoded
+        else:
+            is_bytes = False
+            encoded = msg.encoded.encode()
+        return struct.pack('?', sent_by_server) + struct.pack('f', seconds) + struct.pack('?', is_bytes) + pack_variable_len_string(
+            msg.sender.encode()) + pack_variable_len_string(encoded)
 
 
 def unpack_recorded_packets(content: bytes) -> Sequence[Tuple[int, AnyStr, bytes]]:

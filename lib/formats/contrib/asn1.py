@@ -1,4 +1,4 @@
-from abc import ABC
+from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 from pycrate_core.charpy import Charpy
@@ -6,13 +6,13 @@ from pycrate_core.charpy import Charpy
 from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
-from typing import Generator, Tuple, AnyStr, Any, Type
+from typing import Generator, Tuple, AnyStr, Any, Type, Dict
 from typing_extensions import Protocol
 
 
 class ASNProtocol(Protocol):
     @classmethod
-    def from_ber(cls, char, single: bool = False): ...
+    def from_ber(cls, char, single: bool = False) -> Any: ...
 
     @classmethod
     def to_ber(cls, decoded: AnyStr) -> AnyStr: ...
@@ -38,13 +38,13 @@ class PyCrateAsnCodec(BaseCodec):
         return self.asn_class.to_ber(decoded)
 
 
-class BaseAsnObject(BaseMessageObject, ABC):
+class BaseAsnObject(BaseMessageObject, Protocol):
     name = 'ASN.1'
     codec_cls = PyCrateAsnCodec
     asn_class = None
 
     @classmethod
-    def _get_codec_kwargs(cls) -> dict:
+    def _get_codec_kwargs(cls) -> Dict[str, Any]:
         return {'asn_class': cls.asn_class}
 
     @property

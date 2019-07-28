@@ -1,53 +1,48 @@
+from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from typing import Dict, Union
+from typing import Any, Union, DefaultDict
+
+from lib.factories import event_set
 
 
 @dataclass
 class Counter:
     num: int = 0
-    max: int = -1
-    is_zero: asyncio.Event = field(default_factory=asyncio.Event, init=False)
-    is_full: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+    is_zero: asyncio.Event = field(default_factory=event_set, init=False)
 
-    def increment(self):
+    def increment(self) -> None:
         self.is_zero.clear()
-        if not self.num == self.max:
-            self.num += 1
-            if self.num == self.max:
-                self.is_full.set()
+        self.num += 1
 
-    def decrement(self):
+    def decrement(self) -> None:
         if self.num <= 0:
             raise ValueError('counter decremented too many times')
         self.num -= 1
         if self.num == 0:
             self.is_zero.set()
-        self.is_full.clear()
 
-    async def wait_zero(self, timeout: Union[int, float] = None) -> None:
-        if self.num:
-            await asyncio.wait_for(self.is_zero.wait(), timeout=timeout)
-
-    async def wait_full(self, timeout: Union[int, float] = None) -> None:
-        if not self.num == self.max:
-            await asyncio.wait_for(self.is_full.wait(), timeout=timeout)
+    async def wait_zero(self) -> None:
+        await self.is_zero.wait()
 
 
-class Counters(Dict[int, Counter]):
-    def increment(self, key: int):
-        if key not in self:
-            self[key] = Counter()
+class Counters(DefaultDict[Any, Counter]):
+    default_factory = Counter
+
+    def __missing__(self, key):
+        result = self[key] = self.default_factory()
+        return result
+
+    def increment(self, key: Any) -> None:
         self[key].increment()
+        pass
 
-    def decrement(self, key: int):
+    def decrement(self, key: Any) -> None:
         self[key].decrement()
 
-    def get_num(self, key: int):
+    def get_num(self, key: Any) -> int:
         return self[key].num
 
-    async def wait_full(self, key: int, timeout: Union[int, float] = None):
-        await self[key].wait_full(timeout=timeout)
-
-    async def wait_zero(self, key: int, timeout: Union[int, float] = None):
-        await self[key].wait_zero(timeout=timeout)
+    async def wait_zero(self, key: Any, timeout: Union[int, float] = None):
+        counter = self[key]
+        await asyncio.wait_for(counter.wait_zero(), timeout=timeout)

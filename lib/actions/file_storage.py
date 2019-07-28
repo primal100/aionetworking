@@ -83,7 +83,7 @@ class ManagedFile:
         self.logger.debug('Waiting for writes to complete for %s', self.path)
         done, pending = await asyncio.wait([self._queue.join(), self._task], return_when=asyncio.FIRST_COMPLETED)
         for d in done:
-            if d.exception():
+            if d.exception():                       #3.8 assignment expressions
                 self.logger.error(d.exception())
         self.logger.debug('Writes completed for %s', self.path)
 

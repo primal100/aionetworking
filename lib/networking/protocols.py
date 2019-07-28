@@ -63,6 +63,14 @@ class NetworkConnectionProtocol(NetworkConnectionMixinProtocol, ConnectionProtoc
 NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=NetworkConnectionProtocol)
 
 
+class SimpleNetworkConnectionProtocol(Protocol):
+    peer_str: str
+    parent: int
+
+    @abstractmethod
+    def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
+
+
 class UDPConnectionMixinProtocol(Protocol):
     def set_transport(self, transport: asyncio.DatagramTransport): ...
 
@@ -133,7 +141,8 @@ class SenderAdaptorMixinProtocol(Protocol):
     def get_notification(self) -> MessageObjectType: ...
 
     @abstractmethod
-    async def wait_notifications(self) -> AsyncGenerator[MessageObjectType, None]: ...
+    async def wait_notifications(self) -> AsyncGenerator[MessageObjectType, None]:
+        yield
 
     @abstractmethod
     def all_notifications(self) -> Generator[MessageObjectType, None, None]: ...
@@ -163,7 +172,8 @@ class SenderAdaptorGetattr(SenderAdaptorMixinProtocol, Protocol):
 
     def get_notification(self) -> MessageObjectType: ...
 
-    async def wait_notifications(self) -> AsyncGenerator[MessageObjectType, None]: ...
+    async def wait_notifications(self) -> AsyncGenerator[MessageObjectType, None]:
+        yield
 
     def all_notifications(self) -> Generator[MessageObjectType, None, None]: ...
 

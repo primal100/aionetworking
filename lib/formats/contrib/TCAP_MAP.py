@@ -1,9 +1,12 @@
+from __future__ import annotations
 import binascii
+from dataclasses import dataclass
 from pycrate_asn1dir import TCAP_MAP
 from lib.formats.contrib.asn1 import BaseAsnObject
 from lib.utils import cached_property
 
 
+@dataclass
 class TCAPMAPASNObject(BaseAsnObject):
 
     asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
@@ -30,5 +33,5 @@ class TCAPMAPASNObject(BaseAsnObject):
         return binascii.hexlify(b'\x00\x00\x00\x00')
 
     @cached_property
-    def uid(self):
+    def uid(self) -> str:
         return self.otid.decode()

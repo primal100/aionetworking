@@ -6,14 +6,16 @@ from dataclasses import dataclass, field, replace
 from .exceptions import MessageFromNotAuthorizedHost
 
 from lib.formats.base import BaseMessageObject
-from lib.conf.logging import Logger, ConnectionLogger
+from lib.conf.logging import Logger
+from lib.conf.types import ConnectionLoggerType
 
 from .network_connections import connections_manager
-from .protocols import ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol, \
-    ConnectionGeneratorType, SenderAdaptorProtocolType, UDPConnectionMixinProtocol, \
-    AdaptorProtocolType
+from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
+from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol,
+                        AdaptorProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol)
+from .types import ConnectionGeneratorType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
-from typing import AnyStr, MutableMapping, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
+from typing import Any, AnyStr, Dict, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
 from typing_extensions import Protocol
 
 
@@ -29,10 +31,10 @@ class ConnectionGenerator(ConnectionGeneratorProtocol):
     connection: NetworkConnectionProtocol
     logger: Logger = Logger('receiver')
 
-    def __call__(self) -> NetworkConnectionProtocol:
+    def __call__(self) -> NetworkConnectionType:
         return self.connection.clone()
 
-    def is_owner(self, connection: NetworkConnectionProtocol) -> bool:
+    def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(id(self))
 
     async def close(self, timeout: Union[int, float] = None) -> None:
@@ -71,14 +73,14 @@ class UDPConnectionGenerator(asyncio.DatagramProtocol, ConnectionGenerator):
 
 
 @dataclass
-class BaseConnectionProtocol(AdaptorProtocolType, ConnectionProtocol, Protocol):
+class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protocol):
     name = ''
-    adaptor_cls: Type[AdaptorProtocolType] = None
+    adaptor_cls: Type[AdaptorType] = None
     action = None
     requester = None
     dataformat: Type[BaseMessageObject] = None
-    adaptor: AdaptorProtocolType = field(default=None)
-    context: MutableMapping = field(default_factory=dict)
+    adaptor: AdaptorType = field(default=None)
+    context: Dict[str, Any] = field(default_factory=dict)
     logger: Logger = Logger('receiver')
     parent: int = None
     timeout: Union[int, float] = 5
@@ -87,10 +89,10 @@ class BaseConnectionProtocol(AdaptorProtocolType, ConnectionProtocol, Protocol):
         if self.adaptor:
             return getattr(self.adaptor, item)
 
-    def update_context(self):
+    def update_context(self) -> None:
         self.context['protocol_name'] = self.name
 
-    def initialize(self):
+    def initialize(self) -> None:
         self.update_context()
         self.set_adaptor()
         connections_manager.add_connection(self)
@@ -110,10 +112,10 @@ class BaseConnectionProtocol(AdaptorProtocolType, ConnectionProtocol, Protocol):
         else:
             self.adaptor = self._get_sender_adaptor(**kwargs)
 
-    def _get_receiver_adaptor(self, **kwargs) -> AdaptorProtocolType:
+    def _get_receiver_adaptor(self, **kwargs) -> AdaptorType:
         return self.adaptor_cls(action=self.action, **kwargs)
 
-    def _get_sender_adaptor(self, **kwargs) -> SenderAdaptorProtocolType:
+    def _get_sender_adaptor(self, **kwargs) -> SenderAdaptorType:
         return self.adaptor_cls(requester=self.requester, **kwargs)
 
     def clone(self: ConnectionType) -> ConnectionType:
@@ -122,8 +124,8 @@ class BaseConnectionProtocol(AdaptorProtocolType, ConnectionProtocol, Protocol):
     def is_child(self, parent_id: int) -> bool:
         return parent_id == self.parent
 
-    def get_connection_logger(self) -> ConnectionLogger:
-        return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, context=self.context)
+    def get_connection_logger(self) -> ConnectionLoggerType:
+        return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, extra=self.context)
 
     def delete_connection(self, fut: asyncio.Future) -> None:
         connections_manager.remove_connection(self)
@@ -177,11 +179,17 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
             return self._get_alias(peer)
         self._raise_message_from_not_authorized_host(peer)
 
-    def update_context(self):
+    def update_context(self) -> None:
         super().update_context()
-        self.context['peer'] = self.peer_str
-        self.context['sock'] = self.sock_str
-        self.context['alias'] = self.alias
+        self.context.update({
+            'peer': self.peer_str,
+            'host': self.peer[0],
+            'port': self.peer[1],
+            'sock': self.sock_str,
+            'alias': self.alias
+        })
+        if self.alias and self.alias not in self.peer_str:
+            self.context['peer'] = f"{self.alias}({self.peer_str})"
 
     def initialize_connection(self, peer: Tuple[str, int], sock:  Tuple[str, int], ) -> bool:
         self.peer = peer
@@ -197,7 +205,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
             return False
 
 
-class TCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
+class BaseTCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
     transport: asyncio.Transport = None
 
     def connection_made(self, transport: asyncio.Transport) -> None:
@@ -223,7 +231,7 @@ class TCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
         self.transport.writelines(data_list)
 
 
-class UDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
+class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
 
     def set_transport(self, transport: asyncio.DatagramTransport):
         self.transport = transport
@@ -234,3 +242,27 @@ class UDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
     def send_many(self, data_list: List[bytes]) -> None:
         data = b''.join(data_list)
         self.send(data)
+
+
+class OneWayTCPServer(BaseTCPConnection):
+    adaptor_cls = OneWayReceiverAdaptor
+
+
+class TCPServer(BaseTCPConnection):
+    adaptor_cls = ReceiverAdaptor
+
+
+class TCPClient(BaseTCPConnection):
+    adaptor_cls = SenderAdaptor
+
+
+class OneWayUDPServer(BaseUDPConnection):
+    adaptor_cls = OneWayReceiverAdaptor
+
+
+class UDPServer(BaseUDPConnection):
+    adaptor_cls = ReceiverAdaptor
+
+
+class UDPClient(BaseUDPConnection):
+    adaptor_cls = SenderAdaptor

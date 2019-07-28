@@ -1,9 +1,8 @@
 import pytest
-import asyncio
 from pathlib import Path
 
 from lib.actions.file_storage import ManagedFile
-from lib.utils import alist
+from lib.utils import alist, Record
 
 
 class TestASNFileStorage:
@@ -96,6 +95,18 @@ class TestASNBufferedFileStorage:
         msgs = await alist(asn_codec.from_file(expected_file))
         assert msgs == asn_objects
 
+    @pytest.mark.asyncio
+    async def test_02_pre_action(self, tmp_path, buffered_file_storage_pre_action_binary, buffer_object_asn1,
+                                 buffer_object_asn2, asn1_recording, asn1_recording_data):
+        buffered_file_storage_pre_action_binary.do_many([buffer_object_asn1])
+        buffered_file_storage_pre_action_binary.do_many([buffer_object_asn2])
+        await buffered_file_storage_pre_action_binary.close()
+        expected_file = Path(tmp_path / '127.0.0.1.recording')
+        assert expected_file.exists()
+        packets = list(Record.from_file(expected_file))
+        assert packets == asn1_recording_data
+        assert expected_file.read_bytes() == asn1_recording
+
 
 class TestJsonFileStorage:
 
@@ -157,3 +168,15 @@ class TestJsonBufferedFileStorage:
         assert expected_file.read_text() == json_buffer
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects
+
+    @pytest.mark.asyncio
+    async def test_02_pre_action(self, tmp_path, buffered_file_storage_pre_action_text, buffer_object_json1,
+                                 buffer_object_json2, json_recording, json_recording_data):
+        buffered_file_storage_pre_action_text.do_many([buffer_object_json1])
+        buffered_file_storage_pre_action_text.do_many([buffer_object_json2])
+        await buffered_file_storage_pre_action_text.close()
+        expected_file = Path(tmp_path / '127.0.0.1.recording')
+        assert expected_file.exists()
+        packets = list(Record.from_file(expected_file))
+        assert packets == json_recording_data
+        assert expected_file.read_bytes() == json_recording

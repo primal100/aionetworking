@@ -10,16 +10,11 @@ from pydantic import ValidationError
 from lib.networking.network_connections import connections_manager
 from lib.utils import log_exception
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
-from lib.wrappers.periodic import call_cb_periodic
 
 
-from typing import TYPE_CHECKING, ClassVar, Type, Optional, MutableMapping, AnyStr, Iterable, Generator, Any, Tuple
-from typing_extensions import Literal
-
-if TYPE_CHECKING:
-    from lib.formats.base import BaseMessageObject
-else:
-    BaseMessageObject = None
+from typing import ClassVar, Type, Optional, Dict, AnyStr, Iterable, Generator, Any
+from lib.formats.types import MessageObjectType
+from .types import ConnectionLoggerType
 
 
 class BaseLogger(ABC, logging.LoggerAdapter):
@@ -29,12 +24,12 @@ class BaseLogger(ABC, logging.LoggerAdapter):
     datefmt: str = '%Y-%M-%d %H:%M:%S'
     extra: dict = field(default_factory=dict)
 
-    def __init__(self, logger_name, datefmt='%Y-%M-%d %H:%M:%S', extra=None, connection_logger_cls=None):
+    def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None,
+                 connection_logger_cls: Type[ConnectionLoggerType] = None):
         self.logger_name = logger_name
         self.datefmt = datefmt
-        self.extra = extra or {}
         logger = logging.getLogger(logger_name)
-        super().__init__(logger, extra)
+        super().__init__(logger, extra or {})
         self.connection_logger_cls = connection_logger_cls
         if not self.connection_logger_cls:
             self.connection_logger_cls = self.get_connection_logger_cls()
@@ -68,7 +63,7 @@ class BaseLogger(ABC, logging.LoggerAdapter):
     def get_sibling(self, name: str = '', **kwargs) -> BaseLogger: ...
 
     @abstractmethod
-    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, context: MutableMapping = None, **kwargs) -> Any: ...
+    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, extra: Dict[str, Any] = None, **kwargs) -> Any: ...
 
 
 class Logger(BaseLogger):
@@ -123,10 +118,9 @@ class Logger(BaseLogger):
         name = f'{self.logger.parent.name}.{name}'
         return self.get_logger(*args, name=name, **kwargs)
 
-    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, context: MutableMapping = None, **kwargs) -> Any:
+    def get_logger(self, name: str = '', cls: Type[BaseLogger] = None, extra: Dict[str, Any] = None, **kwargs) -> Any:
         cls = cls or self.__class__
-        context = context or {}
-        extra = ChainMap(context, self.extra)
+        extra = ChainMap(extra or {}, self.extra)
         return cls(name, connection_logger_cls=self.connection_logger_cls, extra=extra, **kwargs)
 
     def log_num_connections(self, action: str, parent_id: int):
@@ -138,9 +132,8 @@ class Logger(BaseLogger):
 class ConnectionLogger(Logger):
     _is_closing = False
 
-    def __init__(self, *args, is_receiver: bool = False, extra: MutableMapping = None, **kwargs):
-        extra = extra or {}
-        extra = self.get_extra(extra, is_receiver)
+    def __init__(self, *args, is_receiver: bool = False, extra: Dict[str, Any] = None, **kwargs):
+        extra = self.get_extra(extra or {}, is_receiver)
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling(name='raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling(name='raw_sent', cls=Logger)
@@ -151,29 +144,16 @@ class ConnectionLogger(Logger):
     def __get_validators__(cls):
         yield cls.validate_new
 
-
-    @staticmethod
-    def tuple_to_str(t: Tuple[Any, Any]):
-        return ':'.join([str(s) for s in t])
-
-    def get_extra(self, context: MutableMapping, is_server: bool):
-        alias, peer, sock = context.get('alias', ''), context.get('peer', ('', '')), context.get('sock', ('', ''))
-        peer_str = self.tuple_to_str(peer)
-        sock_str = self.tuple_to_str(sock)
-        if alias and alias not in peer_str:
-            peer_str = f"{alias}({peer_str})"
-        context.update({
-            'peer_ip': peer[0],
-            'peer_port': peer[1],
-            'other': peer_str,
-            'own': sock_str,
-            'server': sock_str if is_server else peer_str,
-            'client': peer_str if is_server else sock_str
+    def get_extra(self, extra: Dict[str, Any], is_receiver: bool):
+        extra = extra.copy()
+        extra.update({
+            'server': extra.get('sock', '') if is_receiver else extra['peer'],
+            'client': extra.get('peer', '') if is_receiver else extra['sock']
         })
-        return context
+        return extra
 
-    def msg_logger(self, msg: BaseMessageObject) -> BaseLogger:
-        return self.get_sibling('msg', context={'msg_obj': msg})
+    def msg_logger(self, msg: MessageObjectType) -> BaseLogger:
+        return self.get_sibling('msg', extra={'msg_obj': msg})
 
     @property
     def connection_type(self) -> str:
@@ -201,11 +181,11 @@ class ConnectionLogger(Logger):
     def _raw_sent(self, data: AnyStr, *args, **kwargs) -> None:
         self._raw_sent_logger.debug(data, *args, **kwargs)
 
-    def _data_received(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> None:
+    def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_received_logger.debug(msg, *args, extra=extra, **kwargs)
 
-    def _data_sent(self, msg_obj: BaseMessageObject, *args, msg: str = '', **kwargs) -> None:
+    def _data_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         extra = ChainMap({'data': msg_obj}, self.extra)
         self._data_sent_logger.debug(msg, *args, extra=extra, **kwargs)
 
@@ -216,18 +196,18 @@ class ConnectionLogger(Logger):
         self.debug("Received msg from %s", self.alias)
         self._raw_received(data)
 
-    def on_msg_decoded(self, msg_obj: BaseMessageObject) -> None:
+    def on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
         self._data_received(msg_obj)
 
-    def log_decoded_msgs(self, msgs: Iterable[BaseMessageObject]) -> None:
+    def log_decoded_msgs(self, msgs: Iterable[MessageObjectType]) -> None:
         for msg_obj in msgs:
             self.on_msg_decoded(msg_obj)
 
-    def log_buffer(self, msgs: Iterable[BaseMessageObject]) -> None:
+    def log_buffer(self, msgs: Iterable[MessageObjectType]) -> None:
         self.logger.debug('Buffer contains %s', p.no('message', msgs))
         self.logger.log_decoded_msgs(msgs)
 
-    def on_sending_decoded_msg(self, msg_obj: BaseMessageObject) -> None:
+    def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)
 
     def on_sending_encoded_msg(self, data: AnyStr) -> None:
@@ -259,7 +239,7 @@ class StatsTracker(_StatsTracker):
     def reset(self) -> _StatsTracker:
         return self.__class__(self.properties, self.datefmt)
 
-    def __init__(self, properties: MutableMapping, datefmt: str ="%Y-%M-%d %H:%M:%S"):
+    def __init__(self, properties: Dict, datefmt: str ="%Y-%M-%d %H:%M:%S"):
         super().__init__()
         self.datefmt = datefmt
         self.properties = properties
@@ -391,5 +371,9 @@ class ConnectionLoggerStats(ConnectionLogger):
         self.check_last_message_processed()
 
 
-def connection_logger_receiver():
-    return ConnectionLogger('receiver.connection', is_receiver=True, context={})
+def connection_logger_receiver() -> ConnectionLoggerType:
+    return ConnectionLogger('receiver.connection', is_receiver=True)
+
+
+def connection_logger_sender() -> ConnectionLoggerType:
+    return ConnectionLogger('sender.connection', is_receiver=False)
