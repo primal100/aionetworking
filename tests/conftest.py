@@ -10,11 +10,13 @@ from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
 from pathlib import Path
 
 from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
-from lib.actions.jsonrpc import SampleJSONRPCServer
+from lib.actions.jsonrpc import JSONRPCServer
+from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
 #from lib.requesters.jsonrpc import SampleJSONRPCClient
 from lib.conf.types import ConnectionLoggerType, LoggerType
 from lib.conf.logging import ConnectionLogger, Logger
 from lib.formats.contrib.json import JSONObject, JSONCodec
+from lib.formats.contrib.types import JSONObjectType
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.base import BufferObject
@@ -27,6 +29,27 @@ from lib.wrappers.schedulers import TaskScheduler
 from tests.mock import MockTCPTransport, MockDatagramTransport
 
 from typing import Dict, Any, List, Tuple, Union, Callable, AsyncGenerator
+
+
+@pytest.fixture
+def response(request):
+    if request.param:                               #3.8 assignment expression
+        return request.getfixturevalue(request.param)
+    return request.param
+
+
+@pytest.fixture
+def notification(request):
+    if request.param:                               #3.8 assignment expression
+        return request.getfixturevalue(request.param)
+    return request.param
+
+
+@pytest.fixture
+def items(request):
+    if request.param:                               #3.8 assignment expression
+        return request.getfixturevalue(request.param)
+    return request.param
 
 
 @pytest.fixture
@@ -56,15 +79,9 @@ def sender_connection_logger(sender_logger, context) -> ConnectionLogger:
 
 
 @pytest.fixture
-def asn_codec_empty_context(context) -> PyCrateAsnCodec:
-    return PyCrateAsnCodec(TCAPMAPASNObject, context={},
+def asn_codec(context) -> PyCrateAsnCodec:
+    return PyCrateAsnCodec(TCAPMAPASNObject, context=context,
                            asn_class=TCAPMAPASNObject.asn_class)
-
-
-@pytest.fixture
-def asn_codec(asn_codec_empty_context, context) -> PyCrateAsnCodec:
-    asn_codec_empty_context.set_context(context)
-    return asn_codec_empty_context
 
 
 @pytest.fixture
@@ -154,14 +171,48 @@ def json_codec_no_context() -> JSONCodec:
 
 
 @pytest.fixture
-def json_codec(json_codec_no_context, context) -> JSONCodec:
-    json_codec_no_context.set_context(context)
-    return json_codec_no_context
+def json_codec(context) -> JSONCodec:
+    return JSONCodec(JSONObject, context=context)
 
 
 @pytest.fixture
-def json_rpc_action() -> SampleJSONRPCServer:
-    return SampleJSONRPCServer(timeout=3)
+def default_notes(user1) -> Dict:
+    return {0: {'id': 0, 'name': '1stnote', 'text': 'Hello, World!', 'user': user1[0]}}
+
+
+@pytest.fixture
+def after_create_notes(user1, default_notes) -> Dict:
+    notes = default_notes.copy()
+    notes.update({1: {'id': 1, 'name': 'Hello', 'text': 'This is my second note', 'user': user1[0]}})
+    return notes
+
+
+@pytest.fixture
+def after_update_notes(user1) -> Dict:
+    return {0: {'id': 0, 'name': '1stnote', 'text': 'Updating my first note', 'user': user1[0]}}
+
+
+@pytest.fixture
+def json_rpc_app(user1, user2, default_notes) -> SampleJSONRPCServer:
+    app = SampleJSONRPCServer(notes=default_notes.copy())
+    app.add_user(*user1)
+    app.add_user(*user2)
+    return app
+
+
+@pytest.fixture
+async def json_rpc_action(json_rpc_app, connections_manager_with_connection) -> JSONRPCServer:
+    action = JSONRPCServer(app=json_rpc_app, connections_manager=connections_manager_with_connection, timeout=3)
+    yield action
+    await action.close()
+
+
+@pytest.fixture
+async def json_rpc_action_no_process_queue(json_rpc_app) -> JSONRPCServer:
+    action = JSONRPCServer(app=json_rpc_app, timeout=3, start_task=False)
+    yield action
+    await asyncio.wait_for(action.close(), timeout=1)
+
 
 """
 @pytest.fixture
@@ -271,12 +322,271 @@ def json_decoded_multi() -> List[dict]:
 
 
 @pytest.fixture
-def json_rpc_request() -> dict:
-    return {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': ['abcd']}
+def user1() -> Tuple[str, str]:
+    return 'user1', 'password'
 
 
 @pytest.fixture
-def json_object(json_one_encoded, json_rpc_request, timestamp, context) -> JSONObject:
+def user2() -> Tuple[str, str]:
+    return 'user2', 'password'
+
+
+@pytest.fixture
+def user1_context(context, user1) -> Dict:
+    c = context.copy()
+    c['user'] = user1[0]
+    return c
+
+
+@pytest.fixture
+def user2_context(context, user2) -> Dict:
+    c = context.copy()
+    c['user'] = user2[1]
+    return c
+
+
+@pytest.fixture
+def user1_codec(json_codec, user1) -> JSONCodec:
+    json_codec.context['user'] = user1[0]
+    return json_codec
+
+
+@pytest.fixture
+def user2_codec(json_codec, user2) -> JSONCodec:
+    json_codec.context['user'] = user2[0]
+    return json_codec
+
+
+@pytest.fixture
+def json_rpc_login_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user1}
+
+
+@pytest.fixture
+def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp) -> JSONObject:
+    return json_codec.from_decoded(json_rpc_login_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user1[0], 'message': 'Login successful'}}
+
+
+@pytest.fixture
+def json_rpc_login_response_object(json_rpc_login_response, user1_codec, timestamp) -> JSONObject:
+    return user1_codec.from_decoded(json_rpc_login_response, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_request_user2(user2) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user1}
+
+
+@pytest.fixture
+def json_rpc_login_request_object_user2(json_rpc_login_request_user2, json_codec, timestamp) -> JSONObject:
+    return json_codec.from_decoded(json_rpc_login_request_user2, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_response_user2(user2) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user2[0], 'message': 'Login successful'}}
+
+
+@pytest.fixture
+def json_rpc_login_response_object_user2(json_rpc_login_response_user2, user2_codec, timestamp) -> JSONObject:
+    return user2_codec.from_decoded(json_rpc_login_response_user2, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_logout_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'logout'}
+
+@pytest.fixture
+def json_rpc_logout_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user1[0], 'message': 'Logout successful'}}
+
+
+@pytest.fixture
+def json_rpc_create_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'create', 'params': ('Hello', 'This is my second note')}
+
+
+@pytest.fixture
+def json_rpc_create_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'id': 1, 'user': user1[0], 'message': 'New note has been created'}}
+
+
+@pytest.fixture
+def json_rpc_create_notification(user1) -> Dict:
+    return {'jsonrpc': "2.0", 'result': {'id': 1, 'message': 'New note has been created', 'user': 'user1'}}
+
+
+@pytest.fixture
+def json_rpc_update_notification(user1) -> Dict:
+    return {'jsonrpc': "2.0", 'result': {'id': 0, 'message': 'Note has been updated', 'user': 'user1'}}
+
+
+@pytest.fixture
+def json_rpc_delete_notification(user1) -> Dict:
+    return {'jsonrpc': "2.0", 'result': {'id': 0, 'message': 'Note has been deleted', 'user': 'user1'}}
+
+
+@pytest.fixture
+def json_rpc_update_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'update', 'params': {'id': 0, 'text': 'Updating my first note'}}
+
+
+@pytest.fixture
+def json_rpc_update_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'id': 0, 'user': user1[0], 'message': 'Note has been updated'}}
+
+
+@pytest.fixture
+def json_rpc_delete_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'delete', 'params': (0,)}
+
+
+@pytest.fixture
+def json_rpc_delete_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'id': 0, 'user': user1[0], 'message': 'Note has been deleted'}}
+
+
+@pytest.fixture
+def json_rpc_get_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'get', 'params': (0,)}
+
+
+@pytest.fixture
+def json_rpc_get_response(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1,
+            'result': {'id': 0, 'user': user1[0], 'name': '1stnote', 'text': 'Hello, World!'}}
+
+
+@pytest.fixture
+def json_rpc_get_request_no_object(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'get', 'params': (3,)}
+
+
+
+@pytest.fixture
+def json_rpc_subscribe_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'method': 'subscribe_to_user', 'params': (user1[0],)}
+
+
+@pytest.fixture
+def json_rpc_subscribe_request_object(json_rpc_subscribe_request, user2_codec, timestamp) -> JSONObject:
+    return user2_codec.from_decoded(json_rpc_subscribe_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_unsubscribe_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'method': 'unsubscribe_from_user', 'params': (user1[0],)}
+
+
+@pytest.fixture
+def json_rpc_unsubscribe_request_object(json_rpc_unsubscribe_request, user2_codec, timestamp) -> JSONObject:
+    return user2_codec.from_decoded(json_rpc_unsubscribe_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_wrong_password(user1) -> dict:
+    user = user1[0], 'abcd1234'
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user}
+
+
+@pytest.fixture
+def json_rpc_login_wrong_user_response() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'code': -30000, 'message': 'Login failed'}}
+
+
+@pytest.fixture
+def json_rpc_login_wrong_user_response() -> dict:
+    user = ('user3', 'abcd1234')
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user}
+
+
+@pytest.fixture
+def json_rpc_invalid_login_request_object(json_rpc_login_invalid, user1_codec, timestamp) -> JSONObject:
+    return user1_codec.from_decoded(json_rpc_login_invalid, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_invalid_login_response() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'code': -30000, 'message': 'Login failed'}}
+
+
+@pytest.fixture
+def json_rpc_invalid_login_response_object(json_rpc_invalid_login_response, user1_codec, timestamp) -> JSONObject:
+    return user1_codec.from_decoded(json_rpc_invalid_login_response, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_wrong_method_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'creat', 'params': ('Hello', 'This is my second note')}
+
+
+@pytest.fixture
+def json_rpc_wrong_method_response() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'code': -30601, 'message': 'Method not found'}}
+
+
+@pytest.fixture
+def json_rpc_authorisation_error() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {'code': -30601, 'message': 'Method not found'}}
+
+
+@pytest.fixture
+def json_rpc_invalid_params_request(user1) -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user1[0]}
+
+
+@pytest.fixture
+def json_rpc_invalid_params_response() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {"code": -32602, "message": "Invalid params"}}
+
+
+@pytest.fixture
+def json_rpc_permissions_error_response() -> dict:
+    return {'jsonrpc': "2.0", 'id': 1, 'result': {"code": -30001, "message": "You do not have permissions to perform this action"}}
+
+
+@pytest.fixture
+def json_rpc_object_no_user(json_codec, request) -> JSONObjectType:
+    if request.param:
+        return json_codec.from_decoded(request.getfixturevalue(request.param), received_timestamp=timestamp)
+    return request.param
+
+
+@pytest.fixture
+def subscribe_key() -> str:
+    return "user_user1"
+
+
+@pytest.fixture
+def json_rpc_object_user1(user1_codec, request) -> JSONObjectType:
+    return user1_codec.from_decoded(request.getfixturevalue(request.param), received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_object_user1_response(user1_codec, request) -> JSONObjectType:
+    return user1_codec.from_decoded(request.getfixturevalue(request.param), received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_object_user(request, json_codec, json_rpc_object_no_user, json_rpc_object_user1, json_rpc_object_user1_response, timestamp):
+    user, fixture = request.param
+    json_object = json_codec.from_decoded(request.getfixturevalue(fixture, received_timestamp=timestamp))
+    fixture['context']['user'] = user
+    return fixture
+
+
+@pytest.fixture
+def json_rpc_object_user2(user2_codec, request):
+    return user2_codec.from_decoded(request.getfixturevalue(request.param), received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_object(json_one_encoded, json_rpc_request, timestamp) -> JSONObject:
     return JSONObject(json_one_encoded, json_rpc_request, context=context, received_timestamp=timestamp)
 
 
@@ -435,13 +745,20 @@ class SimpleNetworkConnection:
 
 
 @pytest.fixture
-def simple_network_connections(deque) -> List[SimpleNetworkConnection]:
-    return [SimpleNetworkConnection('127.0.0.1:8888', 1, deque), SimpleNetworkConnection('127.0.0.1:4444', 1, deque)]
+def simple_network_connections(deque, peer_str) -> List[SimpleNetworkConnection]:
+    return [SimpleNetworkConnection(peer_str, 1, deque), SimpleNetworkConnection('127.0.0.1:4444', 1, deque)]
 
 
 @pytest.fixture
 def simple_network_connection(simple_network_connections) -> SimpleNetworkConnection:
     return simple_network_connections[0]
+
+
+@pytest.fixture
+def connections_manager_with_connection(simple_network_connection) -> ConnectionsManager:
+    cm = ConnectionsManager()
+    cm.add_connection(simple_network_connection)
+    return cm
 
 
 @pytest.fixture

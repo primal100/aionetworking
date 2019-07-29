@@ -59,9 +59,6 @@ class BufferObjectProtocol(MessageObject, Protocol):
 class Codec(Protocol):
 
     @abstractmethod
-    def set_context(self, context, logger: ConnectionLogger = None) -> None: ...
-
-    @abstractmethod
     def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]: ...
 
     @abstractmethod

@@ -118,11 +118,6 @@ class BaseCodec(Codec):
     context: Dict[str, Any] = field(default_factory=dict)
     logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
 
-    def set_context(self, context, logger: ConnectionLoggerType = None) -> None:
-        self.context.update(context)
-        if logger:
-            self.logger = logger
-
     def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         yield (encoded, encoded)
 
