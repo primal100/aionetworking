@@ -6,7 +6,7 @@ from lib.actions.base import BaseAction
 from lib.formats.contrib.types import JSONObjectType
 from lib.networking.network_connections import connections_manager, ConnectionsManager
 
-from typing import Any, Dict, AnyStr, NoReturn
+from typing import Any, Dict, AnyStr, NoReturn, Tuple
 
 
 class MethodNotFoundError(BaseException):
@@ -32,8 +32,7 @@ class JSONRPCServer(BaseAction):
         'InternalError': {"code": -32603, "message": "Invalid params"},
         'ParseError': {"code": -32700, "message": "Parse error"}
     }
-    _notifications_queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False)
-    connections_manager: ConnectionsManager = connections_manager
+    _notifications_queue: asyncio.Queue[Tuple[str, Any]] = field(default_factory=asyncio.Queue, init=False)
     task: asyncio.Task = field(default=None, init=False)
     start_task: InitVar[bool] = True
 
@@ -44,27 +43,30 @@ class JSONRPCServer(BaseAction):
     async def close(self) -> None:
         if hasattr(self.app, 'close_app'):
             await self.app.close_app()
+        await asyncio.wait((super().close(), self._notifications_queue.join()), timeout=self.timeout)
         if self.task:
             self.task.cancel()
-        await asyncio.wait((super().close(), self._notifications_queue.join(), self.task), timeout=self.timeout)
+
+    def create_notification(self, result: Any):
+        return {'jsonrpc': self.version, 'result': result}
 
     async def manage_queue(self):
         while True:
             key, result = await self._notifications_queue.get()
             try:
-                item = {'jsonrpc': self.version, 'result': result}
+                item = self.create_notification(result)
                 self.logger.debug('Sending notification for key %s', key)
-                self.connections_manager.notify(key, item)
+                connections_manager.notify(key, item)
             finally:
                 self._notifications_queue.task_done()
 
     @staticmethod
-    def raise_correct_exception(exc: Exception) -> NoReturn:
+    def _raise_correct_exception(exc: BaseException) -> NoReturn:
         if "positional argument" or "keyword argument" in str(exc):
             raise InvalidParamsError
         raise exc
 
-    async def async_do_one(self, msg: JSONObjectType) -> Dict[str, Any]:
+    async def asnyc_do_one(self, msg: JSONObjectType) -> Dict[str, Any]:
         try:
             if msg['jsonrpc'] != self.version:
                 raise InvalidRequestError
@@ -88,12 +90,12 @@ class JSONRPCServer(BaseAction):
             if request_id is not None:
                 return {'jsonrpc': self.version, 'result': result, 'id': request_id}
         except TypeError as exc:
-            self.raise_correct_exception(exc)
+            self._raise_correct_exception(exc)
 
     def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Dict:
         return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError')}
 
-    def get_exception_details(self, exc: BaseException):
+    def _get_exception_details(self, exc: BaseException):
         exc_name = exc.__class__.__name__
         error = getattr(self.app, 'exception_codes', {}).get(exc_name, None)
         if error:
@@ -104,5 +106,5 @@ class JSONRPCServer(BaseAction):
 
     def response_on_exception(self, msg_obj: JSONObjectType, exc: BaseException) -> Dict[str, Any]:
         request_id = msg_obj.get('id', None)
-        error = self.get_exception_details(exc)
+        error = self._get_exception_details(exc)
         return {"jsonrpc": self.version, "error": error, "id": request_id}

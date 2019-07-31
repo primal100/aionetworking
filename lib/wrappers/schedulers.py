@@ -45,11 +45,10 @@ class TaskScheduler:
             self.task_done(future)
 
     def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, **kwargs):
-        task = self.create_task(coro)
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        task.add_done_callback(self._process_promise_result)
+        task = self.create_task(coro, self._process_promise_result)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()
@@ -82,8 +81,7 @@ class TaskScheduler:
     async def close(self, timeout: Union[int, float] = None):
         for task in self._periodic_tasks:
             task.cancel()
-        futs = [self.join()] + self._periodic_tasks
-        return await asyncio.wait(futs, timeout=timeout)
+        await asyncio.wait_for(self.join(), timeout=timeout)
 
     @staticmethod
     def get_next_time(delay: Union[int, float], current_time: datetime = None) -> float:

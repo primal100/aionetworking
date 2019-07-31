@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, DefaultDict
 
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.wrappers.counters import Counters
@@ -11,7 +11,12 @@ from lib.factories import list_defaultdict
 class ConnectionsManager:
     _connections: Dict[str, SimpleNetworkConnectionType] = field(init=False, default_factory=dict)
     _counters: Counters = field(init=False, default_factory=Counters)
-    _subscriptions: Dict[Any, List[SimpleNetworkConnectionType]] = field(init=False, default_factory=list_defaultdict)
+    _subscriptions: DefaultDict[Any, List[SimpleNetworkConnectionType]] = field(init=False, default_factory=list_defaultdict)
+
+    def clear(self):
+        self._connections.clear()
+        self._counters.clear()
+        self._subscriptions.clear()
 
     def add_connection(self, connection: SimpleNetworkConnectionType) -> None:
         self._connections[connection.peer_str] = connection
@@ -37,7 +42,7 @@ class ConnectionsManager:
             pass
 
     def is_subscribed(self, connection: SimpleNetworkConnectionType, subscribe_key: str):
-        return connection in self._subscriptions[subscribe_key]
+        return connection in self._subscriptions.get(subscribe_key, [])
 
     def peer_is_subscribed(self, peer_str: str,  subscribe_key: str):
         connection = self.get(peer_str)

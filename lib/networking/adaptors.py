@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import asyncio
 import binascii
-import contextvars
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
@@ -20,9 +19,6 @@ from .protocols import AdaptorProtocol
 from pathlib import Path
 from typing import Any, AnyStr, Awaitable, AsyncGenerator, Callable, Generator, Iterator, List, Dict, Sequence, Type, Optional, Union
 from typing_extensions import Protocol
-
-
-msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -181,16 +177,17 @@ class OneWayReceiverAdaptor(BaseReceiverAdaptor):
 class ReceiverAdaptor(OneWayReceiverAdaptor):
     action: ParallelAction = None
 
-    def on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
+    def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         self.logger.manage_error(exc)
         response = self.action.response_on_exception(msg_obj, exc)
-        self.encode_and_send_msg(response)
+        if response:
+            self.encode_and_send_msg(response)
 
-    def on_success(self, result, msg_obj: MessageObjectType = None) -> None:
+    def _on_success(self, result, msg_obj: MessageObjectType = None) -> None:
         if result:
             self.encode_and_send_msg(result)
 
-    def on_decoding_error(self, buffer: AnyStr, exc: BaseException):
+    def _on_decoding_error(self, buffer: AnyStr, exc: BaseException):
         self.logger.manage_error(exc)
         response = self.action.response_on_decode_error(buffer, exc)
         if response:
@@ -199,7 +196,7 @@ class ReceiverAdaptor(OneWayReceiverAdaptor):
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
             for msg in msgs:
-                self._scheduler.create_promise(self.action.asnyc_do_one(msg), self.on_success, self.on_exception,
+                self._scheduler.create_promise(self.action.asnyc_do_one(msg), self._on_success, self._on_exception,
                                                msg_obj=msg)
         except Exception as exc:
-            self.on_decoding_error(buffer, exc)
+            self._on_decoding_error(buffer, exc)

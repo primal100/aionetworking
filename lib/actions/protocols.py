@@ -2,10 +2,9 @@ from __future__ import annotations
 from abc import abstractmethod
 import warnings
 
-from lib.conf.logging import Logger
-from lib.formats.base import BaseMessageObject
+from lib.formats.types import MessageObjectType
 
-from typing import Iterator, List, Any, AnyStr, TypeVar, Type
+from typing import Iterator, Any, AnyStr, TypeVar
 from typing_extensions import Protocol
 
 
@@ -18,26 +17,26 @@ ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 class BaseActionProtocol(Protocol):
 
     @abstractmethod
-    def filter(self, msg: BaseMessageObject) -> bool: ...
+    def filter(self, msg: MessageObjectType) -> bool: ...
 
     @abstractmethod
     async def close(self) -> None: ...
 
 
 class ParallelAction(BaseActionProtocol, Protocol):
-    async def asnyc_do_one(self, msg: BaseMessageObject) -> Any: ...
+    async def asnyc_do_one(self, msg: MessageObjectType) -> Any: ...
 
     @abstractmethod
     def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Any: ...
 
     @abstractmethod
-    def response_on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any: ...
+    def response_on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any: ...
 
 
 class OneWaySequentialAction(BaseActionProtocol, Protocol):
-    def do_one(self, msg: BaseMessageObject) -> Any: ...
+    def do_one(self, msg: MessageObjectType) -> Any: ...
 
-    def do_many(self, msgs: Iterator[BaseMessageObject]):
+    def do_many(self, msgs: Iterator[MessageObjectType]):
         for msg in msgs:
             if not self.filter(msg):
                 self.do_one(msg)

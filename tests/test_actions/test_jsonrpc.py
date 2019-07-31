@@ -10,8 +10,21 @@ from lib.formats.contrib.types import JSONObjectType
 
 class TestJsonRPC:
 
+    def test_00_create_notification(self, json_rpc_action, json_rpc_notification_result, json_rpc_create_notification):
+        result = json_rpc_action.create_notification(json_rpc_notification_result)
+        assert result == json_rpc_create_notification
+
     @pytest.mark.asyncio
-    async def test_00_login(self, json_rpc_action, json_rpc_login_request_object,
+    async def test_01_queue_task_close(self, json_rpc_action, subscribe_key, json_rpc_notification_result, peer_str,
+                                       json_rpc_create_notification, connections_manager_with_connection, deque):
+        connections_manager_with_connection.subscribe(peer_str, subscribe_key)
+        assert connections_manager_with_connection.peer_is_subscribed(peer_str, subscribe_key)
+        await json_rpc_action._notifications_queue.put((subscribe_key, json_rpc_notification_result))
+        await json_rpc_action.close()
+        assert deque.pop() == json_rpc_create_notification
+
+    @pytest.mark.asyncio
+    async def test_02_login(self, json_rpc_action, json_rpc_login_request_object,
                             json_rpc_login_response, context, user1_context):
         result = await json_rpc_action.async_do_one(json_rpc_login_request_object)
         assert result == json_rpc_login_response
@@ -24,7 +37,7 @@ class TestJsonRPC:
                               ],
                              indirect=['json_rpc_object_no_user'])
     @pytest.mark.asyncio
-    async def test_01_not_logged_in(self, json_rpc_action, json_rpc_object_no_user: JSONObjectType, exception,
+    async def test_03_not_logged_in(self, json_rpc_action, json_rpc_object_no_user: JSONObjectType, exception,
                                     json_rpc_app, default_notes):
         with pytest.raises(exception):
             await json_rpc_action.async_do_one(json_rpc_object_no_user)
@@ -34,16 +47,16 @@ class TestJsonRPC:
     @pytest.mark.parametrize(['json_rpc_object_user1', 'response', 'notification', 'items'],
                              [
                                 ['json_rpc_create_request', 'json_rpc_create_response', 'json_rpc_create_notification', 'after_create_notes'],
-                                 #['json_rpc_update_request', 'json_rpc_update_response', 'json_rpc_update_notification', 'after_update_notes'],
-                                 #['json_rpc_delete_request', 'json_rpc_delete_response', 'json_rpc_delete_notification', {}],
-                                 #['json_rpc_get_request', 'json_rpc_get_response', None, 'default_notes'],
-                                 #['json_rpc_logout_request', 'json_rpc_logout_response', None, 'default_notes']
+                                ['json_rpc_update_request', 'json_rpc_update_response', 'json_rpc_update_notification', 'after_update_notes'],
+                                 ['json_rpc_delete_request', 'json_rpc_delete_response', 'json_rpc_delete_notification', {}],
+                                 ['json_rpc_get_request', 'json_rpc_get_response', None, 'default_notes'],
+                                 ['json_rpc_logout_request', 'json_rpc_logout_response', None, 'default_notes']
                               ],
                              indirect=True)
-    async def test_03_logged_in_crud_logout(self, json_rpc_action, json_rpc_app, connections_manager_with_connection, simple_network_connection,
+    async def test_04_logged_in_crud_logout(self, json_rpc_action, json_rpc_app, connections_manager_with_connection, peer_str,
                                             json_rpc_object_user1: JSONObjectType, response, notification, items, deque, subscribe_key):
-        connections_manager_with_connection.subscribe(simple_network_connection.peer_str, subscribe_key)
-        assert connections_manager_with_connection.is_subscribed(simple_network_connection, subscribe_key)
+        connections_manager_with_connection.subscribe(peer_str, subscribe_key)
+        assert connections_manager_with_connection.peer_is_subscribed(peer_str, subscribe_key)
         result = await json_rpc_action.async_do_one(json_rpc_object_user1)
         assert result == response
         assert json_rpc_app.notes == items
@@ -61,7 +74,7 @@ class TestJsonRPC:
                                  ['json_rpc_get_request_no_object', KeyError],
                               ],
                              indirect=['json_rpc_object_user2'])
-    async def test_04_tasks_with_exception(self, json_rpc_action, json_rpc_app,
+    async def test_05_tasks_with_exception(self, json_rpc_action, json_rpc_app,
                                            json_rpc_object_user2: JSONObjectType, exception, default_notes):
         with pytest.raises(exception):
             result = await json_rpc_action.async_do_one(json_rpc_object_user2)
@@ -70,7 +83,7 @@ class TestJsonRPC:
             await asyncio.wait_for(json_rpc_action._notifications_queue.get(), timeout=0.1)
 
     @pytest.mark.asyncio
-    async def test_05_subscribe_unsubscribe(self, json_rpc_action, json_rpc_app,
+    async def test_06_subscribe_unsubscribe(self, json_rpc_action, json_rpc_app,
                                             json_rpc_subscribe_request_object, json_rpc_unsubscribe_request_object,
                                             connections_manager_with_connection, peer_str, subscribe_key):
         result = await json_rpc_action.async_do_one(json_rpc_subscribe_request_object)
@@ -85,15 +98,15 @@ class TestJsonRPC:
         ('wrong_method', MethodNotFoundError),
         ('invalid_params', InvalidParamsError),
     ], indirect=['json_rpc_error_request'])
-    async def test_02_exceptions(self, json_rpc_action, json_codec, json_rpc_error_request, exception):
+    async def test_07_exceptions(self, json_rpc_action, json_codec, json_rpc_error_request, exception):
         json_obj = json_codec.from_decoded(json_rpc_error_request)
         with pytest.raises(exception):
-            await json_rpc_action.do_one(json_obj)
+            await json_rpc_action.async_do_one(json_obj)
 
-    def test_03_filter(self, json_rpc_action, json_object):
-        assert json_rpc_action.filter(json_object) is False
+    def test_08_filter(self, json_rpc_action, json_rpc_notification_object):
+        assert json_rpc_action.filter(json_rpc_notification_object) is False
 
-    def test_04_response_on_decode_error(self, json_rpc_action, invalid_json, json_rpc_parse_error_response):
+    def test_09_response_on_decode_error(self, json_rpc_action, invalid_json, json_rpc_parse_error_response):
         try:
             result = json.loads(invalid_json)
         except JSONDecodeError as e:
@@ -105,7 +118,7 @@ class TestJsonRPC:
         ('wrong_method', 'wrong_method', MethodNotFoundError),
         ('invalid_params', 'invalid_params', InvalidParamsError),
     ], indirect=['json_rpc_error_request', 'json_rpc_error_response'])
-    def test_05_response_on_exception(self, json_rpc_action, json_codec, json_rpc_error_request, json_rpc_error_response, exception):
+    def test_10_response_on_exception(self, json_rpc_action, json_codec, json_rpc_error_request, json_rpc_error_response, exception):
         obj = json_codec.from_decoded(json_rpc_error_request)
         result = json_rpc_action.response_on_exception(obj, exception())
         assert result == json_rpc_error_response

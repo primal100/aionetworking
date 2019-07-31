@@ -12,7 +12,7 @@ from pathlib import Path
 from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
 from lib.actions.jsonrpc import JSONRPCServer
 from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
-#from lib.requesters.jsonrpc import SampleJSONRPCClient
+from lib.requesters.jsonrpc import SampleJSONRPCClient
 from lib.conf.types import ConnectionLoggerType, LoggerType
 from lib.conf.logging import ConnectionLogger, Logger
 from lib.formats.contrib.json import JSONObject, JSONCodec
@@ -201,8 +201,8 @@ def json_rpc_app(user1, user2, default_notes) -> SampleJSONRPCServer:
 
 
 @pytest.fixture
-async def json_rpc_action(json_rpc_app, connections_manager_with_connection) -> JSONRPCServer:
-    action = JSONRPCServer(app=json_rpc_app, connections_manager=connections_manager_with_connection, timeout=3)
+async def json_rpc_action(json_rpc_app) -> JSONRPCServer:
+    action = JSONRPCServer(app=json_rpc_app, timeout=15)
     yield action
     await action.close()
 
@@ -214,10 +214,9 @@ async def json_rpc_action_no_process_queue(json_rpc_app) -> JSONRPCServer:
     await asyncio.wait_for(action.close(), timeout=1)
 
 
-"""
 @pytest.fixture
 def json_rpc_requester() -> SampleJSONRPCClient:
-    return SampleJSONRPCClient()"""
+    return SampleJSONRPCClient()
 
 
 @pytest.fixture
@@ -368,6 +367,16 @@ def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp)
 
 
 @pytest.fixture
+def json_rpc_login_response_encoded(user1) -> str:
+    return '{"jsonrpc": "2.0", "id": 1, "result": {"user": "user1", "message": "Login successful"}}'
+
+
+@pytest.fixture
+def json_buffer() -> str:
+    return '{"jsonrpc": "2.0", "id": 1, "result": {"user": "user1", "message": "Login successful"}}{"jsonrpc": "2.0", "id": 1, "method": "logout"}'
+
+
+@pytest.fixture
 def json_rpc_login_response(user1) -> dict:
     return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user1[0], 'message': 'Login successful'}}
 
@@ -401,6 +410,17 @@ def json_rpc_login_response_object_user2(json_rpc_login_response_user2, user2_co
 def json_rpc_logout_request(user1) -> dict:
     return {'jsonrpc': "2.0", 'id': 1, 'method': 'logout'}
 
+
+@pytest.fixture
+def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestamp) -> JSONObject:
+    return json_codec.from_decoded(json_rpc_logout_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_logout_request_encoded(user1) -> str:
+    return '{"jsonrpc": "2.0", "id": 1, "method": "logout"}'
+
+
 @pytest.fixture
 def json_rpc_logout_response(user1) -> dict:
     return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user1[0], 'message': 'Logout successful'}}
@@ -417,8 +437,13 @@ def json_rpc_create_response(user1) -> dict:
 
 
 @pytest.fixture
-def json_rpc_create_notification(user1) -> Dict:
-    return {'jsonrpc': "2.0", 'result': {'id': 1, 'message': 'New note has been created', 'user': 'user1'}}
+def json_rpc_notification_result() -> Dict:
+    return {'id': 1, 'message': 'New note has been created', 'user': 'user1'}
+
+
+@pytest.fixture
+def json_rpc_create_notification(user1, json_rpc_notification_result) -> Dict:
+    return {'jsonrpc': "2.0", 'result': json_rpc_notification_result}
 
 
 @pytest.fixture
@@ -465,7 +490,6 @@ def json_rpc_get_response(user1) -> dict:
 @pytest.fixture
 def json_rpc_get_request_no_object(user1) -> dict:
     return {'jsonrpc': "2.0", 'id': 1, 'method': 'get', 'params': (3,)}
-
 
 
 @pytest.fixture
@@ -621,11 +645,11 @@ def json_rpc_notification_object(json_rpc_notification_encoded, json_rpc_notific
 @pytest.fixture
 def json_rpc_error_request(request) -> dict:
     if request.param == 'no_version':
-        return {'id': 0, 'method': 'help', 'params': ['abcd']}
+        return {'id': 0, 'method': 'delete', 'params': (0,)}
     if request.param == 'wrong_method':
         return {'jsonrpc': "2.0", 'id': 0, 'method': 'help', 'params': ['1']}
     if request.param == 'invalid_params':
-        return {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': {'a': 2}}
+        return {'jsonrpc': "2.0", 'id': 0, 'method': 'delete', 'params': {'a': 2}}
 
 
 @pytest.fixture
@@ -639,8 +663,23 @@ def json_rpc_error_response(request) -> dict:
 
 
 @pytest.fixture
+def json_rpc_error_response_encoded(request) -> str:
+    if request.param == 'no_version':
+        return '{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": 0}'
+    if request.param == 'wrong_method':
+        return '{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": 0}'
+    if request.param == 'invalid_params':
+        return '{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid params"}, "id": 0}'
+
+@pytest.fixture
 def json_rpc_parse_error_response() -> dict:
     return {'jsonrpc': "2.0", 'error':{"code": -32700, "message": "Parse error"}}
+
+
+@pytest.fixture
+def json_rpc_parse_error_response_encoded() -> str:
+    return '{"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}}'
+
 
 
 @pytest.fixture
@@ -731,7 +770,9 @@ def fail() -> Callable:
 
 @pytest.fixture
 def connections_manager() -> ConnectionsManager:
-    return ConnectionsManager()
+    from lib.networking.network_connections import connections_manager
+    yield connections_manager
+    connections_manager.clear()
 
 
 @dataclass
@@ -755,10 +796,9 @@ def simple_network_connection(simple_network_connections) -> SimpleNetworkConnec
 
 
 @pytest.fixture
-def connections_manager_with_connection(simple_network_connection) -> ConnectionsManager:
-    cm = ConnectionsManager()
-    cm.add_connection(simple_network_connection)
-    return cm
+def connections_manager_with_connection(connections_manager, simple_network_connection) -> ConnectionsManager:
+    connections_manager.add_connection(simple_network_connection)
+    return connections_manager
 
 
 @pytest.fixture
@@ -865,6 +905,19 @@ def one_way_receiver_adaptor(buffered_file_storage_action_binary, buffered_file_
 @pytest.fixture
 def one_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
     return SenderAdaptor(TCAPMAPASNObject, context=context, logger=sender_connection_logger, send=deque.append)
+
+
+@pytest.fixture
+def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_binary, context,
+                             receiver_connection_logger, deque) -> ReceiverAdaptor:
+    return ReceiverAdaptor(JSONObject, action=json_rpc_action,
+                           context=context, logger=receiver_connection_logger,
+                           preaction=buffered_file_storage_pre_action_binary, send=deque.append)
+
+
+@pytest.fixture
+def two_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
+    return SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, send=deque.append)
 
 
 """
