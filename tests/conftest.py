@@ -362,6 +362,11 @@ def json_rpc_login_request(user1) -> dict:
 
 
 @pytest.fixture
+def json_rpc_login_request_encoded(user1) -> str:
+    return '{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
+
+
+@pytest.fixture
 def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp) -> JSONObject:
     return json_codec.from_decoded(json_rpc_login_request, received_timestamp=timestamp)
 
@@ -408,7 +413,7 @@ def json_rpc_login_response_object_user2(json_rpc_login_response_user2, user2_co
 
 @pytest.fixture
 def json_rpc_logout_request(user1) -> dict:
-    return {'jsonrpc': "2.0", 'id': 1, 'method': 'logout'}
+    return {'jsonrpc': "2.0", 'id': 2, 'method': 'logout'}
 
 
 @pytest.fixture
@@ -418,12 +423,12 @@ def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestam
 
 @pytest.fixture
 def json_rpc_logout_request_encoded(user1) -> str:
-    return '{"jsonrpc": "2.0", "id": 1, "method": "logout"}'
+    return '{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
 @pytest.fixture
 def json_rpc_logout_response(user1) -> dict:
-    return {'jsonrpc': "2.0", 'id': 1, 'result': {'user': user1[0], 'message': 'Logout successful'}}
+    return {'jsonrpc': "2.0", 'id': 2, 'result': {'user': user1[0], 'message': 'Logout successful'}}
 
 
 @pytest.fixture
@@ -444,6 +449,16 @@ def json_rpc_notification_result() -> Dict:
 @pytest.fixture
 def json_rpc_create_notification(user1, json_rpc_notification_result) -> Dict:
     return {'jsonrpc': "2.0", 'result': json_rpc_notification_result}
+
+
+@pytest.fixture
+def json_rpc_create_notification_object(json_codec, json_rpc_create_notification_encoded) -> JSONObjectType:
+    return next(json_codec.decode_buffer(json_rpc_create_notification_encoded))
+
+
+@pytest.fixture
+def json_rpc_create_notification_encoded() -> str:
+    return '{"jsonrpc": "2.0", "result": {"id": 1, "message": "New note has been created", "user": "user1"}}'
 
 
 @pytest.fixture
@@ -864,7 +879,7 @@ def asn1_recording_data(buffer_asn1_1, buffer_asn1_2) -> List[Dict]:
 
 @pytest.fixture
 def json_recording() -> bytes:
-    return b'\x00\x00\x00\x00\x00\x00\t\x00\x00\x00127.0.0.1A\x00\x00\x00{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}\x00\x00\x00\x80?\x00\t\x00\x00\x00127.0.0.1A\x00\x00\x00{"jsonrpc": "2.0", "id": 1, "method": "test", "params": ["efgh"]}'
+    return b'\x00\x00\x00\x00\x00\x00\t\x00\x00\x00127.0.0.1O\x00\x00\x00{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}\x00\x00\x00\x80?\x00\t\x00\x00\x00127.0.0.1/\x00\x00\x00{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
 @pytest.fixture
@@ -878,18 +893,18 @@ def buffer_object_json2(buffer_json_2, timestamp, context) -> BufferObject:
 
 
 @pytest.fixture
-def json_recording_data(buffer_json_1, buffer_json_2) -> List[Dict]:
+def json_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded) -> List[Dict]:
     return [{
         'sent_by_server': False,
         'seconds': 0.0,
         'peer': "127.0.0.1",
-        'data': buffer_json_1
+        'data': json_rpc_login_request_encoded
     },
     {
         'sent_by_server': False,
         'seconds': 1.0,
         'peer': "127.0.0.1",
-        'data': buffer_json_2
+        'data': json_rpc_logout_request_encoded
     }
     ]
 
@@ -903,8 +918,8 @@ def one_way_receiver_adaptor(buffered_file_storage_action_binary, buffered_file_
 
 
 @pytest.fixture
-def one_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
-    return SenderAdaptor(TCAPMAPASNObject, context=context, logger=sender_connection_logger, send=deque.append)
+async def one_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
+    yield SenderAdaptor(TCAPMAPASNObject, context=context, logger=sender_connection_logger, send=deque.append)
 
 
 @pytest.fixture
@@ -916,8 +931,8 @@ def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_b
 
 
 @pytest.fixture
-def two_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
-    return SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, send=deque.append)
+async def two_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
+    yield SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, send=deque.append)
 
 
 """

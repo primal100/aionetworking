@@ -109,10 +109,6 @@ class SenderAdaptor(BaseAdaptorProtocol):
     def get_notification(self) -> MessageObjectType:
         return self._notification_queue.get_nowait()
 
-    async def wait_notifications(self) -> AsyncGenerator[MessageObjectType, None]:
-        for item in await self._notification_queue.get():
-            yield item
-
     def all_notifications(self) -> Generator[MessageObjectType, None, None]:
         for i in range(0, self._notification_queue.qsize()):
             yield self._notification_queue.get_nowait()

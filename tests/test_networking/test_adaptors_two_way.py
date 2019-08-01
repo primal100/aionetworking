@@ -18,10 +18,10 @@ class TestTwoWayReceiverAdaptor:
         await two_way_receiver_adaptor.close(None, timeout=0.1)
 
     @pytest.mark.asyncio
-    async def test_02_manage_buffer(self, tmp_path, two_way_receiver_adaptor, json_encoded_multi, timestamp,
-                                    json_recording, json_recording_data):
-        two_way_receiver_adaptor._manage_buffer(json_encoded_multi[0], timestamp)
-        two_way_receiver_adaptor._manage_buffer(json_encoded_multi[1], timestamp + timedelta(seconds=1))
+    async def test_02_manage_buffer(self, tmp_path, two_way_receiver_adaptor, json_rpc_login_request_encoded,
+                                    json_rpc_logout_request_encoded, timestamp, json_recording, json_recording_data):
+        two_way_receiver_adaptor._manage_buffer(json_rpc_login_request_encoded, timestamp)
+        two_way_receiver_adaptor._manage_buffer(json_rpc_logout_request_encoded, timestamp + timedelta(seconds=1))
         await two_way_receiver_adaptor.close(None, timeout=0.5)
         expected_file = Path(tmp_path / '127.0.0.1.recording')
         assert expected_file.exists()
@@ -67,46 +67,55 @@ class TestTwoWayReceiverAdaptor:
         await two_way_receiver_adaptor.close(None, timeout=0.5)
         msg1 = deque.pop()
         msg2 = deque.pop()
-        msgs = [json.loads(msg1), json.loads(msg2)] == [json_rpc_login_response, json_rpc_logout_response]
+        msgs = [json.loads(msg1), json.loads(msg2)]
+        assert sorted(msgs, key=lambda x: x['id']) == sorted([json_rpc_login_response, json_rpc_logout_response],
+                                                             key=lambda x: x['id'])
 
     @pytest.mark.asyncio
-    async def test_04_on_data_received(self, tmp_path, one_way_receiver_adaptor, asn_buffer, buffer_asn1_1,
-                                       buffer_asn1_2, timestamp, asn1_recording, asn1_recording_data, asn_codec,
-                                       asn_objects):
-        one_way_receiver_adaptor.on_data_received(buffer_asn1_1, timestamp)
-        one_way_receiver_adaptor.on_data_received(buffer_asn1_2, timestamp + timedelta(seconds=1))
-        await one_way_receiver_adaptor.close(None, timeout=0.5)
-        expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
-        assert expected_file.exists()
-        assert expected_file.read_bytes() == asn_buffer
-        msgs = await alist(asn_codec.from_file(expected_file))
-        assert msgs == asn_objects
+    async def test_08_on_data_received(self, tmp_path, two_way_receiver_adaptor, json_rpc_login_request_encoded,
+                                       json_rpc_logout_request_encoded, json_rpc_login_response,
+                                       json_rpc_logout_response, timestamp, json_recording, json_recording_data, deque):
+        two_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
+        two_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp + timedelta(seconds=1))
+        await two_way_receiver_adaptor.close(None, timeout=0.5)
+        msg1 = deque.pop()
+        msg2 = deque.pop()
+        msgs = [json.loads(msg1), json.loads(msg2)]
+        assert sorted(msgs, key=lambda x: x['id']) == sorted([json_rpc_login_response, json_rpc_logout_response],
+                                                             key=lambda x: x['id'])
         expected_file = Path(tmp_path / '127.0.0.1.recording')
         assert expected_file.exists()
-        assert expected_file.read_bytes() == asn1_recording
         packets = list(Record.from_file(expected_file))
-        assert packets == asn1_recording_data
+        assert packets == json_recording_data
+        assert expected_file.read_bytes() == json_recording
 
 
 class TestSenderAdaptorTwoWay:
-    def test_00_post_init(self, one_way_receiver_adaptor, asn_codec):
-        assert one_way_receiver_adaptor.codec == asn_codec
+    def test_00_post_init(self, two_way_sender_adaptor, json_codec):
+        assert two_way_sender_adaptor.codec == json_codec
 
     @pytest.mark.asyncio
-    async def test_01_close(self, one_way_receiver_adaptor):
-        await one_way_receiver_adaptor.close(None, timeout=0.1)
+    async def test_01_close(self, two_way_sender_adaptor):
+        await two_way_sender_adaptor.close(None, timeout=0.1)
 
-    def test_02_send(self, one_way_sender_adaptor, asn_one_encoded, deque):
-        one_way_sender_adaptor.send(asn_one_encoded)
-        assert deque.pop() == asn_one_encoded
+    @pytest.mark.asyncio
+    async def test_02_wait_notification(self, two_way_sender_adaptor, json_rpc_create_notification_object):
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(two_way_sender_adaptor.wait_notification(), timeout=1)
+        two_way_sender_adaptor._notification_queue.put_nowait(json_rpc_create_notification_object)
+        notification = await two_way_sender_adaptor.wait_notification()
+        assert notification == json_rpc_create_notification_object
 
-    def test_03_send_data(self, one_way_sender_adaptor, asn_one_encoded, deque):
-        one_way_sender_adaptor.send_data(asn_one_encoded)
-        assert deque.pop() == asn_one_encoded
+    def test_03_get_notification(self, two_way_sender_adaptor, json_rpc_create_notification_object):
+        two_way_sender_adaptor._notification_queue.put_nowait(json_rpc_create_notification_object)
+        notification = two_way_sender_adaptor.get_notification()
+        assert notification == json_rpc_create_notification_object
 
-    def test_04_send_hex(self, one_way_sender_adaptor, asn_encoded_hex, asn_one_encoded, deque):
-        one_way_sender_adaptor.send_hex(asn_encoded_hex[0])
-        assert deque.pop() == asn_one_encoded
+    @pytest.mark.asyncio
+    async def test_04_all_notifications(self, two_way_sender_adaptor, json_rpc_create_notification_object):
+        two_way_sender_adaptor._notification_queue.put_nowait(json_rpc_create_notification_object)
+        obj = next(two_way_sender_adaptor.all_notifications())
+        assert obj == json_rpc_create_notification_object
 
     def test_05_send_hex_msgs(self, one_way_sender_adaptor, asn_encoded_hex, asn_encoded_multi, deque):
         one_way_sender_adaptor.send_hex_msgs(asn_encoded_hex)
