@@ -3,7 +3,7 @@ from abc import ABC
 
 from .base import BaseRequester
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class MethodNotFoundError(BaseException):
@@ -13,11 +13,14 @@ class MethodNotFoundError(BaseException):
 class JSONRPCMethod:
     version = "2.0"
 
-    def __init__(self, name: str):
+    def __init__(self, request_id: Optional[int], name: str):
+        self.request_id = request_id
         self.name = name
 
     def __call__(self, *args, **kwargs) -> Dict[str, Any]:
         command = {"jsonrpc": self.version, "method": self.name}
+        if self.request_id is not None:
+            command['id'] = self.request_id
         if args:
             command['params'] = args
         elif kwargs:
@@ -26,12 +29,14 @@ class JSONRPCMethod:
 
 
 class BaseJSONRPCClient(BaseRequester, ABC):
+    last_id = 0
 
     def __getattr__(self, item: str) -> JSONRPCMethod:
         if item in self.methods:
-            return JSONRPCMethod(item)
+            self.last_id += 1
+            return JSONRPCMethod(self.last_id, item)
         if item in self.notification_methods:
-            return JSONRPCMethod(item)
+            return JSONRPCMethod(None, item)
         raise MethodNotFoundError(f'{item} not found in methods or notification methods for {self.__class__.__name__}')
 
 

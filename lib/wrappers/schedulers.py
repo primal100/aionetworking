@@ -37,10 +37,8 @@ class TaskScheduler:
                 fail = fail_callback_cv.get()
                 fail(exception, **kwargs)
             else:
-                result = future.result()            #3.8 assignment expression
-                if result:
-                    success = success_callback_cv.get()
-                    success(result, **kwargs)
+                success = success_callback_cv.get()
+                success(future.result(), **kwargs)
         finally:
             self.task_done(future)
 
@@ -48,7 +46,7 @@ class TaskScheduler:
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        task = self.create_task(coro, self._process_promise_result)
+        self.create_task(coro, self._process_promise_result)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()
@@ -62,10 +60,10 @@ class TaskScheduler:
 
     async def run_wait_fut(self, name: Any, callback: Callable, *args, **kwargs) -> Any:
         fut = self.create_future(name)
-        callback(*args, **kwargs)
         try:
+            callback(*args, **kwargs)
             await fut
-            return fut
+            return fut.result()
         finally:
             self.future_done(name)
 
@@ -78,10 +76,10 @@ class TaskScheduler:
     async def join(self) -> None:
         await self._counter.wait_zero()
 
-    async def close(self, timeout: Union[int, float] = None):
+    async def close(self):
         for task in self._periodic_tasks:
             task.cancel()
-        await asyncio.wait_for(self.join(), timeout=timeout)
+        await self.join()
 
     @staticmethod
     def get_next_time(delay: Union[int, float], current_time: datetime = None) -> float:

@@ -114,7 +114,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
             yield self._notification_queue.get_nowait()
 
     async def send_data_and_wait(self, request_id: Any, encoded: AnyStr) -> Any:
-        return self._scheduler.run_wait_fut(request_id, self.send_data, encoded)
+        return await self._scheduler.run_wait_fut(request_id, self.send_data, encoded)
 
     async def send_msg_and_wait(self, msg_obj: MessageObjectType) -> asyncio.Future:
         return await self.send_data_and_wait(msg_obj.request_id, msg_obj.encoded)
@@ -144,7 +144,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         for msg in msgs:
             if msg.request_id:
-                self._scheduler.set_result(msg.requst_id, msg)
+                self._scheduler.set_result(msg.request_id, msg)
             else:
                 self._notification_queue.put_nowait(msg)
 

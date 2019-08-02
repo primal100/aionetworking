@@ -321,13 +321,13 @@ def json_decoded_multi() -> List[dict]:
 
 
 @pytest.fixture
-def user1() -> Tuple[str, str]:
-    return 'user1', 'password'
+def user1() -> List[str, str]:
+    return ['user1', 'password']
 
 
 @pytest.fixture
-def user2() -> Tuple[str, str]:
-    return 'user2', 'password'
+def user2() -> List[str, str]:
+    return ['user2', 'password']
 
 
 @pytest.fixture
@@ -509,7 +509,7 @@ def json_rpc_get_request_no_object(user1) -> dict:
 
 @pytest.fixture
 def json_rpc_subscribe_request(user1) -> dict:
-    return {'jsonrpc': "2.0", 'method': 'subscribe_to_user', 'params': (user1[0],)}
+    return {'jsonrpc': "2.0", 'method': 'subscribe_to_user', 'params': [user1[0],]}
 
 
 @pytest.fixture
@@ -706,12 +706,17 @@ def json_rpc_invalid_params_response() -> dict:
 async def task_scheduler() -> TaskScheduler:
     scheduler = TaskScheduler()
     yield scheduler
-    await scheduler.close(timeout=1)
+    await asyncio.wait_for(scheduler.close(), timeout=1)
 
 
 @pytest.fixture
 def deque() -> collections.deque:
     return collections.deque()
+
+
+@pytest.fixture
+async def queue() -> asyncio.Queue:
+    yield asyncio.Queue()
 
 
 @pytest.fixture
@@ -931,8 +936,8 @@ def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_b
 
 
 @pytest.fixture
-async def two_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
-    yield SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, send=deque.append)
+async def two_way_sender_adaptor(context, sender_connection_logger, json_rpc_requester, queue) -> SenderAdaptor:
+    yield SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, requester=json_rpc_requester, send=queue.put_nowait)
 
 
 """
