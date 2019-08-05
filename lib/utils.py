@@ -7,7 +7,7 @@ import traceback
 import time
 
 
-from typing import Sequence, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING
+from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
@@ -19,6 +19,32 @@ async def time_coro(coro):
     start_time = time.time()
     await coro
     return time.time() - start_time
+
+
+###Coroutines###
+async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool = False, cleanup: Callable = None,
+                    cleanup_args=(), num_items=None, ignore_first: bool = True, **kwargs):
+    if not quiet:
+        print("Running", async_func.__name__)
+    total = 0
+    if ignore_first:
+        await time_coro(async_func(*args, **kwargs))
+        await cleanup(*cleanup_args)
+    for _ in range(0, num_times):
+        time_taken = await time_coro(async_func(*args, **kwargs))
+        await cleanup(*cleanup_args)
+        total += time_taken
+        if not quiet:
+            print(time_taken)
+    average = total / num_times
+    if not quiet:
+        print("Average time taken:", average)
+        if num_items:
+            average_per_item = average / num_items
+            items_per_second = 1 / average_per_item
+            print('Num Items:', num_items)
+            print("Average per item:", average_per_item)
+            print("Items per second:", items_per_second)
 
 
 ###Typing###

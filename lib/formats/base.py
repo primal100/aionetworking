@@ -13,7 +13,7 @@ from lib.types import Type
 from lib.utils import Record, aone
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence
+from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence, ClassVar
 from typing_extensions import Protocol
 from .types import MessageObjectType, CodecType
 

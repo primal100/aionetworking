@@ -6,6 +6,7 @@ import asyncio
 import collections
 import pytest
 import binascii
+import shutil
 from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from lib.wrappers.schedulers import TaskScheduler
 
 from tests.mock import MockTCPTransport, MockDatagramTransport
 
-from typing import Dict, Any, List, Tuple, Union, Callable, AsyncGenerator
+from typing import Dict, Any, List, Tuple, Union, Callable, ClassVar
 
 
 @pytest.fixture
@@ -85,6 +86,12 @@ def asn_codec(context) -> PyCrateAsnCodec:
 
 
 @pytest.fixture
+def asn_codec_unique_id(context) -> PyCrateAsnCodec:
+    return PyCrateAsnCodec(TCAPMAPASNObject, context=context,
+                           asn_class=TCAPMAPASNObject.asn_class)
+
+
+@pytest.fixture
 def asn_buffer() -> bytes:
     return b"bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0e\x81\xa4H\x04\x84\x00\x01\xffI\x04\xa5\x05\x00\x01k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x0e\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00lj\xa2h\x02\x01\x010c\x02\x018\xa3^\xa1\\0Z\x04\x10K\x9da\x91\x10u6e\x8c\xfeY\x88\x0c\xd2\xac'\x04\x10K\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8\x04\x10\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x04\x10C\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x8c\x04\x10\xa2U\x1a\x05\x8c\xdb\x00\x00K\x8dy\xf7\xca\xffP\x12e\x16H\x04\xa5\x05\x00\x01I\x04\x84\x00\x01\xffl\x08\xa1\x06\x02\x01\x02\x02\x018d<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b"
 
@@ -124,6 +131,28 @@ def asn_objects(asn_encoded_multi, asn_decoded_multi, timestamp, context) -> Lis
     return [TCAPMAPASNObject(encoded, asn_decoded_multi[i], context=context,
                             received_timestamp=timestamp) for i, encoded in
            enumerate(asn_encoded_multi)]
+
+
+@pytest.fixture
+def data_dir():
+    from lib.settings import TEST_DATA_DIR
+    if TEST_DATA_DIR.exists():
+        shutil.rmtree(TEST_DATA_DIR)
+    TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    yield TEST_DATA_DIR
+    shutil.rmtree(TEST_DATA_DIR)
+
+
+@pytest.fixture()
+def asn_objects_many(request, asn_codec, context) -> List[TCAPMAPASNObject]:
+    encoded = b'd<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b'
+    return [next(asn_codec.decode_buffer(encoded)) for _ in range(0, request.param)]
+
+
+@pytest.fixture()
+def asn_objects_thousand(asn_codec, context) -> List[TCAPMAPASNObject]:
+    encoded = b'd<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b'
+    return [next(asn_codec.decode_buffer(encoded)) for _ in range(0, 1000)]
 
 
 @pytest.fixture
@@ -244,6 +273,12 @@ async def managed_file_short_timeout(tmp_path) -> ManagedFile:
 
 
 @pytest.fixture
+def file_storage_action_binary_real_dir(data_dir) -> FileStorage:
+    return FileStorage(base_path=data_dir, binary=True,
+                      path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
+
+
+@pytest.fixture
 def file_storage_action_binary(tmp_path) -> FileStorage:
     return FileStorage(base_path=tmp_path, binary=True,
                       path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
@@ -276,14 +311,9 @@ def buffered_file_storage_action_text(tmp_path) -> BufferedFileStorage:
 
 
 @pytest.fixture
-def json_one_encoded() -> str:
-    return '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}'
-
-
-@pytest.fixture
-def file_containing_json(tmpdir, json_one_encoded) -> Path:
+def file_containing_json(tmpdir, json_rpc_login_request_encoded) -> Path:
     p = Path(tmpdir.mkdir("encoded").join("json"))
-    p.write_text(json_one_encoded)
+    p.write_text(json_rpc_login_request_encoded)
     return p
 
 
@@ -300,10 +330,10 @@ def json_buffer() -> str:
 
 
 @pytest.fixture
-def json_encoded_multi() -> List[str]:
+def json_encoded_multi(json_rpc_login_request_encoded, json_rpc_logout_request_encoded) -> List[str]:
     return [
-        '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}',
-        '{"jsonrpc": "2.0", "id": 1, "method": "test", "params": ["efgh"]}'
+        json_rpc_login_request_encoded,
+        json_rpc_logout_request_encoded
     ]
 
 
@@ -313,10 +343,10 @@ def invalid_json(json_encoded_multi) -> str:
 
 
 @pytest.fixture
-def json_decoded_multi() -> List[dict]:
+def json_decoded_multi(json_rpc_login_request, json_rpc_logout_request) -> List[dict]:
     return [
-        {'jsonrpc': "2.0", 'id': 0, 'method': 'test', 'params': ['abcd']},
-        {'jsonrpc': "2.0", 'id': 1, 'method': 'test', 'params': ['efgh']}
+        json_rpc_login_request,
+        json_rpc_logout_request
     ]
 
 
@@ -378,7 +408,7 @@ def json_rpc_login_response_encoded(user1) -> str:
 
 @pytest.fixture
 def json_buffer() -> str:
-    return '{"jsonrpc": "2.0", "id": 1, "result": {"user": "user1", "message": "Login successful"}}{"jsonrpc": "2.0", "id": 1, "method": "logout"}'
+    return '{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
 @pytest.fixture
@@ -625,8 +655,8 @@ def json_rpc_object_user2(user2_codec, request):
 
 
 @pytest.fixture
-def json_object(json_one_encoded, json_rpc_request, timestamp) -> JSONObject:
-    return JSONObject(json_one_encoded, json_rpc_request, context=context, received_timestamp=timestamp)
+def json_object(json_rpc_login_request_encoded, json_rpc_login_request, context, timestamp) -> JSONObject:
+    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context, received_timestamp=timestamp)
 
 
 @pytest.fixture
@@ -637,23 +667,8 @@ def json_objects(json_encoded_multi, json_decoded_multi, timestamp, context) -> 
 
 
 @pytest.fixture
-def json_rpc_result() -> dict:
-    return {'jsonrpc': "2.0", 'id': 0, 'result': "Successfully processed abcd"}
-
-
-@pytest.fixture
-def json_rpc_notification_encoded() -> str:
-    return '{"jsonrpc": "2.0", "method": "test", "params": ["abcd"]}'
-
-
-@pytest.fixture
-def json_rpc_notification() -> dict:
-    return {'jsonrpc': "2.0", 'method': 'test', 'params': ['abcd']}
-
-
-@pytest.fixture
-def json_rpc_notification_object(json_rpc_notification_encoded, json_rpc_notification, timestamp) -> JSONObject:
-    return JSONObject(json_one_encoded, json_rpc_notification, context=context,
+def json_rpc_notification_object(json_rpc_create_notification_encoded, json_rpc_create_notification, timestamp) -> JSONObject:
+    return JSONObject(json_rpc_create_notification_encoded, json_rpc_create_notification, context=context,
                       received_timestamp=timestamp)
 
 

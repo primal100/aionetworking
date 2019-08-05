@@ -11,6 +11,7 @@ class TCAPMAPASNObject(BaseAsnObject):
 
     asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
     name = "TCAP_MAP"
+    next_otid = 0x00000000
 
     """
     Sample implementation of interface for ASN.1 messages via pycrate library
@@ -30,7 +31,9 @@ class TCAPMAPASNObject(BaseAsnObject):
     def otid(self) -> bytes:
         if 'otid' in self.decoded[1]:
             return binascii.hexlify(self.decoded[1]['otid'])
-        return binascii.hexlify(b'\x00\x00\x00\x00')
+        otid = self.__class__.next_otid
+        self.__class__.next_otid += 1
+        return format(otid, '08x').encode()
 
     @cached_property
     def uid(self) -> str:

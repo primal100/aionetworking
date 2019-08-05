@@ -74,7 +74,6 @@ class ManagedFile:
             await self._task_started.wait()
             await self.wait_writes_done()
             self._task.cancel()
-            await self._task
         else:
             self.logger.debug('File %s already closed', self.path)
         self.logger.debug('Closed file %s', self.path)
@@ -112,8 +111,9 @@ class ManagedFile:
                     self.logger.debug('Task done set for %s on file %s', p.no('item', msgs), self.path)
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as e:
             self.logger.info('File %s closing due to task being cancelled', self.path)
+            raise e
         finally:
             self._cleanup()
 

@@ -5,23 +5,20 @@ from lib.utils import alist
 
 
 class TestASN1Codec:
-    def test_00_set_context(self, asn_codec_empty_context, context):
-        asn_codec_empty_context.set_context(context)
-        assert asn_codec_empty_context.context == context
 
-    def test_01_decode(self, asn_codec, asn_buffer, asn_encoded_multi, asn_decoded_multi):
+    def test_00_decode(self, asn_codec, asn_buffer, asn_encoded_multi, asn_decoded_multi):
         decoded = list(asn_codec.decode(asn_buffer))
         assert decoded == [(e, asn_decoded_multi[i]) for i, e in enumerate(asn_encoded_multi)]
 
-    def test_02_encode(self, asn_codec, asn_one_decoded, asn_one_encoded):
+    def test_01_encode(self, asn_codec, asn_one_decoded, asn_one_encoded):
         encoded = asn_codec.encode(asn_one_decoded)
         assert encoded == asn_one_encoded
 
-    def test_03_decode_buffer(self, asn_codec, asn_buffer, asn_objects, timestamp):
+    def test_02_decode_buffer(self, asn_codec, asn_buffer, asn_objects, timestamp):
         decoded = list(asn_codec.decode_buffer(asn_buffer, received_timestamp=timestamp))
         assert decoded == asn_objects
 
-    def test_04_from_decoded(self, asn_codec, asn_one_decoded, asn_object, asn_objects, timestamp, asn_decoded_multi,
+    def test_03_from_decoded(self, asn_codec, asn_one_decoded, asn_object, asn_objects, timestamp, asn_decoded_multi,
                              asn_encoded_multi):
         for i, decoded in enumerate(asn_decoded_multi):
             msg_obj = asn_codec.from_decoded(decoded, received_timestamp=timestamp)
@@ -30,12 +27,12 @@ class TestASN1Codec:
             assert msg_obj == asn_objects[i]
 
     @pytest.mark.asyncio
-    async def test_05_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
+    async def test_04_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
         objects = asn_codec.from_file(file_containing_multi_asn, received_timestamp=timestamp)
         assert await alist(objects) == asn_objects
 
     @pytest.mark.asyncio
-    async def test_06_from_file_one(self, asn_codec, file_containing_asn, asn_object, timestamp):
+    async def test_05_from_file_one(self, asn_codec, file_containing_asn, asn_object, timestamp):
         obj = await asn_codec.one_from_file(file_containing_asn, received_timestamp=timestamp)
         assert obj == asn_object
 

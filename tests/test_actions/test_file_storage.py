@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 from pathlib import Path
 
 from lib.actions.file_storage import ManagedFile
@@ -22,7 +23,7 @@ class TestASNFileStorage:
         for asn_object in asn_objects:
             task = task_scheduler.create_task(file_storage_action_binary.async_do_one(asn_object),
                                               callback=task_scheduler.task_done)
-        await task_scheduler.close(timeout=1)
+        await asyncio.wait_for(task_scheduler.close(), timeout=1)
         expected_file = Path(tmp_path/'Encoded/TCAP_MAP/127.0.0.1_00000001.TCAP_MAP')
         assert expected_file.exists()
         assert expected_file.read_bytes() == asn_encoded_multi[0]
@@ -111,11 +112,11 @@ class TestASNBufferedFileStorage:
 class TestJsonFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, file_storage_action_text, json_object, json_one_encoded, json_codec):
+    async def test_00_do_one(self, tmp_path, file_storage_action_text, json_object, json_rpc_login_request_encoded, json_codec):
         await file_storage_action_text.async_do_one(json_object)
-        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_0.JSON')
+        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_1.JSON')
         assert expected_file.exists()
-        assert expected_file.read_text() == json_one_encoded
+        assert expected_file.read_text() == json_rpc_login_request_encoded
         msg = await json_codec.one_from_file(expected_file)
         assert msg == json_object
 
@@ -125,11 +126,11 @@ class TestJsonFileStorage:
         for obj in json_objects:
             task = task_scheduler.create_task(file_storage_action_text.async_do_one(obj),
                                               callback=task_scheduler.task_done)
-        await task_scheduler.close(timeout=1)
-        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_0.JSON')
+        await asyncio.wait_for(task_scheduler.close(), timeout=1)
+        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_1.JSON')
         expected_file.exists()
         assert expected_file.read_text() == json_encoded_multi[0]
-        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_1.JSON')
+        expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_2.JSON')
         expected_file.exists()
         assert expected_file.read_text() == json_encoded_multi[1]
 
@@ -150,12 +151,12 @@ class TestManagedFileJSON:
 class TestJsonBufferedFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_text, json_object, json_one_encoded, json_codec):
+    async def test_00_do_one(self, tmp_path, buffered_file_storage_action_text, json_object, json_rpc_login_request_encoded, json_codec):
         buffered_file_storage_action_text.do_many([json_object])
         await buffered_file_storage_action_text.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
-        assert expected_file.read_text() == json_one_encoded
+        assert expected_file.read_text() == json_rpc_login_request_encoded
         obj = await json_codec.one_from_file(expected_file)
         assert obj == json_object
 

@@ -185,9 +185,9 @@ class TestSenderAdaptorTwoWay:
             two_way_sender_adaptor.subscrbe_to_user("user1")
 
     @pytest.mark.asyncio
-    async def test_13_play_recording_delay(self, one_way_sender_adaptor, file_containing_asn1_recording, buffer_asn1_1,
+    async def test_13_play_recording_delay(self, two_way_sender_adaptor, file_containing_asn1_recording, buffer_asn1_1,
                                            buffer_asn1_2, deque):
-        coro = one_way_sender_adaptor.play_recording(file_containing_asn1_recording, timing=True)
+        coro = two_way_sender_adaptor.play_recording(file_containing_asn1_recording, timing=True)
         time_taken = await time_coro(coro)
         assert list(deque) == [buffer_asn1_1, buffer_asn1_2]
         assert time_taken > 1.0
