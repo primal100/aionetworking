@@ -5,9 +5,11 @@ import struct
 import re
 import traceback
 import time
+from dataclasses import fields
 
 
-from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING
+from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
+from typing_extensions import Protocol
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 
@@ -23,7 +25,8 @@ async def time_coro(coro):
 
 ###Coroutines###
 async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool = False, cleanup: Callable = None,
-                    cleanup_args=(), num_items=None, ignore_first: bool = True, **kwargs):
+                    cleanup_args=(), num_items: int = None, num_bytes: int = None, ignore_first: bool = True, **kwargs):
+    times = []
     if not quiet:
         print("Running", async_func.__name__)
     total = 0
@@ -33,6 +36,7 @@ async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool
     for _ in range(0, num_times):
         time_taken = await time_coro(async_func(*args, **kwargs))
         await cleanup(*cleanup_args)
+        times.append(str(time_taken))
         total += time_taken
         if not quiet:
             print(time_taken)
@@ -45,9 +49,27 @@ async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool
             print('Num Items:', num_items)
             print("Average per item:", average_per_item)
             print("Items per second:", items_per_second)
+            if num_bytes:
+                print("Bytes per second:", (num_bytes / average))
+                times = '\t'.join(times)
+                print(f"{async_func.__name__}\t{num_bytes}\t{num_items}\t{times}")
+
+
+###Dataclasses###
+def compare_dataclasses(dc1, dc2) -> Generator[str, None, None]:
+    for f in fields(dc1):
+        value1 = getattr(dc1, f.name)
+        value2 = getattr(dc2, f.name)
+        if  value1 != value2:
+            if f.compare:
+                yield f.name, value1, value2
 
 
 ###Typing###
+class EmptyProtocol(Protocol):
+    pass
+
+
 def inherit_on_type_checking_only(arg):
     """Decorator for protocols/ABC classes who's methods can be used for
     type checking on subclasses but are not available at runtime.
@@ -55,7 +77,7 @@ def inherit_on_type_checking_only(arg):
     """
     if TYPE_CHECKING:
         return arg
-    return object
+    return EmptyProtocol
 
 
 ###Iterators###
@@ -301,15 +323,16 @@ async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequen
     await message_manager.stop()
 
 
-###ASN.1 PyCrate###
 def addr_tuple_to_str(addr: Sequence):
     return ':'.join(str(a) for a in addr)
 
 
 def addr_str_to_tuple(addr: AnyStr):
-    return tuple(addr.split(':'))
+    addr, port = addr.split(':')
+    return addr, int(port)
 
 
+###ASN.1 PyCrate###
 def adapt_asn_domain(domain: Sequence) -> str:
     return '.'.join([str(x) for x in domain])
 

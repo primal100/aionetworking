@@ -22,6 +22,7 @@ from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.base import BufferObject
 from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
+from lib.networking.connections import ConnectionGenerator, OneWayTCPServerConnection, TCPServerConnection, TCPClientConnection
 from lib.networking.network_connections import ConnectionsManager
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.wrappers.counters import Counters, Counter
@@ -55,8 +56,14 @@ def items(request):
 
 @pytest.fixture
 def context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'alias': '127.0.0.1', 'host': '127.0.0.1', 'port': 8888,
-            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000'}
+    return {'protocol_name': 'TCP Server', 'host': '127.0.0.1', 'port': 60000,
+            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1'}
+
+
+@pytest.fixture
+def client_context() -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Client', 'peer': '127.0.0.1:8888', 'host': '127.0.0.1', 'port': 8888,
+            'sock': '127.0.0.1:60000', 'alias': '127.0.0.1'}
 
 
 @pytest.fixture
@@ -82,6 +89,12 @@ def sender_connection_logger(sender_logger, context) -> ConnectionLogger:
 @pytest.fixture
 def asn_codec(context) -> PyCrateAsnCodec:
     return PyCrateAsnCodec(TCAPMAPASNObject, context=context,
+                           asn_class=TCAPMAPASNObject.asn_class)
+
+
+@pytest.fixture
+def asn_client_codec(client_context) -> PyCrateAsnCodec:
+    return PyCrateAsnCodec(TCAPMAPASNObject, context=client_context,
                            asn_class=TCAPMAPASNObject.asn_class)
 
 
@@ -736,17 +749,17 @@ async def queue() -> asyncio.Queue:
 
 @pytest.fixture
 def peername() -> Tuple[str, int]:
-    return '127.0.0.1', 8888
+    return '127.0.0.1', 60000
 
 
 @pytest.fixture
 def peer_str() -> str:
-    return '127.0.0.1:8888'
+    return '127.0.0.1:60000'
 
 
 @pytest.fixture
 def sock() -> Tuple[str, int]:
-    return '127.0.0.1', 60000
+    return '127.0.0.1', 8888
 
 
 @pytest.fixture
@@ -755,13 +768,28 @@ def extra(peername, sock) -> dict:
 
 
 @pytest.fixture
-async def tcp_transport(deque, extra) -> asyncio.Transport:
-    yield MockTCPTransport(deque, extra=extra)
+def extra_client(peername, sock) -> dict:
+    return {'peername': sock, 'sockname': peername}
+
+
+@pytest.fixture
+async def tcp_transport(queue, extra) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra)
+
+
+@pytest.fixture
+async def tcp_transport_client(queue, extra_client) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra_client)
 
 
 @pytest.fixture
 async def udp_transport(deque, extra) -> asyncio.DatagramTransport:
     yield MockDatagramTransport(deque, extra=extra)
+
+
+@pytest.fixture
+async def udp_transport_client(deque, extra_client) -> asyncio.DatagramTransport:
+    yield MockDatagramTransport(deque, extra=extra_client)
 
 
 @pytest.fixture
@@ -938,8 +966,8 @@ def one_way_receiver_adaptor(buffered_file_storage_action_binary, buffered_file_
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context, sender_connection_logger, deque) -> SenderAdaptor:
-    yield SenderAdaptor(TCAPMAPASNObject, context=context, logger=sender_connection_logger, send=deque.append)
+async def one_way_sender_adaptor(client_context, sender_connection_logger, deque) -> SenderAdaptor:
+    yield SenderAdaptor(TCAPMAPASNObject, context=client_context, logger=sender_connection_logger, send=deque.append)
 
 
 @pytest.fixture
@@ -951,16 +979,74 @@ def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_b
 
 
 @pytest.fixture
-async def two_way_sender_adaptor(context, sender_connection_logger, json_rpc_requester, queue) -> SenderAdaptor:
-    yield SenderAdaptor(JSONObject, context=context, logger=sender_connection_logger, requester=json_rpc_requester, send=queue.put_nowait)
+async def two_way_sender_adaptor(client_context, sender_connection_logger, json_rpc_requester, queue) -> SenderAdaptor:
+    yield SenderAdaptor(JSONObject, context=client_context, logger=sender_connection_logger,
+                        requester=json_rpc_requester, send=queue.put_nowait)
+
+
+@pytest.fixture
+async def tcp_protocol_one_way_server(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, receiver_logger) -> OneWayTCPServerConnection:
+    yield OneWayTCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary, parent_id=4,
+                                    preaction=buffered_file_storage_pre_action_binary, logger=receiver_logger, timeout=0.5)
+
+
+@pytest.fixture
+async def tcp_protocol_one_way_client(sender_logger) -> TCPClientConnection:
+    yield TCPClientConnection(dataformat=TCAPMAPASNObject, logger=sender_logger, timeout=0.5, parent_id=4)
+
+
+@pytest.fixture
+async def tcp_protocol_two_way_server(json_rpc_action, buffered_file_storage_pre_action_binary,
+                                      receiver_logger) -> TCPServerConnection:
+    yield TCPServerConnection(dataformat=JSONObject, action=json_rpc_action, parent_id=4,
+                              preaction=buffered_file_storage_pre_action_binary, logger=receiver_logger, timeout=0.5)
+
+
+@pytest.fixture
+async def tcp_protocol_two_way_client(json_rpc_requester, sender_logger) -> TCPClientConnection:
+    yield TCPClientConnection(dataformat=JSONObject, logger=sender_logger, requester=json_rpc_requester, timeout=0.5,
+                              parent_id=4)
+
+
+def get_fixture(request, param=None):
+    if not param:
+        param = request.param
+    return request.getfixturevalue(param.__name__)
+
+
+def get_fixtures(request):
+    return [request.getfixturevalue(param.__name__) for param in request.param]
+
+
+@pytest.fixture(params=[(tcp_protocol_one_way_server, tcp_transport, one_way_receiver_adaptor),
+                        (tcp_protocol_one_way_client, tcp_transport_client, one_way_sender_adaptor),
+                        (tcp_protocol_two_way_server, tcp_transport, two_way_receiver_adaptor),
+                        (tcp_protocol_two_way_client, tcp_transport_client, two_way_sender_adaptor)])
+def connection_args(request):
+    return request.param
+
+
+@pytest.fixture
+def connection(request, connection_args):
+    return get_fixture(request, connection_args[0])
+
+
+@pytest.fixture
+def transport(request, connection_args):
+    return get_fixture(request, connection_args[1])
+
+
+@pytest.fixture
+def adaptor(request, connection_args):
+    return get_fixture(request, connection_args[2])
+
+
+@pytest.fixture
+def connection_generator(connection) -> ConnectionGenerator:
+    return ConnectionGenerator(connection, logger=connection.logger)
 
 
 """
-@pytest.fixture
-async def tcp_server_protocol_one_way(buffered_file_storage_action_binary) -> TCPOneWayServerProtocol:
-    yield TCPOneWayServerProtocol(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary, timeout=0.5)()
-
-
 @pytest.fixture
 async def tcp_server_protocol_two_way_no_response(buffered_file_storage_action_binary) -> TCPServerProtocol:
     yield TCPServerProtocol(dataformat=TCAPMAPASNObject, action=file_storage_action_binary, timeout=0.5)()

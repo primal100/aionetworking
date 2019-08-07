@@ -5,14 +5,16 @@ from dataclasses import dataclass, field, replace
 
 from .exceptions import MessageFromNotAuthorizedHost
 
+from lib.actions.protocols import OneWaySequentialAction, ParallelAction
 from lib.formats.base import BaseMessageObject
+from lib.requesters.protocols import RequesterProtocol
 from lib.conf.logging import Logger
 from lib.conf.types import ConnectionLoggerType
 
 from .network_connections import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
 from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol,
-                        AdaptorProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
+                        AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
 from .types import ConnectionGeneratorType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
 from typing import Any, AnyStr, Dict, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
@@ -32,13 +34,13 @@ class ConnectionGenerator(ConnectionGeneratorProtocol):
     logger: Logger = Logger('receiver')
 
     def __call__(self) -> NetworkConnectionType:
-        return self.connection.clone()
+        return self.connection.clone(parent_id=id(self))
 
     def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(id(self))
 
-    async def close(self, timeout: Union[int, float] = None) -> None:
-        await connections_manager.wait_all_connections_closed(id(self), timeout=timeout)
+    async def wait_closed(self) -> None:
+        await connections_manager.wait_all_connections_closed(id(self))
 
 
 @dataclass
@@ -76,35 +78,36 @@ class UDPConnectionGenerator(asyncio.DatagramProtocol, ConnectionGenerator):
 class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protocol):
     name = ''
     adaptor_cls: Type[AdaptorType] = None
-    action = None
-    requester = None
+    action: ParallelAction = None
+    preaction: OneWaySequentialAction = None
+    requester: RequesterProtocol = None
     dataformat: Type[BaseMessageObject] = None
     adaptor: AdaptorType = field(default=None)
     context: Dict[str, Any] = field(default_factory=dict)
+    closed: asyncio.Task = field(default=None, init=False)
     logger: Logger = Logger('receiver')
-    parent: int = None
+    parent_id: int = None
     timeout: Union[int, float] = 5
 
     def __getattr__(self, item):
         if self.adaptor:
             return getattr(self.adaptor, item)
 
-    def update_context(self) -> None:
+    def _update_context(self) -> None:
         self.context['protocol_name'] = self.name
 
-    def initialize(self) -> None:
-        self.update_context()
-        self.set_adaptor()
+    def start_adaptor(self) -> None:
+        self._update_context()
+        self._set_adaptor()
         connections_manager.add_connection(self)
-        self.logger.log_num_connections('opened', self.parent)
+        self.logger.log_num_connections('opened', self.parent_id)
 
-    def set_adaptor(self) -> None:
+    def _set_adaptor(self) -> None:
         kwargs = {
-            'connection_logger': self.get_connection_logger(),
+            'logger': self._get_connection_logger(),
             'context': self.context,
             'dataformat': self.dataformat,
             'preaction': self.preaction,
-            'timeout': self.timeout,
             'send': self.send
         }
         if self.adaptor_cls.is_receiver:
@@ -118,28 +121,32 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     def _get_sender_adaptor(self, **kwargs) -> SenderAdaptorType:
         return self.adaptor_cls(requester=self.requester, **kwargs)
 
-    def clone(self: ConnectionType) -> ConnectionType:
-        return replace(self)
+    def clone(self: ConnectionType, **kwargs) -> ConnectionType:
+        return replace(self, **kwargs)
 
     def is_child(self, parent_id: int) -> bool:
-        return parent_id == self.parent
+        return parent_id == self.parent_id
 
-    def get_connection_logger(self) -> ConnectionLoggerType:
+    def _get_connection_logger(self) -> ConnectionLoggerType:
         return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, extra=self.context)
 
-    def delete_connection(self, fut: asyncio.Future) -> None:
+    def _delete_connection(self) -> None:
         connections_manager.remove_connection(self)
-        self.logger.log_num_connections('closed', self.parent)
+        self.logger.log_num_connections('closed', self.parent_id)
 
-    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task:
-        task = asyncio.create_task(self.adaptor.close(exc, timeout=self.timeout))
-        task.add_done_callback(self.delete_connection)
-        return task
+    async def _close(self, exc: Optional[BaseException]) -> None:
+        try:
+            await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
+        finally:
+            self._delete_connection()
 
-    async def close_wait(self, exc: Optional[BaseException]) -> asyncio.Task:
-        task = self.finish_connection(exc)
-        await task
-        return task
+    def finish_connection(self, exc: Optional[BaseException]) -> None:
+        self.closed = asyncio.create_task(self._close(exc))
+
+    async def close_wait(self):
+        if not self.closed:
+            self.finish_connection(None)
+        await self.closed
 
 
 TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
@@ -179,8 +186,8 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
             return self._get_alias(peer)
         self._raise_message_from_not_authorized_host(peer)
 
-    def update_context(self) -> None:
-        super().update_context()
+    def _update_context(self) -> None:
+        super()._update_context()
         self.context.update({
             'peer': self.peer_str,
             'host': self.peer[0],
@@ -198,13 +205,14 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
         self.sock_str = details_to_str(sock)
         try:
             self.alias = self._check_peer(self.peer)
-            self.initialize()
+            self.start_adaptor()
             return True
         except MessageFromNotAuthorizedHost as exc:
             self.finish_connection(exc)
             return False
 
 
+@dataclass
 class BaseTCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
     transport: asyncio.Transport = None
 
@@ -215,20 +223,14 @@ class BaseTCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
         self.initialize_connection(peer, sock)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
-        self.finish_connection(exc)
-
-    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task:
         self.transport.close()
-        return super().finish_connection(exc)
+        self.finish_connection(exc)
 
     def data_received(self, data: AnyStr) -> None:
         self.adaptor.on_data_received(data)
 
     def send(self, msg: AnyStr) -> None:
         self.transport.write(msg)
-
-    def send_many(self, data_list: List[bytes]) -> None:
-        self.transport.writelines(data_list)
 
 
 class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
@@ -239,30 +241,40 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
     def send(self, msg: AnyStr) -> None:
         self.transport.sendto(msg, self.peer)
 
-    def send_many(self, data_list: List[bytes]) -> None:
-        data = b''.join(data_list)
-        self.send(data)
+
+@dataclass
+class OneWayTCPServerConnection(BaseTCPConnection):
+    name = 'TCP Server'
+    adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
+    action: OneWaySequentialAction = None
 
 
-class OneWayTCPServer(BaseTCPConnection):
-    adaptor_cls = OneWayReceiverAdaptor
+@dataclass
+class TCPServerConnection(BaseTCPConnection):
+    name = 'TCP Server'
+    adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
 
 
-class TCPServer(BaseTCPConnection):
-    adaptor_cls = ReceiverAdaptor
+@dataclass
+class TCPClientConnection(BaseTCPConnection, SenderAdaptorGetattr):
+    name = 'TCP Client'
+    adaptor_cls: Type[AdaptorType] = SenderAdaptor
 
 
-class TCPClient(SenderAdaptorGetattr, BaseTCPConnection):
-    adaptor_cls = SenderAdaptor
+@dataclass
+class OneWayUDPServerConnection(BaseUDPConnection):
+    name = 'UDP Server'
+    adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
+    action: OneWaySequentialAction = None
 
 
-class OneWayUDPServer(BaseUDPConnection):
-    adaptor_cls = OneWayReceiverAdaptor
+@dataclass
+class UDPServerConnection(BaseUDPConnection):
+    name = 'UDP Server'
+    adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
 
 
-class UDPServer(BaseUDPConnection):
-    adaptor_cls = ReceiverAdaptor
-
-
-class UDPClient(SenderAdaptorGetattr, BaseUDPConnection):
-    adaptor_cls = SenderAdaptor
+@dataclass
+class UDPClientConnection(BaseUDPConnection, SenderAdaptorGetattr):
+    name = 'UDP Client'
+    adaptor_cls: Type[AdaptorType] = SenderAdaptor

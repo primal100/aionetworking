@@ -147,8 +147,8 @@ class ConnectionLogger(Logger):
     def get_extra(self, extra: Dict[str, Any], is_receiver: bool):
         extra = extra.copy()
         extra.update({
-            'server': extra.get('sock', '') if is_receiver else extra['peer'],
-            'client': extra.get('peer', '') if is_receiver else extra['sock']
+            'server': extra.get('sock', '') if is_receiver else extra.get('peer', ''),
+            'client': extra.get('peer', '') if is_receiver else extra.get('sock', '')
         })
         return extra
 

@@ -19,7 +19,7 @@ class ConnectionGeneratorProtocol(Protocol):
     def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
 
     @abstractmethod
-    async def close(self, timeout: Union[int, float] = None) -> None: ...
+    async def wait_closed(self) -> None: ...
 
 
 ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound=ConnectionGeneratorProtocol)
@@ -29,22 +29,18 @@ class ConnectionProtocol(Protocol):
     parent: int
 
     @abstractmethod
+    def start_adaptor(self) -> None: ...
+
+    @abstractmethod
     def send(self, data: AnyStr) -> None: ...
 
     @abstractmethod
-    def send_many(self, data_list: List[AnyStr]) -> None: ...
-
-    @abstractmethod
-    def clone(self: ConnectionType, *args, **kwargs) -> ConnectionType: ...
+    def clone(self: ConnectionType, **kwargs) -> ConnectionType: ...
 
     @abstractmethod
     def is_child(self, parent_id: int) -> bool: ...
 
-    @abstractmethod
-    def finish_connection(self, exc: Optional[BaseException]) -> asyncio.Task: ...
-
-    @abstractmethod
-    async def close_wait(self, exc: Optional[BaseException]) -> asyncio.Task: ...
+    async def close_wait(self): ...
 
 
 ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
@@ -52,9 +48,6 @@ ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
 
 class NetworkConnectionMixinProtocol(Protocol):
     peer_str: str
-
-    @abstractmethod
-    def initialize_connection(self, peer: Tuple[str, int], sock:  Tuple[str, int], ) -> bool: ...
 
 
 class NetworkConnectionProtocol(NetworkConnectionMixinProtocol, ConnectionProtocol, Protocol): ...

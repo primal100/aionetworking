@@ -9,7 +9,7 @@ from .exceptions import MethodNotFoundError
 from lib.actions.protocols import BaseActionProtocol, OneWaySequentialAction, ParallelAction
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
-from lib.requesters.base import BaseRequester
+from lib.requesters.protocols import RequesterProtocol
 from lib.utils import Record
 from lib.utils_logging import p
 from lib.wrappers.schedulers import TaskScheduler
@@ -29,10 +29,10 @@ def not_implemented_callable(*args, **kwargs) -> None:
 class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     dataformat: Type[BaseMessageObject]
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger: ConnectionLogger = field(default_factory=connection_logger_receiver)
+    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False)
     context: Dict[str, Any] = field(default_factory=dict)
     preaction: OneWaySequentialAction = None
-    send: Callable[[AnyStr], None] = not_implemented_callable
+    send: Callable[[AnyStr], None] = field(default=not_implemented_callable, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.codec: BaseCodec = self.dataformat.get_codec(logger=self.logger, context=self.context)
@@ -91,7 +91,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 @dataclass
 class SenderAdaptor(BaseAdaptorProtocol):
     is_receiver = False
-    requester: BaseRequester = None
+    requester: RequesterProtocol = None
 
     _notification_queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False,
                                                compare=False)

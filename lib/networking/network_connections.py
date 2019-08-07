@@ -20,11 +20,15 @@ class ConnectionsManager:
 
     def add_connection(self, connection: SimpleNetworkConnectionType) -> None:
         self._connections[connection.peer_str] = connection
-        self._counters.increment(connection.parent)
+        self._counters.increment(connection.parent_id)
 
     def remove_connection(self, connection: Any):
         connection = self._connections.pop(connection.peer_str, None)
-        self._counters.decrement(connection.parent)
+        self._counters.decrement(connection.parent_id)
+
+    @property
+    def total(self) -> int:
+        return len(self._connections)
 
     def num_connections(self, parent_id: int) -> int:
         return self._counters.get_num(parent_id)
@@ -56,8 +60,8 @@ class ConnectionsManager:
         for connection in self._subscriptions[subscribe_key]:
             connection.encode_and_send_msg(decoded)
 
-    async def wait_all_connections_closed(self, parent_id: int, timeout: Union[int, float] = None) -> None:
-        await self._counters.wait_zero(parent_id, timeout=timeout)
+    async def wait_all_connections_closed(self, parent_id: int) -> None:
+        await self._counters.wait_zero(parent_id)
 
     def get(self, key: str) -> SimpleNetworkConnectionType:
         return self._connections.get(key)
