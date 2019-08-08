@@ -783,13 +783,13 @@ async def tcp_transport_client(queue, extra_client) -> asyncio.Transport:
 
 
 @pytest.fixture
-async def udp_transport(deque, extra) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(deque, extra=extra)
+async def udp_transport(queue, extra) -> asyncio.DatagramTransport:
+    yield MockDatagramTransport(queue, extra=extra)
 
 
 @pytest.fixture
-async def udp_transport_client(deque, extra_client) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(deque, extra=extra_client)
+async def udp_transport_client(queue, extra_client) -> asyncio.DatagramTransport:
+    yield MockDatagramTransport(queue, extra=extra_client)
 
 
 @pytest.fixture
@@ -1018,10 +1018,10 @@ def get_fixtures(request):
     return [request.getfixturevalue(param.__name__) for param in request.param]
 
 
-@pytest.fixture(params=[(tcp_protocol_one_way_server, tcp_transport, one_way_receiver_adaptor),
-                        (tcp_protocol_one_way_client, tcp_transport_client, one_way_sender_adaptor),
-                        (tcp_protocol_two_way_server, tcp_transport, two_way_receiver_adaptor),
-                        (tcp_protocol_two_way_client, tcp_transport_client, two_way_sender_adaptor)])
+@pytest.fixture(params=[(tcp_protocol_one_way_server, tcp_transport, one_way_receiver_adaptor, peername),
+                        (tcp_protocol_one_way_client, tcp_transport_client, one_way_sender_adaptor, sock),
+                        (tcp_protocol_two_way_server, tcp_transport, two_way_receiver_adaptor, peername),
+                        (tcp_protocol_two_way_client, tcp_transport_client, two_way_sender_adaptor, sock)])
 def connection_args(request):
     return request.param
 
@@ -1039,6 +1039,11 @@ def transport(request, connection_args):
 @pytest.fixture
 def adaptor(request, connection_args):
     return get_fixture(request, connection_args[2])
+
+
+@pytest.fixture
+def peer_data(request, connection_args):
+    return get_fixture(request, connection_args[3])
 
 
 @pytest.fixture
