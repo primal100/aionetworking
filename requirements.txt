@@ -1,9 +1,4 @@
-pytest
 inflect
-pydantic
-asyncssh
-paramiko
-passlib
-aiofile
+#pydantic
 typing-extensions
-git+https://github.com/P1sec/pycrate.git#egg=pycrate
+#git+https://github.com/P1sec/pycrate.git#egg=pycrate

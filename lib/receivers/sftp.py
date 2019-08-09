@@ -6,6 +6,7 @@ from functools import partial
 from passlib.hash import pbkdf2_sha256
 
 from lib import settings
+from lib.wrappers.schedulers import TaskScheduler
 from lib.wrappers.futures import NamedFutures
 from lib.networking.asyncio_protocols import TCPServerProtocol
 from .asyncio_servers import BaseTCPServerReceiver
@@ -76,21 +77,21 @@ class OrderedSFTPFactory(SFTPFactory):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.futures = NamedFutures()
+        self._scheduler = TaskScheduler()
         self.process_task = asyncio.create_task(self.process_files())
 
     async def process_files(self):
-        name, result = await self.futures.wait_one()
-        self.handle_file(name, result)
-        await self.process_files()
+        while True:
+            name, result = await self._scheduler.next_future()
+            self.handle_file(name, result)
 
     def open(self, *args, **kwargs):
         file_obj = super(OrderedSFTPFactory, self).open(*args, **kwargs)
-        self.futures.new(file_obj.name)
+        self._scheduler.create_future(file_obj.name)
         return file_obj
 
     def on_close(self, file_obj, data):
-        self.futures.set_result(file_obj.name, data)
+        self._scheduler.set_result(file_obj.name, data)
 
 
 class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
@@ -98,7 +99,6 @@ class SSHServer(TCPServerProtocol, asyncssh.SSHServer):
     def __init__(self, manager, logins=None, public_key_auth_supported=False, **kwargs):
         super().__init__(manager, **kwargs)
         self._public_key_auth_supported = public_key_auth_supported
-
 
     def send(self, msg):
         raise ServerException('Unable to send messages with this receiver')

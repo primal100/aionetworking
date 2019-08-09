@@ -39,7 +39,7 @@ class ConnectionGenerator(ConnectionGeneratorProtocol):
     def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(id(self))
 
-    async def wait_closed(self) -> None:
+    async def wait_all_closed(self) -> None:
         await connections_manager.wait_all_connections_closed(id(self))
 
 

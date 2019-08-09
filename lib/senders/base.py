@@ -1,17 +1,17 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
+from abc import abstractmethod
 import asyncio
 
-from pydantic.dataclasses import dataclass
-
+from dataclasses import dataclass, field
 from lib.types import Logger
-from lib.networking.mixins import ClientProtocolMixin
-from lib.networking.asyncio_protocols import BaseNetworkProtocol
+from lib.networking.types import ConnectionGeneratorType, ConnectionType
 
-from typing import NoReturn
+from typing import Tuple
+from typing_extensions import Protocol
 
 
 @dataclass
-class BaseSender(ABC):
+class BaseSender(Protocol):
     name = 'sender'
     logger: Logger = 'sender'
 
@@ -19,44 +19,50 @@ class BaseSender(ABC):
     def loop(self) -> asyncio.SelectorEventLoop:
         return asyncio.get_event_loop()
 
-    async def __aenter__(self) -> ClientProtocolMixin:
+    async def __aenter__(self) -> ConnectionType:
         return await self.start()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> NoReturn:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.stop()
 
-    async def start(self) -> ClientProtocolMixin:
-        pass
+    @abstractmethod
+    async def start(self) -> ConnectionType: ...
 
     async def stop(self):
         pass
 
 
 @dataclass
-class BaseNetworkClient(ABC, BaseSender):
+class BaseNetworkClient(BaseSender):
     name = "Network client"
-    conn = None
-    transport = None
+    conn: ConnectionType = field(init=False)
+    transport: asyncio.BaseTransport = field(init=False, compare=False)
 
     host: str = '127.0.0.1'
     port: int = 4000
     srcip: str = None
     srcport: int = 0
-    protocol:  BaseNetworkProtocol = None
+    protocol_generator:  ConnectionGeneratorType = None
 
     @abstractmethod
-    async def open_connection(self) -> ClientProtocolMixin: ...
+    async def open_connection(self) -> ConnectionType: ...
 
     async def close_connection(self):
-        pass
+        self.transport.close()
 
-    async def start(self) -> ClientProtocolMixin:
-        self.logger.info("Opening %s connection to %s", self.sender_type, self.dst)
+    @property
+    def local_addr(self) -> Tuple[str, int]:
+        return self.srcip, self.port
+
+    @property
+    def dst(self):
+        return f"{self.host}:{str(self.port)}"
+
+    async def start(self) -> ConnectionType:
+        self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self.open_connection()
-        self.logger.info("Connection open")
         return connection
 
-    async def stop(self) -> NoReturn:
-        self.logger.info("Closing %s connection to %s", self.sender_type, self.dst)
+    async def stop(self) -> None:
+        self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self.close_connection()
-        self.logger.info("Connection closed")

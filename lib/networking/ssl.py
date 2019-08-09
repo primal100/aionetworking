@@ -4,18 +4,15 @@ from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get
 from lib.conf.logging import Logger
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-if TYPE_CHECKING:
-    from dataclasses import dataclass
-else:
-    from pydantic.dataclasses import dataclass
+from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
 class BaseSSLContext:
     logger: Logger = 'receiver'
     ssl: bool = False
-    _context: SSLContext = None
+    context: SSLContext = None
     cert: Path = None
     key: Path = None
     key_password: str = None
@@ -26,7 +23,7 @@ class BaseSSLContext:
     hostname_check: bool = False
 
     @property
-    def context(self):
+    def ssl_context(self):
         return self.create_context()
 
     def create_context(self, ) -> Optional[SSLContext]:

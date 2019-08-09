@@ -40,7 +40,8 @@ class ConnectionProtocol(Protocol):
     @abstractmethod
     def is_child(self, parent_id: int) -> bool: ...
 
-    async def close_wait(self): ...
+    @abstractmethod
+    async def wait_all_closed(self): ...
 
 
 ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
