@@ -1,11 +1,11 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field
 
 from .exceptions import ServerException
 from lib.conf.logging import Logger
-from lib.networking.protocols import BaseAdaptorProtocol, ConnectionGeneratorType
+from lib.networking.protocols import ConnectionGeneratorType
 from .protocols import ReceiverProtocol
 
 from socket import socket
@@ -17,8 +17,6 @@ from typing_extensions import Protocol
 class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
     logger: Logger = 'receiver'
-    protocol: BaseAdaptorProtocol = None
-
     quiet: bool = False
 
     def __post_init__(self):
@@ -33,15 +31,14 @@ class BaseReceiver(ReceiverProtocol, Protocol):
 class BaseServer(BaseReceiver, Protocol):
     name = 'Server'
 
-    host: str = '0.0.0.0'
-    port: int = 4000
     protocol_generator:  ConnectionGeneratorType = None
+    server: asyncio.AbstractServer = field(default=None, init=False)
     started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     stopped: asyncio.Event = field(default_factory=asyncio.Event, init=False)
 
     @property
-    def listening_on(self) -> str:
-        return f"{self.host}:{self.port}"
+    @abstractmethod
+    def listening_on(self) -> str: ...
 
     def _print_listening_message(self, sockets) -> None:
         if not self.quiet:
@@ -85,7 +82,17 @@ class BaseServer(BaseReceiver, Protocol):
 
 
 @dataclass
-class BaseTCPReceiver(BaseServer, ABC):
+class BaseNetworkServer(BaseServer, Protocol):
+    host: str = '0.0.0.0'
+    port: int = 4000
+
+    @property
+    def listening_on(self) -> str:
+        return f"{self.host}:{self.port}"
+
+
+@dataclass
+class BaseTCPReceiver(BaseNetworkServer, Protocol):
     server: asyncio.AbstractServer = None
 
     @abstractmethod

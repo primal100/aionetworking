@@ -24,6 +24,8 @@ from lib.formats.base import BufferObject
 from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import ConnectionGenerator, OneWayTCPServerConnection, TCPServerConnection, TCPClientConnection
 from lib.networking.network_connections import ConnectionsManager
+from lib.receivers.servers import TCPServer, UDPServer
+from lib.senders.clients import TCPClient, UDPClient
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.wrappers.counters import Counters, Counter
 from lib.wrappers.schedulers import TaskScheduler
@@ -1049,49 +1051,3 @@ def peer_data(request, connection_args):
 @pytest.fixture
 def connection_generator(connection) -> ConnectionGenerator:
     return ConnectionGenerator(connection, logger=connection.logger)
-
-
-"""
-@pytest.fixture
-async def tcp_server_protocol_two_way_no_response(buffered_file_storage_action_binary) -> TCPServerProtocol:
-    yield TCPServerProtocol(dataformat=TCAPMAPASNObject, action=file_storage_action_binary, timeout=0.5)()
-
-
-@pytest.fixture
-async def tcp_server_protocol_two_way(json_rpc_action) -> TCPServerProtocol:
-    yield TCPServerProtocol(dataformat=JSONObject, action=json_rpc_action, timeout=0.5)()
-
-
-@pytest.fixture
-async def tcp_client_protocol_one_way(json_rpc_requester) -> TCPClientProtocol:
-    yield TCPClientProtocol(dataformat=TCAPMAPASNObject, requester=json_rpc_requester, timeout=0.5)()
-
-
-@pytest.fixture
-async def tcp_server_protocol_one_way_connected(tcp_server_protocol_one_way, tcp_transport) -> TCPOneWayServerProtocol:
-    tcp_server_protocol_one_way.connection_made(tcp_transport)
-    yield tcp_server_protocol_one_way
-    if not tcp_transport.is_closing():
-        tcp_server_protocol_one_way.connection_lost(None)
-
-
-@pytest.fixture
-async def tcp_two_way_server_protocol_no_response_connected(tcp_server_protocol_two_way_no_response, tcp_transport) -> TCPOneWayServerProtocol:
-    tcp_server_protocol_two_way_no_response.connection_made(tcp_transport)
-    yield tcp_server_protocol_two_way_no_response
-    tcp_server_protocol_two_way_no_response.connection_lost(None)
-
-
-@pytest.fixture
-async def tcp_server_protocol_two_way_connected(tcp_server_protocol_two_way, tcp_transport) -> TCPOneWayServerProtocol:
-    tcp_server_protocol_two_way.connection_made(tcp_transport)
-    yield tcp_server_protocol_two_way
-    tcp_server_protocol_two_way.connection_lost(None)
-
-
-@pytest.fixture
-async def tcp_client_protocol_connected(tcp_client_protocol, tcp_transport) -> TCPOneWayServerProtocol:
-    tcp_client_protocol.connection_made(tcp_transport)
-    yield tcp_client_protocol
-    tcp_client_protocol.connection_lost(None)
-"""

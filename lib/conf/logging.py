@@ -5,7 +5,7 @@ from collections import ChainMap
 from datetime import datetime
 from dataclasses import field
 
-from pydantic import ValidationError
+#from pydantic import ValidationError
 
 from lib.networking.network_connections import connections_manager
 from lib.utils import log_exception
@@ -88,7 +88,7 @@ class Logger(BaseLogger):
             instance = cls(logger)
             cls._loggers[logger] = instance
             return instance
-        raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
+        #raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
 
     @classmethod
     def validate_new(cls, logger) -> BaseLogger:
@@ -96,7 +96,7 @@ class Logger(BaseLogger):
             return logger
         if isinstance(logger, str):
             return cls(logger)
-        raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
+        #raise ValidationError(f"{logger.__class__.__name__} is not a valid type for logger")
 
     def get_connection_logger_cls(self) -> Type[BaseLogger]:
         if self.get_child_logger('stats').isEnabledFor(logging.INFO):

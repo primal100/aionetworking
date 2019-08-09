@@ -65,12 +65,12 @@ class BaseEventLoop(AbstractEventLoop):
         @overload
         async def create_connection(self, protocol_factory: _ProtocolFactory, host: str = ..., port: int = ..., *,
                                     ssl: _SSLContext = ..., family: int = ..., proto: int = ..., flags: int = ...,
-                                    sock: None = ..., local_addr: Optional[str] = ..., server_hostname: Optional[str] = ...,
+                                    sock: None = ..., local_addr: Tuple[str, int] = ..., server_hostname: Optional[str] = ...,
                                     ssl_handshake_timeout: Optional[float] = ...) -> _TransProtPair: ...
         @overload
         async def create_connection(self, protocol_factory: _ProtocolFactory, host: None = ..., port: None = ..., *,
                                     ssl: _SSLContext = ..., family: int = ..., proto: int = ..., flags: int = ...,
-                                    sock: socket, local_addr: Tuple[str, int] = ..., server_hostname: Optional[str] = ...,
+                                    sock: socket, local_addr: None = ..., server_hostname: Optional[str] = ...,
                                     ssl_handshake_timeout: Optional[float] = ...) -> _TransProtPair: ...
         @overload
         async def create_server(self, protocol_factory: _ProtocolFactory, host: Optional[Union[str, Sequence[str]]] = ...,

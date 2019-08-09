@@ -1,10 +1,11 @@
 from __future__ import annotations
 import asyncio
+from pathlib import Path
 from ssl import SSLContext
 
 from dataclasses import dataclass
 
-from .base import BaseServer, BaseTCPReceiver
+from .base import BaseServer, BaseNetworkServer, BaseTCPReceiver
 from lib.networking.ssl import ServerSideSSL
 
 from socket import socket
@@ -16,7 +17,7 @@ class TCPServer(BaseTCPReceiver):
     name = "TCP Server"
 
     ssl: ServerSideSSL = None
-    ssl_handshake_timeout: int = 0
+    ssl_handshake_timeout: int = None
 
     def __post_init__(self):
         if isinstance(self.ssl, SSLContext):
@@ -29,7 +30,36 @@ class TCPServer(BaseTCPReceiver):
 
 
 @dataclass
-class UDPServer(BaseServer):
+class UnixServer(BaseServer):
+    name = "Unix Server"
+
+    path: Path = Path('/tmp/unix_server.socket')
+    ssl: ServerSideSSL = None
+    ssl_handshake_timeout: int = None
+
+    @property
+    def listening_on(self) -> str:
+        return str(self.path)
+
+    def __post_init__(self):
+        if isinstance(self.ssl, SSLContext):
+            self.ssl = ServerSideSSL(context=self.ssl)
+
+    async def get_server(self) -> asyncio.AbstractServer:
+        return await self.loop.create_unix_server(self.protocol_generator, path=str(self.path), ssl=self.ssl.context,
+                                                  ssl_handshake_timeout=self.ssl_handshake_timeout)
+
+    async def start_server(self) -> List[socket]:
+        self.server = await self.get_server()
+        return self.server.sockets
+
+    async def stop_server(self) -> None:
+        self.server.close()
+        await self.server.wait_closed()
+
+
+@dataclass
+class UDPServer(BaseNetworkServer):
     name = "UDP Server"
     transport: asyncio.DatagramTransport = None
 

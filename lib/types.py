@@ -4,17 +4,19 @@ from pathlib import Path
 import builtins
 import operator
 
-from pydantic import validator, errors, BaseModel, ValidationError
-from pydantic.types import conint
-from pydantic.validators import path_validator
-from pydantic.utils import AnyCallable
+#from pydantic import validator, errors, BaseModel, ValidationError
+#from pydantic.types import conint
+#from pydantic.validators import path_validator
+#from pydantic.utils import AnyCallable
 
 from lib.utils import str_to_list
 
 from typing import TYPE_CHECKING, Union, Generator, Callable, Iterable, Any
 
 
-if TYPE_CHECKING:
+from dataclasses import dataclass
+
+"""if TYPE_CHECKING:
     from dataclasses import dataclass
     from typing import Type
     CallableGenerator = Generator[AnyCallable, None, None]
@@ -39,7 +41,7 @@ else:
             return type(f"{item.__name__}Type", (cls,), {'base_cls': item})
 
 
-Port = conint(ge=0, le=65335)
+Port = conint(ge=0, le=65335)"""
 
 
 class Logger(logging.Logger):

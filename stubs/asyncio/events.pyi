@@ -116,7 +116,7 @@ class AbstractEventLoop(metaclass=ABCMeta):
         @abstractmethod
         async def create_connection(self, protocol_factory: _ProtocolFactory, host: str = ..., port: int = ..., *,
                                     ssl: _SSLContext = ..., family: int = ..., proto: int = ..., flags: int = ...,
-                                    sock: None = ..., local_addr: Optional[str] = ..., server_hostname: Optional[str] = ...,
+                                    sock: None = ..., local_addr: Tuple[str, int] = ..., server_hostname: Optional[str] = ...,
                                     ssl_handshake_timeout: Optional[float] = ...) -> _TransProtPair: ...
         @overload
         @abstractmethod
