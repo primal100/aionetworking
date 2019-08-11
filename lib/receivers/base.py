@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from .exceptions import ServerException
 from lib.conf.logging import Logger
 from lib.networking.protocols import ConnectionGeneratorType
+from lib.factories import event_set
 from .protocols import ReceiverProtocol
 
 from socket import socket
@@ -19,12 +20,17 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     logger: Logger = 'receiver'
     quiet: bool = False
 
-    def __post_init__(self):
-        asyncio.create_task(self.start())
-
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
+
+    async def start_wait(self) -> bool:
+        await self.start()
+        return await self.wait_started()
+
+    async def stop_wait(self) -> bool:
+        await self.stop()
+        return await self.wait_stopped()
 
 
 @dataclass
@@ -34,52 +40,60 @@ class BaseServer(BaseReceiver, Protocol):
     protocol_factory:  ConnectionGeneratorType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
     started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
-    stopped: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+    stopped: asyncio.Event = field(default_factory=event_set, init=False)
 
     @property
     @abstractmethod
     def listening_on(self) -> str: ...
 
-    def _print_listening_message(self, sockets) -> None:
-        if not self.quiet:
-            for sock in sockets:
-                sock_name = sock.getsockname()
-                listening_on = ':'.join([str(v) for v in sock_name])
-                print(f"Serving, {self.name}, on {listening_on}")
+    def _print_listening_message(self) -> None:
+        sockets = self.server.sockets
+        for sock in sockets:
+            sock_name = sock.getsockname()
+            listening_on = ':'.join([str(v) for v in sock_name])
+            print(f"Serving {self.name} on {listening_on}")
 
     async def stop(self) -> None:
-        if self.stopped.set():
+        if self.stopped.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} already stopped")
-        if not self.started.set():
+        if not self.started.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} not yet started")
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
-        await self.started.clear()
+        self.started.clear()
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
         await self.protocol_factory.wait_all_closed()
         self.stopped.set()
 
     async def start(self) -> None:
-        if self.started.set():
+        if self.started.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
         self.stopped.clear()
-        sockets = await self.start_server()
+        await self.start_server()
+        if not self.quiet:
+            self._print_listening_message()
         self.started.set()
-        self._print_listening_message(sockets)
 
-    async def wait_started(self) -> None:
+    def _is_serving(self) -> bool:
+        return self.server.is_serving()
+
+    def is_started(self) -> bool:
+        return self.started.is_set() and self._is_serving()
+
+    async def wait_started(self) -> bool:
         await self.started.wait()
+        return self._is_serving()
 
-    async def wait_stopped(self) -> None:
+    async def wait_stopped(self) -> bool:
         await self.stopped.wait()
+        return self._is_serving()
 
     @abstractmethod
     async def _get_server(self) -> asyncio.AbstractServer: ...
 
-    async def start_server(self) -> List[socket]:
+    async def start_server(self) -> None:
         self.server = await self._get_server()
-        return self.server.sockets
 
     async def stop_server(self) -> None:
         self.server.close()

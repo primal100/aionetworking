@@ -71,11 +71,11 @@ class WindowsPipeClient(BaseClient):
         return self.conn
 
 
-def unix_or_windows_client(address: Union[str, Path] = None, **kwargs):
+def pipe_client(path: Union[str, Path] = None, **kwargs):
     if hasattr(socket, 'AF_UNIX'):
-        return UnixSocketClient(path=address, **kwargs)
+        return UnixSocketClient(path=path, **kwargs)
     if sys.platform == 'win32':
-        return WindowsPipeClient(path=address, **kwargs)
+        return WindowsPipeClient(path=path, **kwargs)
     raise OSError("Neither AF_UNIX nor Named Pipe is supported on this platform")
 
 

@@ -14,7 +14,6 @@ from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFi
 from lib.actions.jsonrpc import JSONRPCServer
 from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
 from lib.requesters.jsonrpc import SampleJSONRPCClient
-from lib.conf.types import ConnectionLoggerType, LoggerType
 from lib.conf.logging import ConnectionLogger, Logger
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.contrib.types import JSONObjectType
@@ -24,15 +23,18 @@ from lib.formats.base import BufferObject
 from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import ConnectionGenerator, OneWayTCPServerConnection, TCPServerConnection, TCPClientConnection
 from lib.networking.network_connections import ConnectionsManager
-from lib.receivers.servers import TCPServer, UDPServer
-from lib.senders.clients import TCPClient, UDPClient
-from lib.networking.types import SimpleNetworkConnectionType
+from lib.receivers.servers import TCPServer, pipe_server
+from lib.senders.clients import TCPClient, pipe_client
+from lib.utils import pipe_address_by_os, set_proactor_loop_policy
 from lib.wrappers.counters import Counters, Counter
 from lib.wrappers.schedulers import TaskScheduler
 
 from tests.mock import MockTCPTransport, MockDatagramTransport
 
-from typing import Dict, Any, List, Tuple, Union, Callable, ClassVar
+from typing import Dict, Any, List, Tuple, Union, Callable
+
+
+set_proactor_loop_policy()
 
 
 @pytest.fixture
@@ -1051,3 +1053,119 @@ def peer_data(request, connection_args):
 @pytest.fixture
 def connection_generator(connection) -> ConnectionGenerator:
     return ConnectionGenerator(connection, logger=connection.logger)
+
+
+@pytest.fixture
+def connection_generator_one_way_server(tcp_protocol_one_way_server, receiver_logger):
+    return ConnectionGenerator(tcp_protocol_one_way_server, logger=receiver_logger)
+
+
+@pytest.fixture
+def connection_generator_one_way_client(tcp_protocol_one_way_client, sender_logger):
+    return ConnectionGenerator(tcp_protocol_one_way_client, logger=sender_logger)
+
+
+@pytest.fixture
+def connection_generator_two_way_server(tcp_protocol_two_way_server, receiver_logger):
+    return ConnectionGenerator(tcp_protocol_two_way_server, logger=receiver_logger)
+
+
+@pytest.fixture
+def connection_generator_two_way_client(tcp_protocol_two_way_server, sender_logger):
+    return ConnectionGenerator(tcp_protocol_two_way_server, logger=sender_logger)
+
+
+@pytest.fixture
+def tcp_server_one_way(connection_generator_one_way_server, receiver_logger, sock):
+    return TCPServer(protocol_factory=connection_generator_one_way_server, logger=receiver_logger, host=sock[0],
+                     port=sock[1])
+
+
+@pytest.fixture
+def tcp_client_one_way(connection_generator_one_way_client, sender_logger, sock, peer_data):
+    return TCPClient(protocol_factory=connection_generator_one_way_client, logger=sender_logger, host=sock[0],
+                     port=sock[1], srcip=peer_data[0], srcport=peer_data[1])
+
+
+@pytest.fixture
+def tcp_server_two_way(connection_generator_two_way_server, receiver_logger, sock):
+    return TCPServer(protocol_factory=connection_generator_two_way_server, logger=receiver_logger, host=sock[0],
+                     port=sock[1])
+
+
+@pytest.fixture
+def tcp_client_two_way(connection_generator_two_way_client, sender_logger, sock, peer_data):
+    return TCPClient(protocol_factory=connection_generator_two_way_client, logger=sender_logger, host=sock[0],
+                     port=sock[1], srcip=peer_data[0], srcport=peer_data[1])
+
+
+@pytest.fixture
+async def pipe_path() -> Path:
+    path = pipe_address_by_os()
+    yield path
+    if path.exists():
+        path.unlink()
+
+
+@pytest.fixture
+def pipe_server_one_way(connection_generator_one_way_server, receiver_logger, pipe_path):
+    return pipe_server(protocol_factory=connection_generator_one_way_server, logger=receiver_logger, path=pipe_path)
+
+
+@pytest.fixture
+def pipe_client_one_way(connection_generator_one_way_client, sender_logger, pipe_path):
+    return pipe_client(protocol_factory=connection_generator_one_way_client, logger=sender_logger, host=sock[0],
+                       port=sock[1], srcip=peer_data[0], srcport=peer_data[1], path=pipe_path)
+
+
+@pytest.fixture
+def pipe_server_two_way(connection_generator_two_way_server, receiver_logger, pipe_path):
+    return pipe_server(protocol_factory=connection_generator_two_way_server, logger=receiver_logger, path=pipe_path)
+
+
+@pytest.fixture
+def pipe_client_two_way(connection_generator_two_way_client, sender_logger, pipe_path):
+    return pipe_client(protocol_factory=connection_generator_two_way_client, logger=sender_logger, path=pipe_path)
+
+
+@pytest.fixture(params=[(tcp_server_one_way, tcp_client_one_way),
+                        (tcp_server_two_way, tcp_client_two_way),
+                         (pipe_server_one_way, pipe_client_two_way),
+                         (pipe_server_two_way, pipe_client_two_way)])
+def server_client_args(request):
+    return request.param
+
+
+@pytest.fixture
+def _server_receiver(request, server_client_args):
+    return get_fixture(request, server_client_args[0])
+
+
+@pytest.fixture
+async def server_receiver(_server_receiver):
+    yield _server_receiver
+    if _server_receiver.is_started():
+        await _server_receiver.stop_wait()
+
+
+@pytest.fixture
+async def server_receiver_quiet(server_receiver):
+    server_receiver.quiet = True
+    yield server_receiver
+
+
+@pytest.fixture
+async def server_started(server_receiver):
+    await server_receiver.start_wait()
+    yield server_receiver
+
+
+@pytest.fixture
+def client_receiver(request, server_client_args):
+    return get_fixture(request, server_client_args[1])
+
+
+@pytest.fixture
+async def client_connected(client, server_started):
+    with client as conn:
+        yield conn

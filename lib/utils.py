@@ -6,10 +6,13 @@ import re
 import traceback
 import time
 import itertools
+import sys
+import socket
 import tempfile
 from dataclasses import fields
 
 
+from pathlib import Path
 from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
 from typing_extensions import Protocol
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
@@ -146,17 +149,30 @@ class cached_property(object):
         return wrapper()
 
 
-class WindowsEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
+class WindowsfProactorEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
 
-    # Class can be removed in Python 3.8 as ProactorEventLoop will be default for windows.
+    # Unnecessary in Python 3.8 as ProactorEventLoop will be default for windows.
 
     def new_event_loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.ProactorEventLoop()
 
 
-def set_loop_policy() -> None:
+class WindowsSelectorEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
+
+    # For UDP support in Windows in Python 3.7 or under
+
+    def new_event_loop(self) -> asyncio.AbstractEventLoop:
+        return asyncio.SelectorEventLoop()
+
+
+def set_proactor_loop_policy() -> None:
     if os.name == 'nt':
-        asyncio.set_event_loop_policy(WindowsEventLoopPolicy())
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+
+def set_selector_loop_policy() -> None:
+    if os.name == 'nt':
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
 
 ###Logging###
@@ -192,25 +208,32 @@ def current_date() -> str:
 _mmap_counter = itertools.count()
 
 
-def arbitrary_address(family, future_pid=False):
+def arbitrary_address(family, future_pid=False) -> Union[Tuple[str, int], Path]:
     if family == 'AF_INET':
-        return ('localhost', 0)
-    elif family == 'AF_UNIX':
-        return tempfile.mktemp(prefix='listener-', dir=tempfile.mkdtemp(prefix='pymp-'))
-    elif family == 'AF_PIPE':
+        return 'localhost', 0
+    if family == 'AF_UNIX':
+        return Path(tempfile.mktemp(prefix='listener-', dir=tempfile.mkdtemp(prefix='pymp-')))
+    if family == 'AF_PIPE':
         pid = '{pid}' if future_pid else os.getpid()
-        return tempfile.mktemp(prefix=r'\\.\pipe\pyc-%d-%d-' %
-                               (pid, next(_mmap_counter)), dir="")
-    else:
-        raise ValueError('unrecognized family')
+        return Path(tempfile.mktemp(prefix=r'\\.\pipe\pyc-%d-%d-' %
+                               (pid, next(_mmap_counter)), dir=""))
+    raise ValueError('unrecognized family')
 
 
-def unix_address():
+def unix_address() -> Path:
     return arbitrary_address('AF_UNIX')
 
 
-def pipe_address():
+def pipe_address() -> Path:
     return arbitrary_address('AF_PIPE')
+
+
+def pipe_address_by_os() -> Path:
+    if hasattr(socket, 'AF_UNIX'):
+        return unix_address()
+    if sys.platform == 'win32':
+        return pipe_address()
+    OSError("Neither AF_UNIX nor Named Pipe is supported on this platform")
 
 
 ###Binary###
