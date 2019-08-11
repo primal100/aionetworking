@@ -5,6 +5,8 @@ import struct
 import re
 import traceback
 import time
+import itertools
+import tempfile
 from dataclasses import fields
 
 
@@ -183,6 +185,32 @@ def datetime_to_human_readable(dt: datetime.datetime, strf: str='%Y-%m-%d %H:%M:
 
 def current_date() -> str:
     return datetime.datetime.now().strftime("%Y%m%d")
+
+
+###Multiprocessing###
+
+_mmap_counter = itertools.count()
+
+
+def arbitrary_address(family, future_pid=False):
+    if family == 'AF_INET':
+        return ('localhost', 0)
+    elif family == 'AF_UNIX':
+        return tempfile.mktemp(prefix='listener-', dir=tempfile.mkdtemp(prefix='pymp-'))
+    elif family == 'AF_PIPE':
+        pid = '{pid}' if future_pid else os.getpid()
+        return tempfile.mktemp(prefix=r'\\.\pipe\pyc-%d-%d-' %
+                               (pid, next(_mmap_counter)), dir="")
+    else:
+        raise ValueError('unrecognized family')
+
+
+def unix_address():
+    return arbitrary_address('AF_UNIX')
+
+
+def pipe_address():
+    return arbitrary_address('AF_PIPE')
 
 
 ###Binary###

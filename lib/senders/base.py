@@ -35,7 +35,7 @@ class BaseSender(Protocol):
 @dataclass
 class BaseClient(BaseSender, Protocol):
     name = "Client"
-    protocol_generator:  ConnectionGeneratorType = None
+    protocol_factory:  ConnectionGeneratorType = None
     conn: ConnectionType = field(init=False, default=None)
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
 

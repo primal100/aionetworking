@@ -19,7 +19,7 @@ class ConnectionGeneratorProtocol(Protocol):
     def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
 
     @abstractmethod
-    async def wait_closed(self) -> None: ...
+    async def wait_all_closed(self) -> None: ...
 
 
 ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound=ConnectionGeneratorProtocol)
@@ -39,9 +39,6 @@ class ConnectionProtocol(Protocol):
 
     @abstractmethod
     def is_child(self, parent_id: int) -> bool: ...
-
-    @abstractmethod
-    async def wait_all_closed(self): ...
 
 
 ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
@@ -63,6 +60,11 @@ class SimpleNetworkConnectionProtocol(Protocol):
 
     @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
+
+
+class ReadWriteConnectionProtocol(NetworkConnectionProtocol, Protocol):
+    @abstractmethod
+    def set_write_transport(self, transport: asyncio.Transport) -> None: ...
 
 
 class UDPConnectionMixinProtocol(Protocol):

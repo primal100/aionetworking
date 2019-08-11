@@ -9,11 +9,10 @@ from lib import settings
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.conf.types import ConnectionLoggerType
 from lib.networking.network_connections import connections_manager
-from lib.types import Type
 from lib.utils import Record, aone
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence, ClassVar
+from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence, Type
 from typing_extensions import Protocol
 from .types import MessageObjectType, CodecType
 
@@ -53,6 +52,16 @@ class BaseMessageObject(MessageObject, Protocol):
     @property
     def full_sender(self) -> str:
         return self.context['peer']
+
+    def get(self, item, default=None):
+        try:
+            return self.decoded[item]
+        except KeyError:
+            return default
+
+    def __getitem__(self, item):
+        if isinstance(self.decoded, (list, tuple, dict)):
+            return self.decoded[item]
 
     def is_subscribed(self, subscribe_key: Any) -> bool:
         return connections_manager.peer_is_subscribed(self.full_sender, subscribe_key)
@@ -123,6 +132,9 @@ class BaseCodec(Codec):
 
     def encode(self, decoded: Any, **kwargs) -> AnyStr:
         return decoded
+
+    def decode_one(self, encoded:bytes, **kwargs) -> Any:
+        return next(self.decode(encoded, **kwargs))[1]
 
     def _from_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
         for encoded, decoded in self.decode(encoded):

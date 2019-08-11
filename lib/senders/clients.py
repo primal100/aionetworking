@@ -3,10 +3,14 @@ from pathlib import Path
 from ssl import SSLContext
 
 from dataclasses import dataclass, field
+import socket
+import sys
 
-from lib.networking.types import ConnectionType
+from lib.networking.types import ConnectionType, ReadWriteConnectionProtocolType
 from lib.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
+
+from typing import Union
 
 
 @dataclass
@@ -24,15 +28,15 @@ class TCPClient(BaseNetworkClient):
 
     async def open_connection(self) -> ConnectionType:
         self.transport, self.conn = await self.loop.create_connection(
-            self.protocol_generator, self.host, self.port, ssl=self.ssl_context,
+            self.protocol_factory, self.host, self.port, ssl=self.ssl_context,
             local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
         return self.conn
 
 
 @dataclass
-class UnixClient(BaseClient):
-    name = "Unix Client"
-    path: Path = Path('/tmp/unix_server.socket')
+class UnixSocketClient(BaseClient):
+    name = "Unix socket Client"
+    path: Union[str, Path] = None
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
 
     ssl_context: SSLContext = None
@@ -44,9 +48,35 @@ class UnixClient(BaseClient):
 
     async def open_connection(self) -> ConnectionType:
         self.transport, self.conn = await self.loop.create_unix_connection(
-            self.protocol_generator, path=str(self.path), ssl=self.ssl_context,
+            self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
             ssl_handshake_timeout=self.ssl_handshake_timeout)
         return self.conn
+
+
+@dataclass
+class WindowsPipeClient(BaseClient):
+    name = "Windows Pipe Client"
+    path: Union[str, Path] = None
+    pid: int = None
+
+    def __post_init__(self):
+        self.path = str(self.path).format(pid=self.pid)
+
+    @property
+    def dst(self) -> str:
+        return self.path
+
+    async def open_connection(self) -> ConnectionType:
+        self.transport, self.conn = await self.loop.create_pipe_connection(self.protocol_factory, self.path)
+        return self.conn
+
+
+def unix_or_windows_client(address: Union[str, Path] = None, **kwargs):
+    if hasattr(socket, 'AF_UNIX'):
+        return UnixSocketClient(path=address, **kwargs)
+    if sys.platform == 'win32':
+        return WindowsPipeClient(path=address, **kwargs)
+    raise OSError("Neither AF_UNIX nor Named Pipe is supported on this platform")
 
 
 @dataclass
@@ -56,5 +86,5 @@ class UDPClient(BaseNetworkClient):
 
     async def open_connection(self) -> ConnectionType:
         self.transport, self.conn = await self.loop.create_datagram_endpoint(
-            self.protocol_generator, remote_addr=(self.host, self.port), local_addr=self.local_addr)
+            self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr)
         return self.conn

@@ -14,7 +14,7 @@ from lib.conf.types import ConnectionLoggerType
 from .network_connections import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
 from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol,
-                        AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
+                        ReadWriteConnectionProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
 from .types import ConnectionGeneratorType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
 from typing import Any, AnyStr, Dict, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
@@ -213,10 +213,10 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
 
 
 @dataclass
-class BaseTCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
-    transport: asyncio.Transport = None
+class BaseStreamConnection(asyncio.Protocol, NetworkConnectionProtocol):
+    transport: asyncio.ReadTransport = None
 
-    def connection_made(self, transport: asyncio.Transport) -> None:
+    def connection_made(self, transport: asyncio.ReadTransport) -> None:
         self.transport = transport
         peer = self.transport.get_extra_info('peername')
         sock = self.transport.get_extra_info('sockname')
@@ -224,13 +224,14 @@ class BaseTCPConnection(asyncio.Protocol, NetworkConnectionProtocol):
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.transport.close()
+        self.write_transport.close()
         self.finish_connection(exc)
 
     def data_received(self, data: AnyStr) -> None:
         self.adaptor.on_data_received(data)
 
     def send(self, msg: AnyStr) -> None:
-        self.transport.write(msg)
+        self.write_transport.write(msg)
 
 
 class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
@@ -243,20 +244,20 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
 
 
 @dataclass
-class OneWayTCPServerConnection(BaseTCPConnection):
+class OneWayTCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
     action: OneWaySequentialAction = None
 
 
 @dataclass
-class TCPServerConnection(BaseTCPConnection):
+class TCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
 
 
 @dataclass
-class TCPClientConnection(BaseTCPConnection, SenderAdaptorGetattr):
+class TCPClientConnection(BaseStreamConnection, SenderAdaptorGetattr):
     name = 'TCP Client'
     adaptor_cls: Type[AdaptorType] = SenderAdaptor
 

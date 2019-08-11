@@ -5,3 +5,4 @@ class MessageFromNotAuthorizedHost(BaseException):
 class MethodNotFoundError(BaseException):
     pass
 
+

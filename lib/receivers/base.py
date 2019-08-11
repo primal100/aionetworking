@@ -31,7 +31,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
 class BaseServer(BaseReceiver, Protocol):
     name = 'Server'
 
-    protocol_generator:  ConnectionGeneratorType = None
+    protocol_factory:  ConnectionGeneratorType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
     started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     stopped: asyncio.Event = field(default_factory=asyncio.Event, init=False)
@@ -56,7 +56,7 @@ class BaseServer(BaseReceiver, Protocol):
         await self.started.clear()
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
-        await self.protocol_generator.wait_all_closed()
+        await self.protocol_factory.wait_all_closed()
         self.stopped.set()
 
     async def start(self) -> None:
@@ -75,10 +75,15 @@ class BaseServer(BaseReceiver, Protocol):
         await self.stopped.wait()
 
     @abstractmethod
-    async def stop_server(self) -> None: ...
+    async def _get_server(self) -> asyncio.AbstractServer: ...
 
-    @abstractmethod
-    async def start_server(self) -> List[socket]: ...
+    async def start_server(self) -> List[socket]:
+        self.server = await self._get_server()
+        return self.server.sockets
+
+    async def stop_server(self) -> None:
+        self.server.close()
+        await self.server.wait_closed()
 
 
 @dataclass
@@ -89,19 +94,3 @@ class BaseNetworkServer(BaseServer, Protocol):
     @property
     def listening_on(self) -> str:
         return f"{self.host}:{self.port}"
-
-
-@dataclass
-class BaseTCPReceiver(BaseNetworkServer, Protocol):
-    server: asyncio.AbstractServer = None
-
-    @abstractmethod
-    async def get_server(self) -> asyncio.AbstractServer: ...
-
-    async def start_server(self) -> List[socket]:
-        self.server = await self.get_server()
-        return self.server.sockets
-
-    async def stop_server(self) -> None:
-        self.server.close()
-        await self.server.wait_closed()

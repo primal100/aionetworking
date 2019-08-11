@@ -1,4 +1,5 @@
 from __future__ import annotations
+import io
 import json
 from dataclasses import dataclass
 
@@ -30,15 +31,6 @@ class JSONObject(BaseMessageObject):
     name = 'JSON'
     codec_cls = JSONCodec
 
-    def get(self, item, default=None):
-        try:
-            return self.decoded[item]
-        except KeyError:
-            return default
-
-    def __getitem__(self, item):
-        if isinstance(self.decoded, dict):
-            return self.decoded[item]
 
 
 

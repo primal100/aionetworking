@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from .protocols import (ConnectionGeneratorProtocol, ConnectionProtocol, NetworkConnectionProtocol,
                             UDPConnectionProtocol, AdaptorProtocol, SenderAdaptorProtocol,
-                            SimpleNetworkConnectionProtocol)
+                            SimpleNetworkConnectionProtocol, ReadWriteConnectionProtocol)
 
 
 ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound='ConnectionGeneratorProtocol')
@@ -14,3 +14,4 @@ UDPConnectionType = TypeVar('UDPConnectionType', bound='UDPConnectionProtocol')
 AdaptorType = TypeVar('AdaptorType', bound='AdaptorProtocol')
 SenderAdaptorType = TypeVar('SenderAdaptorType', bound='SenderAdaptorProtocol')
 SimpleNetworkConnectionType = TypeVar('SimpleNetworkConnectionType', bound='SimpleNetworkConnectionProtocol')
+ReadWriteConnectionProtocolType = TypeVar('ReadWriteConnectionProtocolType', bound='ReadWriteConnectionProtocol')
