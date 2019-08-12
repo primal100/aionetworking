@@ -3,6 +3,10 @@ import pytest
 
 from lib.receivers.exceptions import ServerException
 
+###Required for skipif in fixture params###
+from lib.compatibility import datagram_supported
+from lib.utils import supports_pipe_or_unix_connections
+
 
 class TestServerStartStop:
     @pytest.mark.asyncio
@@ -72,7 +76,7 @@ class TestServerStartStop:
             await server_started.stop_wait()
 
     @pytest.mark.asyncio
-    async def test_07_server_start(self, server_receiver_quiet, capsys):
+    async def test_07_server_start_quiet(self, server_receiver_quiet, capsys):
         assert not server_receiver_quiet.is_started()
         task = asyncio.create_task(server_receiver_quiet.start())
         try:

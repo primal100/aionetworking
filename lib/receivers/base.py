@@ -5,13 +5,11 @@ from dataclasses import dataclass, field
 
 from .exceptions import ServerException
 from lib.conf.logging import Logger
-from lib.networking.protocols import ConnectionGeneratorType
+from lib.networking.types import ProtocolFactoryType
 from lib.factories import event_set
 from .protocols import ReceiverProtocol
 
-from socket import socket
-from typing import List
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 
 
 @dataclass
@@ -37,7 +35,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
 class BaseServer(BaseReceiver, Protocol):
     name = 'Server'
 
-    protocol_factory:  ConnectionGeneratorType = None
+    protocol_factory:  ProtocolFactoryType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
     started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     stopped: asyncio.Event = field(default_factory=event_set, init=False)

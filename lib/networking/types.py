@@ -2,16 +2,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from .protocols import (ConnectionGeneratorProtocol, ConnectionProtocol, NetworkConnectionProtocol,
+    from .protocols import (ProtocolFactoryProtocol, ConnectionProtocol, NetworkConnectionProtocol,
                             UDPConnectionProtocol, AdaptorProtocol, SenderAdaptorProtocol,
-                            SimpleNetworkConnectionProtocol, ReadWriteConnectionProtocol)
+                            SimpleNetworkConnectionProtocol)
 
 
-ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound='ConnectionGeneratorProtocol')
+ProtocolFactoryType = TypeVar('ProtocolFactoryType', bound='ProtocolFactoryProtocol')
 ConnectionType = TypeVar('ConnectionType', bound='ConnectionProtocol')
 NetworkConnectionType = TypeVar('NetworkConnectionType', bound='NetworkConnectionProtocol')
 UDPConnectionType = TypeVar('UDPConnectionType', bound='UDPConnectionProtocol')
 AdaptorType = TypeVar('AdaptorType', bound='AdaptorProtocol')
 SenderAdaptorType = TypeVar('SenderAdaptorType', bound='SenderAdaptorProtocol')
 SimpleNetworkConnectionType = TypeVar('SimpleNetworkConnectionType', bound='SimpleNetworkConnectionProtocol')
-ReadWriteConnectionProtocolType = TypeVar('ReadWriteConnectionProtocolType', bound='ReadWriteConnectionProtocol')

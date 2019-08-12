@@ -4,10 +4,10 @@ import asyncio
 
 from dataclasses import dataclass, field
 from lib.conf.logging import Logger
-from lib.networking.types import ConnectionGeneratorType, ConnectionType
+from lib.networking.types import ProtocolFactoryType, ConnectionType
 
 from typing import Tuple
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 
 
 @dataclass
@@ -20,15 +20,21 @@ class BaseSender(Protocol):
         return asyncio.get_event_loop()
 
     async def __aenter__(self) -> ConnectionType:
-        return await self.start()
+        return await self.connect()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        await self.stop()
+        await self.close()
 
     @abstractmethod
-    async def start(self) -> ConnectionType: ...
+    def is_started(self) -> bool: ...
 
-    async def stop(self):
+    @abstractmethod
+    def is_closing(self) -> bool: ...
+
+    @abstractmethod
+    async def connect(self) -> ConnectionType: ...
+
+    async def close(self):
         pass
 
 
@@ -38,29 +44,36 @@ class BaseClient(BaseSender, Protocol):
     protocol_factory:  ConnectionGeneratorType = None
     conn: ConnectionType = field(init=False, default=None)
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
+    timeout: int =2
 
     @property
     @abstractmethod
     def dst(self) -> str: ...
 
     @abstractmethod
-    async def open_connection(self) -> ConnectionType: ...
+    async def _open_connection(self) -> ConnectionType: ...
 
-    async def close_connection(self):
+    async def _close_connection(self):
         self.transport.close()
+        await self.conn.close_wait()
 
-    async def start(self) -> ConnectionType:
+    def is_started(self) -> bool:
+        return bool(self.conn)
+
+    def is_closing(self) -> bool:
+        return not self.transport or self.transport.is_closing()
+
+    async def connect(self) -> ConnectionType:
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
-        connection = await self.open_connection()
+        connection = await self._open_connection()
+        await connection.wait_connected()
         return connection
 
-    async def stop(self) -> None:
+    async def close(self) -> None:
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
-        await self.close_connection()
+        await self._close_connection()
 
 
-# Wrongly gives an a "non-default argument after default argument" error in PyCharm. So disabled the inspection.
-# noinspection PyDataclass
 @dataclass
 class BaseNetworkClient(BaseClient, Protocol):
     name = "Network client"
@@ -72,7 +85,7 @@ class BaseNetworkClient(BaseClient, Protocol):
 
     @property
     def local_addr(self) -> Tuple[str, int]:
-        return self.srcip, self.port
+        return self.srcip, self.srcport
 
     @property
     def dst(self) -> str:

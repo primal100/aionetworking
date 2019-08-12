@@ -7,13 +7,12 @@ from pprint import pformat
 
 from lib import settings
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
-from lib.conf.types import ConnectionLoggerType
 from lib.networking.network_connections import connections_manager
 from lib.utils import Record, aone
 
 from .protocols import MessageObject, Codec
 from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence, Type
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 from .types import MessageObjectType, CodecType
 
 

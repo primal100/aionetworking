@@ -3,7 +3,7 @@ from __future__ import annotations
 from lib.conf.logging import Logger, connection_logger_sender
 
 from dataclasses import dataclass, field
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 
 
 @dataclass

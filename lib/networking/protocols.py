@@ -2,27 +2,24 @@ from __future__ import annotations
 import asyncio
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any, AnyStr, AsyncGenerator, Generator, List, Optional, Sequence, TypeVar, Tuple, Union
-from typing_extensions import Protocol
+from typing import Any, AnyStr, AsyncGenerator, Generator, Optional, Sequence, TypeVar, Union
+from lib.compatibility import Protocol
 from pathlib import Path
 
 from lib.formats.base import MessageObjectType
 from lib.utils import inherit_on_type_checking_only
 
 
-class ConnectionGeneratorProtocol(Protocol):
+class ProtocolFactoryProtocol(Protocol):
 
     @abstractmethod
-    def __call__(self) -> Union[ConnectionGeneratorProtocol, NetworkConnectionProtocol]: ...
+    def __call__(self) -> Union[ProtocolFactoryProtocol, NetworkConnectionProtocol]: ...
 
     @abstractmethod
     def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
 
     @abstractmethod
     async def wait_all_closed(self) -> None: ...
-
-
-ConnectionGeneratorType = TypeVar('ConnectionGeneratorType', bound=ConnectionGeneratorProtocol)
 
 
 class ConnectionProtocol(Protocol):
@@ -60,11 +57,6 @@ class SimpleNetworkConnectionProtocol(Protocol):
 
     @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
-
-
-class ReadWriteConnectionProtocol(NetworkConnectionProtocol, Protocol):
-    @abstractmethod
-    def set_write_transport(self, transport: asyncio.Transport) -> None: ...
 
 
 class UDPConnectionMixinProtocol(Protocol):

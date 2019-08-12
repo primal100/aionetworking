@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 
 
 class ReceiverProtocol(Protocol):

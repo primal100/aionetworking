@@ -6,6 +6,8 @@ import asyncio
 import collections
 import pytest
 import binascii
+import os
+import socket
 import shutil
 from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
 from pathlib import Path
@@ -14,6 +16,7 @@ from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFi
 from lib.actions.jsonrpc import JSONRPCServer
 from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
 from lib.requesters.jsonrpc import SampleJSONRPCClient
+from lib.compatibility import datagram_supported
 from lib.conf.logging import ConnectionLogger, Logger
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.contrib.types import JSONObjectType
@@ -21,20 +24,35 @@ from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.base import BufferObject
 from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
-from lib.networking.connections import ConnectionGenerator, OneWayTCPServerConnection, TCPServerConnection, TCPClientConnection
+from lib.networking.connections import ProtocolFactory, BaseConnectionProtocol, OneWayTCPServerConnection, TCPServerConnection, TCPClientConnection
 from lib.networking.network_connections import ConnectionsManager
+from lib.receivers.base import BaseServer
 from lib.receivers.servers import TCPServer, pipe_server
+from lib.senders.base import BaseClient
 from lib.senders.clients import TCPClient, pipe_client
-from lib.utils import pipe_address_by_os, set_proactor_loop_policy
+from lib.utils import pipe_address_by_os, set_loop_policy
 from lib.wrappers.counters import Counters, Counter
 from lib.wrappers.schedulers import TaskScheduler
 
 from tests.mock import MockTCPTransport, MockDatagramTransport
 
-from typing import Dict, Any, List, Tuple, Union, Callable
+from typing import Dict, Any, List, Tuple, Union, Callable, Optional, Type
 
 
-set_proactor_loop_policy()
+def pytest_addoption(parser):
+    default = 'proactor' if os.name == 'nt' else 'selector'
+    parser.addoption(
+        "--loop",
+        action="store",
+        default=default,
+        help="Loop to use. Choices are: selector,proactor,uvloop",
+    )
+
+
+def pytest_configure(config):
+    loop_type = config.getoption("--loop")
+    if loop_type:
+        set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
 
 
 @pytest.fixture
@@ -1051,52 +1069,52 @@ def peer_data(request, connection_args):
 
 
 @pytest.fixture
-def connection_generator(connection) -> ConnectionGenerator:
-    return ConnectionGenerator(connection, logger=connection.logger)
+def protocol_factory(connection) -> ProtocolFactory:
+    return ProtocolFactory(connection, logger=connection.logger)
 
 
 @pytest.fixture
-def connection_generator_one_way_server(tcp_protocol_one_way_server, receiver_logger):
-    return ConnectionGenerator(tcp_protocol_one_way_server, logger=receiver_logger)
+def protocol_factory_one_way_server(tcp_protocol_one_way_server, receiver_logger):
+    return ProtocolFactory(tcp_protocol_one_way_server, logger=receiver_logger)
 
 
 @pytest.fixture
-def connection_generator_one_way_client(tcp_protocol_one_way_client, sender_logger):
-    return ConnectionGenerator(tcp_protocol_one_way_client, logger=sender_logger)
+def protocol_factory_one_way_client(tcp_protocol_one_way_client, sender_logger):
+    return ProtocolFactory(tcp_protocol_one_way_client, logger=sender_logger)
 
 
 @pytest.fixture
-def connection_generator_two_way_server(tcp_protocol_two_way_server, receiver_logger):
-    return ConnectionGenerator(tcp_protocol_two_way_server, logger=receiver_logger)
+def protocol_factory_two_way_server(tcp_protocol_two_way_server, receiver_logger):
+    return ProtocolFactory(tcp_protocol_two_way_server, logger=receiver_logger)
 
 
 @pytest.fixture
-def connection_generator_two_way_client(tcp_protocol_two_way_server, sender_logger):
-    return ConnectionGenerator(tcp_protocol_two_way_server, logger=sender_logger)
+def protocol_factory_two_way_client(tcp_protocol_two_way_client, sender_logger):
+    return ProtocolFactory(tcp_protocol_two_way_client, logger=sender_logger)
 
 
 @pytest.fixture
-def tcp_server_one_way(connection_generator_one_way_server, receiver_logger, sock):
-    return TCPServer(protocol_factory=connection_generator_one_way_server, logger=receiver_logger, host=sock[0],
+def tcp_server_one_way(protocol_factory_one_way_server, receiver_logger, sock):
+    return TCPServer(protocol_factory=protocol_factory_one_way_server, logger=receiver_logger, host=sock[0],
                      port=sock[1])
 
 
 @pytest.fixture
-def tcp_client_one_way(connection_generator_one_way_client, sender_logger, sock, peer_data):
-    return TCPClient(protocol_factory=connection_generator_one_way_client, logger=sender_logger, host=sock[0],
-                     port=sock[1], srcip=peer_data[0], srcport=peer_data[1])
+def tcp_client_one_way(protocol_factory_one_way_client, sender_logger, sock, peername):
+    return TCPClient(protocol_factory=protocol_factory_one_way_client, logger=sender_logger, host=sock[0],
+                     port=sock[1], srcip=peername[0], srcport=0)
 
 
 @pytest.fixture
-def tcp_server_two_way(connection_generator_two_way_server, receiver_logger, sock):
-    return TCPServer(protocol_factory=connection_generator_two_way_server, logger=receiver_logger, host=sock[0],
+def tcp_server_two_way(protocol_factory_two_way_server, receiver_logger, sock):
+    return TCPServer(protocol_factory=protocol_factory_two_way_server, logger=receiver_logger, host=sock[0],
                      port=sock[1])
 
 
 @pytest.fixture
-def tcp_client_two_way(connection_generator_two_way_client, sender_logger, sock, peer_data):
-    return TCPClient(protocol_factory=connection_generator_two_way_client, logger=sender_logger, host=sock[0],
-                     port=sock[1], srcip=peer_data[0], srcport=peer_data[1])
+def tcp_client_two_way(protocol_factory_two_way_client, sender_logger, sock, peername):
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, logger=sender_logger, host=sock[0],
+                     port=sock[1], srcip=peername[0], srcport=0)
 
 
 @pytest.fixture
@@ -1108,64 +1126,96 @@ async def pipe_path() -> Path:
 
 
 @pytest.fixture
-def pipe_server_one_way(connection_generator_one_way_server, receiver_logger, pipe_path):
-    return pipe_server(protocol_factory=connection_generator_one_way_server, logger=receiver_logger, path=pipe_path)
+def pipe_server_one_way(protocol_factory_one_way_server, receiver_logger, pipe_path):
+    return pipe_server(protocol_factory=protocol_factory_one_way_server, logger=receiver_logger, path=pipe_path)
 
 
 @pytest.fixture
-def pipe_client_one_way(connection_generator_one_way_client, sender_logger, pipe_path):
-    return pipe_client(protocol_factory=connection_generator_one_way_client, logger=sender_logger, host=sock[0],
-                       port=sock[1], srcip=peer_data[0], srcport=peer_data[1], path=pipe_path)
+def pipe_client_one_way(protocol_factory_one_way_client, sender_logger, pipe_path):
+    return pipe_client(protocol_factory=protocol_factory_one_way_client, logger=sender_logger, path=pipe_path)
 
 
 @pytest.fixture
-def pipe_server_two_way(connection_generator_two_way_server, receiver_logger, pipe_path):
-    return pipe_server(protocol_factory=connection_generator_two_way_server, logger=receiver_logger, path=pipe_path)
+def pipe_server_two_way(protocol_factory_two_way_server, receiver_logger, pipe_path) -> BaseServer:
+    return pipe_server(protocol_factory=protocol_factory_two_way_server, logger=receiver_logger, path=pipe_path)
 
 
 @pytest.fixture
-def pipe_client_two_way(connection_generator_two_way_client, sender_logger, pipe_path):
-    return pipe_client(protocol_factory=connection_generator_two_way_client, logger=sender_logger, path=pipe_path)
+def pipe_client_two_way(protocol_factory_two_way_client, sender_logger, pipe_path) -> BaseServer:
+    return pipe_client(protocol_factory=protocol_factory_two_way_client, logger=sender_logger, path=pipe_path)
 
 
-@pytest.fixture(params=[(tcp_server_one_way, tcp_client_one_way),
-                        (tcp_server_two_way, tcp_client_two_way),
-                         (pipe_server_one_way, pipe_client_two_way),
-                         (pipe_server_two_way, pipe_client_two_way)])
-def server_client_args(request):
+@pytest.fixture
+def loop_supports_tcp() -> bool:
+    return True
+
+
+@pytest.fixture(autouse=True)
+def loop_supports_pipe(event_loop) -> bool:
+    return hasattr(socket, 'AF_UNIX') or hasattr(event_loop, 'start_serving_pipe')
+
+
+@pytest.fixture
+def loop_supports_datagram(event_loop) -> bool:
+    return datagram_supported(loop=event_loop)
+
+
+server_client_params = [
+    (tcp_server_one_way, tcp_client_one_way),
+    (tcp_server_two_way, tcp_client_two_way),
+    pytest.param(
+        (pipe_server_one_way, pipe_client_one_way),
+        marks=pytest.mark.skipif(
+            "supports_pipe_or_unix_connections()")
+    ),
+    pytest.param(
+        (pipe_server_two_way, pipe_client_two_way),
+        marks=pytest.mark.skipif(
+            "supports_pipe_or_unix_connections()")
+    ),
+]
+@pytest.fixture(params=server_client_params)
+def server_client_args(request) -> Tuple:
     return request.param
 
 
 @pytest.fixture
-def _server_receiver(request, server_client_args):
+def _server_receiver(request, server_client_args) -> Optional[BaseServer]:
     return get_fixture(request, server_client_args[0])
 
 
 @pytest.fixture
-async def server_receiver(_server_receiver):
+async def server_receiver(_server_receiver) -> BaseServer:
     yield _server_receiver
     if _server_receiver.is_started():
         await _server_receiver.stop_wait()
 
 
 @pytest.fixture
-async def server_receiver_quiet(server_receiver):
+async def server_receiver_quiet(server_receiver) -> BaseServer:
     server_receiver.quiet = True
     yield server_receiver
 
 
 @pytest.fixture
-async def server_started(server_receiver):
+async def server_started(server_receiver) -> BaseServer:
     await server_receiver.start_wait()
     yield server_receiver
 
 
 @pytest.fixture
-def client_receiver(request, server_client_args):
+def _client_sender(request, server_client_args) -> BaseClient:
     return get_fixture(request, server_client_args[1])
 
 
 @pytest.fixture
-async def client_connected(client, server_started):
-    with client as conn:
-        yield conn
+async def client_sender(_client_sender, server_started) -> BaseClient:
+    yield _client_sender
+    if not _client_sender.is_closing():
+        await _client_sender.close()
+
+
+@pytest.fixture
+async def client_connected(client_sender, server_started) -> Tuple[BaseClient, BaseConnectionProtocol]:
+    async with client_sender as conn:
+        yield client_sender, conn

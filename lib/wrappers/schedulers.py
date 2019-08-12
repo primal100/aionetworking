@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, MutableMapping
 
+from lib.compatibility import set_task_name
 from .counters import Counter
 
 
@@ -22,10 +23,11 @@ class TaskScheduler:
     def task_done(self, future: asyncio.Future) -> None:
         self._counter.decrement()
 
-    def create_task(self, coro: Awaitable, callback: Callable = None) -> asyncio.Future:
+    def create_task(self, coro: Awaitable, callback: Callable = None, name: str = None) -> asyncio.Future:
         self._counter.increment()
         task = asyncio.ensure_future(coro)
-        callback = callback or self.task_done
+        set_task_name(task, name)
+        callback = callback
         task.add_done_callback(callback)
         return task
 
@@ -42,11 +44,12 @@ class TaskScheduler:
         finally:
             self.task_done(future)
 
-    def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, **kwargs):
+    def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, task_name: str = None,
+                       **kwargs) -> asyncio.Future:
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        self.create_task(coro, self._process_promise_result)
+        return self.create_task(coro, self._process_promise_result, name=task_name)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()
@@ -105,14 +108,16 @@ class TaskScheduler:
         await asyncio.sleep(start_time_interval)
         while True:
             coro = async_callback(*args, **kwargs)
-            asyncio.create_task(coro)
+            await coro
             await asyncio.sleep(delay)
 
     def call_coro_periodic(self, delay: Union[int, float], async_callback: Callable, *args,
-                           fixed_start_time: bool = False, immediate: bool = False, **kwargs) -> asyncio.Task:
+                           fixed_start_time: bool = False, immediate: bool = False, task_name: str = None,
+                           **kwargs) -> asyncio.Task:
         start_time_interval = self.get_start_interval(fixed_start_time, immediate, delay)
         task = asyncio.create_task(
             self._call_coro_periodic(delay, async_callback, start_time_interval=start_time_interval, *args, **kwargs))
+        set_task_name(task, task_name)
         self._periodic_tasks.append(task)
         return task
 
@@ -120,5 +125,5 @@ class TaskScheduler:
     async def _call_cb(callback: Callable, *args, **kwargs):
         return callback(*args, **kwargs)
 
-    def call_cb_periodic(self, delay: Union[int, float], cb: Callable, *args, **kwargs):
-        self.call_coro_periodic(delay, self._call_cb, cb, *args, **kwargs)
+    def call_cb_periodic(self, delay: Union[int, float], cb: Callable, *args, task_name: str = None, **kwargs):
+        self.call_coro_periodic(delay, self._call_cb, cb, *args, task_name=task_name, **kwargs)

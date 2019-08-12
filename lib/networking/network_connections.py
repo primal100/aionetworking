@@ -11,7 +11,8 @@ from lib.factories import list_defaultdict
 class ConnectionsManager:
     _connections: Dict[str, SimpleNetworkConnectionType] = field(init=False, default_factory=dict)
     _counters: Counters = field(init=False, default_factory=Counters)
-    _subscriptions: DefaultDict[Any, List[SimpleNetworkConnectionType]] = field(init=False, default_factory=list_defaultdict)
+    _subscriptions: DefaultDict[Any, List[SimpleNetworkConnectionType]] = field(init=False,
+                                                                                default_factory=list_defaultdict)
 
     def clear(self):
         self._connections.clear()
@@ -19,11 +20,14 @@ class ConnectionsManager:
         self._subscriptions.clear()
 
     def add_connection(self, connection: SimpleNetworkConnectionType) -> None:
-        self._connections[connection.peer_str] = connection
+        self._connections[connection.peer] = connection
         self._counters.increment(connection.parent_id)
 
     def remove_connection(self, connection: Any):
-        connection = self._connections.pop(connection.peer_str, None)
+        connection = self._connections.pop(connection.peer, None)
+        for key, subscribers in self._subscriptions.items():
+            if connection in subscribers:
+                subscribers.remove(connection)
         self._counters.decrement(connection.parent_id)
 
     @property

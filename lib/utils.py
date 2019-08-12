@@ -149,30 +149,38 @@ class cached_property(object):
         return wrapper()
 
 
-class WindowsfProactorEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
-
-    # Unnecessary in Python 3.8 as ProactorEventLoop will be default for windows.
-
-    def new_event_loop(self) -> asyncio.AbstractEventLoop:
-        return asyncio.ProactorEventLoop()
+def set_proactor_loop_policy_windows() -> None:
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
-class WindowsSelectorEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
-
-    # For UDP support in Windows in Python 3.7 or under
-
-    def new_event_loop(self) -> asyncio.AbstractEventLoop:
-        return asyncio.SelectorEventLoop()
+def set_selector_loop_policy_windows() -> None:
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-def set_proactor_loop_policy() -> None:
-    if os.name == 'nt':
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+def set_selector_loop_policy_linux() -> None:
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
 
-def set_selector_loop_policy() -> None:
-    if os.name == 'nt':
-        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+def set_uvloop_policy_linux() -> None:
+    import uvloop
+    uvloop.install()
+
+
+def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) -> None:
+    if os.name == 'linux':
+        if linux_loop_type == 'selector':
+            set_selector_loop_policy_linux()
+        elif linux_loop_type == 'uvloop':
+            set_uvloop_policy_linux()
+    elif os.name == 'nt':
+        if windows_loop_type == 'selector':
+            set_selector_loop_policy_windows()
+        elif windows_loop_type == 'proactor':
+            set_proactor_loop_policy_windows()
+
+
+def supports_pipe_or_unix_connections() -> bool:
+    return not (hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe'))
 
 
 ###Logging###

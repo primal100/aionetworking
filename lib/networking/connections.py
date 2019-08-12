@@ -10,15 +10,16 @@ from lib.formats.base import BaseMessageObject
 from lib.requesters.protocols import RequesterProtocol
 from lib.conf.logging import Logger
 from lib.conf.types import ConnectionLoggerType
+from lib.utils import addr_tuple_to_str
 
 from .network_connections import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
-from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ConnectionGeneratorProtocol,
-                        ReadWriteConnectionProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
-from .types import ConnectionGeneratorType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
+from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ProtocolFactoryProtocol,
+                        AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
+from .types import ProtocolFactoryType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
-from typing import Any, AnyStr, Dict, List, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
-from typing_extensions import Protocol
+from typing import Any, AnyStr, Dict, NoReturn, Optional, Text, Tuple, Type, TypeVar, Union
+from lib.compatibility import Protocol
 
 
 msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
@@ -29,7 +30,7 @@ def details_to_str(details: Tuple[str, int]):
 
 
 @dataclass
-class ConnectionGenerator(ConnectionGeneratorProtocol):
+class ProtocolFactory(ProtocolFactoryProtocol):
     connection: NetworkConnectionProtocol
     logger: Logger = Logger('receiver')
 
@@ -44,11 +45,11 @@ class ConnectionGenerator(ConnectionGeneratorProtocol):
 
 
 @dataclass
-class UDPConnectionGenerator(asyncio.DatagramProtocol, ConnectionGenerator):
+class UDPProtocolFactory(asyncio.DatagramProtocol, ProtocolFactory):
     transport = None
     sock = None
 
-    def __call__(self: ConnectionGeneratorType) -> ConnectionGeneratorType:
+    def __call__(self: ProtocolFactoryType) -> ProtocolFactoryType:
         return self
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:
@@ -69,8 +70,7 @@ class UDPConnectionGenerator(asyncio.DatagramProtocol, ConnectionGenerator):
             conn.on_data_received(data)
         else:
             conn = self.connection.clone()
-            conn.initialize_connection(addr, self.sock)
-            conn.set_transport(self.transport)
+            conn.initialize_connection(self.transport, addr)
             conn.on_data_received(data)
 
 
@@ -82,8 +82,10 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     preaction: OneWaySequentialAction = None
     requester: RequesterProtocol = None
     dataformat: Type[BaseMessageObject] = None
+    store_connections: bool = False
     adaptor: AdaptorType = field(default=None)
     context: Dict[str, Any] = field(default_factory=dict)
+    connected: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     closed: asyncio.Task = field(default=None, init=False)
     logger: Logger = Logger('receiver')
     parent_id: int = None
@@ -93,14 +95,18 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
         if self.adaptor:
             return getattr(self.adaptor, item)
 
-    def _update_context(self) -> None:
+    def _initial_context(self) -> None:
         self.context['protocol_name'] = self.name
 
     def start_adaptor(self) -> None:
-        self._update_context()
         self._set_adaptor()
-        connections_manager.add_connection(self)
-        self.logger.log_num_connections('opened', self.parent_id)
+        if self.store_connections:
+            connections_manager.add_connection(self)
+            self.logger.log_num_connections('opened', self.parent_id)
+
+    @property
+    def peer(self) -> str:
+        return self.context.get('peer')
 
     def _set_adaptor(self) -> None:
         kwargs = {
@@ -131,16 +137,19 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
         return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, extra=self.context)
 
     def _delete_connection(self) -> None:
-        connections_manager.remove_connection(self)
-        self.logger.log_num_connections('closed', self.parent_id)
+        if self.store_connections:
+            connections_manager.remove_connection(self)
+            self.logger.log_num_connections('closed', self.parent_id)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
-            await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
+            if self.adaptor:
+                await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
         finally:
             self._delete_connection()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
+        self.connected.clear()
         self.closed = asyncio.create_task(self._close(exc))
 
     async def close_wait(self):
@@ -148,17 +157,18 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
             self.finish_connection(None)
         await self.closed
 
+    async def wait_connected(self) -> None:
+        await self.connected.wait()
+
+    def is_connected(self) -> bool:
+        return self.connected.is_set()
+
 
 TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
 
 
 @dataclass
 class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinProtocol, Protocol):
-    sock = ('', 0)
-    peer = ('', 0)
-    peer_str = ''
-    sock_str = ''
-    alias = ''
     transport: TransportType = None
 
     aliases: dict = field(default_factory=dict)
@@ -186,45 +196,68 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
             return self._get_alias(peer)
         self._raise_message_from_not_authorized_host(peer)
 
-    def _update_context(self) -> None:
-        super()._update_context()
-        self.context.update({
-            'peer': self.peer_str,
-            'host': self.peer[0],
-            'port': self.peer[1],
-            'sock': self.sock_str,
-            'alias': self.alias
-        })
-        if self.alias and self.alias not in self.peer_str:
-            self.context['peer'] = f"{self.alias}({self.peer_str})"
-
-    def initialize_connection(self, peer: Tuple[str, int], sock:  Tuple[str, int], ) -> bool:
-        self.peer = peer
-        self.sock = sock
-        self.peer_str = details_to_str(peer)
-        self.sock_str = details_to_str(sock)
+    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool:
+        self._update_context(transport, peer)
+        peer = self.context['peer']
         try:
-            self.alias = self._check_peer(self.peer)
+            alias = self._check_peer(peer)
+            self.context['alias'] = alias
+            if alias and alias not in peer:
+                self.context['peer'] = f"{self.alias}({peer})"
             self.start_adaptor()
+            self.connected.set()
             return True
         except MessageFromNotAuthorizedHost as exc:
             self.finish_connection(exc)
             return False
 
+    def _update_context(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None):
+        self._initial_context()
+        sockname = transport.get_extra_info('sockname')
+        if sockname:
+            if peer:
+                #UDP server transport
+                pass
+            else:
+                peer = transport.get_extra_info('peername')
+                #TCP Stream transport
+            if peer:
+                #UDP or TCP INET transport
+                self.context['peer'] = addr_tuple_to_str(peer)
+                self.context['sock'] = addr_tuple_to_str(sockname)
+                self.context['host'], self.context['port'] = peer
+            else:
+                #AF_UNIX server transport
+                fd = transport.get_extra_info('socket').fileno()
+                self.context['fd'] = fd
+                self.context['addr'] = sockname
+                self.context['peer'] = f"{sockname}.{fd}"
+        elif peer:
+            #AF_UNIX client transport
+            fd = transport.get_extra_info('socket').fileno()
+            self.context['fd'] = fd
+            self.context['addr'] = peer
+            self.context['peer'] = f"{peer}.{fd}"
+        else:
+            #Pipe Duplex transport
+            addr = transport.get_extra_info('addr')
+            handle = transport.get_extra_info('pipe').handle
+            self.context['addr'] = addr
+            self.context['handle'] = handle
+            self.context['peer'] = f"{addr}.{handle}"
+
 
 @dataclass
 class BaseStreamConnection(asyncio.Protocol, NetworkConnectionProtocol):
-    transport: asyncio.ReadTransport = None
+    transport: asyncio.Transport = None
 
-    def connection_made(self, transport: asyncio.ReadTransport) -> None:
+    def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
-        peer = self.transport.get_extra_info('peername')
-        sock = self.transport.get_extra_info('sockname')
-        self.initialize_connection(peer, sock)
+        self.initialize_connection(transport)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
-        self.transport.close()
-        self.write_transport.close()
+        if not self.transport.is_closing():
+            self.transport.close()
         self.finish_connection(exc)
 
     def data_received(self, data: AnyStr) -> None:
@@ -234,13 +267,17 @@ class BaseStreamConnection(asyncio.Protocol, NetworkConnectionProtocol):
         self.write_transport.write(msg)
 
 
+@dataclass
 class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
+    _peer: Tuple[str, int] = field(default=None, init=False)
 
-    def set_transport(self, transport: asyncio.DatagramTransport):
+    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None):
         self.transport = transport
+        self._peer = peer
+        super().initialize_connection(transport, peer=peer)
 
     def send(self, msg: AnyStr) -> None:
-        self.transport.sendto(msg, self.peer)
+        self.transport.sendto(msg, self._peer)
 
 
 @dataclass
@@ -248,12 +285,14 @@ class OneWayTCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
     action: OneWaySequentialAction = None
+    store_connections = True
 
 
 @dataclass
 class TCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
+    store_connections = True
 
 
 @dataclass
@@ -267,12 +306,14 @@ class OneWayUDPServerConnection(BaseUDPConnection):
     name = 'UDP Server'
     adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
     action: OneWaySequentialAction = None
+    store_connections = True
 
 
 @dataclass
 class UDPServerConnection(BaseUDPConnection):
     name = 'UDP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
+    store_connections = True
 
 
 @dataclass

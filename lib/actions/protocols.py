@@ -5,7 +5,7 @@ import warnings
 from lib.formats.types import MessageObjectType
 
 from typing import Iterator, Any, AnyStr, TypeVar
-from typing_extensions import Protocol
+from lib.compatibility import Protocol
 
 
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")

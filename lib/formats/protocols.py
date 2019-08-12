@@ -4,10 +4,9 @@ from abc import abstractmethod
 from datetime import datetime
 from pathlib import Path
 
-from lib.conf.logging import ConnectionLogger
+from lib.compatibility import Protocol
 
 from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence
-from typing_extensions import Protocol
 from .types import CodecType, MessageObjectType
 
 
