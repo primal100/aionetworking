@@ -11,3 +11,7 @@ def event_set() -> asyncio.Event:
 
 def list_defaultdict() -> DefaultDict:
     return defaultdict(list)
+
+
+def event_defaultdict() -> DefaultDict:
+    return defaultdict(asyncio.Event)

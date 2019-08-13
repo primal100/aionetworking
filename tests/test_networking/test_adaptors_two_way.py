@@ -16,14 +16,14 @@ class TestTwoWayReceiverAdaptor:
 
     @pytest.mark.asyncio
     async def test_01_close(self, two_way_receiver_adaptor):
-        await two_way_receiver_adaptor.close(None, timeout=0.1)
+        await two_way_receiver_adaptor.close_actions(None, timeout=0.1)
 
     @pytest.mark.asyncio
     async def test_02_manage_buffer(self, tmp_path, two_way_receiver_adaptor, json_rpc_login_request_encoded,
                                     json_rpc_logout_request_encoded, timestamp, json_recording, json_recording_data):
         two_way_receiver_adaptor._manage_buffer(json_rpc_login_request_encoded, timestamp)
         two_way_receiver_adaptor._manage_buffer(json_rpc_logout_request_encoded, timestamp + timedelta(seconds=1))
-        await two_way_receiver_adaptor.close(None, timeout=0.5)
+        await two_way_receiver_adaptor.close_actions(None, timeout=0.5)
         expected_file = Path(tmp_path / '127.0.0.1.recording')
         assert expected_file.exists()
         packets = list(Record.from_file(expected_file))
@@ -65,7 +65,7 @@ class TestTwoWayReceiverAdaptor:
     async def test_07_process_msgs(self, two_way_receiver_adaptor, json_buffer, timestamp, json_codec, json_rpc_login_response,
                                    json_rpc_logout_response, json_rpc_login_request_object, json_rpc_logout_request_object, deque):
         two_way_receiver_adaptor.process_msgs([json_rpc_login_request_object, json_rpc_logout_request_object], json_buffer)
-        await two_way_receiver_adaptor.close(None, timeout=0.5)
+        await two_way_receiver_adaptor.close_actions(None, timeout=0.5)
         msg1 = deque.pop()
         msg2 = deque.pop()
         msgs = [json.loads(msg1), json.loads(msg2)]
@@ -78,7 +78,7 @@ class TestTwoWayReceiverAdaptor:
                                        json_rpc_logout_response, timestamp, json_recording, json_recording_data, deque):
         two_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
         two_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp + timedelta(seconds=1))
-        await two_way_receiver_adaptor.close(None, timeout=0.5)
+        await two_way_receiver_adaptor.close_actions(None, timeout=0.5)
         msg1 = deque.pop()
         msg2 = deque.pop()
         msgs = [json.loads(msg1), json.loads(msg2)]
@@ -97,7 +97,7 @@ class TestSenderAdaptorTwoWay:
 
     @pytest.mark.asyncio
     async def test_01_close(self, two_way_sender_adaptor):
-        await asyncio.wait_for(two_way_sender_adaptor.close(None), timeout=1)
+        await asyncio.wait_for(two_way_sender_adaptor.close_actions(None), timeout=1)
 
     @pytest.mark.asyncio
     async def test_02_wait_notification(self, two_way_sender_adaptor, json_rpc_create_notification_object):

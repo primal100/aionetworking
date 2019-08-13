@@ -11,6 +11,6 @@ class TestTCPServerOneWay:
         assert new_connection == connection
         assert protocol_factory.is_owner(new_connection)
         new_connection.connection_made(transport)
-        task = asyncio.create_task(protocol_factory.wait_closed())
+        task = asyncio.create_task(protocol_factory.wait_all_closed())
         new_connection.connection_lost(None)
         await asyncio.wait_for(task, 1)

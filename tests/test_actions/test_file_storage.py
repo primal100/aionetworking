@@ -21,7 +21,7 @@ class TestASNFileStorage:
     async def test_01_do_many_close(self, tmp_path, file_storage_action_binary, asn_objects, asn_encoded_multi,
                                     task_scheduler):
         for asn_object in asn_objects:
-            task = task_scheduler.create_task(file_storage_action_binary.async_do_one(asn_object),
+            task_scheduler.schedule_task(file_storage_action_binary.async_do_one(asn_object),
                                               callback=task_scheduler.task_done)
         await asyncio.wait_for(task_scheduler.close(), timeout=1)
         expected_file = Path(tmp_path/'Encoded/TCAP_MAP/127.0.0.1_00000001.TCAP_MAP')
@@ -124,8 +124,8 @@ class TestJsonFileStorage:
     async def test_01_do_many_close(self, tmp_path, file_storage_action_text, json_objects, json_encoded_multi,
                                     task_scheduler):
         for obj in json_objects:
-            task = task_scheduler.create_task(file_storage_action_text.async_do_one(obj),
-                                              callback=task_scheduler.task_done)
+            task_scheduler.schedule_task(file_storage_action_text.async_do_one(obj),
+                                         callback=task_scheduler.task_done)
         await asyncio.wait_for(task_scheduler.close(), timeout=1)
         expected_file = Path(tmp_path/'Encoded/JSON/127.0.0.1_1.JSON')
         expected_file.exists()

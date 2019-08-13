@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", message="fields may not start with an undersco
 ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 
 
-class BaseActionProtocol(Protocol):
+class ActionProtocol(Protocol):
 
     @abstractmethod
     def filter(self, msg: MessageObjectType) -> bool: ...
@@ -23,7 +23,7 @@ class BaseActionProtocol(Protocol):
     async def close(self) -> None: ...
 
 
-class ParallelAction(BaseActionProtocol, Protocol):
+class ParallelAction(ActionProtocol, Protocol):
     async def asnyc_do_one(self, msg: MessageObjectType) -> Any: ...
 
     @abstractmethod
@@ -33,7 +33,7 @@ class ParallelAction(BaseActionProtocol, Protocol):
     def response_on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any: ...
 
 
-class OneWaySequentialAction(BaseActionProtocol, Protocol):
+class OneWaySequentialAction(ActionProtocol, Protocol):
     def do_one(self, msg: MessageObjectType) -> Any: ...
 
     def do_many(self, msgs: Iterator[MessageObjectType]):

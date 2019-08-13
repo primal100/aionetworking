@@ -7,15 +7,13 @@ class TestTaskScheduler:
 
     @pytest.mark.asyncio
     async def test_00_task_lifecycle(self, task_scheduler):
-        await task_scheduler.close(timeout=1)
+        await asyncio.wait_for(task_scheduler.close(), timeout=0.1)
         task = task_scheduler.create_task(asyncio.sleep(0.2))
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(task_scheduler.join(), timeout=0.1)
-        await task
-        await asyncio.wait_for(task_scheduler.join(), timeout=1)
-        done, pending = await task_scheduler.close(timeout=1)
-        assert len(done) == 1
-        assert len(pending) == 0
+        await asyncio.sleep(0)
+        assert not task.done()
+        await asyncio.sleep(0.3)
+        await asyncio.wait_for(task, timeout=1)
+        task_scheduler.task_done(task)
 
     @pytest.mark.asyncio
     async def test_01_promise_success(self, task_scheduler, future, wait_get_double_coro, success, fail):
@@ -38,21 +36,15 @@ class TestTaskScheduler:
 
     @pytest.mark.asyncio
     async def test_04_future_lifecycle(self, task_scheduler):
-        await task_scheduler.close(timeout=1)
+        await asyncio.wait_for(task_scheduler.close(), timeout=1)
         fut = task_scheduler.create_future(1)
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(task_scheduler.join(), timeout=0.1)
-        done, pending = await task_scheduler.close(timeout=0.3)
-        assert len(done) == 0
-        assert len(pending) == 1
+        task = asyncio.create_task(task_scheduler.close())
+        await asyncio.sleep(0)
+        assert not task.done()
         task_scheduler.set_result(1, "abc")
         await fut
         assert fut.result() == 'abc'
         task_scheduler.future_done(1)
-        await asyncio.wait_for(task_scheduler.join(), timeout=1)
-        done, pending = await task_scheduler.close(timeout=1)
-        assert len(done) == 1
-        assert len(pending) == 0
 
     @pytest.mark.asyncio
     async def test_05_future_set_exception(self, task_scheduler):
@@ -61,15 +53,13 @@ class TestTaskScheduler:
         with pytest.raises(ValueError):
             await fut
         task_scheduler.future_done(2)
-        await asyncio.wait_for(task_scheduler.join(), timeout=1)
 
     @pytest.mark.asyncio
     async def test_06_future_run_wait(self, task_scheduler):
         def set_result(res: str):
             task_scheduler.set_result(3, res)
-        fut = await task_scheduler.run_wait_fut(3, set_result, 'abc')
-        assert fut.result() == 'abc'
-        await task_scheduler.close(timeout=1)
+        result = await task_scheduler.run_wait_fut(3, set_result, 'abc')
+        assert result == 'abc'
 
     @pytest.mark.asyncio
     async def test_07_future_run_wait_exception(self, task_scheduler):
@@ -77,7 +67,6 @@ class TestTaskScheduler:
             task_scheduler.set_exception(3, ValueError())
         with pytest.raises(ValueError):
             await task_scheduler.run_wait_fut(3, set_result, 'abc')
-        await task_scheduler.close(timeout=1)
 
     @pytest.mark.parametrize('delay,start_interval', [(
             3600, 1800.0),

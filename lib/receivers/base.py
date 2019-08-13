@@ -15,7 +15,7 @@ from lib.compatibility import Protocol
 @dataclass
 class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
-    logger: Logger = 'receiver'
+    logger: Logger = Logger('receiver')
     quiet: bool = False
 
     @property
@@ -40,6 +40,9 @@ class BaseServer(BaseReceiver, Protocol):
     started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     stopped: asyncio.Event = field(default_factory=event_set, init=False)
 
+    def __post_init__(self) -> None:
+        self.protocol_factory.set_logger(self.logger)
+
     @property
     @abstractmethod
     def listening_on(self) -> str: ...
@@ -60,8 +63,17 @@ class BaseServer(BaseReceiver, Protocol):
         self.started.clear()
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
-        await self.protocol_factory.wait_all_closed()
+        await self.wait_all_connections_closed()
         self.stopped.set()
+
+    async def wait_num_connections(self, num: int):
+        await self.protocol_factory.wait_num_has_connected(num)
+
+    async def wait_all_messages_processed(self) -> None:
+        await self.protocol_factory.wait_all_messages_processed()
+
+    async def wait_all_connections_closed(self):
+        await self.protocol_factory.wait_all_closed()
 
     async def start(self) -> None:
         if self.started.is_set():

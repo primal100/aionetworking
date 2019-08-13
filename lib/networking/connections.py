@@ -7,12 +7,12 @@ from .exceptions import MessageFromNotAuthorizedHost
 
 from lib.actions.protocols import OneWaySequentialAction, ParallelAction
 from lib.formats.base import BaseMessageObject
-from lib.requesters.protocols import RequesterProtocol
+from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger
 from lib.conf.types import ConnectionLoggerType
 from lib.utils import addr_tuple_to_str
 
-from .network_connections import connections_manager
+from .connections_manager import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
 from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ProtocolFactoryProtocol,
                         AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
@@ -37,8 +37,18 @@ class ProtocolFactory(ProtocolFactoryProtocol):
     def __call__(self) -> NetworkConnectionType:
         return self.connection.clone(parent_id=id(self))
 
+    def set_logger(self, logger: Logger) -> None:
+        self.logger = logger
+        self.connection.set_logger(logger)
+
     def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(id(self))
+
+    async def wait_num_has_connected(self, num: int) -> None:
+        await connections_manager.wait_num_has_connected(id(self), num)
+
+    async def wait_all_messages_processed(self) -> None:
+        await connections_manager.wait_all_messages_processed(id(self))
 
     async def wait_all_closed(self) -> None:
         await connections_manager.wait_all_connections_closed(id(self))
@@ -77,16 +87,16 @@ class UDPProtocolFactory(asyncio.DatagramProtocol, ProtocolFactory):
 @dataclass
 class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protocol):
     name = ''
+    store_connections = False
     adaptor_cls: Type[AdaptorType] = None
     action: ParallelAction = None
     preaction: OneWaySequentialAction = None
-    requester: RequesterProtocol = None
+    requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
-    store_connections: bool = False
     adaptor: AdaptorType = field(default=None)
     context: Dict[str, Any] = field(default_factory=dict)
-    connected: asyncio.Event = field(default_factory=asyncio.Event, init=False)
-    closed: asyncio.Task = field(default=None, init=False)
+    connected: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
+    closed: asyncio.Task = field(default=None, init=False, compare=False)
     logger: Logger = Logger('receiver')
     parent_id: int = None
     timeout: Union[int, float] = 5
@@ -95,10 +105,13 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
         if self.adaptor:
             return getattr(self.adaptor, item)
 
+    def set_logger(self, logger: Logger) -> None:
+        self.logger = logger
+
     def _initial_context(self) -> None:
         self.context['protocol_name'] = self.name
 
-    def start_adaptor(self) -> None:
+    def _start_adaptor(self) -> None:
         self._set_adaptor()
         if self.store_connections:
             connections_manager.add_connection(self)
@@ -144,7 +157,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             if self.adaptor:
-                await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
+                await asyncio.wait_for(self.adaptor.close_actions(exc), timeout=self.timeout)
         finally:
             self._delete_connection()
 
@@ -184,34 +197,36 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
         #    return any(n.supernet_of(other_ip) for n in self.allowed_senders)
         return True
 
-    def _get_alias(self, peer: Tuple[str, int]) -> str:
-        host = peer[0]
+    def _get_alias(self, host: str) -> str:
         alias = self.aliases.get(host, host)
         if alias != host:
             self.logger.debug('Alias found for %s: %s', host, alias)
         return alias
 
-    def _check_peer(self, peer: Tuple[str, int]) -> str:
-        if self._sender_valid(peer):
-            return self._get_alias(peer)
-        self._raise_message_from_not_authorized_host(peer)
-
-    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool:
-        self._update_context(transport, peer)
+    def _check_peer(self) -> None:
         peer = self.context['peer']
-        try:
-            alias = self._check_peer(peer)
+        host = self.context['host']
+        if self._sender_valid(host):
+            alias = self._get_alias(host)
             self.context['alias'] = alias
             if alias and alias not in peer:
                 self.context['peer'] = f"{self.alias}({peer})"
-            self.start_adaptor()
+        else:
+            self._raise_message_from_not_authorized_host(peer)
+
+    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool:
+        check_sender = self._update_context(transport, peer)
+        try:
+            if check_sender:
+                self._check_peer()
+            self._start_adaptor()
             self.connected.set()
             return True
         except MessageFromNotAuthorizedHost as exc:
             self.finish_connection(exc)
             return False
 
-    def _update_context(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None):
+    def _update_context(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool:
         self._initial_context()
         sockname = transport.get_extra_info('sockname')
         if sockname:
@@ -226,18 +241,22 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
                 self.context['peer'] = addr_tuple_to_str(peer)
                 self.context['sock'] = addr_tuple_to_str(sockname)
                 self.context['host'], self.context['port'] = peer
+                return True
             else:
                 #AF_UNIX server transport
                 fd = transport.get_extra_info('socket').fileno()
                 self.context['fd'] = fd
                 self.context['addr'] = sockname
                 self.context['peer'] = f"{sockname}.{fd}"
+                return False
         elif peer:
             #AF_UNIX client transport
             fd = transport.get_extra_info('socket').fileno()
             self.context['fd'] = fd
             self.context['addr'] = peer
             self.context['peer'] = f"{peer}.{fd}"
+            self.context['alias'] = str(fd)
+            return False
         else:
             #Pipe Duplex transport
             addr = transport.get_extra_info('addr')
@@ -245,6 +264,8 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
             self.context['addr'] = addr
             self.context['handle'] = handle
             self.context['peer'] = f"{addr}.{handle}"
+            self.context['alias'] = str(handle)
+            return False
 
 
 @dataclass
@@ -264,7 +285,7 @@ class BaseStreamConnection(asyncio.Protocol, NetworkConnectionProtocol):
         self.adaptor.on_data_received(data)
 
     def send(self, msg: AnyStr) -> None:
-        self.write_transport.write(msg)
+        self.transport.write(msg)
 
 
 @dataclass

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, InitVar
 
 from lib.actions.base import BaseAction
 from lib.formats.contrib.types import JSONObjectType
-from lib.networking.network_connections import connections_manager, ConnectionsManager
+from lib.networking.connections_manager import connections_manager
 
 from typing import Any, Dict, AnyStr, NoReturn, Tuple
 

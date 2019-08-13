@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError
-from lib.actions.protocols import BaseActionProtocol, OneWaySequentialAction, ParallelAction
+from lib.actions.protocols import ActionProtocol, OneWaySequentialAction, ParallelAction
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
 from lib.requesters.protocols import RequesterProtocol
@@ -50,12 +50,12 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for msg in hex_msgs:
             self.send(binascii.unhexlify(msg))
 
-    def encode_msg(self, decoded: Any) -> MessageObjectType:
+    def _encode_msg(self, decoded: Any) -> MessageObjectType:
         return self.codec.from_decoded(decoded)
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None:
         self.logger.on_sending_decoded_msg(msg_decoded)
-        msg_obj = self.encode_msg(msg_decoded)
+        msg_obj = self._encode_msg(msg_decoded)
         self.send_data(msg_obj.encoded)
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None:
@@ -66,7 +66,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.on_buffer_received(buffer)
         if self.preaction:
             buffer = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
-            self.preaction.do_many([buffer])
+            self._scheduler.call_soon(self.preaction.do_many, [buffer])
 
     def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
         timestamp = timestamp or datetime.now()
@@ -83,8 +83,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             tasks.append(self.preaction.close())
         return tasks
 
-    async def close(self, exc: Optional[BaseException], timeout: Union[int, float] = None) -> None:
-        await asyncio.wait(self.get_close_tasks(), timeout=timeout)
+    async def close_actions(self, exc: Optional[BaseException] = None) -> None:
+        await asyncio.wait(self.get_close_tasks())
         self.logger.connection_finished(exc)
 
 
@@ -120,7 +120,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
         return await self.send_data_and_wait(msg_obj.request_id, msg_obj.encoded)
 
     async def encode_send_wait(self, decoded: Any) -> asyncio.Future:
-        msg_obj = self.encode_msg(decoded)
+        msg_obj = self._encode_msg(decoded)
         return await self.send_msg_and_wait(msg_obj)
 
     def _run_method(self, method: Callable, *args, **kwargs) -> None:
@@ -152,7 +152,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
 @dataclass
 class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
     is_receiver = True
-    action: BaseActionProtocol = None
+    action: ActionProtocol = None
 
     def get_close_tasks(self) -> List[Awaitable]:
         tasks = super().get_close_tasks()

@@ -44,7 +44,7 @@ class TestASN1Object:
 
     def test_00_properties(self, asn_object, timestamp):
         assert asn_object.sender == '127.0.0.1'
-        assert asn_object.full_sender == '127.0.0.1:8888'
+        assert asn_object.full_sender == '127.0.0.1:60000'
         assert asn_object.otid == b'00000001'
         assert asn_object.uid == '00000001'
         assert asn_object.request_id is None

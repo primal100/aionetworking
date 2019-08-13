@@ -8,10 +8,11 @@ from lib.networking.types import ProtocolFactoryType, ConnectionType
 
 from typing import Tuple
 from lib.compatibility import Protocol
+from .protocols import SenderProtocol
 
 
 @dataclass
-class BaseSender(Protocol):
+class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
     logger: Logger = Logger('sender')
 
@@ -25,15 +26,6 @@ class BaseSender(Protocol):
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.close()
 
-    @abstractmethod
-    def is_started(self) -> bool: ...
-
-    @abstractmethod
-    def is_closing(self) -> bool: ...
-
-    @abstractmethod
-    async def connect(self) -> ConnectionType: ...
-
     async def close(self):
         pass
 
@@ -41,14 +33,10 @@ class BaseSender(Protocol):
 @dataclass
 class BaseClient(BaseSender, Protocol):
     name = "Client"
-    protocol_factory:  ConnectionGeneratorType = None
+    protocol_factory:  ProtocolFactoryType = None
     conn: ConnectionType = field(init=False, default=None)
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
-    timeout: int =2
-
-    @property
-    @abstractmethod
-    def dst(self) -> str: ...
+    timeout: int = 5
 
     @abstractmethod
     async def _open_connection(self) -> ConnectionType: ...

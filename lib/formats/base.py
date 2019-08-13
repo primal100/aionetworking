@@ -7,7 +7,7 @@ from pprint import pformat
 
 from lib import settings
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
-from lib.networking.network_connections import connections_manager
+from lib.networking.connections_manager import connections_manager
 from lib.utils import Record, aone
 
 from .protocols import MessageObject, Codec

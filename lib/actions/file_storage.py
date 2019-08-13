@@ -74,6 +74,10 @@ class ManagedFile:
             await self._task_started.wait()
             await self.wait_writes_done()
             self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
         else:
             self.logger.debug('File %s already closed', self.path)
         self.logger.debug('Closed file %s', self.path)
@@ -84,6 +88,7 @@ class ManagedFile:
         for d in done:
             if d.exception():                       #3.8 assignment expressions
                 self.logger.error(d.exception())
+                await d
         self.logger.debug('Writes completed for %s', self.path)
 
     async def manage(self) -> None:

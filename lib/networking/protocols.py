@@ -6,8 +6,11 @@ from typing import Any, AnyStr, AsyncGenerator, Generator, Optional, Sequence, T
 from lib.compatibility import Protocol
 from pathlib import Path
 
+from lib.conf.logging import Logger
 from lib.formats.base import MessageObjectType
 from lib.utils import inherit_on_type_checking_only
+
+from typing import Tuple
 
 
 class ProtocolFactoryProtocol(Protocol):
@@ -21,12 +24,17 @@ class ProtocolFactoryProtocol(Protocol):
     @abstractmethod
     async def wait_all_closed(self) -> None: ...
 
+    @abstractmethod
+    async def wait_num_has_connected(self, num: int) -> None: ...
+
+    @abstractmethod
+    async def wait_all_messages_processed(self) -> None: ...
+
 
 class ConnectionProtocol(Protocol):
     parent: int
 
-    @abstractmethod
-    def start_adaptor(self) -> None: ...
+    def set_logger(self, logger: Logger) -> None: ...
 
     @abstractmethod
     def send(self, data: AnyStr) -> None: ...
@@ -36,6 +44,25 @@ class ConnectionProtocol(Protocol):
 
     @abstractmethod
     def is_child(self, parent_id: int) -> bool: ...
+
+    @abstractmethod
+    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool: ...
+
+    @abstractmethod
+    def finish_connection(self, exc: Optional[BaseException]) -> None: ...
+
+    @abstractmethod
+    async def close_wait(self): ...
+
+    @abstractmethod
+    async def wait_connected(self) -> None: ...
+
+    @abstractmethod
+    def is_connected(self) -> bool: ...
+
+    @property
+    @abstractmethod
+    def peer(self) -> str: ...
 
 
 ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
@@ -52,8 +79,11 @@ NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=N
 
 
 class SimpleNetworkConnectionProtocol(Protocol):
-    peer_str: str
-    parent: int
+    peer: str
+    parent_id: int
+
+    @abstractmethod
+    async def wait_all_messages_processed(self) -> None: ...
 
     @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
@@ -82,9 +112,6 @@ class BaseAdaptorProtocol(Protocol):
     def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None: ...
 
     @abstractmethod
-    def encode_msg(self, decoded: Any) -> MessageObjectType: ...
-
-    @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
 
     @abstractmethod
@@ -97,7 +124,7 @@ class BaseAdaptorProtocol(Protocol):
 class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
 
     @abstractmethod
-    async def close(self, exc: Optional[BaseException], timeout: Union[int, float]) -> None: ...
+    async def close_actions(self, exc: Optional[BaseException] = None) -> None: ...
 
 
 AdaptorProtocolType = TypeVar('AdaptorProtocolType', bound=AdaptorProtocol)
@@ -111,8 +138,6 @@ class AdaptorProtocolGetattr(BaseAdaptorProtocol, Protocol):
     def send_hex(self, hex_msg: AnyStr) -> None: ...
 
     def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None: ...
-
-    def encode_msg(self, decoded: Any) -> MessageObjectType: ...
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
 

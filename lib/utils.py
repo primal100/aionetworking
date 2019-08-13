@@ -11,7 +11,7 @@ import socket
 import tempfile
 from dataclasses import fields
 
-
+from lib.compatibility import get_task_name, set_task_name
 from pathlib import Path
 from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
 from typing_extensions import Protocol
@@ -149,6 +149,25 @@ class cached_property(object):
         return wrapper()
 
 
+###Asyncio###
+
+
+def set_current_task_name(name: str):
+    task = asyncio.current_task()
+    set_task_name(task, str)
+
+
+def get_current_task_name():
+    try:
+        task = asyncio.current_task()
+        name = get_task_name(task)
+        if name:
+            return name
+        return str(id(task))
+    except RuntimeError:
+        return 'No Running Loop'
+
+
 def set_proactor_loop_policy_windows() -> None:
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
@@ -180,7 +199,7 @@ def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) 
 
 
 def supports_pipe_or_unix_connections() -> bool:
-    return not (hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe'))
+    return hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe')
 
 
 ###Logging###

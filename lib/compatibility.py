@@ -15,8 +15,13 @@ if py38:
     def set_task_name(task: asyncio.Future, name):
         if name is not None and isinstance(task, asyncio.Task):
             task.set_name(name)
+
+    def get_task_name(task: asyncio.Task) -> str:
+        return task.get_name()
 else:
     def set_task_name(task, name): ...
+
+    def get_task_name(task: asyncio.Future) -> None: ...
 
 
 def datagram_supported(loop: asyncio.AbstractEventLoop = None):

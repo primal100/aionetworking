@@ -6,9 +6,24 @@ from typing import Any, Callable
 
 class LoggingDatetime:
 
-    def __init__(self, datefmt: str ="%Y-%M-%d %H:%M:%S"):
+    def __init__(self, datefmt: str = "%Y-%M-%d %H:%M:%S"):
         self.dt = datetime.now()
         self._datefmt = datefmt
+
+    def __gt__(self, other):
+        return self.dt > other.dt
+
+    def __ge__(self, other):
+        return self.dt >= other.dt
+
+    def __le__(self, other):
+        return self.dt >= other.dt
+
+    def __lt__(self, other):
+        return self.dt < other.dt
+
+    def __eq__(self, other):
+        return self.dt == other.dt
 
     def __getattr__(self, item: str) -> Any:
         return getattr(self.dt, item)
@@ -106,7 +121,7 @@ class BytesSizeRate(float):
 
     @property
     def bytes(self) -> float:
-        return self
+        return float(self)
 
     @property
     def kb(self) -> float:
