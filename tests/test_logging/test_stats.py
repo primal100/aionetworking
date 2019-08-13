@@ -1,4 +1,6 @@
 import logging
+import pytest
+import asyncio
 
 
 class TestStatsTracker:
@@ -43,7 +45,8 @@ class TestStatsTracker:
 
 
 class TestStatsLogger:
-    def test_00_process(self, stats_logger):
+    @pytest.mark.asyncio
+    async def test_00_process(self, stats_logger):
         msg, kwargs = stats_logger.process("abc", {})
         assert msg == 'abc'
         keys = list(kwargs['extra'].keys())
@@ -52,7 +55,8 @@ class TestStatsLogger:
              'receive_rate', 'interval', 'average_buffer', 'average_sent', 'protocol_name', 'host',
              'port', 'peer', 'sock', 'alias'])
 
-    def test_01_reset(self, stats_logger, asn_buffer):
+    @pytest.mark.asyncio
+    async def test_01_reset(self, stats_logger, asn_buffer):
         stats_logger.on_buffer_received(asn_buffer)
         stats_logger.on_msg_processed(326)
         assert stats_logger.received == 326
@@ -61,12 +65,66 @@ class TestStatsLogger:
         assert stats_logger.received == 0
         assert stats_logger.processed == 0
 
-    def test_02_log_info(self, stats_logger, asn_buffer, stats_formatter, caplog):
+    @pytest.mark.asyncio
+    async def test_02_log_info_twice(self, stats_logger, asn_buffer, stats_formatter, caplog):
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
         stats_logger.on_msg_processed(326)
         assert stats_logger.received == 326
         assert stats_logger.processed == 326
-        stats_logger.info('INTERVAL')
-        assert caplog.text == "127.0.0.1 INTERVAL 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+        stats_logger.stats('ALL')
+        assert caplog.text == "127.0.0.1 ALL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+        caplog.clear()
+        assert stats_logger.received == 0
+        assert stats_logger.processed == 0
+        stats_logger.on_buffer_received(asn_buffer)
+        stats_logger.on_msg_processed(326)
+        assert stats_logger.received == 326
+        assert stats_logger.processed == 326
+        stats_logger.periodic_log(True)
+        assert caplog.text == "127.0.0.1 INTERVAL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+
+    @pytest.mark.asyncio
+    async def test_03_periodic_log(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
+        caplog.handler.setFormatter(stats_formatter)
+        stats_logger.on_buffer_received(asn_buffer)
+        stats_logger.on_msg_processed(326)
+        assert stats_logger.received == 326
+        assert stats_logger.processed == 326
+        await asyncio.sleep(0.15)
+        assert caplog.text == "127.0.0.1 INTERVAL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+        assert stats_logger.received == 0
+        assert stats_logger.processed == 0
+
+    @pytest.mark.asyncio
+    async def test_04_finish_all(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
+        caplog.handler.setFormatter(stats_formatter)
+        stats_logger.on_buffer_received(asn_buffer)
+        stats_logger.on_msg_processed(326)
+        stats_logger.finish()
+        assert caplog.text == "127.0.0.1 ALL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+
+    @pytest.mark.asyncio
+    async def test_05_finish_before_processed(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
+        caplog.handler.setFormatter(stats_formatter)
+        stats_logger.on_buffer_received(asn_buffer)
+        assert caplog.text == ""
+        stats_logger.finish()
+        stats_logger.on_msg_processed(326)
+        assert caplog.text == "127.0.0.1 ALL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
+
+    @pytest.mark.asyncio
+    async def test_06_interval_end(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
+        caplog.handler.setFormatter(stats_formatter)
+        stats_logger.on_buffer_received(asn_buffer)
+        await asyncio.sleep(0.15)
+        assert caplog.text == "127.0.0.1 INTERVAL 1 0 0.32KB 0.00KB 0.00KB/s 0.32KB 0\n"
+        caplog.clear()
+        stats_logger.on_msg_processed(326)
+        stats_logger.finish()
+        assert caplog.text == "127.0.0.1 END 0 1 0.00KB 0.32KB 0.32KB/s 0.00KB 1\n"

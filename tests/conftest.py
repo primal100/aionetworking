@@ -7,6 +7,7 @@ import collections
 import logging
 import pytest
 import binascii
+import logging
 import os
 import socket
 import shutil
@@ -107,12 +108,12 @@ def stats_tracker() -> StatsTracker:
 @pytest.fixture
 def stats_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{alias} {msg} {msgs.received} {received.kb:.2f}KB {processed.kb:.2f}KB {processing_rate.kb:.2f}KB/s {average_buffer.kb:.2f}KB {msgs.buffer_processing_rate}", style="{")
+        "{alias} {msg} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {processing_rate.kb:.2f}KB/s {average_buffer.kb:.2f}KB {msgs.buffer_processing_rate}", style="{")
 
 
 @pytest.fixture
-def stats_logger(context) -> StatsLogger:
-    return StatsLogger("receiver.stats", extra=context, interval=0.1)
+async def stats_logger(context) -> StatsLogger:
+    return StatsLogger("receiver.stats", extra=context, interval=0.1, fixed_start_time=False)
 
 
 @pytest.fixture
@@ -121,8 +122,26 @@ def receiver_logger() -> Logger:
 
 
 @pytest.fixture
-def receiver_connection_logger(receiver_logger, context) -> ConnectionLogger:
+async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
+    caplog.set_level(logging.DEBUG, "receiver.connection")
     return receiver_logger.get_connection_logger(is_receiver=True, extra=context)
+
+
+@pytest.fixture
+async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
+    caplog.set_level(logging.INFO, "receiver.stats")
+    caplog.set_level(logging.DEBUG, "receiver.connection")
+    return receiver_logger.get_connection_logger(is_receiver=True, extra=context)
+
+
+@pytest.fixture(params=[receiver_connection_logger, receiver_connection_logger_stats])
+def _connection_logger(request):
+    return get_fixture(request.param)
+
+
+@pytest.fixture
+async def connection_logger(connection_logger):
+    yield _connection_logger
 
 
 @pytest.fixture

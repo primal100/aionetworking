@@ -12,7 +12,7 @@ from lib.utils import log_exception, get_current_task_name
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.schedulers import TaskScheduler
 
-from typing import ClassVar, Type, Optional, Dict, AnyStr, Iterable, Generator, Any, List
+from typing import ClassVar, Type, Optional, Dict, AnyStr, Iterable, Generator, Any, Union
 from lib.formats.types import MessageObjectType
 from .types import ConnectionLoggerType
 
@@ -22,6 +22,7 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     logger_name: str
     datefmt: str
     extra: dict
+    _is_closing = False
 
     def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None):
         self.logger_name = logger_name
@@ -95,10 +96,12 @@ class Logger(BaseLogger):
                           p.plural_verb('is', p.num(connections_manager.num_connections(parent_id))),
                           p.no('active connection'))
 
+    def _set_closing(self) -> None:
+        self._is_closing = True
+
 
 @dataclass
 class ConnectionLogger(Logger):
-    _is_closing = False
 
     def __init__(self, *args, is_receiver: bool = False, extra: Dict[str, Any] = None, **kwargs):
         extra = self.get_extra(extra or {}, is_receiver)
@@ -125,9 +128,6 @@ class ConnectionLogger(Logger):
             })
         return extra
 
-    def msg_logger(self, msg: MessageObjectType) -> BaseLogger:
-        return self.get_sibling('msg', extra={'msg_obj': msg})
-
     @property
     def connection_type(self) -> str:
         return self.extra['protocol_name']
@@ -151,19 +151,15 @@ class ConnectionLogger(Logger):
         self._raw_sent_logger.debug(data, *args, **kwargs)
 
     def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        extra = ChainMap({'data': msg_obj}, self.extra)
+        extra = ChainMap({'data': msg_obj, 'direction': "RECEIVED"}, self.extra)
         self._data_received_logger.debug(msg, *args, extra=extra, **kwargs)
 
     def _data_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        extra = ChainMap({'data': msg_obj}, self.extra)
+        extra = ChainMap({'data': msg_obj, 'direction': "SENT"}, self.extra)
         self._data_sent_logger.debug(msg, *args, extra=extra, **kwargs)
 
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
-
-    def on_buffer_received(self, data: AnyStr) -> None:
-        self.debug("Received msg from %s", self.peer)
-        self._raw_received(data)
 
     def _on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
         self._data_received(msg_obj)
@@ -171,6 +167,10 @@ class ConnectionLogger(Logger):
     def _log_decoded_msgs(self, msgs: Iterable[MessageObjectType]) -> None:
         for msg_obj in msgs:
             self._on_msg_decoded(msg_obj)
+
+    def on_buffer_received(self, data: AnyStr) -> None:
+        self.debug("Received msg from %s", self.peer)
+        self._raw_received(data)
 
     def log_msgs(self, msgs: Iterable[MessageObjectType]) -> None:
         self.logger.debug('Buffer contains %s', p.no('message', msgs))
@@ -192,9 +192,6 @@ class ConnectionLogger(Logger):
     def connection_finished(self, exc: Optional[BaseException] = None) -> None:
         self.manage_error(exc)
         self.info('%s connection from %s to %s has been closed', self.connection_type, self.client, self.server)
-
-    def _set_closing(self) -> None:
-        self._is_closing = True
 
 
 @dataclass
@@ -263,34 +260,21 @@ class StatsTracker:
 
 @dataclass
 class StatsLogger(Logger):
-    _scheduler: TaskScheduler = field(init=False, default_factory=TaskScheduler)
+    _first = True
     _stats: StatsTracker = None
-    interval: int = 0
+    _scheduler: TaskScheduler = field(init=False, default_factory=TaskScheduler)
+    interval: Union[int, float] = 0
+    fixed_start_time: bool = True
     stats_cls = StatsTracker
     _total_received = 0
     _total_processed = 0
 
-    def __init__(self, logger_name: str, extra: dict, *args, **kwargs):
+    def __init__(self, logger_name: str, extra: dict, *args, interval: int = 0, fixed_start_time: bool = True, **kwargs):
         self._scheduler = TaskScheduler()
         super().__init__(logger_name, *args, extra=extra, **kwargs)
-        self._stats = self.stats_cls(datemft=self.datefmt)
-        if self.interval:
-            self._scheduler.call_cb_periodic(self.interval, self.periodic_log, fixed_start_time=True)
-
-    def _check_last_message_processed(self) -> None:
-        if self._stats_logger.msgs.received == self._stats_logger.msgs.processed:
-            self._stats_logger.finish()
-            tag = 'ALL' if self._first else 'END'
-            self.stats(tag)
-
-    def stats(self, tag: str) -> None:
-        self._total_received += self._stats.received
-        self._total_processed += self._stats.processed
-        self._stats_logger.info(tag)
-        self._stats_logger.reset()
-
-    def periodic_log(self, first: bool) -> None:
-        self.stats("INTERVAL")
+        self._stats = self.stats_cls(datefmt=self.datefmt)
+        if interval:
+            self._scheduler.call_cb_periodic(interval, self.periodic_log, fixed_start_time=fixed_start_time)
 
     def process(self, msg, kwargs):
         self._stats.end_interval()
@@ -300,6 +284,22 @@ class StatsLogger(Logger):
 
     def reset(self):
         self._stats = self.stats_cls(datefmt=self.datefmt)
+
+    def stats(self, tag: str) -> None:
+        self._first = False
+        self._total_received += self._stats.received
+        self._total_processed += self._stats.processed
+        self.info(tag)
+        self.reset()
+
+    def periodic_log(self, first: bool = True) -> None:
+        self.stats("INTERVAL")
+
+    def _check_last_message_processed(self) -> None:
+        if (self._total_received + self._stats.received) == (self._total_processed + self._stats.processed):
+            self._stats.end_interval()
+            tag = 'ALL' if self._first else 'END'
+            self.stats(tag)
 
     def finish(self):
         self._set_closing()
@@ -313,7 +313,7 @@ class StatsLogger(Logger):
 
     def __getattr__(self, item):
         if self._stats:
-            return getattr(self._stats, item, None)
+            return getattr(self._stats, item)
 
 
 @dataclass
@@ -321,10 +321,10 @@ class ConnectionLoggerStats(ConnectionLogger):
     stats_cls = StatsLogger
 
     def __init__(self, *args, **kwargs):
-        self._stats_logger = self.get_stats_logger()
+        self._stats_logger = self._get_stats_logger()
         super().__init__(*args, **kwargs)
 
-    def get_stats_logger(self) -> StatsLogger:
+    def _get_stats_logger(self) -> StatsLogger:
         return self.get_sibling('stats', cls=self.stats_cls)
 
     def on_buffer_received(self, msg: AnyStr) -> None:

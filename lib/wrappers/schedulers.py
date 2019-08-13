@@ -122,9 +122,11 @@ class TaskScheduler:
     async def _call_coro_periodic(delay: Union[int, float], async_callback: Callable,
                              *args, start_time_interval: Union[int, float] = 0, **kwargs):
         await asyncio.sleep(start_time_interval)
+        first = True
         while True:
-            coro = async_callback(*args, **kwargs)
+            coro = async_callback(*args, first=first, **kwargs)
             await coro
+            first = False
             await asyncio.sleep(delay)
 
     def call_coro_periodic(self, delay: Union[int, float], async_callback: Callable, *args,
