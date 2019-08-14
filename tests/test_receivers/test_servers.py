@@ -1,5 +1,6 @@
 import asyncio
 import pytest
+import pickle
 
 from lib.receivers.exceptions import ServerException
 
@@ -88,3 +89,9 @@ class TestServerStartStop:
             pass
         finally:
             await asyncio.wait_for(task, timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_08_pickle_server(self, server_receiver):
+        data = pickle.dumps(server_receiver)
+        server = pickle.loads(data)
+        assert server == server_receiver

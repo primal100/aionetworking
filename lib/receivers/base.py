@@ -7,6 +7,7 @@ from .exceptions import ServerException
 from lib.conf.logging import Logger
 from lib.networking.types import ProtocolFactoryType
 from lib.factories import event_set
+from lib.utils import dataclass_getstate, dataclass_setstate
 from .protocols import ReceiverProtocol
 
 from lib.compatibility import Protocol
@@ -30,6 +31,12 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         await self.stop()
         return await self.wait_stopped()
 
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        return dataclass_setstate(self, state)
+
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
@@ -38,8 +45,8 @@ class BaseServer(BaseReceiver, Protocol):
 
     protocol_factory:  ProtocolFactoryType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
-    started: asyncio.Event = field(default_factory=asyncio.Event, init=False)
-    stopped: asyncio.Event = field(default_factory=event_set, init=False)
+    started: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
+    stopped: asyncio.Event = field(default_factory=event_set, init=False, compare=False)
 
     def __post_init__(self) -> None:
         self.protocol_factory.set_logger(self.logger)
@@ -69,7 +76,7 @@ class BaseServer(BaseReceiver, Protocol):
         self.started.clear()
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
-        await self.wait_all_connections_closed()
+        await self.close_protocol_factory()
         self.stopped.set()
 
     async def wait_num_connections(self, num: int):
@@ -80,6 +87,9 @@ class BaseServer(BaseReceiver, Protocol):
 
     async def wait_all_connections_closed(self):
         await self.protocol_factory.wait_all_closed()
+
+    async def close_protocol_factory(self):
+        await self.protocol_factory.close()
 
     async def start(self) -> None:
         if self.started.is_set():

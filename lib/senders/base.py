@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from lib.conf.logging import Logger
 from lib.networking.types import ProtocolFactoryType, ConnectionType
 
-from typing import Tuple, Any
+from typing import Tuple
 from lib.compatibility import Protocol
-from lib.utils import addr_tuple_to_str
+from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 from .protocols import SenderProtocol
 
 
@@ -20,6 +20,12 @@ class BaseSender(SenderProtocol, Protocol):
     @property
     def loop(self) -> asyncio.SelectorEventLoop:
         return asyncio.get_event_loop()
+
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        return dataclass_setstate(self, state)
 
     async def __aenter__(self) -> ConnectionType:
         return await self.connect()
@@ -34,6 +40,7 @@ class BaseSender(SenderProtocol, Protocol):
 @dataclass
 class BaseClient(BaseSender, Protocol):
     name = "Client"
+    peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
     conn: ConnectionType = field(init=False, default=None)
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
@@ -42,7 +49,7 @@ class BaseClient(BaseSender, Protocol):
     def __post_init__(self):
         self.logger.update_extra(endpoint=self.full_name)
         self.protocol_factory.set_logger(self.logger)
-        self.protocol_factory.set_name(self.full_name)
+        self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 
     @abstractmethod
     async def _open_connection(self) -> ConnectionType: ...
@@ -52,7 +59,6 @@ class BaseClient(BaseSender, Protocol):
     def src(self) -> str: ...
 
     @property
-    @abstractmethod
     def full_name(self):
         return f"{self.name}_{self.src}"
 

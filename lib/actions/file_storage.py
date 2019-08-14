@@ -138,15 +138,10 @@ class BaseFileStorage(BaseAction, ABC):
     binary: InitVar[bool] = False
 
     def __post_init__(self, binary):
-        if binary:
+        if binary and 'b' not in self.mode:
             self.mode += 'b'
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
-
-    def __getstate__(self):
-        state = super().__getstate__()
-        state['binary'] = 'b' in self.mode
-        return state
 
     def _get_full_path(self, msg: BaseMessageObject) -> Path:
         return self.base_path / self._get_path(msg)

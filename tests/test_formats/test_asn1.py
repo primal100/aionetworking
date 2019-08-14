@@ -26,13 +26,17 @@ class TestASN1Codec:
             assert msg_obj.encoded == asn_encoded_multi[i]
             assert msg_obj == asn_objects[i]
 
+    def test_04_decode_one(self, asn_codec, asn_one_encoded, asn_one_decoded, asn_object, timestamp):
+        decoded = asn_codec.decode_one(asn_one_encoded, timestamp=timestamp)
+        assert decoded == asn_one_decoded
+
     @pytest.mark.asyncio
-    async def test_04_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
+    async def test_05_from_file_many(self, asn_codec, file_containing_multi_asn, asn_objects, timestamp):
         objects = asn_codec.from_file(file_containing_multi_asn, received_timestamp=timestamp)
         assert await alist(objects) == asn_objects
 
     @pytest.mark.asyncio
-    async def test_05_from_file_one(self, asn_codec, file_containing_asn, asn_object, timestamp):
+    async def test_06_from_file_one(self, asn_codec, file_containing_asn, asn_object, timestamp):
         obj = await asn_codec.one_from_file(file_containing_asn, received_timestamp=timestamp)
         assert obj == asn_object
 

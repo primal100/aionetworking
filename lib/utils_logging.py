@@ -148,20 +148,20 @@ class BytesSizeRate(float):
 
 class BytesSize(int):
 
-    def __add__(self, other) -> int:
+    def __add__(self, other) -> BytesSizeRate:
         return self.__class__(super().__add__(other))
 
-    def __sub__(self, other) -> int:
+    def __sub__(self, other) -> BytesSizeRate:
         return self.__class__(super().__sub__(other))
 
-    def __mul__(self, other) -> int:
+    def __mul__(self, other) -> BytesSizeRate:
         return self.__class__(super().__mul__(other))
 
-    def __floordiv__(self, other) -> float:
-        return BytesSizeRate(super().__floordiv__(int(other)))
+    def __floordiv__(self, other) -> BytesSizeRate:
+        return BytesSizeRate(int(self).__floordiv__(int(other)))
 
-    def __truediv__(self, other) -> float:
-        return BytesSizeRate(super().__truediv__(int(other)))
+    def __truediv__(self, other) -> BytesSizeRate:
+        return BytesSizeRate(int(self).__truediv__(int(other)))
 
     @property
     def bits(self):
@@ -186,9 +186,6 @@ class BytesSize(int):
     @property
     def tb(self) -> float:
         return int(self) / 1024 / 1024 / 1024 / 1024
-
-    def average(self, num) -> float:
-        return BytesSizeRate(int(self) / (num or 1))
 
 
 class MsgsCount:

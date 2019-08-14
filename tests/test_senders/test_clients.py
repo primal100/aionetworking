@@ -1,4 +1,4 @@
-import asyncio
+import pickle
 import pytest
 
 from lib.receivers.exceptions import ServerException
@@ -33,3 +33,9 @@ class TestClientStartStop:
             assert client_sender.transport
             assert client_sender.conn
         assert client_sender.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_03_client_pickle(self, client_sender):
+        data = pickle.dumps(client_sender)
+        client = pickle.loads(data)
+        assert client == client_sender

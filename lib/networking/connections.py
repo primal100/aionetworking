@@ -14,7 +14,7 @@ from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 
 from .connections_manager import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
-from .protocols import (ConnectionType, ConnectionProtocol, NetworkConnectionMixinProtocol, ProtocolFactoryProtocol,
+from .protocols import (ConnectionType, ConnectionProtocol, ProtocolFactoryProtocol,
                         AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
 from .types import ProtocolFactoryType,  NetworkConnectionType, AdaptorType, SenderAdaptorType
 
@@ -64,6 +64,10 @@ class ProtocolFactory(ProtocolFactoryProtocol):
 
     async def wait_all_closed(self) -> None:
         await connections_manager.wait_all_connections_closed(id(self))
+
+    async def close(self) -> None:
+        await self.wait_all_closed()
+        await self.connection.close_actions()
 
 
 @dataclass
@@ -131,6 +135,22 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
             connections_manager.add_connection(self)
             self.logger.log_num_connections('opened', self.parent_name)
 
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        dataclass_setstate(self, state)
+
+    async def close_actions(self) -> None:
+        coros = []
+        if self.requester:
+            coros.append(self.requester.close())
+        if self.action:
+            coros.append(self.action.close())
+        if self.preaction:
+            coros.append(self.preaction.close())
+        await asyncio.wait(coros)
+
     @property
     def peer(self) -> str:
         return f"{self.peer_prefix}_{self.context.get('peer')}"
@@ -171,7 +191,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             if self.adaptor:
-                await asyncio.wait_for(self.adaptor.close_actions(exc), timeout=self.timeout)
+                await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
         finally:
             self._delete_connection()
 
@@ -195,7 +215,7 @@ TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
 
 
 @dataclass
-class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinProtocol, Protocol):
+class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     transport: TransportType = None
 
     aliases: dict = field(default_factory=dict)

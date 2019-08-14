@@ -1,4 +1,3 @@
-import asyncio
 import pytest
 import logging
 
@@ -29,20 +28,13 @@ class TestConnectionLogger:
         assert caplog.record_tuples[0] == (
             "receiver.connection", logging.INFO, 'New TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888')
 
-    def test_06_log_received_msgs(self, connection_logger, asn_objects, caplog, debug_logging):
+    def test_06_log_received_msgs(self, connection_logger, asn_object, caplog, debug_logging):
         logging.getLogger('receiver.data_received').setLevel(logging.CRITICAL)
-        connection_logger.log_msgs(asn_objects)
-        assert caplog.record_tuples == [('receiver.connection', 10, 'Buffer contains 4 messages')]
-        caplog.clear()
         caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
         logging.getLogger('receiver.connection').setLevel(logging.CRITICAL)
         logging.getLogger('receiver.data_received').setLevel(logging.DEBUG)
-        connection_logger.log_msgs(asn_objects)
-        assert caplog.text == """00000001
-840001ff
-a5050001
-00000000
-"""
+        connection_logger.on_msg_decoded(asn_object)
+        assert caplog.text == "00000001\n"
 
     def test_07_sending_decoded_msg(self, connection_logger, asn_object, caplog, debug_logging):
         caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
@@ -56,29 +48,82 @@ a5050001
 
 
 class TestConnectionLoggerNoStats:
-    def test_00_has_no_stats(self, receiver_connection_logger): ...
+    @pytest.mark.asyncio
+    async def test_00_has_no_stats(self, receiver_connection_logger):
+        assert not hasattr(receiver_connection_logger, '_stats_logger')
 
-    def test_00_on_buffer_received(self, receiver_connection_logger, caplog): ...
+    def test_01_on_buffer_received(self, receiver_connection_logger, caplog, asn_one_encoded, asn_one_hex, debug_logging):
+        receiver_connection_logger.on_buffer_received(asn_one_encoded)
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Received message from 127.0.0.1:60000')
+        assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, asn_one_hex)
 
-    def test_01_on_msg_processed(self, receiver_connection_logger, caplog): ...
+    def test_02_on_msg_processed(self, receiver_connection_logger, caplog):
+        receiver_connection_logger.on_msg_processed(306)
+        assert caplog.text == ''
 
-    def test_02_on_msg_sent(self, receiver_connection_logger, caplog): ...
+    def test_03_on_msg_sent(self, receiver_connection_logger, caplog, asn_one_encoded):
+        receiver_connection_logger.on_msg_sent(asn_one_encoded)
+        assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
 
-    def test_03_connection_finished(self, receiver_connection_logger, caplog): ...
+    def test_04_connection_finished_no_error(self, receiver_connection_logger, caplog):
+        receiver_connection_logger.connection_finished()
+        assert caplog.record_tuples == [('receiver.connection', logging.INFO,
+                                         'TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888 has been closed')]
+
+    def test_05_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog):
+        receiver_connection_logger.connection_finished(zero_division_exception)
+        log = caplog.record_tuples[0]
+        assert log[0] == 'receiver.connection'
+        assert log[1] == logging.ERROR
+        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
+                                        'TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888 has been closed')
 
 
 class TestConnectionLoggerStats:
-    def test_00_has_stats_logger(self, receiver_connection_logger_stats, caplog): ...
-
-    def test_01_on_buffer_received(self, receiver_connection_logger_stats, caplog): ...
-
-    def test_02_on_msg_processed(self, receiver_connection_logger_stats, caplog): ...
-
-    def test_03_on_msg_sent(self, receiver_connection_logger_stats, caplog): ...
-
-    def test_04_connection_finished(self, receiver_connection_logger_stats, caplog): ...
-
     @pytest.mark.asyncio
+    async def test_00_has_stats_logger(self, receiver_connection_logger_stats, stats_logger):
+        assert receiver_connection_logger_stats._stats_logger == stats_logger
+
+    def test_01_on_buffer_received(self, receiver_connection_logger_stats, asn_one_encoded,
+                                   asn_one_hex, caplog, debug_logging):
+        assert receiver_connection_logger_stats._stats_logger.received == 0
+        receiver_connection_logger_stats.on_buffer_received(asn_one_encoded)
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Received message from 127.0.0.1:60000')
+        assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, asn_one_hex)
+        assert receiver_connection_logger_stats._stats_logger.received == 73
+
+    def test_02_on_msg_processed(self, receiver_connection_logger_stats, caplog):
+        assert receiver_connection_logger_stats._stats_logger.processed == 0
+        receiver_connection_logger_stats.on_msg_processed(306)
+        assert caplog.text == ''
+        assert receiver_connection_logger_stats._stats_logger.processed == 306
+
+    def test_03_on_msg_sent(self, receiver_connection_logger_stats, caplog, asn_one_encoded, debug_logging):
+        assert receiver_connection_logger_stats._stats_logger.msgs.sent == 0
+        receiver_connection_logger_stats.on_msg_sent(asn_one_encoded)
+        assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
+        assert receiver_connection_logger_stats._stats_logger.msgs.sent == 1
+
+    def test_04_connection_finished_no_error(self, receiver_connection_logger_stats, caplog):
+        receiver_connection_logger_stats.connection_finished()
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO,
+                                         'TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888 has been closed')
+        assert caplog.record_tuples[1] == ('receiver.stats', logging.INFO, 'ALL')
+
+    def test_05_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog):
+        receiver_connection_logger_stats.connection_finished(zero_division_exception)
+        log = caplog.record_tuples[0]
+        assert log[0] == 'receiver.connection'
+        assert log[1] == logging.ERROR
+        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
+                                        'TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888 has been closed')
+        assert caplog.record_tuples[2] == ('receiver.stats', logging.INFO, 'ALL')
+
+
+
+    """@pytest.mark.asyncio
     async def test_05_stats_logging(self, receiver_connection_logger_stats, asn_buffer, stats_formatter, caplog):
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
@@ -88,4 +133,4 @@ class TestConnectionLoggerStats:
         await asyncio.sleep(0.15)
         assert caplog.text == "127.0.0.1 INTERVAL 1 1 0.32KB 0.32KB 0.32KB/s 0.32KB 1\n"
         assert stats_logger.received == 0
-        assert stats_logger.processed == 0
+        assert stats_logger.processed == 0"""

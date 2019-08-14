@@ -11,17 +11,32 @@ else:
     from typing_extensions import Protocol
 
 
-if py38:
-    def set_task_name(task: asyncio.Future, name):
-        if name is not None and isinstance(task, asyncio.Task):
-            task.set_name(name)
+def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
+    if hasattr(task, "set_name"):
+        name = name if name else get_task_name(task)
+        if include_hierarchy:
+            prefix = get_current_task_name()
+            name = name if prefix == 'No Running Loop' else f"{prefix}{separator}{name}"
+        task.set_name(name)
 
-    def get_task_name(task: asyncio.Task) -> str:
+
+def get_task_name(task: asyncio.Future) -> str:
+    if hasattr(task, "get_name"):
         return task.get_name()
-else:
-    def set_task_name(task, name): ...
+    return str(id(task))
 
-    def get_task_name(task: asyncio.Future) -> None: ...
+
+def set_current_task_name(name: str):
+    task = asyncio.current_task()
+    set_task_name(task, name)
+
+
+def get_current_task_name():
+    try:
+        task = asyncio.current_task()
+        return get_task_name(task)
+    except RuntimeError:
+        return 'No Running Loop'
 
 
 def datagram_supported(loop: asyncio.AbstractEventLoop = None):

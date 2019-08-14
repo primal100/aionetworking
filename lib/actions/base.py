@@ -22,7 +22,6 @@ class BaseAction(ABC):
     logger: Logger = Logger('receiver')
 
     timeout: int = 5
-    _outstanding_tasks: List = field(default_factory=list, init=False, repr=False, hash=False)
 
     @classmethod
     def swap_cls(cls, name: str) -> Type[ActionType]:
@@ -36,7 +35,7 @@ class BaseAction(ABC):
         return dataclass_getstate(self)
 
     def __setstate__(self, state):
-        return dataclass_getstate(self)
+        dataclass_setstate(self, state)
 
     def filter(self, msg: BaseMessageObject) -> bool:
         return msg.filter()

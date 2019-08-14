@@ -77,14 +77,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
-    def get_close_tasks(self) -> List[Awaitable]:
-        tasks = [self._scheduler.close()]
-        if self.preaction:
-            tasks.append(self.preaction.close())
-        return tasks
-
-    async def close_actions(self, exc: Optional[BaseException] = None) -> None:
-        await asyncio.wait(self.get_close_tasks())
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        await self._scheduler.close()
         self.logger.connection_finished(exc)
 
 
@@ -153,12 +147,6 @@ class SenderAdaptor(BaseAdaptorProtocol):
 class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
     is_receiver = True
     action: ActionProtocol = None
-
-    def get_close_tasks(self) -> List[Awaitable]:
-        tasks = super().get_close_tasks()
-        if self.action:
-            tasks.append(self.action.close())
-        return tasks
 
 
 @dataclass

@@ -66,6 +66,9 @@ class ConnectionProtocol(Protocol):
     @abstractmethod
     def is_connected(self) -> bool: ...
 
+    @abstractmethod
+    async def close_actions(self) -> None: ...
+
     @property
     @abstractmethod
     def peer(self) -> str: ...
@@ -74,11 +77,7 @@ class ConnectionProtocol(Protocol):
 ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
 
 
-class NetworkConnectionMixinProtocol(Protocol):
-    peer: str
-
-
-class NetworkConnectionProtocol(NetworkConnectionMixinProtocol, ConnectionProtocol, Protocol): ...
+class NetworkConnectionProtocol(ConnectionProtocol, Protocol): ...
 
 
 NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=NetworkConnectionProtocol)
@@ -130,7 +129,7 @@ class BaseAdaptorProtocol(Protocol):
 class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
 
     @abstractmethod
-    async def close_actions(self, exc: Optional[BaseException] = None) -> None: ...
+    async def close(self, exc: Optional[BaseException] = None) -> None: ...
 
 
 AdaptorProtocolType = TypeVar('AdaptorProtocolType', bound=AdaptorProtocol)
@@ -179,7 +178,7 @@ class SenderAdaptorMixinProtocol(Protocol):
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None: ...
 
 
-class SenderAdaptorProtocol(ConnectionProtocol, NetworkConnectionMixinProtocol, Protocol): ...
+class SenderAdaptorProtocol(ConnectionProtocol, Protocol): ...
 
 
 SenderAdaptorProtocolType = TypeVar('SenderAdaptorProtocolType', bound=SenderAdaptorProtocol)

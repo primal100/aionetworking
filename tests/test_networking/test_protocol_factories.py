@@ -1,5 +1,6 @@
 import asyncio
 import pytest
+import pickle
 
 
 class TestTCPServerOneWay:
@@ -14,3 +15,10 @@ class TestTCPServerOneWay:
         task = asyncio.create_task(protocol_factory.wait_all_closed())
         new_connection.connection_lost(None)
         await asyncio.wait_for(task, 1)
+
+    @pytest.mark.asyncio
+    async def test_01_pickle_protocol_factory(self, protocol_factory):
+        data = pickle.dumps(protocol_factory)
+        factory = pickle.loads(data)
+        assert factory == protocol_factory
+

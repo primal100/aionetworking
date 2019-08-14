@@ -1,9 +1,10 @@
 import asyncio
 import pytest
 import json
+import pickle
 from pathlib import Path
 
-from lib.utils import alist, addr_str_to_tuple, Record
+from lib.utils import alist, Record
 
 
 class TestConnectionShared:
@@ -16,22 +17,20 @@ class TestConnectionShared:
         assert connection.transport is None
         connection.connection_made(transport)
         assert not transport.is_closing()
+        assert connection.adaptor.context == adaptor.context
         assert connection.adaptor == adaptor
-        assert connection.peer_str == adaptor.context['peer']
-        assert connection.peer == addr_str_to_tuple(adaptor.context['peer'])
-        assert connection.sock == addr_str_to_tuple(adaptor.context['sock'])
-        assert connection.alias == adaptor.context['alias']
+        assert connection.peer == f"tcp_{adaptor.context['peer']}"
         assert connection.logger is not None
         assert connection.transport == transport
         assert connections_manager.total == 1
-        assert connections_manager.get(connection.peer_str) == connection
+        assert connections_manager.get(connection.peer) == connection
         connection.connection_lost(None)
         await connection.close_wait()
         assert connections_manager.total == 0
         assert transport.is_closing()
 
     @pytest.mark.asyncio
-    async def test_00_send(self, connection, asn_one_encoded, transport, queue, peer_data):
+    async def test_01_send(self, connection, asn_one_encoded, transport, queue, peer_data):
         connection.connection_made(transport)
         connection.send(asn_one_encoded)
         assert queue.get_nowait() == (peer_data, asn_one_encoded)
@@ -39,22 +38,22 @@ class TestConnectionShared:
         await connection.close_wait()
 
     @pytest.mark.asyncio
-    async def test_01_send_data_adaptor_method(self, connection, asn_one_encoded, transport, queue, peer_data):
+    async def test_02_send_data_adaptor_method(self, connection, asn_one_encoded, transport, queue, peer_data):
         connection.connection_made(transport)
         connection.send_data(asn_one_encoded)
         assert queue.get_nowait() == (peer_data, asn_one_encoded)
         connection.connection_lost(None)
         await connection.close_wait()
 
-    def test_02_clone(self, connection):
-        connection_cloned = connection.clone(parent_id=5)
-        assert connection_cloned.parent_id == 5
+    def test_03_clone(self, connection):
+        connection_cloned = connection.clone(parent_name="TCP Server 127.0.0.1:8888")
+        assert connection_cloned.parent_name == "TCP Server 127.0.0.1:8888"
         connection.parent_id = 5
         assert connection_cloned == connection
 
-    def test_03_is_child(self, connection):
-        assert connection.is_child(4)
-        assert not connection.is_child(5)
+    def test_04_is_child(self, connection):
+        assert connection.is_child("TCP Server 127.0.0.1:8888")
+        assert not connection.is_child("UDP Server 127.0.0.1:8888")
 
 
 class TestConnectionOneWayServer:
@@ -78,6 +77,20 @@ class TestConnectionOneWayServer:
         assert expected_file.read_bytes() == asn1_recording
         packets = list(Record.from_file(expected_file))
         assert packets == asn1_recording_data
+
+    @pytest.mark.asyncio
+    async def test_01_pickle(self, tcp_protocol_one_way_server):
+        data = pickle.dumps(tcp_protocol_one_way_server)
+        protocol = pickle.loads(data)
+        assert protocol == tcp_protocol_one_way_server
+
+
+class TestConnectionOneWayClient:
+    @pytest.mark.asyncio
+    async def test_00_pickle(self, tcp_protocol_one_way_client):
+        data = pickle.dumps(tcp_protocol_one_way_client)
+        protocol = pickle.loads(data)
+        assert protocol == tcp_protocol_one_way_client
 
 
 class TestConnectionTwoWayServer:

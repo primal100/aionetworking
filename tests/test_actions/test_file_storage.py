@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import pickle
 from pathlib import Path
 
 from lib.actions.file_storage import ManagedFile
@@ -39,6 +40,11 @@ class TestASNFileStorage:
 
     def test_02_filter(self, file_storage_action_binary, asn_object):
         assert file_storage_action_binary.filter(asn_object) is False
+
+    def test_03_action_pickle(self, file_storage_action_binary):
+        data = pickle.dumps(file_storage_action_binary)
+        action = pickle.loads(data)
+        assert action == file_storage_action_binary
 
 
 class TestManagedFile:
@@ -107,6 +113,16 @@ class TestASNBufferedFileStorage:
         packets = list(Record.from_file(expected_file))
         assert packets == asn1_recording_data
         assert expected_file.read_bytes() == asn1_recording
+
+    def test_03_action_pickle(self, buffered_file_storage_action_binary):
+        data = pickle.dumps(buffered_file_storage_action_binary)
+        action = pickle.loads(data)
+        assert action == buffered_file_storage_action_binary
+
+    def test_04_pre_action_pickle(self, buffered_file_storage_pre_action_binary):
+        data = pickle.dumps(buffered_file_storage_pre_action_binary)
+        action = pickle.loads(data)
+        assert action == buffered_file_storage_pre_action_binary
 
 
 class TestJsonFileStorage:

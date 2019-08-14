@@ -16,6 +16,7 @@ from typing import Union
 @dataclass
 class TCPClient(BaseNetworkClient):
     name = "TCP Client"
+    peer_prefix = 'tcp'
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
 
     #ssl: ClientSideSSL = None
@@ -31,17 +32,25 @@ class TCPClient(BaseNetworkClient):
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context,
             local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
         await self.conn.wait_connected()
+        self.srcip, self.srcport = self.transport.get_extra_info('sockname')
         return self.conn
 
 
 @dataclass
 class UnixSocketClient(BaseClient):
     name = "Unix socket Client"
+    peer_prefix = 'unix'
     path: Union[str, Path] = None
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
 
     ssl_context: SSLContext = None
     ssl_handshake_timeout: int = None
+
+    @property
+    def src(self) -> str:
+        if self.transport:
+            return str(self.transport.get_extra_info('socket').fd)
+        return ''
 
     @property
     def dst(self) -> str:
@@ -57,11 +66,18 @@ class UnixSocketClient(BaseClient):
 @dataclass
 class WindowsPipeClient(BaseClient):
     name = "Windows Pipe Client"
+    peer_prefix = 'str'
     path: Union[str, Path] = None
     pid: int = None
 
     def __post_init__(self):
         self.path = str(self.path).format(pid=self.pid)
+
+    @property
+    def src(self) -> str:
+        if self.transport:
+            return str(self.transport.get_extra_info('handle'))
+        return ''
 
     @property
     def dst(self) -> str:

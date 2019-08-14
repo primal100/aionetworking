@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import contextvars
+import contextlib
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, Dict
@@ -95,6 +96,9 @@ class TaskScheduler:
     async def close(self):
         self.close_nowait()
         await self.join()
+        if self._periodic_tasks:
+            await asyncio.wait(self._periodic_tasks)
+        self._periodic_tasks.clear()
 
     def close_nowait(self):
         for task in self._periodic_tasks:

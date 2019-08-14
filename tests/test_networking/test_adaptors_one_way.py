@@ -12,14 +12,15 @@ class TestOneWayReceiverAdaptor:
 
     @pytest.mark.asyncio
     async def test_01_close(self, one_way_receiver_adaptor):
-        await one_way_receiver_adaptor.close_actions()
+        await one_way_receiver_adaptor.close()
 
     @pytest.mark.asyncio
     async def test_02_manage_buffer(self, tmp_path, one_way_receiver_adaptor, buffer_asn1_1, buffer_asn1_2, timestamp,
-                                    asn1_recording, asn1_recording_data):
+                                    asn1_recording, asn1_recording_data, buffered_file_storage_pre_action_binary):
         one_way_receiver_adaptor._manage_buffer(buffer_asn1_1, timestamp)
         one_way_receiver_adaptor._manage_buffer(buffer_asn1_2, timestamp + timedelta(seconds=1))
-        await one_way_receiver_adaptor.close_actions()
+        await one_way_receiver_adaptor.close()
+        await buffered_file_storage_pre_action_binary.close()
         expected_file = Path(tmp_path / '127.0.0.1.recording')
         assert expected_file.exists()
         packets = list(Record.from_file(expected_file))
@@ -27,9 +28,11 @@ class TestOneWayReceiverAdaptor:
         assert expected_file.read_bytes() == asn1_recording
 
     @pytest.mark.asyncio
-    async def test_03_process_msgs(self, tmp_path, one_way_receiver_adaptor, asn_buffer, timestamp, asn_codec, asn_objects):
+    async def test_03_process_msgs(self, tmp_path, one_way_receiver_adaptor, asn_buffer, timestamp, asn_codec,
+                                   asn_objects, buffered_file_storage_action_binary):
         one_way_receiver_adaptor.process_msgs(asn_objects, asn_buffer)
-        await one_way_receiver_adaptor.close_actions()
+        await one_way_receiver_adaptor.close()
+        await buffered_file_storage_action_binary.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
         assert expected_file.exists()
         msgs = await alist(asn_codec.from_file(expected_file))
@@ -39,10 +42,11 @@ class TestOneWayReceiverAdaptor:
     @pytest.mark.asyncio
     async def test_04_on_data_received(self, tmp_path, one_way_receiver_adaptor, asn_buffer, buffer_asn1_1,
                                        buffer_asn1_2, timestamp, asn1_recording, asn1_recording_data, asn_codec,
-                                       asn_objects):
+                                       asn_objects, buffered_file_storage_action_binary):
         one_way_receiver_adaptor.on_data_received(buffer_asn1_1, timestamp)
         one_way_receiver_adaptor.on_data_received(buffer_asn1_2, timestamp + timedelta(seconds=1))
-        await one_way_receiver_adaptor.close_actions()
+        await one_way_receiver_adaptor.close()
+        await buffered_file_storage_action_binary.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
         assert expected_file.exists()
         assert expected_file.read_bytes() == asn_buffer
@@ -61,7 +65,7 @@ class TestSenderAdaptorOneWay:
 
     @pytest.mark.asyncio
     async def test_01_close(self, one_way_receiver_adaptor):
-        await one_way_receiver_adaptor.close_actions()
+        await one_way_receiver_adaptor.close()
 
     def test_02_send(self, one_way_sender_adaptor, asn_one_encoded, deque):
         one_way_sender_adaptor.send(asn_one_encoded)

@@ -22,21 +22,21 @@ class ConnectionsManager:
 
     def add_connection(self, connection: SimpleNetworkConnectionType) -> None:
         self._connections[connection.peer] = connection
-        self._counters.increment(connection.parent_id)
+        self._counters.increment(connection.parent_name)
 
     def remove_connection(self, connection: Any):
         connection = self._connections.pop(connection.peer, None)
         for key, subscribers in self._subscriptions.items():
             if connection in subscribers:
                 subscribers.remove(connection)
-        self._counters.decrement(connection.parent_id)
+        self._counters.decrement(connection.parent_name)
 
     @property
     def total(self) -> int:
         return len(self._connections)
 
-    def num_connections(self, parent_id: int) -> int:
-        return self._counters.get_num(parent_id)
+    def num_connections(self, parent_name: str) -> int:
+        return self._counters.get_num(parent_name)
 
     def subscribe(self, peer_str: str, subscribe_key: Any) -> None:
         connection = self.get(peer_str)
