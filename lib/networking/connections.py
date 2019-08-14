@@ -10,7 +10,7 @@ from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger
 from lib.conf.types import ConnectionLoggerType
-from lib.utils import addr_tuple_to_str
+from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 
 from .connections_manager import connections_manager
 from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
@@ -36,6 +36,12 @@ class ProtocolFactory(ProtocolFactoryProtocol):
 
     def __call__(self) -> NetworkConnectionType:
         return self.connection.clone(parent_id=id(self))
+
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        dataclass_setstate(self, state)
 
     def set_logger(self, logger: Logger) -> None:
         self.logger = logger
@@ -93,8 +99,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     preaction: OneWaySequentialAction = None
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
-    adaptor: AdaptorType = field(default=None)
-    context: Dict[str, Any] = field(default_factory=dict)
+    adaptor: AdaptorType = field(default=None, init=False)
+    context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     connected: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
     closed: asyncio.Task = field(default=None, init=False, compare=False)
     logger: Logger = Logger('receiver')

@@ -9,7 +9,7 @@ import itertools
 import sys
 import socket
 import tempfile
-from dataclasses import fields
+from dataclasses import fields, MISSING
 
 from lib.compatibility import get_task_name, set_task_name
 from pathlib import Path
@@ -431,3 +431,28 @@ def asn_timestamp_to_datetime(timestamp: Sequence) -> datetime.datetime:
     else:
         microsecond = int(timestamp[6].ljust(6, '0'))
     return datetime.datetime(year, month, day, hour, minute, second, microsecond)
+
+
+def dataclass_getstate(self):
+    state = {}
+    f = fields(self)
+    for field in f:
+        name = field.name
+        if field.init:
+            try:
+                value = getattr(self, field.name)
+                if field.default == MISSING and field.default_factory == MISSING:
+                    state[name] = value
+                elif field.default != MISSING and value != field.default:
+                    if field.metadata.get('pickle', True):
+                        state[name] = value
+                elif field.default_factory != MISSING :
+                    if field.metadata.get('pickle', False):
+                        state[name] = value
+            except AttributeError:
+                pass
+    return state
+
+
+def dataclass_setstate(self, state):
+    self.__dict__.update(self.__class__(**state).__dict__)

@@ -130,7 +130,7 @@ def default_data_dir():
 @dataclass
 class BaseFileStorage(BaseAction, ABC):
 
-    base_path: Path = field(default_factory=default_data_dir)
+    base_path: Path = field(default_factory=default_data_dir, metadata={'pickle': True})
     path: str = ''
     attr: str = 'encoded'
     mode: str = 'w'
@@ -142,6 +142,11 @@ class BaseFileStorage(BaseAction, ABC):
             self.mode += 'b'
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        state['binary'] = 'b' in self.mode
+        return state
 
     def _get_full_path(self, msg: BaseMessageObject) -> Path:
         return self.base_path / self._get_path(msg)

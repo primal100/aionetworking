@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 #from pydantic import ValidationError
 
 from lib.networking.connections_manager import connections_manager
+from lib.utils import dataclass_getstate, dataclass_setstate
 from lib.utils import log_exception, get_current_task_name
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.schedulers import TaskScheduler
@@ -22,7 +23,7 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     logger_name: str
     datefmt: str
     extra: dict
-    _is_closing = False
+    _is_closing: bool = field(default=False, init=False)
 
     def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None):
         self.logger_name = logger_name
@@ -38,6 +39,16 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     def manage_critical_error(self, exc: BaseException) -> None:
         if exc:
             self.critical(log_exception(exc))
+
+    def __getstate__(self):
+        state = dataclass_getstate(self)
+        if self._is_closing:
+            state['_is_closing'] = self._is_closing
+        return state
+
+    def __setstate__(self, state):
+        self._is_closing = state.pop('_is_closing', self._is_closing)
+        dataclass_setstate(self, state)
 
     @abstractmethod
     def _get_connection_logger_cls(self) -> Type: ...
@@ -55,6 +66,7 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     def _get_logger(self, name: str = '', cls: Type[BaseLogger] = None, extra: Dict[str, Any] = None, **kwargs) -> Any: ...
 
 
+@dataclass
 class Logger(BaseLogger):
     _loggers: ClassVar = {}
 

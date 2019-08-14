@@ -5,6 +5,7 @@ import warnings
 
 from lib.conf.logging import Logger
 from lib.formats.base import BaseMessageObject
+from lib.utils import dataclass_getstate, dataclass_setstate
 
 from typing import Iterator, List, Any, AnyStr, TypeVar, Type
 
@@ -30,6 +31,12 @@ class BaseAction(ABC):
 
     def __post_init__(self) -> None:
         self.logger = self.logger.get_child(name='actions')
+
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        return dataclass_getstate(self)
 
     def filter(self, msg: BaseMessageObject) -> bool:
         return msg.filter()
