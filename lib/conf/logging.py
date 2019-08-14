@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+import binascii
 import logging
 from collections import ChainMap
 from datetime import datetime
@@ -31,6 +32,9 @@ class BaseLogger(logging.LoggerAdapter, ABC):
         logger = logging.getLogger(logger_name)
         super().__init__(logger, extra or {})
         self.connection_logger_cls = self._get_connection_logger_cls()
+
+    def update_extra(self, **kwargs):
+        self.extra.update(**kwargs)
 
     def manage_error(self, exc: BaseException) -> None:
         if exc:
@@ -76,6 +80,7 @@ class Logger(BaseLogger):
     def process(self, msg, kwargs):
         msg, kwargs = super().process(msg, kwargs)
         kwargs['extra']['taskname'] = get_current_task_name()
+        kwargs['extra'].update(kwargs.pop('detail', {}))
         return msg, kwargs
 
     def _get_connection_logger_cls(self) -> Type[BaseLogger]:
@@ -103,10 +108,11 @@ class Logger(BaseLogger):
         extra = ChainMap(extra or {}, self.extra)
         return cls(name, extra=extra, **kwargs)
 
-    def log_num_connections(self, action: str, parent_id: int):
-        self.debug('Connection %s. There %s now %s.', action,
-                          p.plural_verb('is', p.num(connections_manager.num_connections(parent_id))),
-                          p.no('active connection'))
+    def log_num_connections(self, action: str, parent_name: str):
+        if self.isEnabledFor(logging.DEBUG):
+            self.log(logging.DEBUG, 'Connection %s. There %s now %s.', action,
+                        p.plural_verb('is', p.num(connections_manager.num_connections(parent_name))),
+                        p.no('active connection'))
 
     def _set_closing(self) -> None:
         self._is_closing = True
@@ -156,22 +162,27 @@ class ConnectionLogger(Logger):
     def peer(self) -> str:
         return self.extra['peer']
 
+    def _convert_raw_to_hex(self, data: AnyStr):
+        if isinstance(data, bytes):
+            try:
+                return data.decode('utf-8')
+            except UnicodeDecodeError:
+                return binascii.hexlify(data).decode('utf-8')
+        return data
+
     def _raw_received(self, data: AnyStr, *args, **kwargs) -> None:
-        self._raw_received_logger.debug(data, *args, **kwargs)
+        msg = self._convert_raw_to_hex(data)
+        self._raw_received_logger.debug(msg, *args, **kwargs)
 
     def _raw_sent(self, data: AnyStr, *args, **kwargs) -> None:
-        self._raw_sent_logger.debug(data, *args, **kwargs)
+        msg = self._convert_raw_to_hex(data)
+        self._raw_sent_logger.debug(msg, *args, **kwargs)
 
     def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        extra = ChainMap({'data': msg_obj, 'direction': "RECEIVED"}, self.extra)
-        self._data_received_logger.debug(msg, *args, extra=extra, **kwargs)
+        self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
 
     def _data_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        extra = ChainMap({'data': msg_obj, 'direction': "SENT"}, self.extra)
-        self._data_sent_logger.debug(msg, *args, extra=extra, **kwargs)
-
-    def new_connection(self) -> None:
-        self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
+        self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'SENT'}, **kwargs)
 
     def _on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
         self._data_received(msg_obj)
@@ -180,13 +191,16 @@ class ConnectionLogger(Logger):
         for msg_obj in msgs:
             self._on_msg_decoded(msg_obj)
 
+    def new_connection(self) -> None:
+        self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
+
     def on_buffer_received(self, data: AnyStr) -> None:
         self.debug("Received msg from %s", self.peer)
         self._raw_received(data)
 
     def log_msgs(self, msgs: Iterable[MessageObjectType]) -> None:
-        self.logger.debug('Buffer contains %s', p.no('message', msgs))
-        self.logger.log_decoded_msgs(msgs)
+        self.logger.debug('Buffer contains %s', p.no('message', len(msgs)))
+        self._log_decoded_msgs(msgs)
 
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)

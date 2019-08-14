@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from lib.conf.logging import Logger
 from lib.networking.types import ProtocolFactoryType, ConnectionType
 
-from typing import Tuple
+from typing import Tuple, Any
 from lib.compatibility import Protocol
+from lib.utils import addr_tuple_to_str
 from .protocols import SenderProtocol
 
 
@@ -38,8 +39,22 @@ class BaseClient(BaseSender, Protocol):
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
     timeout: int = 5
 
+    def __post_init__(self):
+        self.logger.update_extra(endpoint=self.full_name)
+        self.protocol_factory.set_logger(self.logger)
+        self.protocol_factory.set_name(self.full_name)
+
     @abstractmethod
     async def _open_connection(self) -> ConnectionType: ...
+
+    @property
+    @abstractmethod
+    def src(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def full_name(self):
+        return f"{self.name}_{self.src}"
 
     async def _close_connection(self):
         self.transport.close()
@@ -74,6 +89,10 @@ class BaseNetworkClient(BaseClient, Protocol):
     @property
     def local_addr(self) -> Tuple[str, int]:
         return self.srcip, self.srcport
+
+    @property
+    def src(self) -> str:
+        return addr_tuple_to_str(self.local_addr)
 
     @property
     def dst(self) -> str:

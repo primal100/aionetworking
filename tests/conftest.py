@@ -85,6 +85,24 @@ def context() -> Dict[str, Any]:
 
 
 @pytest.fixture
+def unix_socket_context() -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'sock': '/tmp/test', 'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'fd': 1}
+
+
+@pytest.fixture
+def unix_server_extra() -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'sock': '/tmp/test', 'peer': '/tmp/test.1', 'alias': '/tmp/test.1',
+            'server': '/tmp/test', 'client': '/tmp/test.1', 'fd': 1}
+
+
+@pytest.fixture
+def tcp_server_extra() -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'host': '127.0.0.1', 'port': 60000,
+            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000'}
+
+
+@pytest.fixture
 def client_context() -> Dict[str, Any]:
     return {'protocol_name': 'TCP Client', 'peer': '127.0.0.1:8888', 'host': '127.0.0.1', 'port': 8888,
             'sock': '127.0.0.1:60000', 'alias': '127.0.0.1'}
@@ -92,7 +110,13 @@ def client_context() -> Dict[str, Any]:
 
 @pytest.fixture
 def context_windows_pipe(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'addr': pipe_path}
+    return {'protocol_name': 'TCP Server', 'addr': pipe_path, 'peer': f"{pipe_path}.{12345}", 'handle': 12345, 'alias': 12345}
+
+
+@pytest.fixture
+def windows_pipe_extra(pipe_path) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'addr': pipe_path, 'peer': f"{pipe_path}.{12345}", 'handle': 12345,
+            'alias': 12345, 'server': pipe_path, 'client': 12345}
 
 
 @pytest.fixture
@@ -117,8 +141,13 @@ async def stats_logger(context) -> StatsLogger:
 
 
 @pytest.fixture
-def receiver_logger() -> Logger:
+def receiver_logger(caplog) -> Logger:
     return Logger('receiver')
+
+
+@pytest.fixture
+def debug_logging(caplog) -> None:
+    caplog.set_level(logging.DEBUG)
 
 
 @pytest.fixture
@@ -134,14 +163,12 @@ async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> 
     return receiver_logger.get_connection_logger(is_receiver=True, extra=context)
 
 
-@pytest.fixture(params=[receiver_connection_logger, receiver_connection_logger_stats])
-def _connection_logger(request):
-    return get_fixture(request.param)
-
-
 @pytest.fixture
-async def connection_logger(connection_logger):
-    yield _connection_logger
+def zero_division_exception() -> BaseException:
+    try:
+        1 / 0
+    except ZeroDivisionError as e:
+        return e
 
 
 @pytest.fixture
@@ -150,8 +177,25 @@ def sender_logger() -> Logger:
 
 
 @pytest.fixture
-def sender_connection_logger(sender_logger, context) -> ConnectionLogger:
-    return sender_logger.get_connection_logger(is_receiver=False, extra=context)
+def sender_connection_logger(sender_logger, client_context) -> ConnectionLogger:
+    return sender_logger.get_connection_logger(is_receiver=False, extra=client_context)
+
+
+@pytest.fixture
+def sender_connection_logger_stats(sender_connection_logger, client_context, caplog) -> ConnectionLoggerStats:
+    caplog.set_level(logging.INFO, "sender.stats")
+    caplog.set_level(logging.DEBUG, "sender.connection")
+    return sender_logger.get_connection_logger(is_receiver=False, extra=client_context)
+
+
+@pytest.fixture(params=[(receiver_connection_logger), (receiver_connection_logger_stats)])
+def _connection_logger(request):
+    return get_fixture(request)
+
+
+@pytest.fixture
+async def connection_logger(_connection_logger):
+    yield _connection_logger
 
 
 @pytest.fixture
@@ -209,6 +253,7 @@ def timestamp() -> datetime:
 
 @pytest.fixture
 def asn_objects(asn_encoded_multi, asn_decoded_multi, timestamp, context) -> List[TCAPMAPASNObject]:
+    TCAPMAPASNObject.next_otid = 0x00000000
     return [TCAPMAPASNObject(encoded, asn_decoded_multi[i], context=context,
                             received_timestamp=timestamp) for i, encoded in
            enumerate(asn_encoded_multi)]
@@ -234,6 +279,11 @@ def asn_objects_many(request, asn_codec, context) -> List[TCAPMAPASNObject]:
 def asn_objects_thousand(asn_codec, context) -> List[TCAPMAPASNObject]:
     encoded = b'd<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b'
     return [next(asn_codec.decode_buffer(encoded)) for _ in range(0, 1000)]
+
+
+@pytest.fixture
+def asn_one_hex() -> str:
+    return '62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f0'
 
 
 @pytest.fixture

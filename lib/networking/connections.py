@@ -31,11 +31,13 @@ def details_to_str(details: Tuple[str, int]):
 
 @dataclass
 class ProtocolFactory(ProtocolFactoryProtocol):
+    full_name = ''
+    peer_prefix = ''
     connection: NetworkConnectionProtocol
     logger: Logger = Logger('receiver')
 
     def __call__(self) -> NetworkConnectionType:
-        return self.connection.clone(parent_id=id(self))
+        return self.connection.clone(parent_name=self.full_name, peer_prefix=self.peer_prefix)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -47,14 +49,18 @@ class ProtocolFactory(ProtocolFactoryProtocol):
         self.logger = logger
         self.connection.set_logger(logger)
 
+    def set_name(self, full_name: str, peer_prefix: str) -> None:
+        self.full_name = full_name
+        self.peer_prefix = peer_prefix
+
     def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(id(self))
 
     async def wait_num_has_connected(self, num: int) -> None:
-        await connections_manager.wait_num_has_connected(id(self), num)
+        await connections_manager.wait_num_has_connected(self.full_name, num)
 
     async def wait_all_messages_processed(self) -> None:
-        await connections_manager.wait_all_messages_processed(id(self))
+        await connections_manager.wait_all_messages_processed(self.full_name)
 
     async def wait_all_closed(self) -> None:
         await connections_manager.wait_all_connections_closed(id(self))
@@ -104,7 +110,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     connected: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
     closed: asyncio.Task = field(default=None, init=False, compare=False)
     logger: Logger = Logger('receiver')
-    parent_id: int = None
+    parent_name: str = None
+    peer_prefix: str = ''
     timeout: Union[int, float] = 5
 
     def __getattr__(self, item):
@@ -116,16 +123,17 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
 
     def _initial_context(self) -> None:
         self.context['protocol_name'] = self.name
+        self.context['endpoint'] = self.parent_name
 
     def _start_adaptor(self) -> None:
         self._set_adaptor()
         if self.store_connections:
             connections_manager.add_connection(self)
-            self.logger.log_num_connections('opened', self.parent_id)
+            self.logger.log_num_connections('opened', self.parent_name)
 
     @property
     def peer(self) -> str:
-        return self.context.get('peer')
+        return f"{self.peer_prefix}_{self.context.get('peer')}"
 
     def _set_adaptor(self) -> None:
         kwargs = {
@@ -149,8 +157,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     def clone(self: ConnectionType, **kwargs) -> ConnectionType:
         return replace(self, **kwargs)
 
-    def is_child(self, parent_id: int) -> bool:
-        return parent_id == self.parent_id
+    def is_child(self, parent_name: str) -> bool:
+        return parent_name == self.parent_name
 
     def _get_connection_logger(self) -> ConnectionLoggerType:
         return self.logger.get_connection_logger(is_receiver=self.adaptor_cls.is_receiver, extra=self.context)
@@ -158,7 +166,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionProtocol, Protoco
     def _delete_connection(self) -> None:
         if self.store_connections:
             connections_manager.remove_connection(self)
-            self.logger.log_num_connections('closed', self.parent_id)
+            self.logger.log_num_connections('closed', self.parent_name)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
@@ -252,7 +260,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, NetworkConnectionMixinPr
                 #AF_UNIX server transport
                 fd = transport.get_extra_info('socket').fileno()
                 self.context['fd'] = fd
-                self.context['addr'] = sockname
+                self.context['sock'] = sockname
                 self.context['peer'] = f"{sockname}.{fd}"
                 return False
         elif peer:

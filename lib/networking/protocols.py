@@ -22,6 +22,12 @@ class ProtocolFactoryProtocol(Protocol):
     def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
 
     @abstractmethod
+    def set_logger(self, logger: Logger): ...
+
+    @abstractmethod
+    def set_name(self, name: str, peer_prefix: str): ...
+
+    @abstractmethod
     async def wait_all_closed(self) -> None: ...
 
     @abstractmethod
@@ -32,7 +38,7 @@ class ProtocolFactoryProtocol(Protocol):
 
 
 class ConnectionProtocol(Protocol):
-    parent: int
+    parent_name: str
 
     def set_logger(self, logger: Logger) -> None: ...
 
@@ -43,7 +49,7 @@ class ConnectionProtocol(Protocol):
     def clone(self: ConnectionType, **kwargs) -> ConnectionType: ...
 
     @abstractmethod
-    def is_child(self, parent_id: int) -> bool: ...
+    def is_child(self, parent_name: str) -> bool: ...
 
     @abstractmethod
     def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool: ...
@@ -69,7 +75,7 @@ ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
 
 
 class NetworkConnectionMixinProtocol(Protocol):
-    peer_str: str
+    peer: str
 
 
 class NetworkConnectionProtocol(NetworkConnectionMixinProtocol, ConnectionProtocol, Protocol): ...
@@ -80,7 +86,7 @@ NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=N
 
 class SimpleNetworkConnectionProtocol(Protocol):
     peer: str
-    parent_id: int
+    parent_name: int
 
     @abstractmethod
     async def wait_all_messages_processed(self) -> None: ...

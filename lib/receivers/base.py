@@ -34,6 +34,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
     name = 'Server'
+    peer_prefix = 'server'
 
     protocol_factory:  ProtocolFactoryType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
@@ -42,10 +43,15 @@ class BaseServer(BaseReceiver, Protocol):
 
     def __post_init__(self) -> None:
         self.protocol_factory.set_logger(self.logger)
+        self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 
     @property
     @abstractmethod
     def listening_on(self) -> str: ...
+
+    @property
+    def full_name(self):
+        return f"{self.name} {self.listening_on}"
 
     def _print_listening_message(self) -> None:
         sockets = self.server.sockets

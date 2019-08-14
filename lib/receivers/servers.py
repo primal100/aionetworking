@@ -20,6 +20,7 @@ from typing import List, Optional, Union
 @dataclass
 class TCPServer(BaseNetworkServer):
     name = "TCP Server"
+    peer_prefix = 'tcp'
 
     ssl: SSLContext = None
     ssl_handshake_timeout: int = None
@@ -33,6 +34,7 @@ class TCPServer(BaseNetworkServer):
 @dataclass
 class UnixSocketServer(BaseServer):
     name = "Unix Socket Server"
+    peer_prefix = 'unix'
 
     path: Union[str, Path] = field(default_factory=unix_address)
     ssl: SSLContext = None
@@ -50,6 +52,7 @@ class UnixSocketServer(BaseServer):
 @dataclass
 class WindowsPipeServer(BaseServer):
     name = "Windows Named Pipe Server"
+    peer_prefix = 'pipe'
     path: Union[str, Path] = field(default_factory=pipe_address)
 
     def __post_init__(self):
@@ -155,6 +158,7 @@ class DatagramServer(asyncio.AbstractServer):
 @dataclass
 class UDPServer(BaseNetworkServer):
     name = "UDP Server"
+    peer_prefix = 'udp'
 
     async def _get_server(self) -> DatagramServer:
         server = DatagramServer(

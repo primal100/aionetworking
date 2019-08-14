@@ -221,26 +221,4 @@ class MsgsCount:
         return self.processed / self.processing_time
 
 
-_p = inflect.engine()
-
-
-class LazyStr:
-    def __init__(self, func: Callable, *args, **kwargs):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def __str__(self):
-        return self.func(*self.args, **self.kwargs)
-
-
-class LazyInflect:
-    def __getattr__(self, item):
-        return LazyStr(getattr(_p, item))
-
-
-p = LazyInflect()
+p = inflect.engine()

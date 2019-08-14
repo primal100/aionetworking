@@ -65,18 +65,18 @@ class ConnectionsManager:
         for connection in self._subscriptions[subscribe_key]:
             connection.encode_and_send_msg(decoded)
 
-    async def wait_num_connections(self, parent_id: int, num: int) -> None:
-        await self._counters.wait_for(parent_id, num)
+    async def wait_num_connections(self, parent_name: str, num: int) -> None:
+        await self._counters.wait_for(parent_name, num)
 
-    async def wait_num_has_connected(self, parent_id: int, num: int) -> None:
-        await self._counters.wait_for_total_increments(parent_id, num)
+    async def wait_num_has_connected(self, parent_name: str, num: int) -> None:
+        await self._counters.wait_for_total_increments(parent_name, num)
 
-    async def wait_all_messages_processed(self, parent_id: int) -> None:
-        tasks = [conn.close_actions() for conn in self if conn.parent_id == parent_id]
+    async def wait_all_messages_processed(self, parent_name: str) -> None:
+        tasks = [conn.close_actions() for conn in self if conn.parent_name == parent_name]
         await asyncio.wait(tasks)
 
-    async def wait_all_connections_closed(self, parent_id: int) -> None:
-        await self.wait_num_connections(parent_id, 0)
+    async def wait_all_connections_closed(self, parent_name: str) -> None:
+        await self.wait_num_connections(parent_name, 0)
 
     def get(self, key: str) -> SimpleNetworkConnectionType:
         return self._connections.get(key)
