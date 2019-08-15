@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import warnings
 
 from lib.conf.logging import Logger
+from lib.conf.types import LoggerType
 from lib.formats.base import BaseMessageObject
 from lib.utils import dataclass_getstate, dataclass_setstate
 
@@ -19,7 +20,7 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 @dataclass
 class BaseAction(ABC):
     name = 'receiver action'
-    logger: Logger = Logger('receiver')
+    logger: LoggerType = Logger('receiver')
 
     timeout: int = 5
 

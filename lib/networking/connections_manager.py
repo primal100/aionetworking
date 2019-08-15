@@ -1,8 +1,9 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Union, DefaultDict
+from typing import List, Dict, Any, DefaultDict
 
+from lib.networking.protocols import SimpleNetworkConnectionProtocol
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.wrappers.counters import Counters
 from lib.factories import list_defaultdict
@@ -20,16 +21,16 @@ class ConnectionsManager:
         self._counters.clear()
         self._subscriptions.clear()
 
-    def add_connection(self, connection: SimpleNetworkConnectionType) -> None:
+    def add_connection(self, connection: SimpleNetworkConnectionType) -> int:
         self._connections[connection.peer] = connection
-        self._counters.increment(connection.parent_name)
+        return self._counters.increment(connection.parent_name)
 
-    def remove_connection(self, connection: Any):
+    def remove_connection(self, connection: Any) -> int:
         connection = self._connections.pop(connection.peer, None)
         for key, subscribers in self._subscriptions.items():
             if connection in subscribers:
                 subscribers.remove(connection)
-        self._counters.decrement(connection.parent_name)
+        return self._counters.decrement(connection.parent_name)
 
     @property
     def total(self) -> int:

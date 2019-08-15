@@ -3,7 +3,7 @@ import binascii
 from dataclasses import dataclass
 from pycrate_asn1dir import TCAP_MAP
 from lib.formats.contrib.asn1 import BaseAsnObject
-from lib.utils import cached_property
+from lib.compatibility import cached_property
 
 
 @dataclass

@@ -6,29 +6,17 @@ class TestConnectionLogger:
     def test_00_logger_init(self, connection_logger, context):
         assert connection_logger.logger.name == 'receiver.connection'
 
-    def test_01_get_extra_inet(self, connection_logger, context, tcp_server_extra):
-        extra = connection_logger.get_extra(context, True)
-        assert extra == tcp_server_extra
-
-    def test_02_get_extra_unix_server(self, connection_logger, unix_socket_context, unix_server_extra):
-        extra = connection_logger.get_extra(unix_socket_context, True)
-        assert extra == unix_server_extra
-
-    def test_03_get_extra_pipe(self, connection_logger, context_windows_pipe, windows_pipe_extra):
-        extra = connection_logger.get_extra(context_windows_pipe, True)
-        assert extra == windows_pipe_extra
-
-    def test_04_process(self, connection_logger, tcp_server_extra):
+    def test_01_process(self, connection_logger, context):
         msg, kwargs = connection_logger.process("Hello World", {})
-        tcp_server_extra['taskname'] = "No Running Loop"
-        assert msg, kwargs == ("Hello World", {'extra': tcp_server_extra})
+        assert context['taskname'] == "No Running Loop"
+        assert msg, kwargs == ("Hello World", {'extra': context})
 
-    def test_05_new_connection(self, connection_logger, caplog):
+    def test_02_new_connection(self, connection_logger, caplog):
         connection_logger.new_connection()
         assert caplog.record_tuples[0] == (
             "receiver.connection", logging.INFO, 'New TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888')
 
-    def test_06_log_received_msgs(self, connection_logger, asn_object, caplog, debug_logging):
+    def test_03_log_received_msgs(self, connection_logger, asn_object, caplog, debug_logging):
         logging.getLogger('receiver.data_received').setLevel(logging.CRITICAL)
         caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
         logging.getLogger('receiver.connection').setLevel(logging.CRITICAL)
@@ -36,12 +24,12 @@ class TestConnectionLogger:
         connection_logger.on_msg_decoded(asn_object)
         assert caplog.text == "00000001\n"
 
-    def test_07_sending_decoded_msg(self, connection_logger, asn_object, caplog, debug_logging):
+    def test_04_sending_decoded_msg(self, connection_logger, asn_object, caplog, debug_logging):
         caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
         connection_logger.on_sending_decoded_msg(asn_object)
         assert caplog.text == "00000001\n"
 
-    def test_08_on_sending_encoded_msg(self, caplog, asn_one_encoded, asn_one_hex, connection_logger, debug_logging):
+    def test_05_on_sending_encoded_msg(self, caplog, asn_one_encoded, asn_one_hex, connection_logger, debug_logging):
         connection_logger.on_sending_encoded_msg(asn_one_encoded)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Sending message to 127.0.0.1:60000')
         assert caplog.record_tuples[1] == ('receiver.raw_sent', logging.DEBUG, asn_one_hex)

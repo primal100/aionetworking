@@ -10,20 +10,24 @@ from lib.utils import alist, Record
 class TestConnectionShared:
 
     @pytest.mark.asyncio
-    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager):
+    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager, connection_is_stored):
         assert not transport.is_closing()
         assert connections_manager.total == 0
         assert connection.logger
         assert connection.transport is None
         connection.connection_made(transport)
+        await connection.wait_connected()
+        assert connection.is_connected()
         assert not transport.is_closing()
         assert connection.adaptor.context == adaptor.context
         assert connection.adaptor == adaptor
         assert connection.peer == f"tcp_{adaptor.context['peer']}"
         assert connection.logger is not None
         assert connection.transport == transport
-        assert connections_manager.total == 1
-        assert connections_manager.get(connection.peer) == connection
+        total_connections = 1 if connection_is_stored else 0
+        assert connections_manager.total == total_connections
+        if connection_is_stored:
+            assert connections_manager.get(connection.peer) == connection
         connection.connection_lost(None)
         await connection.close_wait()
         assert connections_manager.total == 0
@@ -45,28 +49,22 @@ class TestConnectionShared:
         connection.connection_lost(None)
         await connection.close_wait()
 
-    def test_03_clone(self, connection):
-        connection_cloned = connection.clone(parent_name="TCP Server 127.0.0.1:8888")
-        assert connection_cloned.parent_name == "TCP Server 127.0.0.1:8888"
-        connection.parent_id = 5
-        assert connection_cloned == connection
-
-    def test_04_is_child(self, connection):
-        assert connection.is_child("TCP Server 127.0.0.1:8888")
-        assert not connection.is_child("UDP Server 127.0.0.1:8888")
-
 
 class TestConnectionOneWayServer:
     @pytest.mark.asyncio
-    async def test_00_data_received(self, tmp_path, tcp_protocol_one_way_server, asn_buffer, buffer_asn1_1,
-                                    buffer_asn1_2, asn1_recording, asn1_recording_data, asn_codec,
-                                    asn_objects, tcp_transport):
+    async def test_00_data_received(self, tmp_path, tcp_protocol_one_way_server, buffer_asn1_1, buffer_asn1_2,
+                                    asn1_recording, asn1_recording_data, asn_codec, asn_buffer,
+                                    asn_objects, tcp_transport, buffered_file_storage_pre_action_binary,
+                                    buffered_file_storage_action_binary):
         tcp_protocol_one_way_server.connection_made(tcp_transport)
+        await tcp_protocol_one_way_server.wait_connected()
         tcp_protocol_one_way_server.data_received(buffer_asn1_1)
         await asyncio.sleep(1)
         tcp_protocol_one_way_server.data_received(buffer_asn1_2)
         tcp_protocol_one_way_server.connection_lost(None)
         await tcp_protocol_one_way_server.close_wait()
+        await asyncio.wait(
+            [buffered_file_storage_action_binary.close(), buffered_file_storage_pre_action_binary.close()], timeout=2)
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP')
         assert expected_file.exists()
         assert expected_file.read_bytes() == asn_buffer
@@ -78,8 +76,12 @@ class TestConnectionOneWayServer:
         packets = list(Record.from_file(expected_file))
         assert packets == asn1_recording_data
 
+    def test_01_is_child(self, tcp_protocol_one_way_server):
+        assert tcp_protocol_one_way_server.is_child("TCP Server 127.0.0.1:8888")
+        assert not tcp_protocol_one_way_server.is_child("UDP Server 127.0.0.1:8888")
+
     @pytest.mark.asyncio
-    async def test_01_pickle(self, tcp_protocol_one_way_server):
+    async def test_02_pickle(self, tcp_protocol_one_way_server):
         data = pickle.dumps(tcp_protocol_one_way_server)
         protocol = pickle.loads(data)
         assert protocol == tcp_protocol_one_way_server

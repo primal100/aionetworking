@@ -2,15 +2,19 @@ from __future__ import annotations
 import asyncio
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any, AnyStr, AsyncGenerator, Generator, Optional, Sequence, TypeVar, Union
-from lib.compatibility import Protocol
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from lib.actions.types import ActionType, OneWaySequentialActionType
+from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger
-from lib.formats.base import MessageObjectType
+from lib.formats.types import MessageObjectType
 from lib.utils import inherit_on_type_checking_only
 
-from typing import Tuple
+from .types import AdaptorType
+
+from lib.compatibility import Protocol
+from typing import Any, AnyStr, AsyncGenerator, Generator, Optional, Sequence, TypeVar, Union, Dict, Tuple, Type
 
 
 class ProtocolFactoryProtocol(Protocol):
@@ -37,22 +41,15 @@ class ProtocolFactoryProtocol(Protocol):
     async def wait_all_messages_processed(self) -> None: ...
 
 
+@dataclass
 class ConnectionProtocol(Protocol):
-    parent_name: str
 
-    def set_logger(self, logger: Logger) -> None: ...
-
+    @property
     @abstractmethod
-    def send(self, data: AnyStr) -> None: ...
-
-    @abstractmethod
-    def clone(self: ConnectionType, **kwargs) -> ConnectionType: ...
+    def peer(self) -> str: ...
 
     @abstractmethod
     def is_child(self, parent_name: str) -> bool: ...
-
-    @abstractmethod
-    def initialize_connection(self, transport: asyncio.BaseTransport, peer: Tuple[str, int] = None) -> bool: ...
 
     @abstractmethod
     def finish_connection(self, exc: Optional[BaseException]) -> None: ...
@@ -61,31 +58,48 @@ class ConnectionProtocol(Protocol):
     async def close_wait(self): ...
 
     @abstractmethod
-    async def wait_connected(self) -> None: ...
+    async def wait_connected(self) -> bool: ...
 
     @abstractmethod
     def is_connected(self) -> bool: ...
 
     @abstractmethod
-    async def close_actions(self) -> None: ...
+    def send(self, data: AnyStr) -> None: ...
 
-    @property
+
+@dataclass
+class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
+    name = None
+    store_connections = True
+
+    parent_name: str = None
+    action: ActionType = None
+    preaction: OneWaySequentialActionType = None
+    requester: RequesterType = None
+    dataformat: Type[MessageObjectType] = None
+    context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
+    peer_prefix: str = ''
+    logger: Logger = Logger('receiver')
+    timeout: Union[int, float] = 10
+
+    adaptor_cls: Type[AdaptorType] = field(default=None, init=False)
+    adaptor: AdaptorType = field(default=None, init=False)
+
+
+TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
+
+
+@dataclass
+class NetworkConnectionProtocol(ConnectionDataclassProtocol, Protocol):
     @abstractmethod
-    def peer(self) -> str: ...
+    def initialize_connection(self, transport: TransportType, peer: Tuple[str, int] = None) -> bool: ...
 
 
-ConnectionType = TypeVar('ConnectionType', bound=ConnectionProtocol)
-
-
-class NetworkConnectionProtocol(ConnectionProtocol, Protocol): ...
-
-
-NetworkConnectionProtocolType = TypeVar('NetworkConnectionProtocolType', bound=NetworkConnectionProtocol)
-
-
+@dataclass
 class SimpleNetworkConnectionProtocol(Protocol):
     peer: str
-    parent_name: int
+    parent_name: str
+    queue: asyncio.Queue
 
     @abstractmethod
     async def wait_all_messages_processed(self) -> None: ...
@@ -94,18 +108,13 @@ class SimpleNetworkConnectionProtocol(Protocol):
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
 
 
-class UDPConnectionMixinProtocol(Protocol):
-    def set_transport(self, transport: asyncio.DatagramTransport): ...
+class UDPConnectionMixinProtocol(Protocol): ...
 
 
 class UDPConnectionProtocol(UDPConnectionMixinProtocol, NetworkConnectionProtocol, Protocol):  ...
 
 
-UDPConnectionType = TypeVar('UDPConnectionType', bound=UDPConnectionProtocol)
-
-
 class BaseAdaptorProtocol(Protocol):
-    is_receiver: bool
 
     @abstractmethod
     def send_data(self, msg_encoded: AnyStr) -> None: ...
@@ -130,9 +139,6 @@ class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
 
     @abstractmethod
     async def close(self, exc: Optional[BaseException] = None) -> None: ...
-
-
-AdaptorProtocolType = TypeVar('AdaptorProtocolType', bound=AdaptorProtocol)
 
 
 @inherit_on_type_checking_only
@@ -179,9 +185,6 @@ class SenderAdaptorMixinProtocol(Protocol):
 
 
 class SenderAdaptorProtocol(ConnectionProtocol, Protocol): ...
-
-
-SenderAdaptorProtocolType = TypeVar('SenderAdaptorProtocolType', bound=SenderAdaptorProtocol)
 
 
 @inherit_on_type_checking_only

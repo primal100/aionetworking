@@ -1,8 +1,0 @@
-pytest
-pytest-asyncio
-asyncssh
-passlib
-aiofile
-pytest-benchmark
--e git://github.com/P1sec/pycrate.git#egg=pycrate
--e git+git://github.com/python/mypy.git#egg=mypy

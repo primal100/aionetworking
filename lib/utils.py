@@ -10,8 +10,8 @@ import sys
 import socket
 import tempfile
 from dataclasses import fields, MISSING
+from functools import wraps
 
-from lib.compatibility import get_task_name, set_task_name
 from pathlib import Path
 from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
 from typing_extensions import Protocol
@@ -115,38 +115,18 @@ def supernet_of(self, other: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Ne
     return any(n.supernet_of(other) for n in self.data)
 
 
-###Future Python###
+###Asyncio###
 
-class cached_property(object):
-    """
-    A property that is only computed once per instance and then replaces itself
-    with an ordinary attribute. Deleting the attribute resets the property.
-    Source: https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
-    """  # noqa
+def run_in_loop(f):
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        if asyncio.get_event_loop().is_running():
+            task = asyncio.create_task(f(*args, **kwds))
+            return task
+        else:
+            return asyncio.run(f(*args, **kwds))
 
-    def __init__(self, func):
-        self.__doc__ = getattr(func, "__doc__")
-        self.func = func
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-
-        if asyncio and asyncio.iscoroutinefunction(self.func):
-            return self._wrap_in_coroutine(obj)
-
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
-        return value
-
-    def _wrap_in_coroutine(self, obj):
-
-        @asyncio.coroutine
-        def wrapper():
-            future = asyncio.ensure_future(self.func(obj))
-            obj.__dict__[self.func.__name__] = future
-            return future
-
-        return wrapper()
+    return wrapper
 
 
 def set_proactor_loop_policy_windows() -> None:

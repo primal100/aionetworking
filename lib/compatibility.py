@@ -7,8 +7,11 @@ py38 = sys.version_info >= (3, 8)
 
 if py38:
     from typing import Protocol
+    from functools import cached_property, singledispatchmethod
 else:
     from typing_extensions import Protocol
+    from cached_property import cached_property
+    from singledispatchmethod import singledispatchmethod
 
 
 def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
@@ -26,9 +29,9 @@ def get_task_name(task: asyncio.Future) -> str:
     return str(id(task))
 
 
-def set_current_task_name(name: str):
+def set_current_task_name(name: str, include_hierarchy: bool = True, separator: str = ':'):
     task = asyncio.current_task()
-    set_task_name(task, name)
+    set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
 
 
 def get_current_task_name():

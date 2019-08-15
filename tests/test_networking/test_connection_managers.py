@@ -6,25 +6,25 @@ class TestNetworkConnections:
 
     @pytest.mark.asyncio
     async def test_00_multiple_connections(self, connections_manager, simple_network_connection):
-        parent_id = simple_network_connection.parent_id
+        parent_name = simple_network_connection.parent_name
         peer = simple_network_connection.peer
-        task1 = asyncio.create_task(connections_manager.wait_num_connections(parent_id, 1))
+        task1 = asyncio.create_task(connections_manager.wait_num_connections(parent_name, 1))
         await simple_network_connection.wait_all_messages_processed()
         await asyncio.sleep(0)
         assert not task1.done()
         connections_manager.add_connection(simple_network_connection)
-        assert connections_manager.num_connections(parent_id) == 1
+        assert connections_manager.num_connections(parent_name) == 1
         connection = connections_manager.get(peer)
         assert connection == simple_network_connection
         await asyncio.sleep(0)
         assert task1.done()
-        task = asyncio.create_task(connections_manager.wait_all_connections_closed(parent_id))
+        task = asyncio.create_task(connections_manager.wait_all_connections_closed(parent_name))
         await asyncio.sleep(0)
         assert not task.done()
         connections_manager.remove_connection(simple_network_connection)
-        assert connections_manager.num_connections(parent_id) == 0
+        assert connections_manager.num_connections(parent_name) == 0
         await asyncio.wait_for(task, timeout=1)
-        await connections_manager.wait_num_has_connected(parent_id, 1)
+        await connections_manager.wait_num_has_connected(parent_name, 1)
 
     @pytest.mark.asyncio
     async def test_01_multiple_connections_iter(self, connections_manager, simple_network_connections):

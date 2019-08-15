@@ -19,7 +19,7 @@ class Counter:
         self.increment()
         return self._num
 
-    def increment(self) -> None:
+    def increment(self) -> int:
         if self.max and self._num == self.max:
             raise ValueError(f'counter incrementing above the maximum value: {self.max}')
         if self.max_increments and self.max_increments == self._total_increments:
@@ -28,12 +28,14 @@ class Counter:
         self._total_increments += 1
         self._check_num_waiters()
         self._check_total_increment_waiters()
+        return self._num
 
-    def decrement(self) -> None:
+    def decrement(self) -> int:
         if self._num <= 0:
             raise ValueError('counter decremented too many times')
         self._num -= 1
         self._check_num_waiters()
+        return self._num
 
     @property
     def num(self):
@@ -61,10 +63,14 @@ class Counter:
         await event.wait()
 
     async def wait_for(self, num: int) -> None:
-        await self._wait_for(num, self._num, self._num_waiters)
+        if num == self._num:
+            return
+        return await self._wait_for(num, self._num, self._num_waiters)
 
     async def wait_for_total_increments(self, num: int) -> None:
-        await self._wait_for(num, self._total_increments, self._total_increment_waiters)
+        if num == self._total_increments:
+            return
+        return await self._wait_for(num, self._total_increments, self._total_increment_waiters)
 
 
 class Counters(DefaultDict[Any, Counter]):
@@ -74,12 +80,11 @@ class Counters(DefaultDict[Any, Counter]):
         result = self[key] = self.default_factory()
         return result
 
-    def increment(self, key: Any) -> None:
-        self[key].increment()
-        pass
+    def increment(self, key: Any) -> int:
+        return self[key].increment()
 
-    def decrement(self, key: Any) -> None:
-        self[key].decrement()
+    def decrement(self, key: Any) -> int:
+        return self[key].decrement()
 
     async def wait_for(self, key: Any, num: int):
         counter = self[key]

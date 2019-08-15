@@ -8,13 +8,12 @@ from dataclasses import dataclass, field
 #from pydantic import ValidationError
 
 from lib.compatibility import get_current_task_name
-from lib.networking.connections_manager import connections_manager
 from lib.utils import dataclass_getstate, dataclass_setstate
 from lib.utils import log_exception
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.schedulers import TaskScheduler
 
-from typing import Type, Optional, Dict, AnyStr, Iterable, Generator, Any, Union
+from typing import Type, Optional, Dict, AnyStr, Generator, Any, Union
 from lib.formats.types import MessageObjectType
 from .types import ConnectionLoggerType
 
@@ -60,7 +59,7 @@ class Logger(BaseLogger):
     _is_closing: bool = field(default=False, init=False)
 
     def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None,
-                 stats_interval: int = 0, stats_fixed_start_time: bool = True):
+                 stats_interval: Union[int, float] = 0, stats_fixed_start_time: bool = True):
         self.logger_name = logger_name
         self.datefmt = datefmt
         self.stats_interval = stats_interval
@@ -80,6 +79,7 @@ class Logger(BaseLogger):
 
     def process(self, msg, kwargs):
         msg, kwargs = super().process(msg, kwargs)
+        kwargs['extra'] = kwargs['extra'].copy()
         kwargs['extra']['taskname'] = get_current_task_name()
         kwargs['extra'].update(kwargs.pop('detail', {}))
         return msg, kwargs
@@ -112,10 +112,10 @@ class Logger(BaseLogger):
         extra.update(self.extra)
         return cls(name, extra=extra, **kwargs)
 
-    def log_num_connections(self, action: str, parent_name: str):
+    def log_num_connections(self, action: str, num_connections: int):
         if self.isEnabledFor(logging.DEBUG):
             self.log(logging.DEBUG, 'Connection %s. There %s now %s.', action,
-                        p.plural_verb('is', p.num(connections_manager.num_connections(parent_name))),
+                        p.plural_verb('is', p.num(num_connections)),
                         p.no('active connection'))
 
     def _set_closing(self) -> None:
@@ -125,30 +125,13 @@ class Logger(BaseLogger):
 @dataclass
 class ConnectionLogger(Logger):
 
-    def __init__(self, *args, is_receiver: bool = False, extra: Dict[str, Any] = None, **kwargs):
-        extra = self.get_extra(extra or {}, is_receiver)
+    def __init__(self, *args, extra: Dict[str, Any] = None, **kwargs):
+        extra = extra or {}
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling('raw_sent', cls=Logger)
         self._data_received_logger = self.get_sibling('data_received', cls=Logger)
         self._data_sent_logger = self.get_sibling('data_sent', cls=Logger)
-
-    @staticmethod
-    def get_extra(extra: Dict[str, Any], is_receiver: bool):
-        extra = extra.copy()
-        if 'sock' in extra:
-            #Socket based connections
-            extra.update({
-                'server': extra.get('sock', '') if is_receiver else extra.get('peer', ''),
-                'client': extra.get('peer', '') if is_receiver else extra.get('sock', '')
-            })
-        else:
-            #Pipe based connections
-            extra.update({
-                'server': extra.get('addr', ''),
-                'client': extra.get('handle', '')
-            })
-        return extra
 
     @property
     def connection_type(self) -> str:
@@ -378,8 +361,8 @@ class ConnectionLoggerStats(ConnectionLogger):
 
 
 def connection_logger_receiver() -> ConnectionLoggerType:
-    return ConnectionLogger('receiver.connection', is_receiver=True)
+    return ConnectionLogger('receiver.connection')
 
 
 def connection_logger_sender() -> ConnectionLoggerType:
-    return ConnectionLogger('sender.connection', is_receiver=False)
+    return ConnectionLogger('sender.connection')

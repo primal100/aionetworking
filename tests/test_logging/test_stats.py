@@ -51,9 +51,9 @@ class TestStatsLogger:
         assert msg == 'abc'
         keys = list(kwargs['extra'].keys())
         assert sorted(keys) == sorted(
-            ['taskname', 'start', 'end', 'msgs', 'sent', 'received', 'processed', 'processing_rate', 'msgs_per_buffer',
-             'receive_rate', 'interval', 'average_buffer_size', 'average_sent', 'protocol_name', 'host',
-             'port', 'peer', 'sock', 'alias', 'client', 'server'])
+            ['alias', 'average_buffer_size', 'average_sent', 'client', 'end', 'endpoint', 'host', 'interval', 'msgs',
+             'msgs_per_buffer', 'peer', 'port', 'processed', 'processing_rate', 'protocol_name','receive_rate',
+             'received', 'sent', 'server', 'sock', 'start', 'taskname'])
 
     @pytest.mark.asyncio
     async def test_01_reset(self, stats_logger, asn_buffer):
@@ -67,6 +67,7 @@ class TestStatsLogger:
 
     @pytest.mark.asyncio
     async def test_02_log_info_twice(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
@@ -87,6 +88,7 @@ class TestStatsLogger:
 
     @pytest.mark.asyncio
     async def test_03_periodic_log(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
@@ -100,6 +102,7 @@ class TestStatsLogger:
 
     @pytest.mark.asyncio
     async def test_04_finish_all(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
@@ -109,6 +112,7 @@ class TestStatsLogger:
 
     @pytest.mark.asyncio
     async def test_05_finish_before_processed(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)
@@ -119,6 +123,7 @@ class TestStatsLogger:
 
     @pytest.mark.asyncio
     async def test_06_interval_end(self, stats_logger, asn_buffer, stats_formatter, caplog):
+        caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(asn_buffer)

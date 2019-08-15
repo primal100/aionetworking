@@ -45,8 +45,8 @@ class BaseServer(BaseReceiver, Protocol):
 
     protocol_factory:  ProtocolFactoryType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
-    started: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
-    stopped: asyncio.Event = field(default_factory=event_set, init=False, compare=False)
+    _started: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
+    _stopped: asyncio.Event = field(default_factory=event_set, init=False, compare=False)
 
     def __post_init__(self) -> None:
         self.protocol_factory.set_logger(self.logger)
@@ -68,16 +68,16 @@ class BaseServer(BaseReceiver, Protocol):
             print(f"Serving {self.name} on {listening_on}")
 
     async def stop(self) -> None:
-        if self.stopped.is_set():
+        if self._stopped.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} already stopped")
-        if not self.started.is_set():
+        if not self._started.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} not yet started")
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
-        self.started.clear()
+        self._started.clear()
         await self.stop_server()
         self.logger.info('%s stopped', self.name)
         await self.close_protocol_factory()
-        self.stopped.set()
+        self._stopped.set()
 
     async def wait_num_connections(self, num: int):
         await self.protocol_factory.wait_num_has_connected(num)
@@ -92,27 +92,27 @@ class BaseServer(BaseReceiver, Protocol):
         await self.protocol_factory.close()
 
     async def start(self) -> None:
-        if self.started.is_set():
+        if self._started.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
-        self.stopped.clear()
+        self._stopped.clear()
         await self.start_server()
         if not self.quiet:
             self._print_listening_message()
-        self.started.set()
+        self._started.set()
 
     def _is_serving(self) -> bool:
         return self.server.is_serving()
 
     def is_started(self) -> bool:
-        return self.started.is_set() and self._is_serving()
+        return self._started.is_set() and self._is_serving()
 
     async def wait_started(self) -> bool:
-        await self.started.wait()
+        await self._started.wait()
         return self._is_serving()
 
     async def wait_stopped(self) -> bool:
-        await self.stopped.wait()
+        await self._stopped.wait()
         return self._is_serving()
 
     @abstractmethod
@@ -124,6 +124,9 @@ class BaseServer(BaseReceiver, Protocol):
     async def stop_server(self) -> None:
         self.server.close()
         await self.server.wait_closed()
+
+    def serve_in_loop(self) -> None:
+        asyncio.run(self.start())
 
 
 @dataclass

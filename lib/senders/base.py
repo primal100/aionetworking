@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from lib.conf.logging import Logger
 from lib.networking.types import ProtocolFactoryType, ConnectionType
 
-from typing import Tuple
+from pathlib import Path
+from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 from .protocols import SenderProtocol
@@ -81,6 +82,23 @@ class BaseClient(BaseSender, Protocol):
     async def close(self) -> None:
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
+
+    async def open_send_msgs(self, msgs: Sequence[AnyStr], interval:int = None) -> None:
+        async with self as conn:
+            for msg in msgs:
+                if interval is not None:
+                    await asyncio.sleep(interval)
+                conn.send_data(msg)
+
+    async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:
+        async with self as conn:
+            await conn.play_recording(path, hosts=hosts, timing=timing)
+
+    def open_send_in_loop(self, msgs: Sequence[AnyStr], interval: int = None):
+        asyncio.run(self.open_send_msgs(msgs, interval=interval))
+
+    def play_recording_in_loop(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:
+        asyncio.run(self.open_play_recording(path, hosts=hosts, timing=timing))
 
 
 @dataclass

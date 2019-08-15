@@ -17,7 +17,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, AnyStr, Awaitable, AsyncGenerator, Callable, Generator, Iterator, List, Dict, Sequence, Type, Optional, Union
+from typing import Any, AnyStr, Callable, Generator, Iterator, Dict, Sequence, Type, Optional
 from typing_extensions import Protocol
 
 
