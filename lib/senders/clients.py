@@ -32,7 +32,7 @@ class TCPClient(BaseNetworkClient):
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context,
             local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
         await self.conn.wait_connected()
-        self.srcip, self.srcport = self.transport.get_extra_info('sockname')
+        self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         return self.conn
 
 
@@ -72,12 +72,11 @@ class WindowsPipeClient(BaseClient):
 
     def __post_init__(self):
         self.path = str(self.path).format(pid=self.pid)
+        super().__post_init__()
 
     @property
     def src(self) -> str:
-        if self.transport:
-            return str(self.transport.get_extra_info('handle'))
-        return ''
+        return self.path
 
     @property
     def dst(self) -> str:

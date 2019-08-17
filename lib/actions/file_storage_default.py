@@ -10,7 +10,7 @@ from lib import settings
 from lib.utils_logging import p
 from lib.settings import FILE_OPENER
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Iterator, List, AnyStr
+from typing import TYPE_CHECKING, ClassVar, Iterable, Sequence, List, Tuple, AnyStr
 if TYPE_CHECKING:
     from lib.formats.base import BaseMessageObject
 else:
@@ -78,10 +78,8 @@ class ManagedFile:
     def _get_data(self, msgs : Iterable[BaseMessageObject]) -> AnyStr:
         return self.separator.join([getattr(msg, self.attr) for msg in msgs]) + self.separator
 
-    async def write(self, msg: BaseMessageObject) -> None:
-        fut = asyncio.Future()
-        await self._queue.put((msg, fut))
-        await fut
+    def write(self, msg: BaseMessageObject) -> None:
+        self._queue.put_nowait(msg)
 
     async def close(self) -> None:
         if not self._close_lock.locked():
@@ -116,14 +114,10 @@ class ManagedFile:
                 self.logger.debug('File opened')
                 while True:
                     self.logger.debug('Retrieving item from queue for file %s', self.path)
-                    msg, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
-                    msgs = [msg]
-                    futs = [fut]
+                    msgs = [await asyncio.wait_for(self._queue.get(), timeout=self.timeout)]
                     while not self._queue.empty():
                         try:
-                            msg, fut = self._queue.get_nowait()
-                            msgs.append(msg)
-                            futs.append(fut)
+                            msgs.append(self._queue.get_nowait())
                         except asyncio.QueueEmpty:
                             self.logger.info('QueueEmpty error was caught for file %s', self.path)
                     data = self._get_data(msgs)
@@ -131,9 +125,8 @@ class ManagedFile:
                     await f.write(data)
                     await f.flush()
                     self.logger.debug('%s written to file %s', p.no('byte', len(data)), self.path)
-                    for fut in futs:
-                        fut.set_result(True)
-                        #msg.processed()
+                    for msg in msgs:
+                        msg.processed()
                         self._queue.task_done()
                     self.logger.debug('Task done set for %s on file %s', p.no('item', len(msgs)), self.path)
         except asyncio.TimeoutError:
@@ -212,23 +205,23 @@ class BufferedFileStorage(BaseFileStorage):
             self._files_with_outstanding_writes.append(path)
 
     def _get_file(self, path: Path) -> ManagedFile:
+        self.logger.debug('Getting file %s', path)
         full_path = self.base_path / path
         f = ManagedFile.get_file(full_path, mode=self.mode, buffering=self.buffering,
                                     timeout=self.timeout, logger=self.logger, attr=self.attr, separator=self.separator)
         return f
 
-    async def _write_to_file(self, path: Path, msg: BaseMessageObject) -> None:
+    def _write_to_file(self, path: Path, msg: BaseMessageObject) -> None:
         f = self._get_file(path)
+        f.write(msg)
         self._set_outstanding_writes(path)
-        await f.write(msg)
-        msg.processed()
 
-    async def do_one(self, msg: BaseMessageObject) -> None:
+    def do_one(self, msg: BaseMessageObject) -> None:
         if self._close_lock.locked():
             self._close_lock.release()
         msg.logger.debug('Storing message')
         path = self._get_path(msg)
-        await self._write_to_file(path, msg)
+        self._write_to_file(path, msg)
 
     async def wait_complete(self) -> None:
         try:
@@ -246,13 +239,3 @@ class BufferedFileStorage(BaseFileStorage):
             await self._close_lock.acquire()
             await self.wait_complete()
             await ManagedFile.close_all()
-
-    async def _do_many(self, msgs: Iterator[BaseMessageObject]):
-        for msg in msgs:
-            await self.do_one(msg)
-
-    async def do_many(self, msgs: Iterator[BaseMessageObject]):
-        tasks = []
-        for msg in msgs:
-            tasks.append(asyncio.create_task(self.do_one(msg)))
-        await asyncio.wait(tasks)

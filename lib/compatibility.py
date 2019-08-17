@@ -37,7 +37,9 @@ def set_current_task_name(name: str, include_hierarchy: bool = True, separator: 
 def get_current_task_name():
     try:
         task = asyncio.current_task()
-        return get_task_name(task)
+        if task:
+            return get_task_name(task)
+        return "No Task"
     except RuntimeError:
         return 'No Running Loop'
 

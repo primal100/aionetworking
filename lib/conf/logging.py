@@ -59,7 +59,7 @@ class Logger(BaseLogger):
     _is_closing: bool = field(default=False, init=False)
 
     def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None,
-                 stats_interval: Union[int, float] = 0, stats_fixed_start_time: bool = True):
+                 stats_interval: Optional[Union[int, float]] = 0, stats_fixed_start_time: bool = True):
         self.logger_name = logger_name
         self.datefmt = datefmt
         self.stats_interval = stats_interval
@@ -208,9 +208,10 @@ class StatsTracker:
     sent: BytesSize = field(default_factory=BytesSize, init=False)
     received: BytesSize = field(default_factory=BytesSize, init=False)
     processed: BytesSize = field(default_factory=BytesSize, init=False)
+    largest_buffer: BytesSize = field(default_factory=BytesSize, init=False)
     msgs: MsgsCount = field(default_factory=MsgsCount, init=False)
 
-    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed',
+    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'largest_buffer',
              'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent', 'msgs_per_buffer')
 
     def __post_init__(self):
@@ -251,7 +252,10 @@ class StatsTracker:
             self.msgs.first_received = LoggingDatetime(self.datefmt)
         self.msgs.last_received = LoggingDatetime(self.datefmt)
         self.msgs.received += 1
-        self.received += len(msg)
+        size = len(msg)
+        self.received += size
+        if size > self.largest_buffer:
+            self.largest_buffer = BytesSize(size)
 
     def on_msg_processed(self, num_bytes: int) -> None:
         self.msgs.last_processed = LoggingDatetime(self.datefmt)
@@ -274,13 +278,14 @@ class StatsLogger(Logger):
     _stats: StatsTracker = field(default=None, init=False, compare=False)
     _scheduler: TaskScheduler = field(init=False, default_factory=TaskScheduler, compare=False)
     stats_cls = StatsTracker
-    _total_received = 0
-    _total_processed = 0
+    _total_received = BytesSize()
+    _total_processed = BytesSize()
 
     def __init__(self, logger_name: str, extra: dict, *args, **kwargs):
         self._scheduler = TaskScheduler()
         super().__init__(logger_name, *args, extra=extra, **kwargs)
         self._stats = self.stats_cls(datefmt=self.datefmt)
+        self.info('\n')
         if self.stats_interval:
             self._scheduler.call_cb_periodic(self.stats_interval, self.periodic_log,
                                              fixed_start_time=self.stats_fixed_start_time)
@@ -296,9 +301,9 @@ class StatsLogger(Logger):
 
     def stats(self, tag: str) -> None:
         self._first = False
+        self.info(tag)
         self._total_received += self._stats.received
         self._total_processed += self._stats.processed
-        self.info(tag)
         self.reset()
 
     def periodic_log(self, first: bool = True) -> None:
@@ -319,6 +324,8 @@ class StatsLogger(Logger):
         await self._scheduler.close()
 
     def on_msg_processed(self, num_bytes: int):
+        if num_bytes > 100:
+            pass
         self._stats.on_msg_processed(num_bytes)
         if self._is_closing:
             self._check_last_message_processed()

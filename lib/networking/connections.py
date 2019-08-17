@@ -26,7 +26,9 @@ msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 @dataclass
 class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol, Protocol):
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
-    _closed: asyncio.Task = field(default=None, init=False, compare=False)
+    _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
+    _close_task: asyncio.Task = field(default=None, init=False, compare=False)
+    pause_reading_on_buffer_size: int = 0
 
     def __post_init__(self):
         self.context['protocol_name'] = self.name
@@ -96,12 +98,17 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             self._connected.set_exception(exc)
         else:
             self._connected.set_exception(ConnectionAlreadyClosedError())
-        self._closed = asyncio.create_task(self._close(exc))
+        self._close_task = asyncio.create_task(self._close(exc))
+        self._closing.set_result(True)
+
+    def close(self):
+        self.finish_connection(None)
 
     async def close_wait(self):
-        if not self._closed:
-            self.finish_connection(None)
-        await self._closed
+        if not self._closing.done():
+            self.close()
+        await self._closing
+        await self._close_task
 
     async def wait_connected(self) -> bool:
         return await self._connected
@@ -146,7 +153,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     def initialize_connection(self, transport: TransportType, peer: Tuple[str, int] = None) -> bool:
         self._update_context(transport, peer)
         try:
-            if self.context['host']:
+            if self.context.get('host'):
                 self._check_peer()
             self._start_adaptor()
             self._connected.set_result(True)
@@ -205,13 +212,25 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport = transport
         self.initialize_connection(transport)
 
-    def connection_lost(self, exc: Optional[BaseException]) -> None:
+    def close(self):
         if not self.transport.is_closing():
             self.transport.close()
+
+    def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.finish_connection(exc)
 
+    def _resume_reading(self, fut: asyncio.Future):
+        self.transport.resume_reading()
+
     def data_received(self, data: AnyStr) -> None:
-        self.adaptor.on_data_received(data)
+        task = asyncio.create_task(self.adaptor.on_data_received(data))
+        if self.pause_reading_on_buffer_size is not None:
+            if self.pause_reading_on_buffer_size >= len(data):
+                self.transport.pause_reading()
+                task.add_done_callback(self._resume_reading)
+
+    def eof_received(self) -> bool:
+        return False
 
     def send(self, msg: AnyStr) -> None:
         self.transport.write(msg)

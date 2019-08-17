@@ -40,6 +40,12 @@ class ProtocolFactoryProtocol(Protocol):
     @abstractmethod
     async def wait_all_messages_processed(self) -> None: ...
 
+    @abstractmethod
+    async def close_actions(self) -> None: ...
+
+    @abstractmethod
+    async def close(self) -> None: ...
+
 
 @dataclass
 class ConnectionProtocol(Protocol):

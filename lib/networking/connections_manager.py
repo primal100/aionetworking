@@ -26,7 +26,7 @@ class ConnectionsManager:
         return self._counters.increment(connection.parent_name)
 
     def remove_connection(self, connection: Any) -> int:
-        connection = self._connections.pop(connection.peer, None)
+        self._connections.pop(connection.peer)
         for key, subscribers in self._subscriptions.items():
             if connection in subscribers:
                 subscribers.remove(connection)
@@ -76,11 +76,8 @@ class ConnectionsManager:
         tasks = [conn.close_actions() for conn in self if conn.parent_name == parent_name]
         await asyncio.wait(tasks)
 
-    async def wait_all_connections_closed(self, parent_name: str) -> None:
-        await self.wait_num_connections(parent_name, 0)
-
     def get(self, key: str) -> SimpleNetworkConnectionType:
-        return self._connections.get(key)
+        return self._connections[key]
 
     def __iter__(self) -> None:
         for conn in self._connections.values():

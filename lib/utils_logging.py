@@ -1,7 +1,8 @@
+from __future__ import annotations
 from datetime import datetime, timedelta
 import inflect
 
-from typing import Any, Callable
+from typing import Any
 
 
 class LoggingDatetime:
@@ -148,14 +149,8 @@ class BytesSizeRate(float):
 
 class BytesSize(int):
 
-    def __add__(self, other) -> BytesSizeRate:
-        return self.__class__(super().__add__(other))
-
-    def __sub__(self, other) -> BytesSizeRate:
-        return self.__class__(super().__sub__(other))
-
-    def __mul__(self, other) -> BytesSizeRate:
-        return self.__class__(super().__mul__(other))
+    def __add__(self, other) -> BytesSize:
+        return BytesSize(other + int(self))
 
     def __floordiv__(self, other) -> BytesSizeRate:
         return BytesSizeRate(int(self).__floordiv__(int(other)))
@@ -187,6 +182,9 @@ class BytesSize(int):
     def tb(self) -> float:
         return int(self) / 1024 / 1024 / 1024 / 1024
 
+    def __repr__(self):
+        return f"{int(self)} bytes"
+
 
 class MsgsCount:
     sent: int = 0
@@ -207,14 +205,18 @@ class MsgsCount:
 
     @property
     def processing_time(self) -> LoggingTimeDelta:
-        return LoggingTimeDelta(self.first_received, self.last_received)
+        return LoggingTimeDelta(self.first_received, self.last_processed)
 
     @property
     def buffer_receive_rate(self) -> float:
-        return self.received / self.processing_time
+        return self.received / self.receive_interval
 
     @property
     def buffer_processing_rate(self) -> float:
+        return self.received / self.processing_time
+
+    @property
+    def processing_rate(self) -> float:
         return self.processed / self.processing_time
 
 

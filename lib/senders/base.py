@@ -9,7 +9,7 @@ from lib.networking.types import ProtocolFactoryType, ConnectionType
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
-from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
+from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import SenderProtocol
 
 
@@ -48,7 +48,6 @@ class BaseClient(BaseSender, Protocol):
     timeout: int = 5
 
     def __post_init__(self):
-        self.logger.update_extra(endpoint=self.full_name)
         self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 
@@ -61,10 +60,10 @@ class BaseClient(BaseSender, Protocol):
 
     @property
     def full_name(self):
-        return f"{self.name}_{self.src}"
+        return f"{self.name} {self.src}"
 
     async def _close_connection(self):
-        self.transport.close()
+        self.conn.close()
         await self.conn.close_wait()
 
     def is_started(self) -> bool:
@@ -83,22 +82,23 @@ class BaseClient(BaseSender, Protocol):
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
 
-    async def open_send_msgs(self, msgs: Sequence[AnyStr], interval:int = None) -> None:
+    @run_in_loop
+    async def open_send_msgs(self, msgs: Sequence[AnyStr], interval: int = None, start_interval: int = 0,
+                             override: dict = None) -> None:
+        if override:
+            for k, v in override.items():
+                setattr(self, k, v)
         async with self as conn:
+            await asyncio.sleep(start_interval)
             for msg in msgs:
                 if interval is not None:
                     await asyncio.sleep(interval)
                 conn.send_data(msg)
 
+    @run_in_loop
     async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:
         async with self as conn:
             await conn.play_recording(path, hosts=hosts, timing=timing)
-
-    def open_send_in_loop(self, msgs: Sequence[AnyStr], interval: int = None):
-        asyncio.run(self.open_send_msgs(msgs, interval=interval))
-
-    def play_recording_in_loop(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:
-        asyncio.run(self.open_play_recording(path, hosts=hosts, timing=timing))
 
 
 @dataclass
@@ -109,14 +109,20 @@ class BaseNetworkClient(BaseClient, Protocol):
     port: int = 4000
     srcip: str = None
     srcport: int = 0
+    actual_srcip: str = field(default=None, init=False, compare=False)
+    actual_srcport: int = field(default=None, init=False, compare=False)
 
     @property
     def local_addr(self) -> Tuple[str, int]:
         return self.srcip, self.srcport
 
     @property
+    def actual_local_addr(self) -> Tuple[str, int]:
+        return self.actual_srcip, self.actual_srcport
+
+    @property
     def src(self) -> str:
-        return addr_tuple_to_str(self.local_addr)
+        return addr_tuple_to_str(self.actual_local_addr)
 
     @property
     def dst(self) -> str:

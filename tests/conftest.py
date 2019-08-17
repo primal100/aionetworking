@@ -25,7 +25,6 @@ from lib.formats.base import BufferObject
 from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import (BaseConnectionProtocol, OneWayTCPServerConnection,
     TCPServerConnection, TCPClientConnection)
-from lib.networking.protocols import SimpleNetworkConnectionProtocol
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.networking.protocol_factories import (StreamServerOneWayProtocolFactory, StreamClientProtocolFactory,
     StreamServerProtocolFactory)
@@ -40,7 +39,7 @@ from lib.wrappers.schedulers import TaskScheduler
 
 from tests.mock import MockTCPTransport, MockDatagramTransport
 
-from typing import Dict, Any, List, Tuple, Union, Callable, Optional
+from typing import Dict, Any, List, Tuple, Union, Callable, Optional, Type
 
 
 def pytest_addoption(parser):
@@ -90,7 +89,7 @@ def context() -> Dict[str, Any]:
 
 @pytest.fixture
 def context_client() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Client', 'endpoint': 'TCP Client 127.0.0.1:60000', 'host': '127.0.0.1', 'port': 8888,
+    return {'protocol_name': 'TCP Client', 'endpoint': 'TCP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
 
@@ -111,15 +110,15 @@ def context_unix_client() -> Dict[str, Any]:
 
 @pytest.fixture
 def context_pipe_server(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'Windows Pipe Server', 'endpoint': f'Windows Pipe Server {pipe_path}',
-            'peer': '12345', 'alias': 12345, 'server':pipe_path, 'client': f'{pipe_path}.12345',
+    return {'protocol_name': 'TCP Server', 'endpoint': f'Windows Pipe Server {pipe_path}',
+            'peer': '12345', 'alias': 12345, 'server':pipe_path, 'client': '12345',
             'handle': 12345}
 
 
 @pytest.fixture
 def context_pipe_client(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'Windows Pipe Client', 'endpoint': f'Windows Pipe Client {pipe_path}',
-            'peer': '12346', 'alias': 12346, 'server':pipe_path, 'client': f'{pipe_path}.12345',
+    return {'protocol_name': 'TCP Client', 'endpoint': f'Windows Pipe Client {pipe_path}', 'addr': str(pipe_path),
+            'peer': f'{pipe_path}.12345', 'alias': 12346, 'server':str(pipe_path), 'client': '12345',
             'handle': 12346}
 
 
@@ -129,14 +128,76 @@ def stats_tracker() -> StatsTracker:
 
 
 @pytest.fixture
+def logger_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
+    )
+
+
+@pytest.fixture
+def connection_logger_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "{asctime} - {relativeCreated} - {levelname} - {peer} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
+    )
+
+
+@pytest.fixture
 def stats_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{alias} {msg} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.buffer_processing_rate}", style="{")
+        "{host} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {interval}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB", style="{")
+
+
+@pytest.fixture
+def logging_handler_cls() -> Type[logging.Handler]:
+    return logging.StreamHandler
+
+
+@pytest.fixture
+def receiver_logging_handler(logging_handler_cls, logger_formatter) -> logging.Handler:
+    handler = logging_handler_cls()
+    handler.setFormatter(logger_formatter)
+    return handler
+
+
+@pytest.fixture
+def connection_logging_handler(logging_handler_cls, connection_logger_formatter) -> logging.Handler:
+    handler = logging_handler_cls()
+    handler.setFormatter(connection_logger_formatter)
+    return handler
+
+
+@pytest.fixture
+def stats_logging_handler(logging_handler_cls, stats_formatter) -> logging.Handler:
+    handler = logging_handler_cls()
+    handler.setFormatter(stats_formatter)
+    return handler
+
+
+@pytest.fixture
+def receiver_debug_logging_extended(receiver_logging_handler, connection_logging_handler, stats_logging_handler):
+    logger = logging.getLogger('receiver')
+    logger.setLevel(logging.ERROR)
+    logger.addHandler(receiver_logging_handler)
+    actions_logger = logging.getLogger('receiver.actions')
+    actions_logger.addHandler(receiver_logging_handler)
+    actions_logger.setLevel(logging.DEBUG)
+    actions_logger.propagate = False
+    connection_logger = logging.getLogger('receiver.connection')
+    logging.getLogger('receiver.raw_received').setLevel(logging.ERROR)
+    logging.getLogger('receiver.data_received').setLevel(logging.ERROR)
+    connection_logger.addHandler(connection_logging_handler)
+    connection_logger.propagate = False
+    connection_logger.setLevel(logging.ERROR)
+    stats_logger = logging.getLogger('receiver.stats')
+    stats_logger.addHandler(stats_logging_handler)
+    stats_logger.setLevel(logging.DEBUG)
+    stats_logger.propagate = False
+    logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
 
 @pytest.fixture
 async def stats_logger(context) -> StatsLogger:
-    logger = StatsLogger("receiver.stats", extra=context, stats_interval=0.1, stats_fixed_start_time=False)
+    logger = StatsLogger("receiver.stats", extra=context, stats_interval=None, stats_fixed_start_time=False)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
@@ -145,7 +206,7 @@ async def stats_logger(context) -> StatsLogger:
 
 @pytest.fixture
 async def receiver_logger() -> Logger:
-    logger = Logger(logger_name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
+    logger = Logger(logger_name='receiver', stats_interval=None, stats_fixed_start_time=False)
     yield logger
 
 
@@ -981,7 +1042,7 @@ def fail() -> Callable:
 
 
 @pytest.fixture
-def connections_manager() -> ConnectionsManager:
+async def connections_manager() -> ConnectionsManager:
     from lib.networking.connections_manager import connections_manager
     yield connections_manager
     connections_manager.clear()
@@ -1172,7 +1233,7 @@ def tcp_server_one_way(protocol_factory_one_way_server, receiver_logger, sock):
 
 
 @pytest.fixture
-def tcp_server_one_way_benchmark(protocol_factory_one_way_server, receiver_logger, sock):
+def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
     return TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, logger=receiver_logger, host=sock[0],
                      port=sock[1])
 
@@ -1343,10 +1404,10 @@ def pipe_client_two_way(protocol_factory_two_way_client, sender_logger, pipe_pat
 
 
 server_client_params = [
-    (tcp_server_one_way, tcp_client_one_way),
+    (tcp_server_one_way, tcp_client_one_way, context, context_client),
     #(tcp_server_two_way, tcp_client_two_way),
     pytest.param(
-        (pipe_server_one_way, pipe_client_one_way),
+        (pipe_server_one_way, pipe_client_one_way, context_pipe_server, context_pipe_client),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
@@ -1359,6 +1420,16 @@ server_client_params = [
 @pytest.fixture(params=server_client_params)
 def server_client_args(request) -> Tuple:
     return request.param
+
+
+@pytest.fixture
+def expected_server_context(request, server_client_args) -> Dict[str, Any]:
+    return get_fixture(request, server_client_args[2])
+
+
+@pytest.fixture
+def expected_client_context(request, server_client_args) -> Dict[str, Any]:
+    return get_fixture(request, server_client_args[3])
 
 
 @pytest.fixture
@@ -1475,13 +1546,20 @@ async def two_way_server_receiver(_two_way_server_receiver) -> BaseServer:
 
 @pytest.fixture
 async def one_way_server_started(one_way_server_receiver) -> BaseServer:
-    await one_way_server_receiver.start_wait()
+    await one_way_server_receiver.start()
     yield one_way_server_receiver
 
 
 @pytest.fixture
+async def one_way_server_started_benchmark(tcp_server_one_way_benchmark) -> BaseServer:
+    await tcp_server_one_way_benchmark.start()
+    yield tcp_server_one_way_benchmark
+    await tcp_server_one_way_benchmark.close()
+
+
+@pytest.fixture
 async def two_way_server_started(two_way_server_receiver) -> BaseServer:
-    await two_way_server_receiver.start_wait()
+    await two_way_server_receiver.start()
     yield two_way_server_receiver
 
 

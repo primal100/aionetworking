@@ -1,5 +1,6 @@
 import pickle
 import pytest
+import asyncio
 
 from lib.receivers.exceptions import ServerException
 
@@ -10,9 +11,9 @@ from lib.utils import supports_pipe_or_unix_connections
 
 class TestClientStartStop:
     @pytest.mark.asyncio
-    async def test_00_client_start(self, client_sender):
+    async def test_00_client_start(self, client_sender, server_receiver, context_pipe_client, expected_server_context, expected_client_context):
         assert not client_sender.is_started()
-        conn = await client_sender.connect()
+        conn = await asyncio.wait_for(client_sender.connect(), timeout=1)
         assert client_sender.is_started()
         assert conn.transport
         assert client_sender.transport

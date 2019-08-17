@@ -27,14 +27,17 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     logger: Logger = Logger('receiver')
+    pause_reading_on_buffer_size: int = 0
 
     def __call__(self) -> NetworkConnectionType:
         return self._new_connection()
 
     def _new_connection(self) -> NetworkConnectionType:
+        context = self.context.copy()
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   context=self.context, logger=self.logger)
+                                   context=context, pause_reading_on_buffer_size=self.pause_reading_on_buffer_size,
+                                   logger=self.logger)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -55,11 +58,14 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     async def wait_num_has_connected(self, num: int) -> None:
         await connections_manager.wait_num_has_connected(self.full_name, num)
 
+    async def wait_num_connected(self, num: int) -> None:
+        await connections_manager.wait_num_connections(self.full_name, num)
+
     async def wait_all_messages_processed(self) -> None:
         await connections_manager.wait_all_messages_processed(self.full_name)
 
     async def wait_all_closed(self) -> None:
-        await connections_manager.wait_all_connections_closed(self.full_name)
+        await connections_manager.wait_num_connections(self.full_name, 0)
 
     async def close_actions(self) -> None:
         coros = []
@@ -71,7 +77,6 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             await asyncio.wait(coros)
 
     async def close(self) -> None:
-        await self.wait_all_closed()
         await self.close_actions()
 
 

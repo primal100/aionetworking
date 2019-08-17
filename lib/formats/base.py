@@ -99,8 +99,7 @@ class BaseMessageObject(MessageObject, Protocol):
         return False
 
     def processed(self) -> None:
-        if self.stats_logger:
-            self.stats_logger.on_message_processed(self)
+        self.logger.on_msg_processed(len(self.encoded))
 
     def __str__(self):
         return f"{self.name} {self.uid}"
@@ -113,6 +112,9 @@ class BufferObject(BaseMessageObject):
     @property
     def record(self) -> bytes:
         return self._record.pack_client_msg(self)
+
+    def processed(self) -> None:
+        pass
 
 
 @dataclass

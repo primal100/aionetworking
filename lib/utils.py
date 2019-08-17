@@ -120,11 +120,7 @@ def supernet_of(self, other: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Ne
 def run_in_loop(f):
     @wraps(f)
     def wrapper(*args, **kwds):
-        if asyncio.get_event_loop().is_running():
-            task = asyncio.create_task(f(*args, **kwds))
-            return task
-        else:
-            return asyncio.run(f(*args, **kwds))
+        return asyncio.run(f(*args, **kwds))
 
     return wrapper
 

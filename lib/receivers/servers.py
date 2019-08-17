@@ -53,7 +53,7 @@ class UnixSocketServer(BaseServer):
 class WindowsPipeServer(BaseServer):
     name = "Windows Named Pipe Server"
     peer_prefix = 'pipe'
-    path: Union[str, Path] = field(default_factory=pipe_address)
+    path: Union[str, Path] = field(default_factory=pipe_address, metadata={'pickle': True})
 
     def __post_init__(self):
         self.path = str(self.path).format(pid=os.getpid())
@@ -69,7 +69,7 @@ class WindowsPipeServer(BaseServer):
         servers = await self.loop.start_serving_pipe(self.protocol_factory, self.path)
         return servers[0]
 
-    async def stop_server(self) -> None:
+    async def _stop_server(self) -> None:
         self.server.close()
         if not self.server.closed():
             await asyncio.sleep(0)

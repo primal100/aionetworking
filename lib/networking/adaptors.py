@@ -68,11 +68,11 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             buffer = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
             self._scheduler.call_soon(self.preaction.do_many, [buffer])
 
-    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+    async def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
         timestamp = timestamp or datetime.now()
         self._manage_buffer(buffer, timestamp)
         msgs = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        self.process_msgs(msgs, buffer)
+        await self.process_msgs(msgs, buffer)
 
     @abstractmethod
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
@@ -153,8 +153,8 @@ class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
 class OneWayReceiverAdaptor(BaseReceiverAdaptor):
     action: OneWaySequentialAction = None
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
-        self.action.do_many(msgs)
+    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
+        await self.action.do_many(msgs)
 
 
 @dataclass

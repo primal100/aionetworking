@@ -20,7 +20,7 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 @dataclass
 class BaseAction(ABC):
     name = 'receiver action'
-    logger: LoggerType = Logger('receiver')
+    logger: LoggerType = Logger('receiver.actions')
 
     timeout: int = 5
 
