@@ -24,16 +24,18 @@ class TaskScheduler:
     def task_done(self, future: asyncio.Future) -> None:
         self._counter.decrement()
 
-    def create_task(self, coro: Awaitable, name: str = None) -> asyncio.Future:
+    def create_task(self, coro: Awaitable, name: str = None, include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
         self._counter.increment()
-        task = asyncio.ensure_future(coro)
-        set_task_name(task, name)
+        task = asyncio.create_task(coro)
+        set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
         return task
 
-    def schedule_task(self, coro: Awaitable, callback: Callable = None, name: str = None) -> None:
-        task = self.create_task(coro, name=name)
-        if callback:
-            task.add_done_callback(callback)
+    def schedule_task(self, coro: Awaitable, callback: Callable = None, name: str = None,
+                      include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
+        task = self.create_task(coro, name=name, include_hierarchy=include_hierarchy, separator=separator)
+        callback = callback or self.task_done
+        task.add_done_callback(callback)
+        return task
 
     def _process_promise_result(self, future: asyncio.Future):
         kwargs = additional_cv.get()
@@ -49,11 +51,12 @@ class TaskScheduler:
             self.task_done(future)
 
     def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, task_name: str = None,
-                       **kwargs) -> None:
+                       include_hierarchy: bool = True, separator: str = ':', **kwargs) -> None:
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        self.schedule_task(coro, self._process_promise_result, name=task_name)
+        self.schedule_task(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
+                           separator=separator)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()

@@ -15,7 +15,7 @@ class PickleCodec(BaseCodec):
     Decode & Encode Pickle messages
     """
 
-    def decode(self, encoded: bytes, **kwargs) -> [bytes, Any]:
+    async def decode(self, encoded: bytes, **kwargs) -> [bytes, Any]:
         data = io.BytesIO(encoded)
         num_bytes = len(encoded)
         current_pos = 0
@@ -25,7 +25,7 @@ class PickleCodec(BaseCodec):
             current_pos = data.tell()
             yield (encoded[start_pos:current_pos], decoded)
 
-    def encode(self, decoded: Any, **kwargs) -> bytes:
+    async def encode(self, decoded: Any, **kwargs) -> bytes:
         return pickle.dumps(decoded, protocol=self.protocol)
 
 

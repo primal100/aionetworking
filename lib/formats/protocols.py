@@ -52,13 +52,16 @@ class BufferObjectProtocol(MessageObject, Protocol):
 
     @property
     @abstractmethod
-    def record(self) -> bytes: ...
+    def recording(self) -> bytes: ...
 
 
 class Codec(Protocol):
 
     @abstractmethod
-    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]: ...
+    def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]: ...
+
+    @abstractmethod
+    def decode_one(self, encoded: AnyStr, **kwargs) -> Any: ...
 
     @abstractmethod
     def encode(self, decoded: Any, **kwargs) -> AnyStr: ...
@@ -70,7 +73,7 @@ class Codec(Protocol):
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType: ...
 
     @abstractmethod
-    async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+    def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         yield
 
     @abstractmethod

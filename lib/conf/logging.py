@@ -173,14 +173,18 @@ class ConnectionLogger(Logger):
         self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'SENT'}, **kwargs)
 
     def on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
+        self.debug('Message decoded: %s', msg_obj.uid)
         self._data_received(msg_obj)
 
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
 
     def on_buffer_received(self, data: AnyStr) -> None:
-        self.debug("Received message from %s", self.peer)
+        self.info("Received buffer from %s", self.peer)
         self._raw_received(data)
+
+    def on_buffer_decoded(self, num: int) -> None:
+        self.info("Decoded %s in buffer from %s", p.no('message', num), self.peer)
 
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)
@@ -285,7 +289,6 @@ class StatsLogger(Logger):
         self._scheduler = TaskScheduler()
         super().__init__(logger_name, *args, extra=extra, **kwargs)
         self._stats = self.stats_cls(datefmt=self.datefmt)
-        self.info('\n')
         if self.stats_interval:
             self._scheduler.call_cb_periodic(self.stats_interval, self.periodic_log,
                                              fixed_start_time=self.stats_fixed_start_time)

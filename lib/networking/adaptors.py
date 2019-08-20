@@ -6,7 +6,8 @@ from datetime import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError
-from lib.actions.protocols import ActionProtocol, OneWaySequentialAction, ParallelAction
+from lib.actions.protocols import ActionProtocol
+from lib.compatibility import Protocol
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
 from lib.requesters.protocols import RequesterProtocol
@@ -17,8 +18,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, AnyStr, Callable, Generator, Iterator, Dict, Sequence, Type, Optional
-from typing_extensions import Protocol
+from typing import Any, AnyStr, Callable, Iterator, Generator, Dict, Sequence, Type, Optional
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -31,7 +31,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False)
     context: Dict[str, Any] = field(default_factory=dict)
-    preaction: OneWaySequentialAction = None
+    preaction: ActionProtocol = None
     send: Callable[[AnyStr], None] = field(default=not_implemented_callable, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -62,24 +62,24 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for decoded_msg in decoded_msgs:
             self.encode_and_send_msg(decoded_msg)
 
-    def _manage_buffer(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+    async def _run_preaction(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+        buffer_obj = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
+        await self.preaction.do_one(buffer_obj)
+
+    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
         self.logger.on_buffer_received(buffer)
-        if self.preaction:
-            buffer = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
-            self._scheduler.call_soon(self.preaction.do_many, [buffer])
-
-    async def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
         timestamp = timestamp or datetime.now()
-        self._manage_buffer(buffer, timestamp)
-        msgs = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        await self.process_msgs(msgs, buffer)
-
-    @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
+        if self.preaction:
+            self._scheduler.schedule_task(self._run_preaction(buffer, timestamp), name=f"{self.context['peer']}-Preaction")
+        msgs_async_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
+        self.process_msgs(msgs_async_generator, buffer)
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
         await self._scheduler.close()
         self.logger.connection_finished(exc)
+
+    @abstractmethod
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
 
 
 @dataclass
@@ -144,26 +144,13 @@ class SenderAdaptor(BaseAdaptorProtocol):
 
 
 @dataclass
-class BaseReceiverAdaptor(BaseAdaptorProtocol, Protocol):
+class ReceiverAdaptor(BaseAdaptorProtocol):
     is_receiver = True
     action: ActionProtocol = None
 
-
-@dataclass
-class OneWayReceiverAdaptor(BaseReceiverAdaptor):
-    action: OneWaySequentialAction = None
-
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
-        await self.action.do_many(msgs)
-
-
-@dataclass
-class ReceiverAdaptor(OneWayReceiverAdaptor):
-    action: ParallelAction = None
-
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         self.logger.manage_error(exc)
-        response = self.action.response_on_exception(msg_obj, exc)
+        response = self.action.on_exception(msg_obj, exc)
         if response:
             self.encode_and_send_msg(response)
 
@@ -173,14 +160,16 @@ class ReceiverAdaptor(OneWayReceiverAdaptor):
 
     def _on_decoding_error(self, buffer: AnyStr, exc: BaseException):
         self.logger.manage_error(exc)
-        response = self.action.response_on_decode_error(buffer, exc)
+        response = self.action.on_decode_error(buffer, exc)
         if response:
             self.encode_and_send_msg(response)
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
             for msg in msgs:
-                self._scheduler.create_promise(self.action.asnyc_do_one(msg), self._on_success, self._on_exception,
-                                               msg_obj=msg)
+                if not self.action.filter(msg):
+                    self._scheduler.create_promise(self.action.do_one(msg), self._on_success, self._on_exception,
+                                                   task_name=f"{self.context['peer']}-Process-id-{msg.uid}",
+                                                   msg_obj=msg)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)

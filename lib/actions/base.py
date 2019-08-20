@@ -43,18 +43,12 @@ class BaseAction(ABC):
 
     async def close(self) -> None: ...
 
-    def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Any:
+    def on_decode_error(self, data: AnyStr, exc: BaseException) -> Any:
         pass
 
-    def response_on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any:
+    def on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any:
         pass
 
-    async def async_do_one(self, msg: BaseMessageObject) -> Any: ...
+    async def do_one(self, msg: BaseMessageObject) -> Any: ...
 
-    def do_one(self, msg: BaseMessageObject) -> Any: ...
-
-    def do_many(self, msgs: Iterator[BaseMessageObject]):
-        for msg in msgs:
-            if not self.filter(msg):
-                self.do_one(msg)
 

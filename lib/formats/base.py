@@ -8,10 +8,10 @@ from pprint import pformat
 from lib import settings
 from lib.conf.logging import ConnectionLogger, connection_logger_receiver
 from lib.networking.connections_manager import connections_manager
-from lib.utils import Record, aone
+from lib.utils import Record, aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence, Type
+from typing import AsyncGenerator,  Generator, Any, AnyStr, Dict, Sequence, Type
 from lib.compatibility import Protocol
 from .types import MessageObjectType, CodecType
 
@@ -52,6 +52,12 @@ class BaseMessageObject(MessageObject, Protocol):
     def full_sender(self) -> str:
         return self.context['peer']
 
+    def __getstate__(self):
+        return dataclass_getstate(self)
+
+    def __setstate__(self, state):
+        dataclass_setstate(self, state)
+
     def get(self, item, default=None):
         try:
             return self.decoded[item]
@@ -77,7 +83,7 @@ class BaseMessageObject(MessageObject, Protocol):
     def uid(self) -> Any:
         try:
             return self.decoded[self.id_attr]
-        except (AttributeError, KeyError):
+        except (AttributeError, KeyError, TypeError):
             return id(self)
 
     @property
@@ -110,7 +116,7 @@ class BufferObject(BaseMessageObject):
     _record = Record()
 
     @property
-    def record(self) -> bytes:
+    def recording(self) -> bytes:
         return self._record.pack_client_msg(self)
 
     def processed(self) -> None:
@@ -128,29 +134,31 @@ class BaseCodec(Codec):
     context: Dict[str, Any] = field(default_factory=dict)
     logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
 
-    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
+    def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         yield (encoded, encoded)
 
     def encode(self, decoded: Any, **kwargs) -> AnyStr:
         return decoded
 
-    def decode_one(self, encoded:bytes, **kwargs) -> Any:
-        return next(self.decode(encoded, **kwargs))[1]
+    async def decode_one(self, encoded: bytes, **kwargs) -> Any:
+        return next(self.decode(encoded, **kwargs))
 
     def _from_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
         for encoded, decoded in self.decode(encoded):
             yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
 
     def decode_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
-        for msg in self._from_buffer(encoded, **kwargs):
+        i = 0
+        for i, msg in enumerate(self._from_buffer(encoded, **kwargs)):
             self.logger.on_msg_decoded(msg)
             yield msg
+        self.logger.on_buffer_decoded(i + 1)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
         return self.msg_obj(self.encode(decoded), decoded, context=self.context, **kwargs)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
-        self.logger.debug('Creating new %s message from %s', self.codec_name, file_path)
+        self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
         for item in self.decode_buffer(encoded, **kwargs):

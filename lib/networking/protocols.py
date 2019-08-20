@@ -86,10 +86,10 @@ class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
     context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     peer_prefix: str = ''
     logger: Logger = Logger('receiver')
-    timeout: Union[int, float] = 10
+    timeout: Union[int, float] = 1000
 
     adaptor_cls: Type[AdaptorType] = field(default=None, init=False)
-    adaptor: AdaptorType = field(default=None, init=False)
+    _adaptor: AdaptorType = field(default=None, init=False)
 
 
 TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)

@@ -2,14 +2,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 
-from lib.actions.protocols import OneWaySequentialAction, ParallelAction
+from lib.actions.protocols import ActionProtocol
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 from .connections_manager import connections_manager
-from .connections import TCPClientConnection, OneWayTCPServerConnection, TCPServerConnection, UDPServerConnection
+from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
@@ -21,23 +21,23 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     full_name = ''
     peer_prefix = ''
     connection_cls: Type[NetworkConnectionType] = field(default=None, init=False)
-    action: ParallelAction = None
-    preaction: OneWaySequentialAction = None
+    action: ActionProtocol = None
+    preaction: ActionProtocol = None
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
     context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     logger: Logger = Logger('receiver')
-    pause_reading_on_buffer_size: int = 0
+    pause_reading_on_buffer_size: int = None
 
     def __call__(self) -> NetworkConnectionType:
         return self._new_connection()
 
     def _new_connection(self) -> NetworkConnectionType:
+        self.logger.debug('Creating new connection')
         context = self.context.copy()
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   context=context, pause_reading_on_buffer_size=self.pause_reading_on_buffer_size,
-                                   logger=self.logger)
+                                   context=context, logger=self.logger)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -83,12 +83,6 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
 @dataclass
 class StreamServerProtocolFactory(BaseProtocolFactory):
     connection_cls = TCPServerConnection
-
-
-@dataclass
-class StreamServerOneWayProtocolFactory(BaseProtocolFactory):
-    connection_cls = OneWayTCPServerConnection
-    action: OneWaySequentialAction = None
 
 
 @dataclass

@@ -18,16 +18,16 @@ from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
 from lib.requesters.jsonrpc import SampleJSONRPCClient
 from lib.conf.logging import ConnectionLogger, Logger, StatsLogger, StatsTracker, ConnectionLoggerStats
 from lib.formats.contrib.json import JSONObject, JSONCodec
+from lib.formats.contrib.pickle import PickleCodec, PickleObject
 from lib.formats.contrib.types import JSONObjectType
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.base import BufferObject
-from lib.networking.adaptors import OneWayReceiverAdaptor, ReceiverAdaptor, SenderAdaptor
-from lib.networking.connections import (BaseConnectionProtocol, OneWayTCPServerConnection,
-    TCPServerConnection, TCPClientConnection)
+from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
+from lib.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
+
 from lib.networking.types import SimpleNetworkConnectionType
-from lib.networking.protocol_factories import (StreamServerOneWayProtocolFactory, StreamClientProtocolFactory,
-    StreamServerProtocolFactory)
+from lib.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
 from lib.networking.connections_manager import ConnectionsManager
 from lib.receivers.base import BaseServer
 from lib.receivers.servers import TCPServer, pipe_server
@@ -137,7 +137,7 @@ def logger_formatter() -> logging.Formatter:
 @pytest.fixture
 def connection_logger_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{asctime} - {relativeCreated} - {levelname} - {peer} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
+        "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {peer} - {message}", style='{'
     )
 
 
@@ -176,7 +176,7 @@ def stats_logging_handler(logging_handler_cls, stats_formatter) -> logging.Handl
 @pytest.fixture
 def receiver_debug_logging_extended(receiver_logging_handler, connection_logging_handler, stats_logging_handler):
     logger = logging.getLogger('receiver')
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(receiver_logging_handler)
     actions_logger = logging.getLogger('receiver.actions')
     actions_logger.addHandler(receiver_logging_handler)
@@ -187,10 +187,10 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('receiver.data_received').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
     connection_logger.propagate = False
-    connection_logger.setLevel(logging.ERROR)
+    connection_logger.setLevel(logging.DEBUG)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
-    stats_logger.setLevel(logging.DEBUG)
+    stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
     logging.getLogger('asyncio').setLevel(logging.DEBUG)
 
@@ -257,7 +257,7 @@ def sender_connection_logger_stats(sender_connection_logger, context_client, cap
     return sender_logger.get_connection_logger(extra=context_client)
 
 
-@pytest.fixture(params=[(receiver_connection_logger), (receiver_connection_logger_stats)])
+@pytest.fixture(params=[(receiver_connection_logger,), (receiver_connection_logger_stats,)])
 def _connection_logger(request):
     return get_fixture(request)
 
@@ -271,6 +271,11 @@ async def connection_logger(_connection_logger):
 def asn_codec(context) -> PyCrateAsnCodec:
     return PyCrateAsnCodec(TCAPMAPASNObject, context=context,
                            asn_class=TCAPMAPASNObject.asn_class)
+
+
+@pytest.fixture
+def pickle_codec(context, receiver_connection_logger) -> PickleCodec:
+    return PickleCodec(PickleObject, context=context, logger=receiver_connection_logger)
 
 
 @pytest.fixture
@@ -467,12 +472,6 @@ async def managed_file_short_timeout(tmp_path) -> ManagedFile:
 
 
 @pytest.fixture
-def file_storage_action_binary_real_dir(data_dir) -> FileStorage:
-    return FileStorage(base_path=data_dir, binary=True,
-                      path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
-
-
-@pytest.fixture
 def file_storage_action_binary(tmp_path) -> FileStorage:
     return FileStorage(base_path=tmp_path, binary=True,
                       path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
@@ -494,21 +493,21 @@ async def buffered_file_storage_action_binary_pipe(tmp_path) -> BufferedFileStor
 
 @pytest.fixture
 async def buffered_file_storage_pre_action_binary_pipe(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='record', path='pipe.recording')
+    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='recording', path='pipe.recording')
     yield action
     await action.close()
 
 
 @pytest.fixture
 async def buffered_file_storage_pre_action_binary(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='record', path='{msg.sender}.recording')
+    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='recording', path='{msg.sender}.recording')
     yield action
     await action.close()
 
 
 @pytest.fixture
 async def buffered_file_storage_pre_action_text(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='record', path='{msg.sender}.recording')
+    action = BufferedFileStorage(base_path=tmp_path, binary=True, attr='recording', path='{msg.sender}.recording')
     yield action
     await action.close()
 
@@ -540,11 +539,6 @@ def file_containing_multi_json(tmpdir, json_buffer) -> Path:
     p = Path(tmpdir.mkdir("encoded").join("json"))
     p.write_text(json_buffer)
     return p
-
-
-@pytest.fixture
-def json_buffer() -> str:
-    return '{"jsonrpc": "2.0", "id": 0, "method": "test", "params": ["abcd"]}{"jsonrpc": "2.0", "id": 1, "method": "test", "params": ["efgh"]}'
 
 
 @pytest.fixture
@@ -1172,7 +1166,7 @@ def json_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_
 
 @pytest.fixture
 def protocol_factory_one_way_server(buffered_file_storage_pre_action_binary, buffered_file_storage_action_binary, receiver_logger) -> StreamServerOneWayProtocolFactory:
-    factory = StreamServerOneWayProtocolFactory(
+    factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_pre_action_binary,
         action=buffered_file_storage_action_binary,
         dataformat=TCAPMAPASNObject,
@@ -1183,8 +1177,8 @@ def protocol_factory_one_way_server(buffered_file_storage_pre_action_binary, buf
 
 
 @pytest.fixture
-def protocol_factory_one_way_server_benchmark(buffered_file_storage_action_binary, receiver_logger) -> StreamServerOneWayProtocolFactory:
-    factory = StreamServerOneWayProtocolFactory(
+def protocol_factory_one_way_server_benchmark(buffered_file_storage_action_binary, receiver_logger) -> StreamServerProtocolFactory:
+    factory = StreamServerProtocolFactory(
         action=buffered_file_storage_action_binary,
         dataformat=TCAPMAPASNObject,
         logger=receiver_logger)
@@ -1258,8 +1252,8 @@ def tcp_client_two_way(protocol_factory_two_way_client, sender_logger, sock, pee
 
 @pytest.fixture
 def one_way_receiver_adaptor(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, context,
-                             receiver_connection_logger) -> OneWayReceiverAdaptor:
-    return OneWayReceiverAdaptor(TCAPMAPASNObject, action=buffered_file_storage_action_binary,
+                             receiver_connection_logger) -> ReceiverAdaptor:
+    return ReceiverAdaptor(TCAPMAPASNObject, action=buffered_file_storage_action_binary,
                                  context=context, logger=receiver_connection_logger,
                                  preaction=buffered_file_storage_pre_action_binary)
 
@@ -1284,8 +1278,8 @@ async def two_way_sender_adaptor(context_client, sender_connection_logger, json_
 
 
 @pytest.fixture
-async def tcp_protocol_one_way_server(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, receiver_logger) -> OneWayTCPServerConnection:
-    yield OneWayTCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary,
+async def tcp_protocol_one_way_server(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, receiver_logger) -> TCPServerConnection:
+    yield TCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary,
                                     parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
                                     preaction=buffered_file_storage_pre_action_binary, logger=receiver_logger)
 
@@ -1293,16 +1287,16 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action_binary, buffe
 @pytest.fixture
 async def tcp_protocol_one_way_server_benchmark(buffered_file_storage_action_binary,
                                                 buffered_file_storage_pre_action_binary,
-                                                receiver_logger) -> OneWayTCPServerConnection:
-    yield OneWayTCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary,
+                                                receiver_logger) -> TCPServerConnection:
+    yield TCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary,
                                     parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp', logger=receiver_logger)
 
 
 @pytest.fixture
 async def tcp_protocol_one_way_pipe(buffered_file_storage_pre_action_binary_pipe,
                                     buffered_file_storage_action_binary_pipe,
-                                    receiver_logger, pipe_path) -> OneWayTCPServerConnection:
-    yield OneWayTCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary_pipe,
+                                    receiver_logger, pipe_path) -> TCPServerConnection:
+    yield TCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary_pipe,
                                     preaction=buffered_file_storage_pre_action_binary_pipe, peer_prefix='pipe',
                                     parent_name=f"Windows Named Pipe Server {pipe_path}", logger=receiver_logger)
 
@@ -1441,7 +1435,7 @@ def _server_receiver(request, server_client_args) -> Optional[BaseServer]:
 async def server_receiver(_server_receiver) -> BaseServer:
     yield _server_receiver
     if _server_receiver.is_started():
-        await _server_receiver.stop_wait()
+        await _server_receiver.close()
 
 
 @pytest.fixture
@@ -1452,7 +1446,7 @@ async def server_receiver_quiet(server_receiver) -> BaseServer:
 
 @pytest.fixture
 async def server_started(server_receiver) -> BaseServer:
-    await server_receiver.start_wait()
+    await server_receiver.start()
     yield server_receiver
 
 
@@ -1534,14 +1528,14 @@ def _two_way_server_receiver(request, two_way_server_client_args) -> Optional[Ba
 async def one_way_server_receiver(_one_way_server_receiver) -> BaseServer:
     yield _one_way_server_receiver
     if _one_way_server_receiver.is_started():
-        await _one_way_server_receiver.stop_wait()
+        await _one_way_server_receiver.close()
 
 
 @pytest.fixture
 async def two_way_server_receiver(_two_way_server_receiver) -> BaseServer:
     yield _two_way_server_receiver
     if _two_way_server_receiver.is_started():
-        await _two_way_server_receiver.stop_wait()
+        await _two_way_server_receiver.close()
 
 
 @pytest.fixture

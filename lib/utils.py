@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import io
 import os
 import struct
 import re
@@ -256,7 +257,10 @@ class Record:
 
     @classmethod
     def from_file(cls, path):
-        content = path.read_bytes()
+        if isinstance(path, io.BufferedReader):
+            content = path.read()
+        else:
+            content = path.read_bytes()
         float_size = struct.calcsize("f")
         bool_size = struct.calcsize("?")
         pos = 0

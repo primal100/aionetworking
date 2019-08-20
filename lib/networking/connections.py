@@ -5,13 +5,12 @@ from dataclasses import dataclass, field
 
 from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
 
-from lib.actions.protocols import OneWaySequentialAction
-from lib.compatibility import singledispatchmethod
+from lib.compatibility import singledispatchmethod, set_task_name
 from lib.conf.types import ConnectionLoggerType
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 
 from .connections_manager import connections_manager
-from .adaptors import ReceiverAdaptor, OneWayReceiverAdaptor, SenderAdaptor
+from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocols import (
     ConnectionDataclassProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr, TransportType)
 from .types import AdaptorType, SenderAdaptorType
@@ -28,15 +27,14 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _close_task: asyncio.Task = field(default=None, init=False, compare=False)
-    pause_reading_on_buffer_size: int = 0
 
     def __post_init__(self):
         self.context['protocol_name'] = self.name
         self.context['endpoint'] = self.parent_name
 
     def __getattr__(self, item):
-        if self.adaptor:
-            return getattr(self.adaptor, item)
+        if self._adaptor:
+            return getattr(self._adaptor, item)
 
     def _start_adaptor(self) -> None:
         self._set_adaptor()
@@ -63,9 +61,9 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             'send': self.send
         }
         if self.adaptor_cls.is_receiver:
-            self.adaptor = self._get_receiver_adaptor(**kwargs)
+            self._adaptor = self._get_receiver_adaptor(**kwargs)
         else:
-            self.adaptor = self._get_sender_adaptor(**kwargs)
+            self._adaptor = self._get_sender_adaptor(**kwargs)
 
     def _get_receiver_adaptor(self, **kwargs) -> AdaptorType:
         return self.adaptor_cls(action=self.action, **kwargs)
@@ -86,8 +84,10 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
-            if self.adaptor:
-                await asyncio.wait_for(self.adaptor.close(exc), timeout=self.timeout)
+            if self._adaptor:
+                task = asyncio.create_task(self._adaptor.close(exc))
+                set_task_name(task, "CloseAdaptor")
+                await asyncio.wait_for(task, timeout=self.timeout)
         finally:
             self._delete_connection()
 
@@ -99,6 +99,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         else:
             self._connected.set_exception(ConnectionAlreadyClosedError())
         self._close_task = asyncio.create_task(self._close(exc))
+        set_task_name(self._close_task, f"Close:{self.peer}")
         self._closing.set_result(True)
 
     def close(self):
@@ -219,15 +220,8 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.finish_connection(exc)
 
-    def _resume_reading(self, fut: asyncio.Future):
-        self.transport.resume_reading()
-
     def data_received(self, data: AnyStr) -> None:
-        task = asyncio.create_task(self.adaptor.on_data_received(data))
-        if self.pause_reading_on_buffer_size is not None:
-            if self.pause_reading_on_buffer_size >= len(data):
-                self.transport.pause_reading()
-                task.add_done_callback(self._resume_reading)
+        self._adaptor.on_data_received(data)
 
     def eof_received(self) -> bool:
         return False
@@ -251,14 +245,6 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
 
 
 @dataclass
-class OneWayTCPServerConnection(BaseStreamConnection):
-    name = 'TCP Server'
-    adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
-    action: OneWaySequentialAction = None
-    store_connections = True
-
-
-@dataclass
 class TCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
@@ -270,14 +256,6 @@ class TCPClientConnection(BaseStreamConnection, SenderAdaptorGetattr, asyncio.Pr
     name = 'TCP Client'
     adaptor_cls: Type[AdaptorType] = SenderAdaptor
     store_connections = False
-
-
-@dataclass
-class OneWayUDPServerConnection(BaseUDPConnection):
-    name = 'UDP Server'
-    adaptor_cls: Type[AdaptorType] = OneWayReceiverAdaptor
-    action: OneWaySequentialAction = None
-    store_connections = True
 
 
 @dataclass
