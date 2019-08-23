@@ -14,7 +14,7 @@ from pathlib import Path
 
 from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
 from lib.actions.jsonrpc import JSONRPCServer
-from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCServer
+from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCSQLiteServer
 from lib.requesters.jsonrpc import SampleJSONRPCClient
 from lib.conf.logging import ConnectionLogger, Logger, StatsLogger, StatsTracker, ConnectionLoggerStats
 from lib.formats.contrib.json import JSONObject, JSONCodec
@@ -22,7 +22,7 @@ from lib.formats.contrib.pickle import PickleCodec, PickleObject
 from lib.formats.contrib.types import JSONObjectType
 from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
 from lib.formats.contrib.asn1 import PyCrateAsnCodec
-from lib.formats.base import BufferObject
+from lib.formats.recording import BufferObject
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
 
@@ -30,7 +30,7 @@ from lib.networking.types import SimpleNetworkConnectionType
 from lib.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
 from lib.networking.connections_manager import ConnectionsManager
 from lib.receivers.base import BaseServer
-from lib.receivers.servers import TCPServer, pipe_server
+from lib.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
 from lib.senders.base import BaseClient
 from lib.senders.clients import TCPClient, pipe_client
 from lib.utils import pipe_address_by_os, set_loop_policy
@@ -57,6 +57,28 @@ def pytest_configure(config):
     loop_type = config.getoption("--loop")
     if loop_type:
         set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
+
+
+def get_fixture(request, param=None):
+    if not param:
+        param = request.param
+    return request.getfixturevalue(param.__name__)
+
+
+def get_fixtures(request):
+    return [request.getfixturevalue(param.__name__) for param in request.param]
+
+
+@pytest.fixture
+def timestamp() -> datetime:
+    return datetime(2019, 1, 1, 1, 1)
+
+
+@pytest.fixture
+def context() -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
+            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000'}
 
 
 @pytest.fixture
@@ -123,11 +145,6 @@ def context_pipe_client(pipe_path) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def stats_tracker() -> StatsTracker:
-    return StatsTracker()
-
-
-@pytest.fixture
 def logger_formatter() -> logging.Formatter:
     return logging.Formatter(
         "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
@@ -139,12 +156,6 @@ def connection_logger_formatter() -> logging.Formatter:
     return logging.Formatter(
         "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {peer} - {message}", style='{'
     )
-
-
-@pytest.fixture
-def stats_formatter() -> logging.Formatter:
-    return logging.Formatter(
-        "{host} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {interval}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB", style="{")
 
 
 @pytest.fixture
@@ -182,9 +193,15 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     actions_logger.addHandler(receiver_logging_handler)
     actions_logger.setLevel(logging.DEBUG)
     actions_logger.propagate = False
+    sender_connection_logger = logging.getLogger('sender.connection')
+    sender_connection_logger.addHandler(connection_logging_handler)
+    sender_connection_logger.propagate = False
+    sender_connection_logger.setLevel(logging.DEBUG)
     connection_logger = logging.getLogger('receiver.connection')
     logging.getLogger('receiver.raw_received').setLevel(logging.ERROR)
     logging.getLogger('receiver.data_received').setLevel(logging.ERROR)
+    logging.getLogger('sender.raw_received').setLevel(logging.ERROR)
+    logging.getLogger('sender.data_received').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
     connection_logger.propagate = False
     connection_logger.setLevel(logging.DEBUG)
@@ -196,75 +213,11 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
 
 
 @pytest.fixture
-async def stats_logger(context) -> StatsLogger:
-    logger = StatsLogger("receiver.stats", extra=context, stats_interval=None, stats_fixed_start_time=False)
-    yield logger
-    if not logger._is_closing:
-        logger.connection_finished()
-    await logger.wait_closed()
-
-
-@pytest.fixture
-async def receiver_logger() -> Logger:
-    logger = Logger(logger_name='receiver', stats_interval=None, stats_fixed_start_time=False)
-    yield logger
-
-
-@pytest.fixture
-def debug_logging(caplog) -> None:
-    caplog.set_level(logging.DEBUG)
-
-
-@pytest.fixture
-async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
-    caplog.set_level(logging.DEBUG, "receiver.connection")
-    yield receiver_logger.get_connection_logger(extra=context)
-
-
-@pytest.fixture
-async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
-    caplog.set_level(logging.INFO, "receiver.stats")
-    caplog.set_level(logging.DEBUG, "receiver.connection")
-    logger = receiver_logger.get_connection_logger(extra=context)
-    yield logger
-    if not logger._is_closing:
-        logger.connection_finished()
-    await logger.wait_closed()
-
-
-@pytest.fixture
-def zero_division_exception() -> BaseException:
-    try:
-        1 / 0
-    except ZeroDivisionError as e:
-        return e
-
-
-@pytest.fixture
-def sender_logger() -> Logger:
-    return Logger('sender')
-
-
-@pytest.fixture
-def sender_connection_logger(sender_logger, context_client) -> ConnectionLogger:
-    return sender_logger.get_connection_logger(extra=context_client)
-
-
-@pytest.fixture
 def sender_connection_logger_stats(sender_connection_logger, context_client, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "sender.stats")
     caplog.set_level(logging.DEBUG, "sender.connection")
     return sender_logger.get_connection_logger(extra=context_client)
 
-
-@pytest.fixture(params=[(receiver_connection_logger,), (receiver_connection_logger_stats,)])
-def _connection_logger(request):
-    return get_fixture(request)
-
-
-@pytest.fixture
-async def connection_logger(_connection_logger):
-    yield _connection_logger
 
 
 @pytest.fixture
@@ -312,11 +265,6 @@ def asn_decoded_multi(asn_encoded_multi) -> List[Tuple]:
         decoder.from_ber(encoded)
         decoded.append(decoder())
     return decoded
-
-
-@pytest.fixture
-def timestamp() -> datetime:
-    return datetime(2019, 1, 1, 1, 1)
 
 
 @pytest.fixture
@@ -399,11 +347,6 @@ def json_codec_no_context() -> JSONCodec:
 
 
 @pytest.fixture
-def json_codec(context) -> JSONCodec:
-    return JSONCodec(JSONObject, context=context)
-
-
-@pytest.fixture
 def default_notes(user1) -> Dict:
     return {0: {'id': 0, 'name': '1stnote', 'text': 'Hello, World!', 'user': user1[0]}}
 
@@ -445,22 +388,6 @@ async def json_rpc_action_no_process_queue(json_rpc_app) -> JSONRPCServer:
 @pytest.fixture
 def json_rpc_requester() -> SampleJSONRPCClient:
     return SampleJSONRPCClient()
-
-
-@pytest.fixture
-async def managed_file_binary(tmp_path) -> ManagedFile:
-    path = tmp_path/'managed_file1'
-    f = ManagedFile.get_file(path, timeout=None, mode='ab', separator=b'')
-    yield f
-    await f.close()
-
-
-@pytest.fixture
-async def managed_file_text(tmp_path) -> ManagedFile:
-    path = tmp_path/'managed_file1'
-    f = ManagedFile.get_file(path, timeout=None, mode='a', separator='')
-    yield f
-    await f.close()
 
 
 @pytest.fixture
@@ -535,31 +462,8 @@ def file_containing_json(tmpdir, json_rpc_login_request_encoded) -> Path:
 
 
 @pytest.fixture
-def file_containing_multi_json(tmpdir, json_buffer) -> Path:
-    p = Path(tmpdir.mkdir("encoded").join("json"))
-    p.write_text(json_buffer)
-    return p
-
-
-@pytest.fixture
-def json_encoded_multi(json_rpc_login_request_encoded, json_rpc_logout_request_encoded) -> List[str]:
-    return [
-        json_rpc_login_request_encoded,
-        json_rpc_logout_request_encoded
-    ]
-
-
-@pytest.fixture
 def invalid_json(json_encoded_multi) -> str:
     return '{"jsonrpc: "2.0", "id": 0, "method": "test", "params": ["abcd"]}'
-
-
-@pytest.fixture
-def json_decoded_multi(json_rpc_login_request, json_rpc_logout_request) -> List[dict]:
-    return [
-        json_rpc_login_request,
-        json_rpc_logout_request
-    ]
 
 
 @pytest.fixture
@@ -596,16 +500,6 @@ def user1_codec(json_codec, user1) -> JSONCodec:
 def user2_codec(json_codec, user2) -> JSONCodec:
     json_codec.context['user'] = user2[0]
     return json_codec
-
-
-@pytest.fixture
-def json_rpc_login_request(user1) -> dict:
-    return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user1}
-
-
-@pytest.fixture
-def json_rpc_login_request_encoded(user1) -> str:
-    return '{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
 
 
 @pytest.fixture
@@ -654,18 +548,8 @@ def json_rpc_login_response_object_user2(json_rpc_login_response_user2, user2_co
 
 
 @pytest.fixture
-def json_rpc_logout_request(user1) -> dict:
-    return {'jsonrpc': "2.0", 'id': 2, 'method': 'logout'}
-
-
-@pytest.fixture
 def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestamp) -> JSONObject:
     return json_codec.from_decoded(json_rpc_logout_request, received_timestamp=timestamp)
-
-
-@pytest.fixture
-def json_rpc_logout_request_encoded(user1) -> str:
-    return '{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
 @pytest.fixture
@@ -867,18 +751,6 @@ def json_rpc_object_user2(user2_codec, request):
 
 
 @pytest.fixture
-def json_object(json_rpc_login_request_encoded, json_rpc_login_request, context, timestamp) -> JSONObject:
-    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context, received_timestamp=timestamp)
-
-
-@pytest.fixture
-def json_objects(json_encoded_multi, json_decoded_multi, timestamp, context) -> List[JSONObject]:
-    return [JSONObject(encoded, json_decoded_multi[i], context=context,
-                       received_timestamp=timestamp) for i, encoded in
-            enumerate(json_encoded_multi)]
-
-
-@pytest.fixture
 def json_rpc_notification_object(json_rpc_create_notification_encoded, json_rpc_create_notification, timestamp) -> JSONObject:
     return JSONObject(json_rpc_create_notification_encoded, json_rpc_create_notification, context=context,
                       received_timestamp=timestamp)
@@ -947,38 +819,8 @@ async def queue() -> asyncio.Queue:
 
 
 @pytest.fixture
-def peername() -> Tuple[str, int]:
-    return '127.0.0.1', 60000
-
-
-@pytest.fixture
 def peer_str() -> str:
     return '127.0.0.1:60000'
-
-
-@pytest.fixture
-def sock() -> Tuple[str, int]:
-    return '127.0.0.1', 8888
-
-
-@pytest.fixture
-def extra(peername, sock) -> dict:
-    return {'peername': peername, 'sockname': sock}
-
-
-@pytest.fixture
-def extra_client(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername}
-
-
-@pytest.fixture
-async def tcp_transport(queue, extra) -> asyncio.Transport:
-    yield MockTCPTransport(queue, extra=extra)
-
-
-@pytest.fixture
-async def tcp_transport_client(queue, extra_client) -> asyncio.Transport:
-    yield MockTCPTransport(queue, extra=extra_client)
 
 
 @pytest.fixture
@@ -1033,36 +875,6 @@ def fail() -> Callable:
     def fail_func(exc: BaseException, fut: asyncio.Future):
         fut.set_exception(exc)
     return fail_func
-
-
-@pytest.fixture
-async def connections_manager() -> ConnectionsManager:
-    from lib.networking.connections_manager import connections_manager
-    yield connections_manager
-    connections_manager.clear()
-
-
-@dataclass
-class SimpleNetworkConnection:
-    peer: str
-    parent_name: str
-    queue: asyncio.Queue
-
-    async def wait_all_messages_processed(self) -> None: ...
-
-    def encode_and_send_msg(self, msg_decoded: Any) -> None:
-        self.queue.put_nowait(msg_decoded)
-
-
-@pytest.fixture
-def simple_network_connections(queue, peer_str) -> List[SimpleNetworkConnectionType]:
-    return [SimpleNetworkConnection(peer_str, "TCP Server 127.0.0.1:8888", queue),
-            SimpleNetworkConnection('127.0.0.1:4444', "TCP Server 127.0.0.1:8888", queue)]
-
-
-@pytest.fixture
-def simple_network_connection(simple_network_connections) -> SimpleNetworkConnectionType:
-    return simple_network_connections[0]
 
 
 @pytest.fixture
@@ -1147,33 +959,7 @@ def buffer_object_json2(buffer_json_2, timestamp, context) -> BufferObject:
     return BufferObject(buffer_json_2, received_timestamp=timestamp + timedelta(seconds=1), context=context)
 
 
-@pytest.fixture
-def json_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded) -> List[Dict]:
-    return [{
-        'sent_by_server': False,
-        'seconds': 0.0,
-        'peer': "127.0.0.1",
-        'data': json_rpc_login_request_encoded
-    },
-    {
-        'sent_by_server': False,
-        'seconds': 1.0,
-        'peer': "127.0.0.1",
-        'data': json_rpc_logout_request_encoded
-    }
-    ]
 
-
-@pytest.fixture
-def protocol_factory_one_way_server(buffered_file_storage_pre_action_binary, buffered_file_storage_action_binary, receiver_logger) -> StreamServerOneWayProtocolFactory:
-    factory = StreamServerProtocolFactory(
-        preaction=buffered_file_storage_pre_action_binary,
-        action=buffered_file_storage_action_binary,
-        dataformat=TCAPMAPASNObject,
-        logger=receiver_logger)
-    if not factory.full_name:
-        factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
-    yield factory
 
 
 @pytest.fixture
@@ -1184,16 +970,6 @@ def protocol_factory_one_way_server_benchmark(buffered_file_storage_action_binar
         logger=receiver_logger)
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
-    yield factory
-
-
-@pytest.fixture
-def protocol_factory_one_way_client(sender_logger) -> StreamClientProtocolFactory:
-    factory = StreamClientProtocolFactory(
-        dataformat=TCAPMAPASNObject,
-        logger=sender_logger)
-    if not factory.full_name:
-        factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
 
 
@@ -1222,13 +998,13 @@ def protocol_factory_two_way_client(sender_logger, json_rpc_requester) -> Stream
 
 @pytest.fixture
 def tcp_server_one_way(protocol_factory_one_way_server, receiver_logger, sock):
-    return TCPServer(protocol_factory=protocol_factory_one_way_server, logger=receiver_logger, host=sock[0],
+    return TCPServer(protocol_factory=protocol_factory_one_way_server, host=sock[0],
                      port=sock[1])
 
 
 @pytest.fixture
 def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
-    return TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, logger=receiver_logger, host=sock[0],
+    return TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
                      port=sock[1])
 
 
@@ -1251,19 +1027,6 @@ def tcp_client_two_way(protocol_factory_two_way_client, sender_logger, sock, pee
 
 
 @pytest.fixture
-def one_way_receiver_adaptor(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, context,
-                             receiver_connection_logger) -> ReceiverAdaptor:
-    return ReceiverAdaptor(TCAPMAPASNObject, action=buffered_file_storage_action_binary,
-                                 context=context, logger=receiver_connection_logger,
-                                 preaction=buffered_file_storage_pre_action_binary)
-
-
-@pytest.fixture
-async def one_way_sender_adaptor(context_client, sender_connection_logger, deque) -> SenderAdaptor:
-    yield SenderAdaptor(TCAPMAPASNObject, context=context_client, logger=sender_connection_logger, send=deque.append)
-
-
-@pytest.fixture
 def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_binary, context,
                              receiver_connection_logger, deque) -> ReceiverAdaptor:
     return ReceiverAdaptor(JSONObject, action=json_rpc_action,
@@ -1275,13 +1038,6 @@ def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_b
 async def two_way_sender_adaptor(context_client, sender_connection_logger, json_rpc_requester, queue) -> SenderAdaptor:
     yield SenderAdaptor(JSONObject, context=context_client, logger=sender_connection_logger,
                         requester=json_rpc_requester, send=queue.put_nowait)
-
-
-@pytest.fixture
-async def tcp_protocol_one_way_server(buffered_file_storage_action_binary, buffered_file_storage_pre_action_binary, receiver_logger) -> TCPServerConnection:
-    yield TCPServerConnection(dataformat=TCAPMAPASNObject, action=buffered_file_storage_action_binary,
-                                    parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
-                                    preaction=buffered_file_storage_pre_action_binary, logger=receiver_logger)
 
 
 @pytest.fixture
@@ -1302,12 +1058,6 @@ async def tcp_protocol_one_way_pipe(buffered_file_storage_pre_action_binary_pipe
 
 
 @pytest.fixture
-async def tcp_protocol_one_way_client(sender_logger) -> TCPClientConnection:
-    yield TCPClientConnection(dataformat=TCAPMAPASNObject, logger=sender_logger, peer_prefix='tcp',
-                              parent_name="TCP Client 127.0.0.1:0")
-
-
-@pytest.fixture
 async def tcp_protocol_two_way_server(json_rpc_action, buffered_file_storage_pre_action_binary,
                                       receiver_logger) -> TCPServerConnection:
     yield TCPServerConnection(dataformat=JSONObject, action=json_rpc_action, peer_prefix='tcp',
@@ -1321,52 +1071,6 @@ async def tcp_protocol_two_way_client(json_rpc_requester, sender_logger) -> TCPC
                               parent_name="TCP Client 127.0.0.1:0", peer_prefix='tcp')
 
 
-def get_fixture(request, param=None):
-    if not param:
-        param = request.param
-    return request.getfixturevalue(param.__name__)
-
-
-def get_fixtures(request):
-    return [request.getfixturevalue(param.__name__) for param in request.param]
-
-
-@pytest.fixture(params=[(protocol_factory_one_way_server, tcp_protocol_one_way_server, tcp_transport, one_way_receiver_adaptor, peername, True),
-                        (protocol_factory_one_way_client, tcp_protocol_one_way_client, tcp_transport_client, one_way_sender_adaptor, sock, False),
-                        (protocol_factory_two_way_server, tcp_protocol_two_way_server, tcp_transport, two_way_receiver_adaptor, peername, True),
-                        (protocol_factory_two_way_client, tcp_protocol_two_way_client, tcp_transport_client, two_way_sender_adaptor, sock, False)])
-def connection_args(request):
-    return request.param
-
-
-@pytest.fixture
-def protocol_factory(request, connection_args):
-    return get_fixture(request, connection_args[0])
-
-
-@pytest.fixture
-def connection(request, connection_args):
-    return get_fixture(request, connection_args[1])
-
-
-@pytest.fixture
-def transport(request, connection_args):
-    return get_fixture(request, connection_args[2])
-
-
-@pytest.fixture
-def adaptor(request, connection_args):
-    return get_fixture(request, connection_args[3])
-
-
-@pytest.fixture
-def peer_data(request, connection_args):
-    return get_fixture(request, connection_args[4])
-
-
-@pytest.fixture
-def connection_is_stored(connection_args):
-    return connection_args[5]
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field, InitVar
+from functools import wraps
 
 from lib.actions.base import BaseAction
 from lib.formats.contrib.types import JSONObjectType
@@ -23,7 +24,7 @@ class InvalidRequestError(BaseException):
 
 @dataclass
 class JSONRPCServer(BaseAction):
-    app: Any = None
+    app_cls: Any = None
     version = '2.0'
     exception_codes = {
         'InvalidRequestError': {"code": -32600, "message": "Invalid Request"},
@@ -34,16 +35,17 @@ class JSONRPCServer(BaseAction):
     }
     _notifications_queue: asyncio.Queue[Tuple[str, Any]] = field(default_factory=asyncio.Queue, init=False)
     task: asyncio.Task = field(default=None, init=False)
-    start_task: InitVar[bool] = True
 
-    def __post_init__(self, start_task) -> None:
-        if start_task:
-            self.task = asyncio.create_task(self.manage_queue())
+    def __post_init__(self) -> None:
+        self.app = self.app_cls(notifications_queue=self._notifications_queue)
+
+    async def start(self) -> None:
+        await self.app.start()
+        self.task = asyncio.create_task(self.manage_queue())
 
     async def close(self) -> None:
-        if hasattr(self.app, 'close_app'):
-            await self.app.close_app()
-        await asyncio.wait((super().close(), self._notifications_queue.join()), timeout=self.timeout)
+        await self.app.close()
+        await self._notifications_queue.join()
         if self.task:
             self.task.cancel()
 
@@ -66,7 +68,7 @@ class JSONRPCServer(BaseAction):
             raise InvalidParamsError
         raise exc
 
-    async def asnyc_do_one(self, msg: JSONObjectType) -> Dict[str, Any]:
+    async def do_one(self, msg: JSONObjectType) -> Dict[str, Any]:
         try:
             if msg['jsonrpc'] != self.version:
                 raise InvalidRequestError
@@ -92,19 +94,98 @@ class JSONRPCServer(BaseAction):
         except TypeError as exc:
             self._raise_correct_exception(exc)
 
-    def response_on_decode_error(self, data: AnyStr, exc: BaseException) -> Dict:
+    def on_decode_error(self, data: AnyStr, exc: BaseException) -> Dict:
         return {"jsonrpc": self.version, "error": self.exception_codes.get('ParseError')}
 
     def _get_exception_details(self, exc: BaseException):
         exc_name = exc.__class__.__name__
-        error = getattr(self.app, 'exception_codes', {}).get(exc_name, None)
+        error = self.app.exception_codes.get(exc_name, None)
         if error:
             error['message'] = str(exc) or error['message']
         else:
             error = self.exception_codes.get(exc_name, self.exception_codes['InvalidRequestError'])
         return error
 
-    def response_on_exception(self, msg_obj: JSONObjectType, exc: BaseException) -> Dict[str, Any]:
+    def on_exception(self, msg_obj: JSONObjectType, exc: BaseException) -> Dict[str, Any]:
         request_id = msg_obj.get('id', None)
         error = self._get_exception_details(exc)
         return {"jsonrpc": self.version, "error": error, "id": request_id}
+
+
+class BaseJSONRPCApp:
+    exception_codes = {}
+    is_requester = False
+    conn = None
+    notifications_queue: asyncio.Queue
+
+    async def start_for_server(self): ...
+
+    def set_requester(self, conn: ConnectionProtocol):
+        self.is_requester = True
+        self.conn = conn
+
+    async def close(self):
+        if self.conn:
+            await self.conn.close_wait()
+
+
+class BaseJSONRPCMethod:
+    version = "2.0"
+    name = ''
+    request_id = None
+
+    def _get_rpc_command(self, *args, **kwargs) -> Dict[str, Any]:
+        command = {"jsonrpc": self.version, "method": self.name}
+        if self.request_id is not None:
+            command['id'] = self.request_id
+        if args:
+            command['params'] = args
+        elif kwargs:
+            command['params'] = kwargs
+        return command
+
+
+class JSONRPCMethod(BaseJSONRPCMethod):
+    request_id = 0
+
+    def __init__(self, conn: ConnectionProtocol, name: str):
+        self.conn = conn
+        JSONRPCMethod.request_id += 1
+        self.request_id = JSONRPCMethod.request_id
+        self.name = name
+
+    async def __call__(self, *args, **kwargs):
+        command = self._get_rpc_command(*args, **kwargs)
+        return await self.conn.encode_send_wait(command)
+
+
+class JSONRPCMethodNotification(BaseJSONRPCMethod):
+    version = "2.0"
+
+    def __init__(self, conn: ConnectionProtocol, name: str):
+        self.conn = conn
+        self.name = name
+
+    def __call__(self, *args, **kwargs):
+        command = self._get_rpc_command(*args, **kwargs)
+        return self.conn.encode_and_send_msg(command)
+
+
+def rpc_method(f):
+    @wraps(f)
+    def wrapper(self, *args, **kwargs):
+        if self.is_requester:
+            method = JSONRPCMethod(self.conn, f.__name__)
+            return method(*args, **kwargs)
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def rpc_method_notification(f):
+    @wraps(f)
+    def wrapper(self, *args, **kwargs):
+        if self.is_requester:
+            method = JSONRPCMethodNotification(self.conn, f.__name__)
+            return method(*args, **kwargs)
+        return f(*args, **kwargs)
+    return wrapper

@@ -19,9 +19,9 @@ class TestLogger:
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(not py38, reason="Task names only valid from python 3.8")
-    async def test_02_process_taskname(self, connection_logger, context):
+    async def test_02_process_taskname(self, receiver_logger, context):
         set_current_task_name("TestTask", include_hierarchy=False)
-        msg, kwargs = connection_logger.process("Hello World", {})
+        msg, kwargs = receiver_logger.process("Hello World", {})
         assert msg, kwargs == ('Hello World', {'extra': {'taskname': "TestTask"}})
 
     def test_03_update_extra(self, receiver_logger):

@@ -190,10 +190,15 @@ class MsgsCount:
     sent: int = 0
     received: int = 0
     processed: int = 0
+    filtered: int = 0
     first_received = None
     last_received = None
     first_sent = None
     last_processed = None
+
+    @property
+    def percent_filtered(self) -> float:
+        return self.filtered / ((self.processed + self.filtered) or 1)
 
     @property
     def percent_processed(self) -> float:

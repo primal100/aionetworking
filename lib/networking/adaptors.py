@@ -8,8 +8,10 @@ from functools import partial
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
 from lib.compatibility import Protocol
-from lib.conf.logging import ConnectionLogger, connection_logger_receiver
-from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject, BufferObject
+from lib.conf.logging import connection_logger_cv, ConnectionLogger
+from lib.conf.context import context_cv
+from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
+from lib.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from lib.requesters.protocols import RequesterProtocol
 from lib.utils import Record
 from lib.utils_logging import p
@@ -28,27 +30,22 @@ def not_implemented_callable(*args, **kwargs) -> None:
 @dataclass
 class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     dataformat: Type[BaseMessageObject]
+    bufferformat: Type[BufferObject] = BufferObject
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False)
-    context: Dict[str, Any] = field(default_factory=dict)
+    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
+    context: Dict[str, Any] = field(default_factory=context_cv.get)
     preaction: ActionProtocol = None
     send: Callable[[AnyStr], None] = field(default=not_implemented_callable, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        self.codec: BaseCodec = self.dataformat.get_codec(logger=self.logger, context=self.context)
+        self.codec: BaseCodec = self.dataformat.get_codec()
+        self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 
     def send_data(self, msg_encoded: AnyStr) -> None:
         self.logger.on_sending_encoded_msg(msg_encoded)
         self.send(msg_encoded)
         self.logger.on_msg_sent(msg_encoded)
-
-    def send_hex(self, hex_msg: AnyStr) -> None:
-        self.send_data(binascii.unhexlify(hex_msg))
-
-    def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None:
-        for msg in hex_msgs:
-            self.send(binascii.unhexlify(msg))
 
     def _encode_msg(self, decoded: Any) -> MessageObjectType:
         return self.codec.from_decoded(decoded)
@@ -63,7 +60,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.encode_and_send_msg(decoded_msg)
 
     async def _run_preaction(self, buffer: AnyStr, timestamp: datetime = None) -> None:
-        buffer_obj = BufferObject(buffer, received_timestamp=timestamp, logger=self.logger, context=self.context)
+        buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
     def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
@@ -126,13 +123,18 @@ class SenderAdaptor(BaseAdaptorProtocol):
         return await self.encode_send_wait(msg_decoded)
 
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None:
+        last_timestamp = None
         self.logger.debug("Playing recording from file %s", file_path)
-        for packet in Record.from_file(file_path):
-            if (not hosts or packet['host'] in hosts) and not packet['sent_by_server']:
+        async for packet in get_recording_from_file(file_path):
+            if (not hosts or packet.sender in hosts) and not packet.sent_by_server:
                 if timing:
-                    await asyncio.sleep(packet['seconds'])
-                self.logger.debug('Sending msg with %s', p.no('byte', packet['data']))
-                self.send_data(packet['data'])
+                    if last_timestamp:
+                        timedelta = packet.timestamp - last_timestamp
+                        seconds = timedelta.total_seconds() + (timedelta.microseconds / 1000)
+                        await asyncio.sleep(seconds)
+                    last_timestamp = packet.timestamp
+                data = packet.data if packet.is_bytes else packet.data.decode()
+                self.send_data(data)
         self.logger.debug("Recording finished")
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
@@ -149,14 +151,20 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     action: ActionProtocol = None
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
-        self.logger.manage_error(exc)
-        response = self.action.on_exception(msg_obj, exc)
-        if response:
-            self.encode_and_send_msg(response)
+        try:
+            self.logger.manage_error(exc)
+            response = self.action.on_exception(msg_obj, exc)
+            if response:
+                self.encode_and_send_msg(response)
+        finally:
+            self.logger.on_msg_processed(msg_obj)
 
     def _on_success(self, result, msg_obj: MessageObjectType = None) -> None:
-        if result:
-            self.encode_and_send_msg(result)
+        try:
+            if result:
+                self.encode_and_send_msg(result)
+        finally:
+            self.logger.on_msg_processed(msg_obj)
 
     def _on_decoding_error(self, buffer: AnyStr, exc: BaseException):
         self.logger.manage_error(exc)
@@ -166,10 +174,12 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
 
     def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
         try:
-            for msg in msgs:
-                if not self.action.filter(msg):
-                    self._scheduler.create_promise(self.action.do_one(msg), self._on_success, self._on_exception,
-                                                   task_name=f"{self.context['peer']}-Process-id-{msg.uid}",
-                                                   msg_obj=msg)
+            for msg_obj in msgs:
+                if not self.action.filter(msg_obj):
+                    self._scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
+                                                   task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
+                                                   msg_obj=msg_obj)
+                else:
+                    self.logger.on_msg_filtered(msg_obj)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)

@@ -8,6 +8,7 @@ import tempfile
 import sys
 
 from dataclasses import dataclass, field
+from contextvars import ContextVar
 
 from .base import BaseServer, BaseNetworkServer
 from lib.networking.ssl import ServerSideSSL
@@ -15,6 +16,9 @@ from lib.utils import unix_address, pipe_address
 
 import socket
 from typing import List, Optional, Union
+
+
+test_cv = ContextVar('test_cv', default='default')
 
 
 @dataclass
@@ -118,22 +122,6 @@ class DatagramServer(asyncio.AbstractServer):
 
     def is_serving(self) -> bool:
         return self._serving.is_set()
-
-    async def serve_forever(self) -> None:
-        if self._serving_forever_fut is not None:
-            raise RuntimeError(
-                f'server {self!r} is already being awaited on serve_forever()')
-        await self.start_serving()
-        try:
-            await self._serving_forever_fut
-        except asyncio.CancelledError:
-            try:
-                self.close()
-                await self.wait_closed()
-            finally:
-                raise
-        finally:
-            self._serving_forever_fut = None
 
     @property
     def sockets(self) -> List[socket.socket]:

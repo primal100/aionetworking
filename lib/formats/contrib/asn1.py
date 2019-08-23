@@ -1,14 +1,13 @@
 from __future__ import annotations
 import datetime
 from dataclasses import dataclass
-import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from pycrate_core.charpy import Charpy
 
 from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime
 
-from typing import Generator, Tuple, AnyStr, Any, Type, Dict, AsyncGenerator, Sequence
+from typing import AnyStr, Any, Type, Dict
 from typing_extensions import Protocol
 
 
@@ -39,7 +38,7 @@ class PyCrateAsnCodec(BaseCodec):
             end = int(char._cur / 8)
             yield (encoded[start:end], self.asn_class())
 
-    async def encode(self, decoded, **kwargs) -> AnyStr:
+    def encode(self, decoded, **kwargs) -> AnyStr:
         return self.asn_class.to_ber(decoded)
 
 

@@ -6,9 +6,10 @@ from pathlib import Path
 from pprint import pformat
 
 from lib import settings
-from lib.conf.logging import ConnectionLogger, connection_logger_receiver
+from lib.conf.context import context_cv
+from lib.conf.logging import ConnectionLogger, connection_logger_cv
 from lib.networking.connections_manager import connections_manager
-from lib.utils import Record, aone, dataclass_getstate, dataclass_setstate
+from lib.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
 from typing import AsyncGenerator,  Generator, Any, AnyStr, Dict, Sequence, Type
@@ -19,16 +20,18 @@ from .types import MessageObjectType, CodecType
 @dataclass
 class BaseMessageObject(MessageObject, Protocol):
     name = None
-    binary = True
     codec_cls = None
     id_attr = 'id'
     stats_logger = None
 
     encoded: AnyStr
     decoded: Any = None
-    context: Dict[str, Any] = field(default_factory=dict)
-    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
+    context: Dict[str, Any] = field(default_factory=context_cv.get)
+    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
     received_timestamp: datetime = field(default_factory=datetime.now, compare=False)
+
+    def __post_init__(self):
+        pass
 
     @classmethod
     def swap_cls(cls, name) -> Type[MessageObjectType]:
@@ -104,23 +107,8 @@ class BaseMessageObject(MessageObject, Protocol):
     def filter(self) -> bool:
         return False
 
-    def processed(self) -> None:
-        self.logger.on_msg_processed(len(self.encoded))
-
     def __str__(self):
         return f"{self.name} {self.uid}"
-
-
-@dataclass
-class BufferObject(BaseMessageObject):
-    _record = Record()
-
-    @property
-    def recording(self) -> bytes:
-        return self._record.pack_client_msg(self)
-
-    def processed(self) -> None:
-        pass
 
 
 @dataclass
@@ -131,8 +119,8 @@ class BaseCodec(Codec):
     append_mode = 'ab'
 
     msg_obj: Type[MessageObjectType]
-    context: Dict[str, Any] = field(default_factory=dict)
-    logger: ConnectionLogger = field(default_factory=connection_logger_receiver, compare=False, hash=False, repr=False)
+    context: Dict[str, Any] = field(default_factory=context_cv.get)
+    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
 
     def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         yield (encoded, encoded)
@@ -140,11 +128,11 @@ class BaseCodec(Codec):
     def encode(self, decoded: Any, **kwargs) -> AnyStr:
         return decoded
 
-    async def decode_one(self, encoded: bytes, **kwargs) -> Any:
+    def decode_one(self, encoded: bytes, **kwargs) -> Any:
         return next(self.decode(encoded, **kwargs))
 
     def _from_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
-        for encoded, decoded in self.decode(encoded):
+        for encoded, decoded in self.decode(encoded, **kwargs):
             yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
 
     def decode_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
@@ -155,7 +143,7 @@ class BaseCodec(Codec):
         self.logger.on_buffer_decoded(i + 1)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
-        return self.msg_obj(self.encode(decoded), decoded, context=self.context, **kwargs)
+        return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, logger=self.logger, **kwargs)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)
@@ -168,7 +156,7 @@ class BaseCodec(Codec):
         return await aone(self.from_file(file_path, **kwargs))
 
 
-class BaseTextCodec(BaseCodec):
+class TextMixin:
     read_mode = 'r'
     write_mode = 'w'
     append_mode = 'a'

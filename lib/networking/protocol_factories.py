@@ -1,11 +1,13 @@
 from __future__ import annotations
 import asyncio
+from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 
 from lib.actions.protocols import ActionProtocol
+from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
-from lib.conf.logging import Logger
+from lib.conf.logging import Logger, logger_cv
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 from .connections_manager import connections_manager
@@ -25,19 +27,26 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     preaction: ActionProtocol = None
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
-    context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     logger: Logger = Logger('receiver')
-    pause_reading_on_buffer_size: int = None
+
+    async def start(self):
+        starts = []
+        if self.action:
+            starts.append(self.action.start())
+        if self.preaction:
+            starts.append(self.preaction.start())
+        if self.requester:
+            starts.append(self.requester.start())
+        await asyncio.wait(starts)
 
     def __call__(self) -> NetworkConnectionType:
         return self._new_connection()
 
     def _new_connection(self) -> NetworkConnectionType:
+        context_cv.set(context_cv.get().copy())
         self.logger.debug('Creating new connection')
-        context = self.context.copy()
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
-                                   preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   context=context, logger=self.logger)
+                                   preaction=self.preaction, requester=self.requester, dataformat=self.dataformat)
 
     def __getstate__(self):
         return dataclass_getstate(self)

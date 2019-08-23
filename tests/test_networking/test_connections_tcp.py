@@ -10,7 +10,8 @@ from lib.utils import alist, Record
 class TestConnectionShared:
 
     @pytest.mark.asyncio
-    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager, connection_is_stored):
+    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager,
+                                           connection_is_stored):
         assert not transport.is_closing()
         assert connections_manager.total == 0
         assert connection.logger

@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import binascii
 import logging
+import contextvars
 from datetime import datetime
 from dataclasses import dataclass, field
 
@@ -173,31 +174,33 @@ class ConnectionLogger(Logger):
         self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'SENT'}, **kwargs)
 
     def on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
-        self.debug('Message decoded: %s', msg_obj.uid)
         self._data_received(msg_obj)
 
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
 
     def on_buffer_received(self, data: AnyStr) -> None:
-        self.info("Received buffer from %s", self.peer)
+        self.debug("Received buffer")
         self._raw_received(data)
 
     def on_buffer_decoded(self, num: int) -> None:
-        self.info("Decoded %s in buffer from %s", p.no('message', num), self.peer)
+        self.debug("Decoded %s in buffer", p.no('message', num))
 
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)
 
     def on_sending_encoded_msg(self, data: AnyStr) -> None:
-        self.debug("Sending message to %s", self.peer)
+        self.debug("Sending message")
         self._raw_sent(data)
 
     def on_msg_sent(self, data: AnyStr) -> None:
         self.debug('Message sent')
 
-    def on_msg_processed(self, msg: int) -> None:
-        pass
+    def on_msg_processed(self, msg: MessageObjectType) -> None:
+        self.debug('Finished processing message %s', msg.uid)
+
+    def on_msg_filtered(self, msg: MessageObjectType) -> None:
+        self.debug('Filtered msg %s', msg.uid)
 
     def connection_finished(self, exc: Optional[BaseException] = None) -> None:
         self.manage_error(exc)
@@ -212,10 +215,11 @@ class StatsTracker:
     sent: BytesSize = field(default_factory=BytesSize, init=False)
     received: BytesSize = field(default_factory=BytesSize, init=False)
     processed: BytesSize = field(default_factory=BytesSize, init=False)
+    filtered: BytesSize = field(default_factory=BytesSize, init=False)
     largest_buffer: BytesSize = field(default_factory=BytesSize, init=False)
     msgs: MsgsCount = field(default_factory=MsgsCount, init=False)
 
-    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'largest_buffer',
+    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'largest_buffer',
              'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent', 'msgs_per_buffer')
 
     def __post_init__(self):
@@ -251,20 +255,24 @@ class StatsTracker:
     def __getitem__(self, item: Any) -> Any:
         return getattr(self, item)
 
-    def on_buffer_received(self, msg: AnyStr) -> None:
+    def on_buffer_received(self, data: AnyStr) -> None:
         if not self.msgs.first_received:
             self.msgs.first_received = LoggingDatetime(self.datefmt)
         self.msgs.last_received = LoggingDatetime(self.datefmt)
         self.msgs.received += 1
-        size = len(msg)
+        size = len(data)
         self.received += size
         if size > self.largest_buffer:
             self.largest_buffer = BytesSize(size)
 
-    def on_msg_processed(self, num_bytes: int) -> None:
+    def on_msg_processed(self, data: AnyStr) -> None:
         self.msgs.last_processed = LoggingDatetime(self.datefmt)
         self.msgs.processed += 1
-        self.processed += num_bytes
+        self.processed += len(data)
+
+    def on_msg_filtered(self, data: AnyStr) -> None:
+        self.msgs.filtered += 1
+        self.filtered += len(data)
 
     def on_msg_sent(self, msg: AnyStr) -> None:
         if not self.msgs.first_sent:
@@ -284,6 +292,7 @@ class StatsLogger(Logger):
     stats_cls = StatsTracker
     _total_received = BytesSize()
     _total_processed = BytesSize()
+    _total_filtered = BytesSize()
 
     def __init__(self, logger_name: str, extra: dict, *args, **kwargs):
         self._scheduler = TaskScheduler()
@@ -307,13 +316,15 @@ class StatsLogger(Logger):
         self.info(tag)
         self._total_received += self._stats.received
         self._total_processed += self._stats.processed
+        self._total_filtered += self._stats.filtered
         self.reset()
 
-    def periodic_log(self, first: bool = True) -> None:
+    def periodic_log(self) -> None:
         self.stats("INTERVAL")
 
     def _check_last_message_processed(self) -> None:
-        if (self._total_received + self._stats.received) == (self._total_processed + self._stats.processed):
+        if (self._total_received + self._stats.received) == (
+                self._total_processed + self._stats.processed + self._total_filtered + self._stats.filtered):
             self._stats.end_interval()
             tag = 'ALL' if self._first else 'END'
             self.stats(tag)
@@ -326,10 +337,13 @@ class StatsLogger(Logger):
     async def wait_closed(self):
         await self._scheduler.close()
 
-    def on_msg_processed(self, num_bytes: int):
-        if num_bytes > 100:
-            pass
-        self._stats.on_msg_processed(num_bytes)
+    def on_msg_filtered(self, msg: MessageObjectType):
+        self._stats.on_msg_filtered(msg)
+        if self._is_closing:
+            self._check_last_message_processed()
+
+    def on_msg_processed(self, msg: MessageObjectType):
+        self._stats.on_msg_processed(msg)
         if self._is_closing:
             self._check_last_message_processed()
 
@@ -354,9 +368,13 @@ class ConnectionLoggerStats(ConnectionLogger):
         super().on_buffer_received(msg)
         self._stats_logger.on_buffer_received(msg)
 
-    def on_msg_processed(self, num_bytes: int) -> None:
-        super().on_msg_processed(num_bytes)
-        self._stats_logger.on_msg_processed(num_bytes)
+    def on_msg_processed(self, msg: MessageObjectType) -> None:
+        super().on_msg_processed(msg)
+        self._stats_logger.on_msg_processed(msg.encoded)
+
+    def on_msg_filtered(self, msg: MessageObjectType) -> None:
+        super().on_msg_processed(msg)
+        self._stats_logger.on_msg_filtered(msg.encoded)
 
     def on_msg_sent(self, msg: AnyStr) -> None:
         super().on_msg_sent(msg)
@@ -370,9 +388,15 @@ class ConnectionLoggerStats(ConnectionLogger):
         await self._stats_logger.wait_closed()
 
 
-def connection_logger_receiver() -> ConnectionLoggerType:
+def get_connection_logger_receiver() -> ConnectionLoggerType:
     return ConnectionLogger('receiver.connection')
 
 
-def connection_logger_sender() -> ConnectionLoggerType:
+def get_connection_logger_sender() -> ConnectionLoggerType:
     return ConnectionLogger('sender.connection')
+
+
+logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=Logger('receiver'))
+connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
+                                                                                        default=ConnectionLogger(
+                                                                                            'receiver.connection'))

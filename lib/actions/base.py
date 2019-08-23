@@ -1,14 +1,14 @@
 from __future__ import annotations
-from abc import ABC
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import warnings
 
+from lib.compatibility import Protocol
 from lib.conf.logging import Logger
 from lib.conf.types import LoggerType
-from lib.formats.base import BaseMessageObject
+from lib.formats.types import MessageObjectType
 from lib.utils import dataclass_getstate, dataclass_setstate
 
-from typing import Iterator, List, Any, AnyStr, TypeVar, Type
+from typing import Any, AnyStr, TypeVar, Type
 
 
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")
@@ -18,7 +18,7 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 
 
 @dataclass
-class BaseAction(ABC):
+class BaseAction(Protocol):
     name = 'receiver action'
     logger: LoggerType = Logger('receiver.actions')
 
@@ -38,17 +38,19 @@ class BaseAction(ABC):
     def __setstate__(self, state):
         dataclass_setstate(self, state)
 
-    def filter(self, msg: BaseMessageObject) -> bool:
+    def filter(self, msg: MessageObjectType) -> bool:
         return msg.filter()
 
+    async def start(self) -> None: ...
+
     async def close(self) -> None: ...
+    """ Close background tasks"""
 
     def on_decode_error(self, data: AnyStr, exc: BaseException) -> Any:
         pass
 
-    def on_exception(self, msg: BaseMessageObject, exc: BaseException) -> Any:
+    def on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any:
         pass
 
-    async def do_one(self, msg: BaseMessageObject) -> Any: ...
-
+    async def do_one(self, msg: MessageObjectType) -> Any: ...
 

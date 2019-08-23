@@ -9,14 +9,18 @@ from lib.networking.types import ProtocolFactoryType, ConnectionType
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
+from lib.conf.logging import Logger, logger_cv
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import SenderProtocol
+
+from typing import Type
 
 
 @dataclass
 class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
-    logger: Logger = Logger('sender')
+    logger_cls: Type[Logger] = Logger
+    logger_name = 'sender'
 
     @property
     def loop(self) -> asyncio.SelectorEventLoop:
@@ -37,6 +41,9 @@ class BaseSender(SenderProtocol, Protocol):
     async def close(self):
         pass
 
+    def __post_init__(self):
+        self.logger = self.logger_cls(self.logger_name)
+
 
 @dataclass
 class BaseClient(BaseSender, Protocol):
@@ -44,10 +51,12 @@ class BaseClient(BaseSender, Protocol):
     peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
     conn: ConnectionType = field(init=False, default=None)
+    logger: Logger = None
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
     timeout: int = 5
 
     def __post_init__(self):
+        super().__post_init__()
         self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 
@@ -73,9 +82,9 @@ class BaseClient(BaseSender, Protocol):
         return not self.transport or self.transport.is_closing()
 
     async def connect(self) -> ConnectionType:
+        logger_cv.set(self.logger)
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self._open_connection()
-        await connection.wait_connected()
         return connection
 
     async def close(self) -> None:

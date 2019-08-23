@@ -18,7 +18,7 @@ class TestNetworkConnections:
         assert connection == simple_network_connection
         await asyncio.sleep(0)
         assert task1.done()
-        task = asyncio.create_task(connections_manager.wait_all_connections_closed(parent_name))
+        task = asyncio.create_task(connections_manager.wait_num_connections(parent_name, 0))
         await asyncio.sleep(0)
         assert not task.done()
         connections_manager.remove_connection(simple_network_connection)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lib.conf.logging import Logger, connection_logger_sender
+from lib.conf.logging import Logger, get_connection_logger_sender
 
 from dataclasses import dataclass, field
 from lib.compatibility import Protocol
@@ -12,7 +12,7 @@ class RequesterProtocol(Protocol):
     methods = ()
     notification_methods = ()
 
-    logger: Logger = field(default_factory=connection_logger_sender, compare=False)
+    logger: Logger = field(default_factory=get_connection_logger_sender, compare=False)
 
     @classmethod
     def swap_cls(cls, name: str):

@@ -8,8 +8,8 @@ import concurrent.futures
 async def test_00_tcp_server_benchmark(connections_manager, receiver_debug_logging_extended,
                                        one_way_server_started_benchmark, tcp_client_one_way,
                                        tmp_path, asn_buffer, asn_encoded_multi):
-    num = 1000
-    num_clients = 1
+    num = 2
+    num_clients = 5
     msgs = []
     for _ in range(0, num):
         msgs += asn_encoded_multi

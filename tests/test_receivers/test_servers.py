@@ -27,7 +27,7 @@ class TestServerStartStop:
     @pytest.mark.asyncio
     async def test_01_server_close(self, server_started):
         assert server_started.is_started()
-        task = asyncio.create_task(server_started.stop())
+        task = asyncio.create_task(server_started.close())
         try:
             await asyncio.wait_for(server_started.wait_stopped(), timeout=1)
             assert not server_started.is_started()
@@ -40,7 +40,7 @@ class TestServerStartStop:
     async def test_02_server_start_wait(self, server_receiver, capsys):
         assert not server_receiver.is_started()
         try:
-            await asyncio.wait_for(server_receiver.start_wait(), timeout=1)
+            await asyncio.wait_for(server_receiver.close(), timeout=1)
             assert server_receiver.is_started()
             captured = capsys.readouterr()
             assert captured.out.startswith("Serving")
@@ -51,7 +51,7 @@ class TestServerStartStop:
     async def test_03_server_stop_wait(self, server_started):
         assert server_started.is_started()
         try:
-            await asyncio.wait_for(server_started.stop_wait(), timeout=1)
+            await asyncio.wait_for(server_started.close(), timeout=1)
             assert not server_started.is_started()
         except asyncio.TimeoutError:
             pass
@@ -60,21 +60,21 @@ class TestServerStartStop:
     async def test_04_server_already_started(self, server_started):
         assert server_started.is_started()
         with pytest.raises(ServerException):
-            await server_started.start_wait()
+            await server_started.close()
 
     @pytest.mark.asyncio
     async def test_05_server_never_started(self, server_receiver):
         assert not server_receiver.is_started()
         with pytest.raises(ServerException):
-            await server_receiver.stop_wait()
+            await server_receiver.close()
 
     @pytest.mark.asyncio
     async def test_06_server_already_stopped(self, server_started):
         assert server_started.is_started()
-        await server_started.stop_wait()
+        await server_started.close()
         assert not server_started.is_started()
         with pytest.raises(ServerException):
-            await server_started.stop_wait()
+            await server_started.close()
 
     @pytest.mark.asyncio
     async def test_07_server_start_quiet(self, server_receiver_quiet, capsys):

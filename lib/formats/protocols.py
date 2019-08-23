@@ -44,16 +44,6 @@ class MessageObject(Protocol):
     @abstractmethod
     def filter(self) -> bool: ...
 
-    @abstractmethod
-    def processed(self) -> None: ...
-
-
-class BufferObjectProtocol(MessageObject, Protocol):
-
-    @property
-    @abstractmethod
-    def recording(self) -> bytes: ...
-
 
 class Codec(Protocol):
 

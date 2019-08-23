@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
 
 from lib.compatibility import singledispatchmethod, set_task_name
+from lib.conf.context import context_cv
+from lib.conf.logging import Logger, logger_cv, connection_logger_cv
 from lib.conf.types import ConnectionLoggerType
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 
@@ -15,11 +17,8 @@ from .protocols import (
     ConnectionDataclassProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr, TransportType)
 from .types import AdaptorType, SenderAdaptorType
 
-from typing import AnyStr, NoReturn, Optional, Tuple, Type
+from typing import AnyStr, NoReturn, Optional, Tuple, Type, Dict, Any
 from lib.compatibility import Protocol
-
-
-msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
 @dataclass
@@ -27,10 +26,12 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _close_task: asyncio.Task = field(default=None, init=False, compare=False)
+    context: Dict[str, Any] = field(default_factory=context_cv.get, metadata={'pickle': True})
+    logger: Logger = field(default_factory=logger_cv.get)
 
     def __post_init__(self):
         self.context['protocol_name'] = self.name
-        self.context['endpoint'] = self.parent_name
+        #self.context['endpoint'] = self.parent_name
 
     def __getattr__(self, item):
         if self._adaptor:
@@ -53,8 +54,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return f"{self.peer_prefix}_{self.context.get('peer')}"
 
     def _set_adaptor(self) -> None:
+        connection_logger_cv.set(self._get_connection_logger())
         kwargs = {
-            'logger': self._get_connection_logger(),
             'context': self.context,
             'dataformat': self.dataformat,
             'preaction': self.preaction,

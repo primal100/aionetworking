@@ -1,15 +1,13 @@
 import pytest
-
-from lib.formats.contrib.json import JSONObject
+from lib.formats.recording import get_recording
 from lib.utils import alist
 
 
 class TestJsonCodec:
 
-    def test_00_decode(self, json_codec, json_buffer, json_encoded_multi, json_decoded_multi):
+    def test_00_decode(self, json_codec, json_buffer, decoded_result):
         decoded = list(json_codec.decode(json_buffer))
-        result = [(e, json_decoded_multi[i]) for i, e in enumerate(json_encoded_multi)]
-        assert decoded == result
+        assert decoded == decoded_result
 
     def test_01_encode(self, json_codec, json_rpc_login_request, json_rpc_login_request_encoded):
         encoded = json_codec.encode(json_rpc_login_request)
@@ -29,14 +27,14 @@ class TestJsonCodec:
         assert await alist(objects) == json_objects
 
     @pytest.mark.asyncio
-    async def test_05_from_file(self, json_codec, file_containing_json, json_object, timestamp):
-        obj = await json_codec.one_from_file(file_containing_json, received_timestamp=timestamp)
+    async def test_05_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
+        obj = await json_codec.one_from_file(file_containing_multi_json, received_timestamp=timestamp)
         assert obj == json_object
 
 
 class TestJsonObject:
-    def test_00_get_codec(self, json_codec, context):
-        codec = JSONObject.get_codec(context=context)
+    def test_00_get_codec(self, json_codec, object_class, context):
+        codec = object_class.get_codec(context=context)
         assert codec == json_codec
 
     def test_01_properties(self, json_object, timestamp):
@@ -57,6 +55,11 @@ class TestJsonObject:
         json_object.unsubscribe("test")
         assert json_object.is_subscribed("test") is False
 
-    def test_04_processed(self, json_object):
-        pass
 
+class TestBufferObject:
+    def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
+        buffer_obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
+        buffer_obj2 = buffer_codec.from_decoded(json_encoded_multi[1], received_timestamp=timestamp)
+        recording = buffer_obj1.encoded + buffer_obj2.encoded
+        packets = list(get_recording(recording))
+        assert packets == json_recording_data

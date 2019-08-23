@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, DefaultDict
+from typing import Any, DefaultDict, Dict
 
 from lib.factories import event_defaultdict
 
@@ -14,6 +14,7 @@ class Counter:
     _total_increment_waiters: DefaultDict[int, asyncio.Event] = field(default_factory=event_defaultdict, init=False)
     max: int = None
     max_increments: int = None
+    aliases: Dict[str, int] = field(default_factory=dict)
 
     def __next__(self):
         self.increment()
@@ -66,6 +67,19 @@ class Counter:
         if num == self._num:
             return
         return await self._wait_for(num, self._num, self._num_waiters)
+
+    def set_num(self, num: int):
+        self._num = num
+        self._check_num_waiters()
+        return self._num
+
+    async def wait(self, alias: str):
+        num = self.aliases[alias]
+        await self.wait_for(num)
+
+    def set(self, alias: str):
+        num = self.aliases[alias]
+        self.set_num(num)
 
     async def wait_for_total_increments(self, num: int) -> None:
         if num == self._total_increments:

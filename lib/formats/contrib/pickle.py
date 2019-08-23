@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from lib.formats.base import BaseCodec, BaseMessageObject
 
-from typing import Any
+from typing import Any, Generator, Tuple
 
 
 @dataclass
@@ -15,7 +15,7 @@ class PickleCodec(BaseCodec):
     Decode & Encode Pickle messages
     """
 
-    async def decode(self, encoded: bytes, **kwargs) -> [bytes, Any]:
+    def decode(self, encoded: bytes, **kwargs) -> Generator[Tuple[bytes, Any], None, None]:
         data = io.BytesIO(encoded)
         num_bytes = len(encoded)
         current_pos = 0
@@ -23,9 +23,9 @@ class PickleCodec(BaseCodec):
             start_pos = data.tell()
             decoded = pickle.load(data)
             current_pos = data.tell()
-            yield (encoded[start_pos:current_pos], decoded)
+            yield encoded[start_pos:current_pos], decoded
 
-    async def encode(self, decoded: Any, **kwargs) -> bytes:
+    def encode(self, decoded: Any, **kwargs) -> bytes:
         return pickle.dumps(decoded, protocol=self.protocol)
 
 

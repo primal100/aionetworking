@@ -4,20 +4,23 @@ import asyncio
 from dataclasses import dataclass, field
 
 from .exceptions import ServerException
-from lib.conf.logging import Logger
+from lib.conf.context import context_cv
+from lib.conf.logging import Logger, logger_cv, get_connection_logger_receiver
 from lib.networking.types import ProtocolFactoryType
 from lib.factories import event_set
 from lib.utils import dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import ReceiverProtocol
 
 from lib.compatibility import Protocol
+from typing import Type
 
 
 @dataclass
 class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
-    logger: Logger = Logger('receiver')
     quiet: bool = False
+    logger_cls: Type[Logger] = Logger
+    logger_name: str = 'receiver'
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -33,6 +36,9 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     async def serve_in_loop(self) -> None:
         await self.start()
 
+    def __post_init__(self) -> None:
+        self.logger = self.logger_cls(self.logger_name)
+
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
@@ -45,6 +51,7 @@ class BaseServer(BaseReceiver, Protocol):
     _stopped: asyncio.Event = field(default_factory=event_set, init=False, compare=False)
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 
@@ -64,6 +71,9 @@ class BaseServer(BaseReceiver, Protocol):
             print(f"Serving {self.name} on {listening_on}")
 
     async def start(self) -> None:
+        context_cv.set({'endpoint': self.full_name})
+        logger_cv.set(self.logger)
+        await self.protocol_factory.start()
         if self._started.is_set():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self.logger.info('Starting %s on %s', self.name, self.listening_on)

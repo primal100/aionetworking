@@ -5,7 +5,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lib.actions.types import ActionType, OneWaySequentialActionType
+from lib.actions.types import ActionType
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger
 from lib.formats.types import MessageObjectType
@@ -44,6 +44,9 @@ class ProtocolFactoryProtocol(Protocol):
     async def close_actions(self) -> None: ...
 
     @abstractmethod
+    async def start(self) -> None: ...
+
+    @abstractmethod
     async def close(self) -> None: ...
 
 
@@ -80,12 +83,11 @@ class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
 
     parent_name: str = None
     action: ActionType = None
-    preaction: OneWaySequentialActionType = None
+    preaction: ActionType = None
     requester: RequesterType = None
     dataformat: Type[MessageObjectType] = None
     context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     peer_prefix: str = ''
-    logger: Logger = Logger('receiver')
     timeout: Union[int, float] = 1000
 
     adaptor_cls: Type[AdaptorType] = field(default=None, init=False)
@@ -126,12 +128,6 @@ class BaseAdaptorProtocol(Protocol):
     def send_data(self, msg_encoded: AnyStr) -> None: ...
 
     @abstractmethod
-    def send_hex(self, hex_msg: AnyStr) -> None: ...
-
-    @abstractmethod
-    def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None: ...
-
-    @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
 
     @abstractmethod
@@ -151,10 +147,6 @@ class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
 class AdaptorProtocolGetattr(BaseAdaptorProtocol, Protocol):
 
     def send_data(self, msg_encoded: AnyStr) -> None: ...
-
-    def send_hex(self, hex_msg: AnyStr) -> None: ...
-
-    def send_hex_msgs(self, hex_msgs: Sequence[AnyStr]) -> None: ...
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...
 

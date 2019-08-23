@@ -53,10 +53,10 @@ class TestOneWayServer:
         for msg in msgs:
             conn.send_data(msg)
             await asyncio.sleep(0.00025)
-        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=10000)
+        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
         conn.close()
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=10000)
-        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=10000)
+        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
+        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         recording_file_path = next(tmp_path.glob('*.recording'))
         assert recording_file_path.exists()
         expected_file = next(Path(tmp_path / 'Encoded').glob('*.TCAP_MAP'))

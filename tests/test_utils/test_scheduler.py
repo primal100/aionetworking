@@ -8,7 +8,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_00_task_lifecycle(self, task_scheduler):
         await asyncio.wait_for(task_scheduler.close(), timeout=0.1)
-        task = task_scheduler.create_task(asyncio.sleep(0.2))
+        task = task_scheduler.create_task(asyncio.sleep(0.2), name="Test")
         await asyncio.sleep(0)
         assert not task.done()
         await asyncio.sleep(0.3)
