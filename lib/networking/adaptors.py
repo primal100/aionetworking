@@ -1,6 +1,5 @@
 from abc import abstractmethod
 import asyncio
-import binascii
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
@@ -13,8 +12,6 @@ from lib.conf.context import context_cv
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
 from lib.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from lib.requesters.protocols import RequesterProtocol
-from lib.utils import Record
-from lib.utils_logging import p
 from lib.wrappers.schedulers import TaskScheduler
 
 from .protocols import AdaptorProtocol
@@ -38,6 +35,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     send: Callable[[AnyStr], None] = field(default=not_implemented_callable, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        context_cv.set(self.context)
         self.codec: BaseCodec = self.dataformat.get_codec()
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
@@ -67,9 +65,9 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.on_buffer_received(buffer)
         timestamp = timestamp or datetime.now()
         if self.preaction:
-            self._scheduler.schedule_task(self._run_preaction(buffer, timestamp), name=f"{self.context['peer']}-Preaction")
-        msgs_async_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        self.process_msgs(msgs_async_generator, buffer)
+            self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp), name=f"{self.context['peer']}-Preaction")
+        msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
+        self.process_msgs(msgs_generator, buffer)
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
         await self._scheduler.close()
@@ -130,7 +128,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
                 if timing:
                     if last_timestamp:
                         timedelta = packet.timestamp - last_timestamp
-                        seconds = timedelta.total_seconds() + (timedelta.microseconds / 1000)
+                        seconds = timedelta.total_seconds()
                         await asyncio.sleep(seconds)
                     last_timestamp = packet.timestamp
                 data = packet.data if packet.is_bytes else packet.data.decode()

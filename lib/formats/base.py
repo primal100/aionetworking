@@ -122,6 +122,9 @@ class BaseCodec(Codec):
     context: Dict[str, Any] = field(default_factory=context_cv.get)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
 
+    def __post_init__(self):
+        pass
+
     def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
         yield (encoded, encoded)
 

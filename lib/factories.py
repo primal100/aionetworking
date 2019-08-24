@@ -13,5 +13,5 @@ def list_defaultdict() -> DefaultDict:
     return defaultdict(list)
 
 
-def event_defaultdict() -> DefaultDict:
-    return defaultdict(asyncio.Event)
+def future_defaultdict() -> DefaultDict:
+    return defaultdict(asyncio.Future)

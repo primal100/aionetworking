@@ -1,13 +1,12 @@
 from __future__ import annotations
 import asyncio
-from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 
 from lib.actions.protocols import ActionProtocol
 from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
-from lib.conf.logging import Logger, logger_cv
+from lib.conf.logging import Logger
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 from .connections_manager import connections_manager
@@ -29,7 +28,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     logger: Logger = Logger('receiver')
 
-    async def start(self):
+    async def start(self) -> None:
         starts = []
         if self.action:
             starts.append(self.action.start())

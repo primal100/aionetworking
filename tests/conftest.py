@@ -959,9 +959,6 @@ def buffer_object_json2(buffer_json_2, timestamp, context) -> BufferObject:
     return BufferObject(buffer_json_2, received_timestamp=timestamp + timedelta(seconds=1), context=context)
 
 
-
-
-
 @pytest.fixture
 def protocol_factory_one_way_server_benchmark(buffered_file_storage_action_binary, receiver_logger) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
@@ -997,21 +994,9 @@ def protocol_factory_two_way_client(sender_logger, json_rpc_requester) -> Stream
 
 
 @pytest.fixture
-def tcp_server_one_way(protocol_factory_one_way_server, receiver_logger, sock):
-    return TCPServer(protocol_factory=protocol_factory_one_way_server, host=sock[0],
-                     port=sock[1])
-
-
-@pytest.fixture
 def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
     return TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
                      port=sock[1])
-
-
-@pytest.fixture
-def tcp_client_one_way(protocol_factory_one_way_client, sender_logger, sock, peername):
-    return TCPClient(protocol_factory=protocol_factory_one_way_client, logger=sender_logger, host=sock[0],
-                     port=sock[1], srcip=peername[0], srcport=0)
 
 
 @pytest.fixture
@@ -1073,12 +1058,7 @@ async def tcp_protocol_two_way_client(json_rpc_requester, sender_logger) -> TCPC
 
 
 
-@pytest.fixture
-async def pipe_path() -> Path:
-    path = pipe_address_by_os()
-    yield path
-    if path.exists():
-        path.unlink()
+
 
 
 @pytest.fixture
@@ -1101,25 +1081,6 @@ def pipe_client_two_way(protocol_factory_two_way_client, sender_logger, pipe_pat
     return pipe_client(protocol_factory=protocol_factory_two_way_client, logger=sender_logger, path=pipe_path)
 
 
-server_client_params = [
-    (tcp_server_one_way, tcp_client_one_way, context, context_client),
-    #(tcp_server_two_way, tcp_client_two_way),
-    pytest.param(
-        (pipe_server_one_way, pipe_client_one_way, context_pipe_server, context_pipe_client),
-        marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
-    ),
-    #pytest.param(
-    #    (pipe_server_two_way, pipe_client_two_way),
-    #    marks=pytest.mark.skipif(
-    #        "not supports_pipe_or_unix_connections()")
-    #),
-]
-@pytest.fixture(params=server_client_params)
-def server_client_args(request) -> Tuple:
-    return request.param
-
-
 @pytest.fixture
 def expected_server_context(request, server_client_args) -> Dict[str, Any]:
     return get_fixture(request, server_client_args[2])
@@ -1128,30 +1089,6 @@ def expected_server_context(request, server_client_args) -> Dict[str, Any]:
 @pytest.fixture
 def expected_client_context(request, server_client_args) -> Dict[str, Any]:
     return get_fixture(request, server_client_args[3])
-
-
-@pytest.fixture
-def _server_receiver(request, server_client_args) -> Optional[BaseServer]:
-    return get_fixture(request, server_client_args[0])
-
-
-@pytest.fixture
-async def server_receiver(_server_receiver) -> BaseServer:
-    yield _server_receiver
-    if _server_receiver.is_started():
-        await _server_receiver.close()
-
-
-@pytest.fixture
-async def server_receiver_quiet(server_receiver) -> BaseServer:
-    server_receiver.quiet = True
-    yield server_receiver
-
-
-@pytest.fixture
-async def server_started(server_receiver) -> BaseServer:
-    await server_receiver.start()
-    yield server_receiver
 
 
 @pytest.fixture
@@ -1170,19 +1107,6 @@ async def client_sender(_client_sender, server_started) -> BaseClient:
 async def client_connected(client_sender, server_started) -> Tuple[BaseClient, BaseConnectionProtocol]:
     async with client_sender as conn:
         yield client_sender, conn
-
-
-one_way_server_client_params = [
-    (tcp_server_one_way, tcp_client_one_way, '127.0.0.1.recording', 'Encoded/127.0.0.1_TCAP_MAP.TCAP_MAP'),
-    pytest.param(
-        (pipe_server_one_way, pipe_client_one_way, 'pipe.recording', 'Encoded/pipe.TCAP_MAP'),
-        marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
-    ),
-]
-@pytest.fixture(params=one_way_server_client_params)
-def one_way_server_client_args(request) -> Tuple:
-    return request.param
 
 
 @pytest.fixture

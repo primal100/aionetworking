@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 
 from .exceptions import ServerException
 from lib.conf.context import context_cv
-from lib.conf.logging import Logger, logger_cv, get_connection_logger_receiver
+from lib.conf.logging import Logger, logger_cv
+from lib.wrappers.value_waiters import StatusWaiter
 from lib.networking.types import ProtocolFactoryType
-from lib.factories import event_set
 from lib.utils import dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import ReceiverProtocol
 
@@ -21,6 +21,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     quiet: bool = False
     logger_cls: Type[Logger] = Logger
     logger_name: str = 'receiver'
+    _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -47,8 +48,6 @@ class BaseServer(BaseReceiver, Protocol):
 
     protocol_factory:  ProtocolFactoryType = None
     server: asyncio.AbstractServer = field(default=None, init=False)
-    _started: asyncio.Event = field(default_factory=asyncio.Event, init=False, compare=False)
-    _stopped: asyncio.Event = field(default_factory=event_set, init=False, compare=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -71,29 +70,27 @@ class BaseServer(BaseReceiver, Protocol):
             print(f"Serving {self.name} on {listening_on}")
 
     async def start(self) -> None:
+        if self._status.is_starting_or_started():
+            raise ServerException(f"{self.name} running on {self.listening_on} already started")
+        self._status.set_starting()
         context_cv.set({'endpoint': self.full_name})
         logger_cv.set(self.logger)
         await self.protocol_factory.start()
-        if self._started.is_set():
-            raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
-        self._stopped.clear()
         await self._start_server()
         if not self.quiet:
             self._print_listening_message()
-        self._started.set()
+        self._status.set_started()
 
     async def close(self) -> None:
-        if self._stopped.is_set():
-            raise ServerException(f"{self.name} running on {self.listening_on} already stopped")
-        if not self._started.is_set():
-            raise ServerException(f"{self.name} running on {self.listening_on} not yet started")
+        if self._status.is_stopping_or_stopped():
+            raise ServerException(f"{self.name} running on {self.listening_on} already stopping or stopped")
+        self._status.set_stopping()
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
-        self._started.clear()
         await self._stop_server()
         self.logger.info('%s stopped', self.name)
         await self.protocol_factory.close_actions()
-        self._stopped.set()
+        self._status.set_stopped()
 
     async def wait_num_connections(self, num: int):
         await self.protocol_factory.wait_num_connected(num)
@@ -107,19 +104,20 @@ class BaseServer(BaseReceiver, Protocol):
     async def wait_all_tasks_done(self) -> None:
         await self.protocol_factory.close()
 
-    def _is_serving(self) -> bool:
-        return self.server.is_serving()
-
     def is_started(self) -> bool:
-        return self._started.is_set() and self._is_serving()
+        return self._status.is_started()
 
-    async def wait_started(self) -> bool:
-        await self._started.wait()
-        return self._is_serving()
+    def is_closing(self) -> bool:
+        return self._status.is_stopping_or_stopped()
 
-    async def wait_stopped(self) -> bool:
-        await self._stopped.wait()
-        return self._is_serving()
+    async def wait_started(self):
+        await self._status.wait_started()
+
+    async def wait_has_started(self):
+        await self._status.wait_has_started()
+
+    async def wait_stopped(self):
+        await self._status.wait_stopped()
 
     @abstractmethod
     async def _get_server(self) -> asyncio.AbstractServer: ...

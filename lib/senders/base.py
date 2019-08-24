@@ -3,7 +3,6 @@ from abc import abstractmethod
 import asyncio
 
 from dataclasses import dataclass, field
-from lib.conf.logging import Logger
 from lib.networking.types import ProtocolFactoryType, ConnectionType
 
 from pathlib import Path
@@ -11,6 +10,7 @@ from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
 from lib.conf.logging import Logger, logger_cv
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
+from lib.wrappers.value_waiters import StatusWaiter
 from .protocols import SenderProtocol
 
 from typing import Type
@@ -21,6 +21,7 @@ class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
     logger_cls: Type[Logger] = Logger
     logger_name = 'sender'
+    _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
     def loop(self) -> asyncio.SelectorEventLoop:
@@ -51,7 +52,6 @@ class BaseClient(BaseSender, Protocol):
     peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
     conn: ConnectionType = field(init=False, default=None)
-    logger: Logger = None
     transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
     timeout: int = 5
 
@@ -73,23 +73,28 @@ class BaseClient(BaseSender, Protocol):
 
     async def _close_connection(self):
         self.conn.close()
-        await self.conn.close_wait()
+        await self.conn.wait_closed()
 
     def is_started(self) -> bool:
-        return bool(self.conn)
+        return self._status.is_started()
 
     def is_closing(self) -> bool:
-        return not self.transport or self.transport.is_closing()
+        return self._status.is_stopping_or_stopped() or self.transport.is_closing()
 
     async def connect(self) -> ConnectionType:
+        self._status.set_starting()
         logger_cv.set(self.logger)
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self._open_connection()
+        await self.conn.wait_connected()
+        self._status.set_started()
         return connection
 
     async def close(self) -> None:
+        self._status.set_stopping()
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
+        self._status.set_stopped()
 
     @run_in_loop
     async def open_send_msgs(self, msgs: Sequence[AnyStr], interval: int = None, start_interval: int = 0,

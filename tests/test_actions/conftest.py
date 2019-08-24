@@ -19,16 +19,8 @@ async def managed_file(tmp_path, append_mode) -> ManagedFile:
     path = tmp_path/'managed_file1'
     f = ManagedFile.open(path, timeout=None, mode=append_mode)
     yield f
-    if not f.closing.is_set():
+    if not f.is_closing():
         await f.close()
-
-
-@pytest.fixture
-async def managed_file_text(tmp_path) -> ManagedFile:
-    path = tmp_path/'managed_file1'
-    f = ManagedFile.open(path, timeout=None, mode='a')
-    yield f
-    await f.close()
 
 
 @pytest.fixture

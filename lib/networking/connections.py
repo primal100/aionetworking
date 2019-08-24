@@ -1,6 +1,5 @@
 from __future__ import annotations
 import asyncio
-import contextvars
 from dataclasses import dataclass, field
 
 from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
@@ -10,6 +9,7 @@ from lib.conf.context import context_cv
 from lib.conf.logging import Logger, logger_cv, connection_logger_cv
 from lib.conf.types import ConnectionLoggerType
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
+from lib.wrappers.value_waiters import StatusWaiter
 
 from .connections_manager import connections_manager
 from .adaptors import ReceiverAdaptor, SenderAdaptor
@@ -26,8 +26,9 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _close_task: asyncio.Task = field(default=None, init=False, compare=False)
+    _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get, metadata={'pickle': True})
-    logger: Logger = field(default_factory=logger_cv.get)
+    logger: Logger = field(default_factory=logger_cv.get, metadata={'pickle': True})
 
     def __post_init__(self):
         self.context['protocol_name'] = self.name
@@ -35,7 +36,11 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 
     def __getattr__(self, item):
         if self._adaptor:
-            return getattr(self._adaptor, item)
+            try:
+                return getattr(self._adaptor, item)
+            except AttributeError:
+                raise AttributeError(f"Neither connection nor adaptor have attribute {item}")
+        raise AttributeError(f"Connection does not have attribute {item}, and adaptor has not been configured yet")
 
     def _start_adaptor(self) -> None:
         self._set_adaptor()
@@ -79,9 +84,12 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self.logger.get_connection_logger(extra=self.context)
 
     def _delete_connection(self) -> None:
-        if self.store_connections:
-            num = connections_manager.remove_connection(self)
-            self.logger.log_num_connections('closed', num)
+        try:
+            if self.store_connections:
+                num = connections_manager.remove_connection(self)
+                self.logger.log_num_connections('closed', num)
+        finally:
+            self._status.set_stopped()
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
@@ -93,30 +101,24 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             self._delete_connection()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
-        if self._connected.done():
-            self._connected = asyncio.Future()
-        elif exc:
-            self._connected.set_exception(exc)
-        else:
-            self._connected.set_exception(ConnectionAlreadyClosedError())
+        self._status.set_stopping()
         self._close_task = asyncio.create_task(self._close(exc))
         set_task_name(self._close_task, f"Close:{self.peer}")
-        self._closing.set_result(True)
 
     def close(self):
         self.finish_connection(None)
 
-    async def close_wait(self):
-        if not self._closing.done():
-            self.close()
-        await self._closing
-        await self._close_task
+    async def wait_closed(self) -> None:
+        await self._status.wait_stopped()
 
-    async def wait_connected(self) -> bool:
-        return await self._connected
+    async def wait_connected(self) -> None:
+        await self._status.wait_started()
+
+    def is_closing(self) -> bool:
+        return self._status.is_stopping_or_stopped()
 
     def is_connected(self) -> bool:
-        return self._connected.done() and self._connected.result()
+        return self._status.is_started()
 
 
 @dataclass
@@ -153,12 +155,13 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             self._raise_message_from_not_authorized_host(host)
 
     def initialize_connection(self, transport: TransportType, peer: Tuple[str, int] = None) -> bool:
+        self._status.set_starting()
         self._update_context(transport, peer)
         try:
             if self.context.get('host'):
                 self._check_peer()
             self._start_adaptor()
-            self._connected.set_result(True)
+            self._status.set_started()
             return True
         except MessageFromNotAuthorizedHost as exc:
             self.finish_connection(exc)
@@ -219,6 +222,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
             self.transport.close()
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
+        self.close()
         self.finish_connection(exc)
 
     def data_received(self, data: AnyStr) -> None:

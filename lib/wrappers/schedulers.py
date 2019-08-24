@@ -30,8 +30,8 @@ class TaskScheduler:
         set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
         return task
 
-    def schedule_task(self, coro: Awaitable, callback: Callable = None, name: str = None,
-                      include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
+    def task_with_callback(self, coro: Awaitable, callback: Callable = None, name: str = None,
+                           include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
         task = self.create_task(coro, name=name, include_hierarchy=include_hierarchy, separator=separator)
         callback = callback or self.task_done
         task.add_done_callback(callback)
@@ -55,8 +55,8 @@ class TaskScheduler:
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        self.schedule_task(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
-                           separator=separator)
+        self.task_with_callback(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
+                                separator=separator)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()

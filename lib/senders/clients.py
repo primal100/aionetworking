@@ -31,7 +31,6 @@ class TCPClient(BaseNetworkClient):
         self.transport, self.conn = await self.loop.create_connection(
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context,
             local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
-        await self.conn.wait_connected()
         self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         return self.conn
 

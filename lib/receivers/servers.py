@@ -60,6 +60,7 @@ class WindowsPipeServer(BaseServer):
     path: Union[str, Path] = field(default_factory=pipe_address, metadata={'pickle': True})
 
     def __post_init__(self):
+        super().__post_init__()
         self.path = str(self.path).format(pid=os.getpid())
 
     def _print_listening_message(self) -> None:

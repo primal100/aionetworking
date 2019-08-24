@@ -28,7 +28,7 @@ def object_class(is_text) -> Type[MessageObjectType]:
 
 
 @pytest.fixture
-def json_codec(codec_class, object_class, context) -> JSONBCodec:
+def json_codec(codec_class, object_class, context) -> JSONCodec:
     return codec_class(object_class, context=context)
 
 
@@ -105,7 +105,7 @@ def json_object(json_rpc_login_request_encoded, json_rpc_login_request, object_c
 @pytest.fixture
 def json_objects(json_encoded_multi, json_decoded_multi, object_class, timestamp, context) -> List[MessageObjectType]:
     return [object_class(encoded, json_decoded_multi[i], context=context,
-                       received_timestamp=timestamp) for i, encoded in
+            received_timestamp=timestamp) for i, encoded in
             enumerate(json_encoded_multi)]
 
 

@@ -18,6 +18,13 @@ from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, Asy
 from typing_extensions import Protocol
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
+try:
+    import psutil
+    supports_system_info = True
+except ImportError:
+    psutil = None
+    supports_system_info = False
+
 
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
@@ -407,7 +414,7 @@ def dataclass_getstate(self):
                 elif field.default != MISSING and value != field.default:
                     if field.metadata.get('pickle', True):
                         state[name] = value
-                elif field.default_factory != MISSING :
+                elif field.default_factory != MISSING:
                     if field.metadata.get('pickle', False):
                         state[name] = value
             except AttributeError:
@@ -417,3 +424,19 @@ def dataclass_getstate(self):
 
 def dataclass_setstate(self, state):
     self.__dict__.update(self.__class__(**state).__dict__)
+
+
+class SystemInfo:
+    @property
+    def memory(self):
+        try:
+            return psutil.Process(os.getpid()).memory_info()[0]/2.**30
+        except NameError:
+            return "Unknown"
+
+    @property
+    def cpu(self):
+        try:
+            return psutil.Process(os.getpid()).cpu_percent()
+        except NameError:
+            return "Unknown"

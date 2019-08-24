@@ -3,15 +3,15 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any, DefaultDict, Dict
 
-from lib.factories import event_defaultdict
+from lib.factories import future_defaultdict
 
 
 @dataclass
 class Counter:
     _num: int = 0
     _total_increments: int = 0
-    _num_waiters: DefaultDict[int, asyncio.Event] = field(default_factory=event_defaultdict, init=False)
-    _total_increment_waiters: DefaultDict[int, asyncio.Event] = field(default_factory=event_defaultdict, init=False)
+    _num_waiters: DefaultDict[int, asyncio.Future] = field(default_factory=future_defaultdict, init=False)
+    _total_increment_waiters: DefaultDict[int, asyncio.Future] = field(default_factory=future_defaultdict, init=False)
     max: int = None
     max_increments: int = None
     aliases: Dict[str, int] = field(default_factory=dict)
@@ -48,20 +48,20 @@ class Counter:
 
     def _check_num_waiters(self):
         if self._num in self._num_waiters:
-            self._num_waiters[self._num].set()
+            self._num_waiters[self._num].set_result(True)
             self._num_waiters.pop(self._num)
 
     def _check_total_increment_waiters(self):
         if self._total_increments in self._total_increment_waiters:
-            self._total_increment_waiters[self._total_increments].set()
+            self._total_increment_waiters[self._total_increments].set_result(True)
             self._total_increment_waiters.pop(self._total_increments)
 
     @staticmethod
-    async def _wait_for(num: int, target_num: int, waiters: DefaultDict[int, asyncio.Event]):
+    async def _wait_for(num: int, target_num: int, waiters: DefaultDict[int, asyncio.Future]):
         if num == target_num:
             return
-        event = waiters[num]
-        await event.wait()
+        fut = waiters[num]
+        await fut
 
     async def wait_for(self, num: int) -> None:
         if num == self._num:

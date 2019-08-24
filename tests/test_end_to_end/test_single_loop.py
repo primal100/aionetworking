@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import pytest
 from pathlib import Path
 
@@ -10,35 +9,29 @@ from lib.utils import supports_pipe_or_unix_connections
 
 class TestOneWayServer:
     @pytest.mark.asyncio
-    async def test_00_send_and_send_recording(self, connections_manager, one_way_server_started,
-                                              one_way_client_connected, asn_one_encoded,
-                                              tmp_path, asn_buffer, asn_decoded_multi, asn1_recording,
-                                              recording_file_name, asn_file_name):
-        client, conn = one_way_client_connected
-        conn.encode_and_send_msgs(asn_decoded_multi)
-        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
-        conn.close()
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
-        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
-        recording_file = Path(tmp_path / recording_file_name)
+    async def test_00_send_and_send_recording(self, connections_manager, server_started,
+                                              client, json_rpc_login_request_encoded,
+                                              tmp_path, json_buffer, json_decoded_multi, json_recording_data):
+        async with client as conn:
+            conn.encode_and_send_msgs(json_decoded_multi)
+        await asyncio.wait_for(server_started.wait_num_has_connected(1), timeout=1)
+        await asyncio.wait_for(server_started.wait_num_connections(0), timeout=1)
+        await asyncio.wait_for(server_started.wait_all_tasks_done(), timeout=1)
+        recording_file = Path(tmp_path / '127.0.0.1.recording')
         assert recording_file.exists()
-        expected_file = Path(tmp_path / asn_file_name)
+        expected_file = Path(tmp_path / '127.0.0.1_JSON.JSON')
         assert expected_file.exists()
-        assert expected_file.read_bytes() == asn_buffer
+        assert expected_file.read_bytes() == json_buffer
         expected_file.unlink()
-        new_recording_path = tmp_path / (recording_file_name + "2")
+        new_recording_path = tmp_path / '127.0.0.1_new.recording'
         recording_file.rename(new_recording_path)
-        await asyncio.sleep(5)
-        await client.close()
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
         async with client as conn:
             await conn.play_recording(new_recording_path)
-        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(2), timeout=120)
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=120)
-        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=120)
-        expected_file = Path(tmp_path / asn_file_name)
+        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(2), timeout=1)
+        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
+        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         assert expected_file.exists()
-        assert Path(expected_file).read_bytes() == asn_buffer
+        assert Path(expected_file).read_bytes() == json_buffer
 
     @pytest.mark.asyncio
     async def test_01_send_and_send_recording_debug_logging(self, connections_manager, receiver_debug_logging_extended,

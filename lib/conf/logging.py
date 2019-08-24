@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from lib.compatibility import get_current_task_name
 from lib.utils import dataclass_getstate, dataclass_setstate
-from lib.utils import log_exception
+from lib.utils import log_exception, SystemInfo, supports_system_info
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.schedulers import TaskScheduler
 
@@ -82,6 +82,8 @@ class Logger(BaseLogger):
         msg, kwargs = super().process(msg, kwargs)
         kwargs['extra'] = kwargs['extra'].copy()
         kwargs['extra']['taskname'] = get_current_task_name()
+        if supports_system_info:
+            kwargs['extra']['system'] = SystemInfo()
         kwargs['extra'].update(kwargs.pop('detail', {}))
         return msg, kwargs
 

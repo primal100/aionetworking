@@ -5,10 +5,11 @@ from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 
 from .base import BaseAction
-from lib.conf.logging import Logger
+from lib.conf.logging import Logger, logger_cv
 from lib import settings
 from lib.compatibility import set_task_name, Protocol
 from lib.utils_logging import p
+from lib.wrappers.value_waiters import StatusWaiter
 from lib.settings import FILE_OPENER
 
 from typing import ClassVar, AnyStr
@@ -22,10 +23,9 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 5
-    logger: Logger = Logger('receiver.actions')
-    _task_started: asyncio.Event = field(default_factory=asyncio.Event, init=False, repr=False, hash=False, compare=False)
-    closing: asyncio.Event = field(default_factory=asyncio.Event, init=False, repr=False, hash=False, compare=False)
-    previous_closing: asyncio.Event = field(default=None)
+    logger: Logger = field(default_factory=logger_cv.get)
+    _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
+    previous: ManagedFile = field(default=None)
     _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
     _open_files: ClassVar = {}
 
@@ -33,9 +33,9 @@ class ManagedFile:
     def open(cls, path, *args, **kwargs) -> ManagedFile:
         try:
             f = cls._open_files[path]
-            if not f.closing.is_set():
+            if not f.is_closing():
                 return f
-            kwargs['previous_closing'] = f.closing
+            kwargs['previous'] = f
         except KeyError:
             pass
         f = cls(path, *args, **kwargs)
@@ -61,10 +61,21 @@ class ManagedFile:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb): ...
 
+    def is_closing(self):
+        return self._status.is_stopping_or_stopped()
+
+    async def wait_closed(self):
+        return await self._status.wait_stopped()
+
+    async def wait_has_started(self):
+        return await self._status.wait_has_started()
+
     def _cleanup(self) -> None:
+        self._status.set_stopping()
         if self._open_files[self.path] == self:
             del self._open_files[self.path]
         self.logger.debug('Cleanup completed for %s', self.path)
+        self._status.set_stopped()
 
     async def write(self, data: AnyStr) -> None:
         fut = asyncio.Future()
@@ -72,10 +83,10 @@ class ManagedFile:
         await fut
 
     async def close(self) -> None:
-        self.closing.set()
+        self._status.set_stopping()
         self.logger.debug('Closing file %s', self.path)
         if not self._task.done():
-            await self._task_started.wait()
+            await self.wait_has_started()
             await self.wait_writes_done()
             self._task.cancel()
             try:
@@ -96,13 +107,14 @@ class ManagedFile:
         self.logger.debug('Writes completed for %s', self.path)
 
     async def manage(self) -> None:
-        if self.previous_closing:
-            await self.previous_closing.wait()
+        if self.previous:
+            await self.previous.wait_closed()
         try:
-            self._task_started.set()
+            self._status.set_starting()
             self.logger.info('Opening file %s', self.path)
             async with FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
                 self.logger.debug('File %s opened', self.path)
+                self._status.set_started()
                 while True:
                     self.logger.debug('Retrieving item from queue for file %s', self.path)
                     data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
@@ -172,7 +184,7 @@ class BaseFileStorage(BaseAction, Protocol):
     @abstractmethod
     async def _write_to_file(self, path: Path, data: AnyStr): ...
 
-    async def do_one(self, msg: MessageObjectType):
+    async def write_one(self, msg: MessageObjectType) -> Path:
         path = self._get_full_path(msg)
         path.parent.mkdir(parents=True, exist_ok=True)
         msg.logger.debug('Writing to file %s', path)
@@ -180,6 +192,9 @@ class BaseFileStorage(BaseAction, Protocol):
         await self._write_to_file(path, data)
         msg.logger.debug('Data written to file %s', path)
         return path
+
+    async def do_one(self, msg: MessageObjectType) -> None:
+        await self.write_one(msg)
 
 
 @dataclass
