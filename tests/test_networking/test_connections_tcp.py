@@ -59,11 +59,11 @@ class TestConnectionOneWayServer:
         tcp_protocol_one_way_server.data_received(json_rpc_logout_request_encoded)
         tcp_protocol_one_way_server.connection_lost(None)
         await asyncio.wait_for(tcp_protocol_one_way_server.wait_closed(), timeout=1)
-        expected_file = Path(tmp_path/'Encoded/127.0.0.1_JSON.JSON')
+        expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects
-        expected_file = Path(tmp_path / '127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist((get_recording_from_file(expected_file)))
         assert (packets[1].timestamp - packets[0].timestamp).total_seconds() > 1

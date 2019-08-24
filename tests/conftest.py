@@ -159,6 +159,13 @@ def connection_logger_formatter() -> logging.Formatter:
 
 
 @pytest.fixture
+def raw_received_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "{message}", style='{'
+    )
+
+
+@pytest.fixture
 def logging_handler_cls() -> Type[logging.Handler]:
     return logging.StreamHandler
 
@@ -185,18 +192,32 @@ def stats_logging_handler(logging_handler_cls, stats_formatter) -> logging.Handl
 
 
 @pytest.fixture
+def raw_received_handler(logging_handler_cls, raw_received_formatter) -> logging.Handler:
+    handler = logging_handler_cls()
+    handler.setFormatter(raw_received_formatter)
+    return handler
+
+
+@pytest.fixture
+def log_buffers(raw_received_handler):
+    logger = logging.getLogger('receiver.raw_received')
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(raw_received_handler)
+
+
+@pytest.fixture
 def receiver_debug_logging_extended(receiver_logging_handler, connection_logging_handler, stats_logging_handler):
     logger = logging.getLogger('receiver')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
     logger.addHandler(receiver_logging_handler)
     actions_logger = logging.getLogger('receiver.actions')
     actions_logger.addHandler(receiver_logging_handler)
-    actions_logger.setLevel(logging.DEBUG)
+    actions_logger.setLevel(logging.ERROR)
     actions_logger.propagate = False
     sender_connection_logger = logging.getLogger('sender.connection')
     sender_connection_logger.addHandler(connection_logging_handler)
     sender_connection_logger.propagate = False
-    sender_connection_logger.setLevel(logging.DEBUG)
+    sender_connection_logger.setLevel(logging.ERROR)
     connection_logger = logging.getLogger('receiver.connection')
     logging.getLogger('receiver.raw_received').setLevel(logging.ERROR)
     logging.getLogger('receiver.data_received').setLevel(logging.ERROR)
@@ -204,7 +225,7 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('sender.data_received').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
     connection_logger.propagate = False
-    connection_logger.setLevel(logging.DEBUG)
+    connection_logger.setLevel(logging.ERROR)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
     stats_logger.setLevel(logging.INFO)
@@ -508,8 +529,8 @@ def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp)
 
 
 @pytest.fixture
-def json_rpc_login_response_encoded(user1) -> str:
-    return '{"jsonrpc": "2.0", "id": 1, "result": {"user": "user1", "message": "Login successful"}}'
+def json_rpc_login_response_encoded(user1) -> bytes:
+    return b'{"jsonrpc": "2.0", "id": 1, "result": {"user": "user1", "message": "Login successful"}}'
 
 
 @pytest.fixture

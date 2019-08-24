@@ -399,4 +399,12 @@ def get_connection_logger_sender() -> ConnectionLoggerType:
 logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=Logger('receiver'))
 connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
                                                                                         default=ConnectionLogger(
-                                                                                            'receiver.connection'))
+                                                                                            'receiver.connection',
+                                                                                            extra={
+                                                                                                'endpoint': None,
+                                                                                                'protocol_name': None,
+                                                                                                'server': None,
+                                                                                                'client': None,
+                                                                                                'alias': None,
+                                                                                                'peer': None,
+                                                                                            }))

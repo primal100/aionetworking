@@ -15,7 +15,7 @@ async def managed_file(tmp_path) -> ManagedFile:
 
 @pytest.fixture
 async def file_storage_action(tmp_path) -> FileStorage:
-    action = FileStorage(base_path=tmp_path, binary=True,
+    action = FileStorage(base_path=tmp_path / 'Data', binary=True,
                          path='Encoded/{msg.name}/{msg.sender}_{msg.uid}.{msg.name}')
     yield action
 

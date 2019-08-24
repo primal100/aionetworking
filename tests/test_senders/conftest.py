@@ -4,7 +4,7 @@ from lib.senders.clients import BaseNetworkClient, TCPClient, pipe_client
 
 
 @pytest.fixture
-def tcp_client_one_way(server_started, protocol_factory_one_way_client, pipe_path, sock, peername):
+def tcp_client_one_way(server_started, protocol_factory_one_way_client, sock, peername):
     return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
                      srcport=0)
 
@@ -47,14 +47,6 @@ def client_connected(receiver_sender_args) -> BaseNetworkClient:
 @pytest.fixture(params=[
     lazy_fixture(
         (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
-    lazy_fixture(
-        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
-    pytest.param(
-        lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
-                      pipe_client_one_way_connected.__name__)),
-        marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
-    ),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
                       pipe_client_one_way_connected.__name__)),

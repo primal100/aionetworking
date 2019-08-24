@@ -6,6 +6,9 @@ from lib.formats.base import BaseCodec, BaseMessageObject
 
 from typing import Any, Generator, Tuple
 
+encoded_msg = b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
+decoded_msg = {'jsonrpc': '2.0', 'id': 1, 'method': 'login', 'params': ['user1', 'password']}
+
 
 @dataclass
 class JSONCodec(BaseCodec):
@@ -16,11 +19,15 @@ class JSONCodec(BaseCodec):
     """
 
     def decode(self, encoded: bytes, **kwargs) -> Generator[Tuple[bytes, Any], None, None]:
+        """num_msgs = encoded.count(b'jsonrpc')
+        for i in range(0, num_msgs):
+            yield(encoded_msg, decoded_msg)"""
         pos = 0
         end = len(encoded)
         while pos < end:
             start = pos
-            msg, pos = json.JSONDecoder().raw_decode(encoded.decode(), idx=pos)
+            data = encoded.decode()
+            msg, pos = json.JSONDecoder().raw_decode(data, idx=pos)
             yield (encoded[start:pos], msg)
 
     def encode(self, decoded: Any, **kwargs) -> bytes:

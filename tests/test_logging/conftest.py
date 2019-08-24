@@ -79,4 +79,4 @@ async def stats_logger(context) -> StatsLogger:
 @pytest.fixture
 def stats_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{host} {msg} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {average_buffer_size.kb:.2f}KB {largest_buffer.kb:.2f}KB", style="{")
+        "{msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {interval} {average_buffer_size.kb:.2f}KB {largest_buffer.kb:.2f}KB {msgs_per_buffer:.2f}", style="{")

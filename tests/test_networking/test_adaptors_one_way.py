@@ -19,12 +19,12 @@ class TestOneWayReceiverAdaptor:
         one_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
         one_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp)
         await one_way_receiver_adaptor.close()
-        expected_file = Path(tmp_path/'Encoded/127.0.0.1_JSON.JSON')
+        expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         assert expected_file.read_bytes() == json_buffer
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects
-        expected_file = Path(tmp_path / '127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist(get_recording_from_file(expected_file))
         assert packets == json_recording_data

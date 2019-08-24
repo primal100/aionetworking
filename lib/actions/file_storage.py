@@ -44,8 +44,12 @@ class ManagedFile:
 
     @classmethod
     async def close_all(cls, base_path: Path = None) -> None:
-        if cls._open_files:
-            await asyncio.wait([f.close() for f in cls._open_files.values() if f.is_in(base_path)])
+        if base_path:
+            files = [f for f in cls._open_files.values() if f.is_in(base_path)]
+        else:
+            files = [f for f in cls._open_files.values()]
+        if files:
+            await asyncio.wait([f.close() for f in files])
 
     @classmethod
     def num_files(cls):

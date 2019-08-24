@@ -84,21 +84,13 @@ def server_args(request) -> Tuple:
 
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_one_way.__name__, tcp_server_one_way_started.__name__, tcp_server_one_way_quiet.__name__)) + [True],
-    lazy_fixture(
-        (tcp_server_one_way.__name__, tcp_server_one_way_started.__name__, tcp_server_one_way_quiet.__name__)) + [
-        False],
+        (tcp_server_one_way.__name__, tcp_server_one_way_started.__name__, tcp_server_one_way_quiet.__name__)),
     pytest.param(
         lazy_fixture((pipe_server_one_way.__name__, pipe_server_one_way_started.__name__,
                       pipe_server_one_way_quiet.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
-    pytest.param(
-        lazy_fixture((pipe_server_one_way.__name__, pipe_server_one_way_started.__name__,
-                      pipe_server_one_way_quiet.__name__)),
-        marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
-    )])
+    ])
 def receiver_args(request):
     return request.param
