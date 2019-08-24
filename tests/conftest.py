@@ -230,7 +230,9 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     stats_logger.addHandler(stats_logging_handler)
     stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
-    logging.getLogger('asyncio').setLevel(logging.DEBUG)
+    logger = logging.getLogger('asyncio')
+    logger.addHandler(receiver_logging_handler)
+    logger.setLevel(logging.DEBUG)
 
 
 @pytest.fixture

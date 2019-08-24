@@ -327,7 +327,3 @@
 2019-08-24 19:37:20,556 - 2617.915391921997 - INFO - Task-121 - base - close - receiver - Stopping TCP Server running at 127.0.0.1:8888
 2019-08-24 19:37:20,556 - 2617.915391921997 - INFO - Task-121 - base - close - receiver - TCP Server stopped
 
-
-========================== 1 passed in 1.22 seconds ===========================
-
-Process finished with exit code 0

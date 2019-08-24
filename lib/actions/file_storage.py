@@ -200,8 +200,8 @@ class BaseFileStorage(BaseAction, Protocol):
 
     async def write_one(self, msg: MessageObjectType) -> Path:
         path = self._get_full_path(msg)
-        path.parent.mkdir(parents=True, exist_ok=True)
         msg.logger.debug('Writing to file %s', path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         data = self._get_data(msg)
         await self._write_to_file(path, data)
         msg.logger.debug('Data written to file %s', path)
