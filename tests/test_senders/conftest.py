@@ -44,25 +44,20 @@ def client_connected(receiver_sender_args) -> BaseNetworkClient:
     return receiver_sender_args[2]
 
 
-@pytest.fixture
-def is_text(receiver_sender_args) -> bool:
-    return receiver_sender_args[3]
-
-
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)) + [True],
+        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
     lazy_fixture(
-        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)) + [False],
+        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
-                      pipe_client_one_way_connected.__name__)) + [True],
+                      pipe_client_one_way_connected.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
-                      pipe_client_one_way_connected.__name__)) + [False],
+                      pipe_client_one_way_connected.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     )])

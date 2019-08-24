@@ -17,7 +17,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, AnyStr, Callable, Iterator, Generator, Dict, Sequence, Type, Optional
+from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -32,7 +32,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get)
     preaction: ActionProtocol = None
-    send: Callable[[AnyStr], None] = field(default=not_implemented_callable, repr=False, compare=False)
+    send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -40,7 +40,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 
-    def send_data(self, msg_encoded: AnyStr) -> None:
+    def send_data(self, msg_encoded: bytes) -> None:
         self.logger.on_sending_encoded_msg(msg_encoded)
         self.send(msg_encoded)
         self.logger.on_msg_sent(msg_encoded)
@@ -57,11 +57,11 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for decoded_msg in decoded_msgs:
             self.encode_and_send_msg(decoded_msg)
 
-    async def _run_preaction(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+    async def _run_preaction(self, buffer: bytes, timestamp: datetime = None) -> None:
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
-    def on_data_received(self, buffer: AnyStr, timestamp: datetime = None) -> None:
+    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         self.logger.on_buffer_received(buffer)
         timestamp = timestamp or datetime.now()
         if self.preaction:
@@ -74,7 +74,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None: ...
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None: ...
 
 
 @dataclass
@@ -102,7 +102,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
         for i in range(0, self._notification_queue.qsize()):
             yield self._notification_queue.get_nowait()
 
-    async def send_data_and_wait(self, request_id: Any, encoded: AnyStr) -> Any:
+    async def send_data_and_wait(self, request_id: Any, encoded: bytes) -> Any:
         return await self._scheduler.run_wait_fut(request_id, self.send_data, encoded)
 
     async def send_msg_and_wait(self, msg_obj: MessageObjectType) -> asyncio.Future:
@@ -131,11 +131,10 @@ class SenderAdaptor(BaseAdaptorProtocol):
                         seconds = timedelta.total_seconds()
                         await asyncio.sleep(seconds)
                     last_timestamp = packet.timestamp
-                data = packet.data if packet.is_bytes else packet.data.decode()
-                self.send_data(data)
+                self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
         for msg in msgs:
             if msg.request_id:
                 self._scheduler.set_result(msg.request_id, msg)
@@ -164,13 +163,13 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         finally:
             self.logger.on_msg_processed(msg_obj)
 
-    def _on_decoding_error(self, buffer: AnyStr, exc: BaseException):
+    def _on_decoding_error(self, buffer: bytes, exc: BaseException):
         self.logger.manage_error(exc)
         response = self.action.on_decode_error(buffer, exc)
         if response:
             self.encode_and_send_msg(response)
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: AnyStr) -> None:
+    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
         try:
             for msg_obj in msgs:
                 if not self.action.filter(msg_obj):

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lib.compatibility import Protocol
 
-from typing import AsyncGenerator, Generator, Any, AnyStr, Dict, Sequence
+from typing import AsyncGenerator, Generator, Any, Dict, Sequence
 from .types import CodecType, MessageObjectType
 
 
@@ -48,16 +48,16 @@ class MessageObject(Protocol):
 class Codec(Protocol):
 
     @abstractmethod
-    def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]: ...
+    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[bytes, Any], None, None]: ...
 
     @abstractmethod
-    def decode_one(self, encoded: AnyStr, **kwargs) -> Any: ...
+    def decode_one(self, encoded: bytes, **kwargs) -> Any: ...
 
     @abstractmethod
-    def encode(self, decoded: Any, **kwargs) -> AnyStr: ...
+    def encode(self, decoded: Any, **kwargs) -> bytes: ...
 
     @abstractmethod
-    def decode_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]: ...
+    def decode_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]: ...
 
     @abstractmethod
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType: ...

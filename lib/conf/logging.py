@@ -14,7 +14,7 @@ from lib.utils import log_exception, SystemInfo, supports_system_info
 from lib.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from lib.wrappers.schedulers import TaskScheduler
 
-from typing import Type, Optional, Dict, AnyStr, Generator, Any, Union
+from typing import Type, Optional, Dict, Generator, Any, Union
 from lib.formats.types import MessageObjectType
 from .types import ConnectionLoggerType
 
@@ -153,19 +153,17 @@ class ConnectionLogger(Logger):
         return self.extra['peer']
 
     @staticmethod
-    def _convert_raw_to_hex(data: AnyStr):
-        if isinstance(data, bytes):
-            try:
-                return data.decode('utf-8')
-            except UnicodeDecodeError:
-                return binascii.hexlify(data).decode('utf-8')
-        return data
+    def _convert_raw_to_hex(data: bytes):
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            return binascii.hexlify(data).decode('utf-8')
 
-    def _raw_received(self, data: AnyStr, *args, **kwargs) -> None:
+    def _raw_received(self, data: bytes, *args, **kwargs) -> None:
         msg = self._convert_raw_to_hex(data)
         self._raw_received_logger.debug(msg, *args, **kwargs)
 
-    def _raw_sent(self, data: AnyStr, *args, **kwargs) -> None:
+    def _raw_sent(self, data: bytes, *args, **kwargs) -> None:
         msg = self._convert_raw_to_hex(data)
         self._raw_sent_logger.debug(msg, *args, **kwargs)
 
@@ -181,7 +179,7 @@ class ConnectionLogger(Logger):
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
 
-    def on_buffer_received(self, data: AnyStr) -> None:
+    def on_buffer_received(self, data: bytes) -> None:
         self.debug("Received buffer")
         self._raw_received(data)
 
@@ -191,11 +189,11 @@ class ConnectionLogger(Logger):
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)
 
-    def on_sending_encoded_msg(self, data: AnyStr) -> None:
+    def on_sending_encoded_msg(self, data: bytes) -> None:
         self.debug("Sending message")
         self._raw_sent(data)
 
-    def on_msg_sent(self, data: AnyStr) -> None:
+    def on_msg_sent(self, data: bytes) -> None:
         self.debug('Message sent')
 
     def on_msg_processed(self, msg: MessageObjectType) -> None:
@@ -257,7 +255,7 @@ class StatsTracker:
     def __getitem__(self, item: Any) -> Any:
         return getattr(self, item)
 
-    def on_buffer_received(self, data: AnyStr) -> None:
+    def on_buffer_received(self, data: bytes) -> None:
         if not self.msgs.first_received:
             self.msgs.first_received = LoggingDatetime(self.datefmt)
         self.msgs.last_received = LoggingDatetime(self.datefmt)
@@ -267,16 +265,16 @@ class StatsTracker:
         if size > self.largest_buffer:
             self.largest_buffer = BytesSize(size)
 
-    def on_msg_processed(self, data: AnyStr) -> None:
+    def on_msg_processed(self, data: bytes) -> None:
         self.msgs.last_processed = LoggingDatetime(self.datefmt)
         self.msgs.processed += 1
         self.processed += len(data)
 
-    def on_msg_filtered(self, data: AnyStr) -> None:
+    def on_msg_filtered(self, data: bytes) -> None:
         self.msgs.filtered += 1
         self.filtered += len(data)
 
-    def on_msg_sent(self, msg: AnyStr) -> None:
+    def on_msg_sent(self, msg: bytes) -> None:
         if not self.msgs.first_sent:
             self.msgs.first_sent = datetime.now()
         self.msgs.sent += 1
@@ -366,7 +364,7 @@ class ConnectionLoggerStats(ConnectionLogger):
         return self.get_sibling('stats', cls=self.stats_cls, stats_interval=self.stats_interval,
                                 stats_fixed_start_time=self.stats_fixed_start_time)
 
-    def on_buffer_received(self, msg: AnyStr) -> None:
+    def on_buffer_received(self, msg: bytes) -> None:
         super().on_buffer_received(msg)
         self._stats_logger.on_buffer_received(msg)
 
@@ -378,7 +376,7 @@ class ConnectionLoggerStats(ConnectionLogger):
         super().on_msg_processed(msg)
         self._stats_logger.on_msg_filtered(msg.encoded)
 
-    def on_msg_sent(self, msg: AnyStr) -> None:
+    def on_msg_sent(self, msg: bytes) -> None:
         super().on_msg_sent(msg)
         self._stats_logger.on_msg_sent(msg)
 

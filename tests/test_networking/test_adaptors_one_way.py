@@ -1,10 +1,9 @@
 import pytest
 import asyncio
-from datetime import timedelta
 from pathlib import Path
 
 from lib.formats.recording import get_recording_from_file
-from lib.utils import Record, alist, time_coro
+from lib.utils import alist, time_coro
 
 
 class TestOneWayReceiverAdaptor:
@@ -16,14 +15,13 @@ class TestOneWayReceiverAdaptor:
     async def test_01_on_data_received(self, tmp_path, one_way_receiver_adaptor, json_buffer,
                                        json_rpc_login_request_encoded, json_rpc_logout_request_encoded,
                                        timestamp, json_recording_data, json_codec, json_objects,
-                                       buffered_file_storage_action, read_mode):
+                                       buffered_file_storage_action):
         one_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
         one_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp)
         await one_way_receiver_adaptor.close()
         expected_file = Path(tmp_path/'Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
-        with expected_file.open(mode=read_mode) as f:
-            assert f.read() == json_buffer
+        assert expected_file.read_bytes() == json_buffer
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects
         expected_file = Path(tmp_path / '127.0.0.1.recording')

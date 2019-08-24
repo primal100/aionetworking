@@ -1221,3 +1221,33 @@ async def two_way_client_connected(two_way_client_sender, two_way_server_started
         BaseClient, BaseConnectionProtocol]:
     async with two_way_client_sender as conn:
         yield two_way_client_sender, conn
+
+
+@pytest.fixture
+async def connections_manager() -> ConnectionsManager:
+    from lib.networking.connections_manager import connections_manager
+    yield connections_manager
+    connections_manager.clear()
+
+
+@dataclass
+class SimpleNetworkConnection:
+    peer: str
+    parent_name: str
+    queue: asyncio.Queue
+
+    async def wait_all_messages_processed(self) -> None: ...
+
+    def encode_and_send_msg(self, msg_decoded: Any) -> None:
+        self.queue.put_nowait(msg_decoded)
+
+
+@pytest.fixture
+def simple_network_connections(queue, peer_str) -> List[SimpleNetworkConnectionType]:
+    return [SimpleNetworkConnection(peer_str, "TCP Server 127.0.0.1:8888", queue),
+            SimpleNetworkConnection('127.0.0.1:4444', "TCP Server 127.0.0.1:8888", queue)]
+
+
+@pytest.fixture
+def simple_network_connection(simple_network_connections) -> SimpleNetworkConnectionType:
+    return simple_network_connections[0]

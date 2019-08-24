@@ -12,7 +12,7 @@ from lib.networking.connections_manager import connections_manager
 from lib.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator,  Generator, Any, AnyStr, Dict, Sequence, Type
+from typing import AsyncGenerator,  Generator, Any, Dict, Sequence, Type
 from lib.compatibility import Protocol
 from .types import MessageObjectType, CodecType
 
@@ -24,7 +24,7 @@ class BaseMessageObject(MessageObject, Protocol):
     id_attr = 'id'
     stats_logger = None
 
-    encoded: AnyStr
+    encoded: bytes
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
@@ -125,20 +125,20 @@ class BaseCodec(Codec):
     def __post_init__(self):
         pass
 
-    def decode(self, encoded: AnyStr, **kwargs) -> Generator[Sequence[AnyStr, Any], None, None]:
+    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[bytes, Any], None, None]:
         yield (encoded, encoded)
 
-    def encode(self, decoded: Any, **kwargs) -> AnyStr:
+    def encode(self, decoded: Any, **kwargs) -> bytes:
         return decoded
 
     def decode_one(self, encoded: bytes, **kwargs) -> Any:
         return next(self.decode(encoded, **kwargs))
 
-    def _from_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
+    def _from_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]:
         for encoded, decoded in self.decode(encoded, **kwargs):
             yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
 
-    def decode_buffer(self, encoded: AnyStr, **kwargs) -> Generator[MessageObjectType, None, None]:
+    def decode_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]:
         i = 0
         for i, msg in enumerate(self._from_buffer(encoded, **kwargs)):
             self.logger.on_msg_decoded(msg)
@@ -158,9 +158,4 @@ class BaseCodec(Codec):
     async def one_from_file(self, file_path: Path, **kwargs) -> MessageObjectType:
         return await aone(self.from_file(file_path, **kwargs))
 
-
-class TextMixin:
-    read_mode = 'r'
-    write_mode = 'w'
-    append_mode = 'a'
 

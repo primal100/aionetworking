@@ -1,4 +1,5 @@
 import pytest
+from lib.formats.contrib.json import JSONObject
 from lib.formats.recording import get_recording
 from lib.utils import alist
 
@@ -33,8 +34,8 @@ class TestJsonCodec:
 
 
 class TestJsonObject:
-    def test_00_get_codec(self, json_codec, object_class, context):
-        codec = object_class.get_codec(context=context)
+    def test_00_get_codec(self, json_codec, context):
+        codec = JSONObject.get_codec(context=context)
         assert codec == json_codec
 
     def test_01_properties(self, json_object, timestamp):

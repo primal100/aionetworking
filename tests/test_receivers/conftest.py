@@ -7,11 +7,6 @@ from pytest_lazyfixture import lazy_fixture
 
 
 @pytest.fixture
-def is_text(receiver_args):
-    return receiver_args[3]
-
-
-@pytest.fixture
 async def pipe_path() -> Path:
     path = pipe_address_by_os()
     yield path
@@ -95,13 +90,13 @@ def server_args(request) -> Tuple:
         False],
     pytest.param(
         lazy_fixture((pipe_server_one_way.__name__, pipe_server_one_way_started.__name__,
-                      pipe_server_one_way_quiet.__name__)) + [True],
+                      pipe_server_one_way_quiet.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
     pytest.param(
         lazy_fixture((pipe_server_one_way.__name__, pipe_server_one_way_started.__name__,
-                      pipe_server_one_way_quiet.__name__)) + [False],
+                      pipe_server_one_way_quiet.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     )])

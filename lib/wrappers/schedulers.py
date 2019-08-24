@@ -1,7 +1,6 @@
 from __future__ import annotations
 import asyncio
 import contextvars
-import contextlib
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, Dict
@@ -24,7 +23,8 @@ class TaskScheduler:
     def task_done(self, future: asyncio.Future) -> None:
         self._counter.decrement()
 
-    def create_task(self, coro: Awaitable, name: str = None, include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
+    def create_task(self, coro: Awaitable, name: str = None, include_hierarchy: bool = True,
+                    separator: str = ':') -> asyncio.Future:
         self._counter.increment()
         task = asyncio.create_task(coro)
         set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)

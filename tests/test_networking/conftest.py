@@ -23,11 +23,6 @@ from tests.test_logging.conftest import *
 
 
 @pytest.fixture
-def is_text(connection_args):
-    return connection_args[6]
-
-
-@pytest.fixture
 def initial_server_context() -> Dict[str, Any]:
     return {'endpoint': 'TCP Server 127.0.0.1:8888'}
 
@@ -38,49 +33,19 @@ def initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-async def connections_manager() -> ConnectionsManager:
-    from lib.networking.connections_manager import connections_manager
-    yield connections_manager
-    connections_manager.clear()
-
-
-@dataclass
-class SimpleNetworkConnection:
-    peer: str
-    parent_name: str
-    queue: asyncio.Queue
-
-    async def wait_all_messages_processed(self) -> None: ...
-
-    def encode_and_send_msg(self, msg_decoded: Any) -> None:
-        self.queue.put_nowait(msg_decoded)
-
-
-@pytest.fixture
-def simple_network_connections(queue, peer_str) -> List[SimpleNetworkConnectionType]:
-    return [SimpleNetworkConnection(peer_str, "TCP Server 127.0.0.1:8888", queue),
-            SimpleNetworkConnection('127.0.0.1:4444', "TCP Server 127.0.0.1:8888", queue)]
-
-
-@pytest.fixture
-def simple_network_connection(simple_network_connections) -> SimpleNetworkConnectionType:
-    return simple_network_connections[0]
-
-
-@pytest.fixture
-def one_way_receiver_adaptor(object_class, buffered_file_storage_action, buffered_file_storage_recording_action, context,
+def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context,
                              receiver_connection_logger) -> ReceiverAdaptor:
     context_cv.set(context)
     connection_logger_cv.set(receiver_connection_logger)
-    return ReceiverAdaptor(object_class, action=buffered_file_storage_action,
+    return ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                            preaction=buffered_file_storage_recording_action)
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(object_class, context_client, sender_connection_logger, deque) -> SenderAdaptor:
+async def one_way_sender_adaptor(context_client, sender_connection_logger, deque) -> SenderAdaptor:
     context_cv.set(context_client)
     connection_logger_cv.set(sender_connection_logger)
-    yield SenderAdaptor(object_class, send=deque.append)
+    yield SenderAdaptor(JSONObject, send=deque.append)
 
 
 @pytest.fixture
@@ -88,7 +53,7 @@ async def file_containing_json_recording(tmpdir, buffer_codec, json_encoded_mult
     obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
     await asyncio.sleep(1)
     obj2 = buffer_codec.from_decoded(json_encoded_multi[1],
-                                     received_timestamp=timestamp + timedelta(seconds=1, microseconds=200))
+                                     received_timestamp=timestamp + timedelta(seconds=1, microseconds=200000))
     p = Path(tmpdir.mkdir("recording") / "json.recording")
     p.write_bytes(obj1.encoded + obj2.encoded)
     return p
@@ -166,24 +131,24 @@ def connection_is_stored(connection_args):
 
 @pytest.fixture
 def protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                    receiver_logger, object_class, initial_server_context) -> StreamServerProtocolFactory:
+                                    receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     logger_cv.set(receiver_logger)
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
-        dataformat=object_class)
+        dataformat=JSONObject)
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
 
 
 @pytest.fixture
-def protocol_factory_one_way_client(sender_logger, object_class, initial_client_context) -> StreamClientProtocolFactory:
+def protocol_factory_one_way_client(sender_logger, initial_client_context) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     logger_cv.set(sender_logger)
     factory = StreamClientProtocolFactory(
-        dataformat=object_class)
+        dataformat=JSONObject)
     if not factory.full_name:
         factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
@@ -191,10 +156,10 @@ def protocol_factory_one_way_client(sender_logger, object_class, initial_client_
 
 @pytest.fixture
 async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                      receiver_logger, object_class, initial_server_context) -> TCPServerConnection:
+                                      receiver_logger, initial_server_context) -> TCPServerConnection:
     logger_cv.set(receiver_logger)
     context_cv.set(initial_server_context)
-    conn = TCPServerConnection(dataformat=object_class, action=buffered_file_storage_action,
+    conn = TCPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
                               parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
                               preaction=buffered_file_storage_recording_action)
     yield conn
@@ -204,10 +169,10 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 
 
 @pytest.fixture
-async def tcp_protocol_one_way_client(sender_logger, object_class, initial_client_context) -> TCPClientConnection:
+async def tcp_protocol_one_way_client(sender_logger, initial_client_context) -> TCPClientConnection:
     logger_cv.set(sender_logger)
     context_cv.set(initial_client_context)
-    conn = TCPClientConnection(dataformat=object_class, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
+    conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
     yield conn
     if not conn.is_closing():
         conn.connection_lost(None)
@@ -215,10 +180,11 @@ async def tcp_protocol_one_way_client(sender_logger, object_class, initial_clien
 
 
 @pytest.fixture(params=[
-    lazy_fixture((protocol_factory_one_way_server.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__, one_way_receiver_adaptor.__name__, peername.__name__)) + [True, True],
-    lazy_fixture((protocol_factory_one_way_server.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__, one_way_receiver_adaptor.__name__, peername.__name__)) + [True, False],
-    lazy_fixture((protocol_factory_one_way_client.__name__, tcp_protocol_one_way_client.__name__, tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False, True],
-    lazy_fixture((protocol_factory_one_way_client.__name__, tcp_protocol_one_way_client.__name__, tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False, False],
+    lazy_fixture((
+                 protocol_factory_one_way_server.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__,
+                 one_way_receiver_adaptor.__name__, peername.__name__)) + [True],
+    lazy_fixture((protocol_factory_one_way_client.__name__, tcp_protocol_one_way_client.__name__,
+                  tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False],
 ])
 def connection_args(request):
     return request.param

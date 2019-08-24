@@ -49,15 +49,16 @@ class Counter:
     def _check_num_waiters(self):
         if self._num in self._num_waiters:
             self._num_waiters[self._num].set_result(True)
-            self._num_waiters.pop(self._num)
+            fut = self._num_waiters.pop(self._num)
+            assert fut.done()
 
     def _check_total_increment_waiters(self):
         if self._total_increments in self._total_increment_waiters:
             self._total_increment_waiters[self._total_increments].set_result(True)
-            self._total_increment_waiters.pop(self._total_increments)
+            fut = self._total_increment_waiters.pop(self._total_increments)
+            assert fut.done()
 
-    @staticmethod
-    async def _wait_for(num: int, target_num: int, waiters: DefaultDict[int, asyncio.Future]):
+    async def _wait_for(self, num: int, target_num: int, waiters: DefaultDict[int, asyncio.Future]):
         if num == target_num:
             return
         fut = waiters[num]

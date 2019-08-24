@@ -8,28 +8,6 @@ from lib.formats.recording import get_recording_from_file
 from lib.utils import alist
 
 
-class TestManagedFile:
-
-    @pytest.mark.asyncio
-    async def test_00_open_close(self, tmp_path, managed_file, append_mode):
-        assert ManagedFile.num_files() == 1
-        new_path = tmp_path/'managed_file2'
-        f2 = ManagedFile.open(new_path, mode=append_mode)
-        assert ManagedFile.num_files() == 2
-        await f2.close()
-        assert ManagedFile.num_files() == 1
-        await managed_file.close()
-        assert ManagedFile.num_files() == 0
-
-    @pytest.mark.asyncio
-    async def test_01_close_all(self, tmp_path, managed_file, append_mode):
-        assert ManagedFile.num_files() == 1
-        ManagedFile.open(tmp_path / 'managed_file2', mode=append_mode)
-        assert ManagedFile.num_files() == 2
-        await ManagedFile.close_all()
-        assert ManagedFile.num_files() == 0
-
-
 class TestJsonFileStorage:
 
     @pytest.mark.asyncio
@@ -49,9 +27,29 @@ class TestJsonFileStorage:
         assert file_storage_action.filter(json_object) is False
 
 
-class TestManagedFileJSON:
+class TestManagedFile:
+
     @pytest.mark.asyncio
-    async def test_00_writes(self, managed_file, json_objects, json_codec, json_buffer):
+    async def test_00_open_close(self, tmp_path, managed_file):
+        assert ManagedFile.num_files() == 1
+        new_path = tmp_path/'managed_file2'
+        f2 = ManagedFile.open(new_path, mode='ab')
+        assert ManagedFile.num_files() == 2
+        await f2.close()
+        assert ManagedFile.num_files() == 1
+        await managed_file.close()
+        assert ManagedFile.num_files() == 0
+
+    @pytest.mark.asyncio
+    async def test_01_close_all(self, tmp_path, managed_file):
+        assert ManagedFile.num_files() == 1
+        ManagedFile.open(tmp_path / 'managed_file2', mode='ab')
+        assert ManagedFile.num_files() == 2
+        await ManagedFile.close_all()
+        assert ManagedFile.num_files() == 0
+
+    @pytest.mark.asyncio
+    async def test_02_writes(self, managed_file, json_objects, json_codec, json_buffer):
         await asyncio.wait([managed_file.write(obj.encoded) for obj in json_objects])
         items = await alist(json_codec.from_file(managed_file.path))
         assert sorted(items, key=str) == sorted(json_objects, key=str)

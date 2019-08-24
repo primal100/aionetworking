@@ -3,7 +3,7 @@ import pytest
 import pickle
 
 
-class TestTCPServerOneWay:
+class TestStreamOneWay:
 
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, protocol_factory, connection, transport, connection_is_stored,

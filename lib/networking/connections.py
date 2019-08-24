@@ -17,7 +17,7 @@ from .protocols import (
     ConnectionDataclassProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr, TransportType)
 from .types import AdaptorType, SenderAdaptorType
 
-from typing import AnyStr, NoReturn, Optional, Tuple, Type, Dict, Any
+from typing import NoReturn, Optional, Tuple, Type, Dict, Any
 from lib.compatibility import Protocol
 
 
@@ -225,13 +225,13 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.close()
         self.finish_connection(exc)
 
-    def data_received(self, data: AnyStr) -> None:
+    def data_received(self, data: bytes) -> None:
         self._adaptor.on_data_received(data)
 
     def eof_received(self) -> bool:
         return False
 
-    def send(self, msg: AnyStr) -> None:
+    def send(self, msg: bytes) -> None:
         self.transport.write(msg)
 
 
@@ -245,7 +245,7 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
         self._peer = peer
         super().initialize_connection(transport, peer=peer)
 
-    def send(self, msg: AnyStr) -> None:
+    def send(self, msg: bytes) -> None:
         self.transport.sendto(msg, self._peer)
 
 

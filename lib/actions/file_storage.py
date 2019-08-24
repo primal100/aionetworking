@@ -22,7 +22,7 @@ class ManagedFile:
     path: Path
     mode: str = 'ab'
     buffering: int = -1
-    timeout: int = 5
+    timeout: int = 10
     logger: Logger = field(default_factory=logger_cv.get)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: ManagedFile = field(default=None)
@@ -43,9 +43,9 @@ class ManagedFile:
         return f
 
     @classmethod
-    async def close_all(cls) -> None:
+    async def close_all(cls, base_path: Path = None) -> None:
         if cls._open_files:
-            await asyncio.wait([f.close() for f in cls._open_files.values()])
+            await asyncio.wait([f.close() for f in cls._open_files.values() if f.is_in(base_path)])
 
     @classmethod
     def num_files(cls):
@@ -56,13 +56,20 @@ class ManagedFile:
         self._task = asyncio.create_task(self.manage())
         set_task_name(self._task, f"ManagedFile:{self.path.name}")
 
+    def is_in(self, path) -> bool:
+        try:
+            self.path.relative_to(path)
+            return True
+        except ValueError:
+            return False
+
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb): ...
 
     def is_closing(self):
-        return self._status.is_stopping_or_stopped()
+        return self._status.has_started() and self._status.is_stopping_or_stopped()
 
     async def wait_closed(self):
         return await self._status.wait_stopped()
@@ -83,19 +90,21 @@ class ManagedFile:
         await fut
 
     async def close(self) -> None:
-        self._status.set_stopping()
-        self.logger.debug('Closing file %s', self.path)
-        if not self._task.done():
-            await self.wait_has_started()
-            await self.wait_writes_done()
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        else:
-            self.logger.debug('File %s already closed', self.path)
-        self.logger.debug('Closed file %s', self.path)
+        if not self.is_closing():
+            await self._status.wait_started()
+            self._status.set_stopping()
+            self.logger.debug('Closing file %s', self.path)
+            if not self._task.done():
+                await self.wait_has_started()
+                await self.wait_writes_done()
+                self._task.cancel()
+                try:
+                    await self._task
+                except asyncio.CancelledError:
+                    pass
+            else:
+                self.logger.debug('File %s already closed', self.path)
+            self.logger.debug('Closed file %s', self.path)
 
     async def wait_writes_done(self) -> None:
         self.logger.debug('Waiting for writes to complete for %s', self.path)
@@ -168,6 +177,7 @@ class BaseFileStorage(BaseAction, Protocol):
             self.mode += 'b'
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
+        self._status.is_started()
 
     def _get_full_path(self, msg: MessageObjectType) -> Path:
         return self.base_path / self._get_path(msg)
@@ -194,6 +204,7 @@ class BaseFileStorage(BaseAction, Protocol):
         return path
 
     async def do_one(self, msg: MessageObjectType) -> None:
+        self._status.set_started()
         await self.write_one(msg)
 
 
@@ -211,12 +222,15 @@ class BufferedFileStorage(BaseFileStorage):
     name = 'Buffered File Storage'
     mode: str = 'a'
 
+    close_file_after_inactivity: int = 10
     buffering: int = -1
 
     async def _write_to_file(self, path: Path, data: AnyStr) -> None:
-        async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering, timeout=self.timeout,
-                                    logger=self.logger) as f:
+        async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
+                                    timeout=self.close_file_after_inactivity, logger=self.logger) as f:
             await f.write(data)
 
     async def close(self) -> None:
-        await ManagedFile.close_all()
+        self._status.set_stopping()
+        await ManagedFile.close_all(base_path=self.base_path)
+        self._status.set_stopped()

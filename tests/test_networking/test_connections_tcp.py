@@ -55,7 +55,7 @@ class TestConnectionOneWayServer:
                                     json_objects, tcp_transport):
         tcp_protocol_one_way_server.connection_made(tcp_transport)
         tcp_protocol_one_way_server.data_received(json_rpc_login_request_encoded)
-        await asyncio.sleep(1.1)
+        await asyncio.sleep(1.2)
         tcp_protocol_one_way_server.data_received(json_rpc_logout_request_encoded)
         tcp_protocol_one_way_server.connection_lost(None)
         await asyncio.wait_for(tcp_protocol_one_way_server.wait_closed(), timeout=1)

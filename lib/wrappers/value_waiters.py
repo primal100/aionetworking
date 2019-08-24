@@ -83,6 +83,9 @@ class StatusWaiter(ValueWaiter):
     async def wait_has_started(self):
         return await self.wait_has_had_value('started')
 
+    def has_started(self):
+        return self.has_had_value('started')
+
     def is_started(self):
         return self.is_value('started')
 
