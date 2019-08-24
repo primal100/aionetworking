@@ -8,7 +8,7 @@ import concurrent.futures
 async def test_00_tcp_server_benchmark(connections_manager, receiver_debug_logging_extended,
                                        tcp_server_one_way_benchmark, tcp_client_one_way,
                                        tmp_path, json_rpc_login_request_encoded):
-    num = 1000
+    num = 100
     num_clients = 1
     msgs = [json_rpc_login_request_encoded for _ in range(0, num)]
     loop = asyncio.get_event_loop()

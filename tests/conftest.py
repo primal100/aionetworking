@@ -208,11 +208,11 @@ def log_buffers(raw_received_handler):
 @pytest.fixture
 def receiver_debug_logging_extended(receiver_logging_handler, connection_logging_handler, stats_logging_handler):
     logger = logging.getLogger('receiver')
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(receiver_logging_handler)
     actions_logger = logging.getLogger('receiver.actions')
     actions_logger.addHandler(receiver_logging_handler)
-    actions_logger.setLevel(logging.ERROR)
+    actions_logger.setLevel(logging.DEBUG)
     actions_logger.propagate = False
     sender_connection_logger = logging.getLogger('sender.connection')
     sender_connection_logger.addHandler(connection_logging_handler)
@@ -225,7 +225,7 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('sender.data_received').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
     connection_logger.propagate = False
-    connection_logger.setLevel(logging.ERROR)
+    connection_logger.setLevel(logging.DEBUG)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
     stats_logger.setLevel(logging.INFO)
