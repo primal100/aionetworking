@@ -10,7 +10,6 @@ from lib import settings
 from lib.compatibility import set_task_name, Protocol
 from lib.utils_logging import p
 from lib.wrappers.value_waiters import StatusWaiter
-from lib.settings import FILE_OPENER
 
 from typing import ClassVar, AnyStr
 from lib.formats.types import MessageObjectType
@@ -125,7 +124,7 @@ class ManagedFile:
         try:
             self._status.set_starting()
             self.logger.info('Opening file %s', self.path)
-            async with FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
+            async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
                 while True:
