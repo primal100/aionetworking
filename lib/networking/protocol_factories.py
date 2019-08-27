@@ -1,20 +1,23 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+import contextvars
+import os
 
 from lib.actions.protocols import ActionProtocol
 from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
-from lib.conf.logging import Logger
+from lib.conf.logging import Logger, logger_cv
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
+
 
 from .connections_manager import connections_manager
 from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
-from typing import Any, Dict, Optional, Text, Tuple, Type, Union
+from typing import Optional, Text, Tuple, Type, Union
 
 
 @dataclass
@@ -27,19 +30,22 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
     logger: Logger = Logger('receiver')
+    _context: contextvars.Context = field(default=None, init=False)
 
     async def start(self) -> None:
-        starts = []
+        self._context = contextvars.copy_context()
+        coros = []
         if self.action:
-            starts.append(self.action.start())
+            coros.append(self.action.start())
         if self.preaction:
-            starts.append(self.preaction.start())
+            coros.append(self.preaction.start())
         if self.requester:
-            starts.append(self.requester.start())
-        await asyncio.wait(starts)
+            coros.append(self.requester.start())
+        if coros:
+            await asyncio.wait(coros)
 
     def __call__(self) -> NetworkConnectionType:
-        return self._new_connection()
+        return self._context.run(self._new_connection)
 
     def _new_connection(self) -> NetworkConnectionType:
         context_cv.set(context_cv.get().copy())

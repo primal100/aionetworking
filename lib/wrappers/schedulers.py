@@ -51,12 +51,13 @@ class TaskScheduler:
             self.task_done(future)
 
     def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, task_name: str = None,
-                       include_hierarchy: bool = True, separator: str = ':', **kwargs) -> None:
+                       include_hierarchy: bool = True, separator: str = ':', **kwargs) -> asyncio.Future:
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        self.task_with_callback(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
+        task = self.task_with_callback(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
                                 separator=separator)
+        return task
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()

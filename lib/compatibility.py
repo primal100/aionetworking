@@ -6,10 +6,10 @@ py38 = sys.version_info >= (3, 8)
 
 
 if py38:
-    from typing import Protocol
+    from typing import Protocol, TypedDict
     from functools import cached_property, singledispatchmethod
 else:
-    from typing_extensions import Protocol
+    from typing_extensions import Protocol, TypedDict
     from cached_property import cached_property
     from singledispatchmethod import singledispatchmethod
 

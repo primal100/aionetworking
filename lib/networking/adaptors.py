@@ -33,6 +33,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     context: Dict[str, Any] = field(default_factory=context_cv.get)
     preaction: ActionProtocol = None
     send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
+    timeout: int = 5
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -58,23 +59,26 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.encode_and_send_msg(decoded_msg)
 
     async def _run_preaction(self, buffer: bytes, timestamp: datetime = None) -> None:
+        self.logger.info('Running preaction')
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
+    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future:
         self.logger.on_buffer_received(buffer)
         timestamp = timestamp or datetime.now()
         if self.preaction:
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp), name=f"{self.context['peer']}-Preaction")
         msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        self.process_msgs(msgs_generator, buffer)
+        task = self._scheduler.create_task(self.process_msgs(msgs_generator, buffer))
+        task.add_done_callback(self._scheduler.task_done)
+        return task
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
-        await self._scheduler.close()
+        await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None: ...
+    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None: ...
 
 
 @dataclass
@@ -169,15 +173,26 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
+    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
+        self.logger.info('Processing messages')
+        tasks = []
         try:
-            for msg_obj in msgs:
+            for i, msg_obj in enumerate(msgs):
                 if not self.action.filter(msg_obj):
-                    self._scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
-                                                   task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
-                                                   msg_obj=msg_obj)
+                    if i == 0:
+                        first = True
+                    else:
+                        first = False
+                    task = self._scheduler.create_promise(self.action.do_one(msg_obj, first=first), self._on_success, self._on_exception,
+                                                          task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
+                                                          msg_obj=msg_obj)
+                    tasks.append(task)
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
+            self.action.set_qsize(i+1)
+            self.logger.info('Created tasks')
+            await asyncio.wait(tasks)
+            self.logger.info('Tasks complete for %s messages', i+1)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)

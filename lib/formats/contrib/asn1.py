@@ -2,7 +2,10 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 from concurrent.futures import ProcessPoolExecutor
-from pycrate_core.charpy import Charpy
+try:
+    from pycrate_core.charpy import Charpy
+except ImportError:
+    Charpy = None
 
 from lib.formats.base import BaseCodec, BaseMessageObject
 from lib.utils import adapt_asn_domain, asn_timestamp_to_datetime

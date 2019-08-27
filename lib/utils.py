@@ -151,7 +151,7 @@ def set_uvloop_policy_linux() -> None:
 
 
 def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) -> None:
-    if os.name == 'linux':
+    if os.name == 'posix':
         if linux_loop_type == 'selector':
             set_selector_loop_policy_linux()
         elif linux_loop_type == 'uvloop':

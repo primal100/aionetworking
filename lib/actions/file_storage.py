@@ -87,9 +87,12 @@ class ManagedFile:
         self.logger.debug('Cleanup completed for %s', self.path)
         self._status.set_stopped()
 
-    async def write(self, data: AnyStr) -> None:
+    async def write(self, data: AnyStr, max_qsize=None) -> None:
         fut = asyncio.Future()
         await self._queue.put((data, fut))
+        #self._queue.put_nowait((data, fut))
+        if max_qsize and self._queue.qsize() == max_qsize:
+            self.logger.info('All items added to queue')
         await fut
 
     async def close(self) -> None:
@@ -130,6 +133,7 @@ class ManagedFile:
                 while True:
                     self.logger.debug('Retrieving item from queue for file %s', self.path)
                     data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
+                    self.logger.info('Retrieved first item from queue')
                     futs = [fut]
                     try:
                         while not self._queue.empty():
@@ -142,7 +146,7 @@ class ManagedFile:
                         self.logger.debug('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
                         await f.write(data)
                         await f.flush()
-                        self.logger.debug('%s written to file %s', p.no('byte', len(data)), self.path)
+                        self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
                         for fut in futs:
                             fut.set_result(True)
                     except Exception as e:
@@ -151,7 +155,7 @@ class ManagedFile:
                     finally:
                         for _ in futs:
                             self._queue.task_done()
-                    self.logger.debug('Task done set for %s on file %s', p.no('item', len(futs)), self.path)
+                    self.logger.info('Task done set for %s on file %s', p.no('item', len(futs)), self.path)
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
         except asyncio.CancelledError as e:
@@ -200,13 +204,14 @@ class BaseFileStorage(BaseAction, Protocol):
     async def write_one(self, msg: MessageObjectType) -> Path:
         path = self._get_full_path(msg)
         msg.logger.debug('Writing to file %s', path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         data = self._get_data(msg)
         await self._write_to_file(path, data)
         msg.logger.debug('Data written to file %s', path)
         return path
 
-    async def do_one(self, msg: MessageObjectType) -> None:
+    async def do_one(self, msg: MessageObjectType, first=True) -> None:
+        if first:
+            self.logger.info('Running first task to add first item to queue')
         self._status.set_started()
         await self.write_one(msg)
 
@@ -216,7 +221,8 @@ class FileStorage(BaseFileStorage):
     name = 'File Storage'
 
     async def _write_to_file(self, path: Path, data: AnyStr) -> None:
-        async with FILE_OPENER(path, self.mode) as f:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        async with settings.FILE_OPENER(path, self.mode) as f:
             await f.write(data)
 
 
@@ -224,6 +230,7 @@ class FileStorage(BaseFileStorage):
 class BufferedFileStorage(BaseFileStorage):
     name = 'Buffered File Storage'
     mode: str = 'a'
+    _qsize: int = 0
 
     close_file_after_inactivity: int = 10
     buffering: int = -1
@@ -231,9 +238,13 @@ class BufferedFileStorage(BaseFileStorage):
     async def _write_to_file(self, path: Path, data: AnyStr) -> None:
         async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
                                     timeout=self.close_file_after_inactivity, logger=self.logger) as f:
-            await f.write(data)
+            await f.write(data, max_qsize=self._qsize)
 
     async def close(self) -> None:
         self._status.set_stopping()
         await ManagedFile.close_all(base_path=self.base_path)
         self._status.set_stopped()
+
+    def set_qsize(self, i):
+        self.logger.info('setting expected qsize to %s', i)
+        self._qsize = i

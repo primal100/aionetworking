@@ -1,8 +1,9 @@
-from pathlib import Path
+import multiprocessing
 import asyncio
 import pytest
 import concurrent.futures
 from lib import settings
+from pathlib import Path
 from tests.mock import MockFileWriter
 
 
@@ -10,18 +11,18 @@ from tests.mock import MockFileWriter
 async def test_00_tcp_server_benchmark(connections_manager, receiver_debug_logging_extended,
                                        tcp_server_one_way_benchmark, tcp_client_one_way,
                                        tmp_path, json_rpc_login_request_encoded):
-    #settings.FILE_OPENER = MockFileWriter
-    num = 1000
+    settings.FILE_OPENER = MockFileWriter
+    num = 4000
     num_clients = 1
     msgs = [json_rpc_login_request_encoded for _ in range(0, num)]
     loop = asyncio.get_event_loop()
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        futs = []
+        coros = []
         for i in range(0, num_clients):
             override = {'srcip': f'127.0.0.{i + 1}'}
-            fut = loop.run_in_executor(executor, tcp_client_one_way.open_send_msgs, msgs, 0.000025, 1, override)
-            futs.append(fut)
-        await asyncio.wait(futs)
+            coro = loop.run_in_executor(executor, tcp_client_one_way.open_send_msgs, msgs, 0, 1, override)
+            coros.append(coro)
+        await asyncio.wait(coros)
     await asyncio.wait_for(tcp_server_one_way_benchmark.wait_num_has_connected(num_clients), timeout=2)
     await asyncio.wait_for(tcp_server_one_way_benchmark.wait_num_connections(0), timeout=4)
     await asyncio.wait_for(tcp_server_one_way_benchmark.wait_all_tasks_done(), timeout=10)

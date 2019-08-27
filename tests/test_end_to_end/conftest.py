@@ -18,7 +18,7 @@ def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, init
 @pytest.fixture
 async def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
     server = TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
-                       port=sock[1])
+                       port=8886)
     await server.start()
     yield server
     if server.is_started():
@@ -27,6 +27,6 @@ async def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark
 
 @pytest.fixture
 def tcp_client_one_way(protocol_factory_one_way_client, sock, peername):
-    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=8886, srcip=peername[0],
                      srcport=0)
 

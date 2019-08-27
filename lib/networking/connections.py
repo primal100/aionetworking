@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+import datetime
 
 from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
 
@@ -18,7 +19,20 @@ from .protocols import (
 from .types import AdaptorType, SenderAdaptorType
 
 from typing import NoReturn, Optional, Tuple, Type, Dict, Any
-from lib.compatibility import Protocol
+from abc import abstractmethod
+from lib.compatibility import Protocol, TypedDict
+
+
+class PipeExtraDict(TypedDict):
+    addr: Any
+    pipe: Any
+
+
+class PipeTransport(Protocol):
+    _extra: TypedDict
+
+    @abstractmethod
+    def get_extra_info(self, name: Any, default: Any = ...) -> Any: ...
 
 
 @dataclass
@@ -125,6 +139,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     transport: asyncio.BaseTransport = field(default=None, init=False)
     aliases: dict = field(default_factory=dict)
+    pause_reading_on_buffer_size: int = 0
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
     def _raise_message_from_not_authorized_host(self, host: str) -> NoReturn:
@@ -198,7 +213,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
 
     @_update_context.register
-    def _update_context_pipe(self, transport: asyncio.proactor_events._ProactorDuplexPipeTransport, peer: Tuple[str, int] = None):
+    def _update_context_pipe(self, transport: PipeTransport, peer: Tuple[str, int] = None):
         addr = transport.get_extra_info('addr')
         handle = transport.get_extra_info('pipe').handle
         self.context['addr'] = addr
@@ -225,8 +240,21 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.close()
         self.finish_connection(exc)
 
+    def _resume_reading(self, fut: asyncio.Future):
+        interval = datetime.datetime.now() - self.last_received
+        self.logger.info('Buffer processed in %s seconds', interval.total_seconds())
+        self.logger.info('Resumed reading')
+        self.transport.resume_reading()
+
     def data_received(self, data: bytes) -> None:
-        self._adaptor.on_data_received(data)
+        self.last_received = datetime.datetime.now()
+        self.logger.info('Data received')
+        if self.pause_reading_on_buffer_size is not None:
+            if self.pause_reading_on_buffer_size <= len(data):
+                self.transport.pause_reading()
+                self.logger.info('Paused Reading')
+        task = self._adaptor.on_data_received(data)
+        task.add_done_callback(self._resume_reading)
 
     def eof_received(self) -> bool:
         return False

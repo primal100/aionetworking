@@ -1,9 +1,10 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+from lib.conf.logging import connection_logger_cv
 from typing import List, Dict, Any, DefaultDict
 
-from lib.networking.protocols import SimpleNetworkConnectionProtocol
+
 from lib.networking.types import SimpleNetworkConnectionType
 from lib.wrappers.counters import Counters
 from lib.factories import list_defaultdict

@@ -129,7 +129,6 @@ class Logger(BaseLogger):
 class ConnectionLogger(Logger):
 
     def __init__(self, *args, extra: Dict[str, Any] = None, **kwargs):
-        extra = extra or {}
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling('raw_sent', cls=Logger)
@@ -180,11 +179,11 @@ class ConnectionLogger(Logger):
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
 
     def on_buffer_received(self, data: bytes) -> None:
-        self.debug("Received buffer")
+        self.info("Received buffer")
         self._raw_received(data)
 
     def on_buffer_decoded(self, num: int) -> None:
-        self.debug("Decoded %s in buffer", p.no('message', num))
+        self.info("Decoded %s in buffer", p.no('message', num))
 
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
         self._data_sent(msg_obj)
@@ -313,6 +312,7 @@ class StatsLogger(Logger):
 
     def stats(self, tag: str) -> None:
         self._first = False
+        print('printing stats')
         self.info(tag)
         self._total_received += self._stats.received
         self._total_processed += self._stats.processed

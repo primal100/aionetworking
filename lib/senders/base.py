@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
+import os
 
 from dataclasses import dataclass, field
 from lib.networking.types import ProtocolFactoryType, ConnectionType
@@ -8,6 +9,7 @@ from lib.networking.types import ProtocolFactoryType, ConnectionType
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
+from lib.conf.context import context_cv
 from lib.conf.logging import Logger, logger_cv
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from lib.wrappers.value_waiters import StatusWaiter
@@ -83,7 +85,9 @@ class BaseClient(BaseSender, Protocol):
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
+        context_cv.set({'endpoint': self.full_name})
         logger_cv.set(self.logger)
+        await self.protocol_factory.start()
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self._open_connection()
         await self.conn.wait_connected()

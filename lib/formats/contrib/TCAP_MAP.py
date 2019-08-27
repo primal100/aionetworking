@@ -1,7 +1,10 @@
 from __future__ import annotations
 import binascii
 from dataclasses import dataclass
-from pycrate_asn1dir import TCAP_MAP
+try:
+    from pycrate_asn1dir import TCAP_MAP
+except ImportError:
+    TCAP_MAP = 'tcapmap'
 from lib.formats.contrib.asn1 import BaseAsnObject
 from lib.compatibility import cached_property
 
@@ -9,7 +12,7 @@ from lib.compatibility import cached_property
 @dataclass
 class TCAPMAPASNObject(BaseAsnObject):
 
-    asn_class = TCAP_MAP.TCAP_MAP_Messages.TCAP_MAP_Message
+    asn_class = TCAP_MAP
     name = "TCAP_MAP"
     next_otid = 0x00000000
 

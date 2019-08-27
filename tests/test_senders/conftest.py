@@ -5,7 +5,7 @@ from lib.senders.clients import BaseNetworkClient, TCPClient, pipe_client
 
 @pytest.fixture
 def tcp_client_one_way(server_started, protocol_factory_one_way_client, sock, peername):
-    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=8887, srcip=peername[0],
                      srcport=0)
 
 

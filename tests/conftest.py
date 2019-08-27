@@ -9,7 +9,10 @@ import binascii
 import logging
 import os
 import shutil
-from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
+try:
+    from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
+except ImportError:
+    TCAP_MAP_Messages = None
 from pathlib import Path
 
 from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
@@ -147,7 +150,7 @@ def context_pipe_client(pipe_path) -> Dict[str, Any]:
 @pytest.fixture
 def logger_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
+        "{asctime} - {relativeCreated} - {levelname} - {module} - {funcName} - {name} - {message}", style='{'
     )
 
 
@@ -207,12 +210,16 @@ def log_buffers(raw_received_handler):
 
 @pytest.fixture
 def receiver_debug_logging_extended(receiver_logging_handler, connection_logging_handler, stats_logging_handler):
+    default_level = logging.ERROR
     logger = logging.getLogger('receiver')
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(default_level)
+    logger.addHandler(receiver_logging_handler)
+    logger = logging.getLogger('sender')
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(receiver_logging_handler)
     actions_logger = logging.getLogger('receiver.actions')
     actions_logger.addHandler(receiver_logging_handler)
-    actions_logger.setLevel(logging.ERROR)
+    actions_logger.setLevel(default_level)
     actions_logger.propagate = False
     sender_connection_logger = logging.getLogger('sender.connection')
     sender_connection_logger.addHandler(connection_logging_handler)
@@ -223,16 +230,17 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('receiver.data_received').setLevel(logging.ERROR)
     logging.getLogger('sender.raw_received').setLevel(logging.ERROR)
     logging.getLogger('sender.data_received').setLevel(logging.ERROR)
+    logging.getLogger('sender.raw_sent').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
     connection_logger.propagate = False
-    connection_logger.setLevel(logging.ERROR)
+    connection_logger.setLevel(default_level)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
     stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
     logger = logging.getLogger('asyncio')
     logger.addHandler(receiver_logging_handler)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
 
 
 @pytest.fixture
