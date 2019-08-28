@@ -3,6 +3,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
+import time
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
@@ -12,6 +13,7 @@ from lib.conf.context import context_cv
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
 from lib.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from lib.requesters.protocols import RequesterProtocol
+from lib.wrappers.counters import Counter
 from lib.wrappers.schedulers import TaskScheduler
 
 from .protocols import AdaptorProtocol
@@ -39,7 +41,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         context_cv.set(self.context)
         self.codec: BaseCodec = self.dataformat.get_codec()
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
-        self.logger.new_connection
+        self.logger.new_connection()
 
     def send_data(self, msg_encoded: bytes) -> None:
         self.logger.on_sending_encoded_msg(msg_encoded)
@@ -160,7 +162,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         finally:
             self.logger.on_msg_processed(msg_obj)
 
-    def _on_success(self, result, msg_obj: MessageObjectType = None) -> None:
+    def _on_success(self, result, msg_obj: MessageObjectType) -> None:
         try:
             if result:
                 self.encode_and_send_msg(result)
@@ -176,7 +178,9 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
         self.logger.info('Processing messages')
         tasks = []
+        i = 0
         try:
+            decoding_task_creation_start = time.time()
             for i, msg_obj in enumerate(msgs):
                 if not self.action.filter(msg_obj):
                     if i == 0:
@@ -190,8 +194,10 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
+            #self.logger.info('Created tasks')
+            total_time = time.time() - decoding_task_creation_start
+            self.logger.info('Decoding & Task creation took %s seconds', total_time)
             self.action.set_qsize(i+1)
-            self.logger.info('Created tasks')
             await asyncio.wait(tasks)
             self.logger.info('Tasks complete for %s messages', i+1)
         except Exception as exc:

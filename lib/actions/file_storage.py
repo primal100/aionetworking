@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
+import time
 from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 
@@ -87,11 +88,13 @@ class ManagedFile:
         self.logger.debug('Cleanup completed for %s', self.path)
         self._status.set_stopped()
 
-    async def write(self, data: AnyStr, max_qsize=None) -> None:
+    async def write(self, data: AnyStr, max_qsize=None, first_time: bool = False) -> None:
         fut = asyncio.Future()
         self._queue.put_nowait((data, fut))
         if max_qsize and self._queue.qsize() == max_qsize:
-            self.logger.info('All items added to queue')
+            #self.logger.info('All items added to queue')
+            last_time = time.time()
+            self.logger.info('Adding items to queue took %s seconds', last_time - first_time)
         await fut
 
     async def close(self) -> None:
@@ -200,19 +203,20 @@ class BaseFileStorage(BaseAction, Protocol):
     @abstractmethod
     async def _write_to_file(self, path: Path, data: AnyStr): ...
 
-    async def write_one(self, msg: MessageObjectType) -> Path:
+    async def write_one(self, msg: MessageObjectType, first_time: float) -> Path:
         path = self._get_full_path(msg)
         msg.logger.debug('Writing to file %s', path)
         data = self._get_data(msg)
-        await self._write_to_file(path, data)
+        await self._write_to_file(path, data, first_time)
         msg.logger.debug('Data written to file %s', path)
         return path
 
     async def do_one(self, msg: MessageObjectType, first=True) -> None:
         if first:
+            self.first_time = time.time()
             self.logger.info('Running first task to add first item to queue')
         self._status.set_started()
-        await self.write_one(msg)
+        await self.write_one(msg, self.first_time)
 
 
 @dataclass
@@ -234,10 +238,10 @@ class BufferedFileStorage(BaseFileStorage):
     close_file_after_inactivity: int = 10
     buffering: int = -1
 
-    async def _write_to_file(self, path: Path, data: AnyStr) -> None:
+    async def _write_to_file(self, path: Path, data: AnyStr, first_time: float) -> None:
         async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
                                     timeout=self.close_file_after_inactivity, logger=self.logger) as f:
-            await f.write(data, max_qsize=self._qsize)
+            await f.write(data, max_qsize=self._qsize, first_time=first_time)
 
     async def close(self) -> None:
         self._status.set_stopping()
