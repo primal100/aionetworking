@@ -55,7 +55,7 @@ class LoggingTimeDelta:
             self.td = end_time.dt - start_time.dt
         else:
             self.td = timedelta()
-        self._divisor = self.total_seconds() or 1
+        self._divisor = self.td.total_seconds() or 1.00
 
     def __getattr__(self, item: str) -> Any:
         return getattr(self.td, item)
@@ -66,8 +66,8 @@ class LoggingTimeDelta:
     def __str__(self) -> str:
         return str(self.td)
 
-    def __int__(self) -> int:
-        return int(self.td.total_seconds()) or 1
+    def __float__(self) -> float:
+        return self._divisor
 
     @property
     def _minutes(self) -> float:
@@ -114,7 +114,7 @@ class BytesSizeRate(float):
         return self.__class__(super().__sub__(other))
 
     def __rtruediv__(self, other) -> float:
-        return self.__class__(super().__sub__(int(other)))
+        return self.__class__(super().__sub__(float(other)))
 
     @property
     def bits(self) -> float:
@@ -153,10 +153,10 @@ class BytesSize(int):
         return BytesSize(other + int(self))
 
     def __floordiv__(self, other) -> BytesSizeRate:
-        return BytesSizeRate(int(self).__floordiv__(int(other)))
+        return BytesSizeRate(float(self).__floordiv__(float(other)))
 
     def __truediv__(self, other) -> BytesSizeRate:
-        return BytesSizeRate(int(self).__truediv__(int(other)))
+        return BytesSizeRate(float(self).__truediv__(float(other)))
 
     @property
     def bits(self):
@@ -194,6 +194,7 @@ class MsgsCount:
     first_received = None
     last_received = None
     first_sent = None
+    last_sent = None
     last_processed = None
 
     @property
@@ -207,6 +208,14 @@ class MsgsCount:
     @property
     def receive_interval(self) -> LoggingTimeDelta:
         return LoggingTimeDelta(self.first_received, self.last_received)
+
+    @property
+    def send_rate(self) -> float:
+        return self.sent / self.send_interval
+
+    @property
+    def send_interval(self) -> LoggingTimeDelta:
+        return LoggingTimeDelta(self.first_sent, self.last_sent)
 
     @property
     def processing_time(self) -> LoggingTimeDelta:

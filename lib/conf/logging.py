@@ -218,7 +218,7 @@ class StatsTracker:
     largest_buffer: BytesSize = field(default_factory=BytesSize, init=False)
     msgs: MsgsCount = field(default_factory=MsgsCount, init=False)
 
-    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'largest_buffer',
+    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'largest_buffer', 'send_rate',
              'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent', 'msgs_per_buffer')
 
     def __post_init__(self):
@@ -231,6 +231,10 @@ class StatsTracker:
     @property
     def receive_rate(self) -> float:
         return self.received / (self.msgs.receive_interval or 1)
+
+    @property
+    def send_rate(self) -> float:
+        return self.sent / (self.msgs.send_interval or 1)
 
     @property
     def msgs_per_buffer(self) -> float:
@@ -274,8 +278,9 @@ class StatsTracker:
         self.filtered += len(data)
 
     def on_msg_sent(self, msg: bytes) -> None:
+        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         if not self.msgs.first_sent:
-            self.msgs.first_sent = datetime.now()
+            self.msgs.first_sent = self.msgs.last_sent
         self.msgs.sent += 1
         self.sent += len(msg)
 
@@ -294,6 +299,7 @@ class StatsLogger(Logger):
     _total_filtered = BytesSize()
 
     def __init__(self, logger_name: str, extra: dict, *args, **kwargs):
+        self._logged_last = False
         self._scheduler = TaskScheduler()
         super().__init__(logger_name, *args, extra=extra, **kwargs)
         self._stats = self.stats_cls(datefmt=self.datefmt)
@@ -321,17 +327,16 @@ class StatsLogger(Logger):
     def periodic_log(self) -> None:
         self.stats("INTERVAL")
 
-    def _check_last_message_processed(self) -> None:
-        if (self._total_received + self._stats.received) == (
-                self._total_processed + self._stats.processed + self._total_filtered + self._stats.filtered):
-            self._stats.end_interval()
-            tag = 'ALL' if self._first else 'END'
-            self.stats(tag)
+    def _log_end(self) -> None:
+        self._stats.end_interval()
+        tag = 'ALL' if self._first else 'END'
+        self.stats(tag)
+        self._logged_last = True
 
     def connection_finished(self):
         self._set_closing()
-        self._check_last_message_processed()
         self._scheduler.close_nowait()
+        self._log_end()
 
     async def wait_closed(self):
         await self._scheduler.close()
@@ -343,8 +348,6 @@ class StatsLogger(Logger):
 
     def on_msg_processed(self, msg: MessageObjectType):
         self._stats.on_msg_processed(msg)
-        if self._is_closing:
-            self._check_last_message_processed()
 
     def __getattr__(self, item):
         if self._stats:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
-import os
+import logging
 
 from dataclasses import dataclass, field
 from lib.networking.types import ProtocolFactoryType, ConnectionType
@@ -103,6 +103,13 @@ class BaseClient(BaseSender, Protocol):
     @run_in_loop
     async def open_send_msgs(self, msgs: Sequence[AnyStr], interval: int = None, start_interval: int = 0,
                              override: dict = None) -> None:
+        stats_formatter = logging.Formatter("{msg} {msgs.sent} {sent.kb:.2f}KB {send_rate.kb:.2f}KB/s {msgs.send_rate:.2f}/s {msgs.send_interval}/s {interval}/s", style="{")
+        handler = logging.StreamHandler()
+        handler.setFormatter(stats_formatter)
+        sender_stats_logger = logging.getLogger('sender.stats')
+        sender_stats_logger.addHandler(handler)
+        sender_stats_logger.setLevel(logging.INFO)
+        sender_stats_logger.propagate = False
         if override:
             for k, v in override.items():
                 setattr(self, k, v)
