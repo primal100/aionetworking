@@ -3,7 +3,6 @@ import asyncio
 import pytest
 import concurrent.futures
 from lib import settings
-from pathlib import Path
 from tests.mock import MockFileWriter
 
 

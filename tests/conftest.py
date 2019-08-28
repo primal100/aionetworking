@@ -232,12 +232,13 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('sender.data_received').setLevel(logging.ERROR)
     logging.getLogger('sender.raw_sent').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
-    connection_logger.propagate = False
+    connection_logger.propagate = Falsef
     connection_logger.setLevel(default_level)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
     stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
+    asyncio.get_event_loop().set_debug(False)
     logger = logging.getLogger('asyncio')
     logger.addHandler(receiver_logging_handler)
     logger.setLevel(logging.ERROR)

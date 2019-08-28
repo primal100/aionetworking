@@ -89,8 +89,7 @@ class ManagedFile:
 
     async def write(self, data: AnyStr, max_qsize=None) -> None:
         fut = asyncio.Future()
-        await self._queue.put((data, fut))
-        #self._queue.put_nowait((data, fut))
+        self._queue.put_nowait((data, fut))
         if max_qsize and self._queue.qsize() == max_qsize:
             self.logger.info('All items added to queue')
         await fut

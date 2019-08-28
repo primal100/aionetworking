@@ -312,7 +312,6 @@ class StatsLogger(Logger):
 
     def stats(self, tag: str) -> None:
         self._first = False
-        print('printing stats')
         self.info(tag)
         self._total_received += self._stats.received
         self._total_processed += self._stats.processed

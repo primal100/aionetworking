@@ -39,7 +39,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         context_cv.set(self.context)
         self.codec: BaseCodec = self.dataformat.get_codec()
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
-        self.logger.new_connection()
+        self.logger.new_connection
 
     def send_data(self, msg_encoded: bytes) -> None:
         self.logger.on_sending_encoded_msg(msg_encoded)
