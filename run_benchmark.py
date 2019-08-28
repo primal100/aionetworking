@@ -149,10 +149,9 @@ def receiver_debug_logging_extended(level):
     stats_logger.addHandler(stats_logging_handler())
     stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
-    asyncio.get_event_loop().set_debug(True)
     logger = logging.getLogger('asyncio')
     logger.addHandler(main_handler)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
 
 
 if __name__ == '__main__':
