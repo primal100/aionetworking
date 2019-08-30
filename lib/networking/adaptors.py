@@ -186,6 +186,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
+            await asyncio.sleep(0)
             await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
