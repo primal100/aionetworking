@@ -46,7 +46,6 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 
     def __post_init__(self):
         self.context['protocol_name'] = self.name
-        #self.context['endpoint'] = self.parent_name
 
     def __getattr__(self, item):
         if self._adaptor:
@@ -115,6 +114,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             self._delete_connection()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
+        self._adaptor.logger.info('Finishing connection')
         self._status.set_stopping()
         self._close_task = asyncio.create_task(self._close(exc))
         set_task_name(self._close_task, f"Close:{self.peer}")
@@ -139,7 +139,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     transport: asyncio.BaseTransport = field(default=None, init=False)
     aliases: dict = field(default_factory=dict)
-    pause_reading_on_buffer_size: int = 0
+    pause_reading_on_buffer_size: int = None
+    _unprocessed_data: int = field(default=0, init=False)
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
     def _raise_message_from_not_authorized_host(self, host: str) -> NoReturn:
@@ -241,12 +242,15 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.finish_connection(exc)
 
     def _resume_reading(self, fut: asyncio.Future):
-        if not self.transport.is_reading():
-            self.transport.resume_reading()
-            self.logger.info('Reading resumed')
+        self._unprocessed_data -= fut.result()
+        if (self.pause_reading_on_buffer_size is not None and not self.transport.is_reading() and
+                not self.transport.is_closing()):
+                if self.pause_reading_on_buffer_size >= self._unprocessed_data:
+                    self.transport.resume_reading()
+                    self._adaptor.logger.info('Reading resumed')
 
     def data_received(self, data: bytes) -> None:
-        self.logger.info('Data received')
+        self._unprocessed_data += len(data)
         if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()

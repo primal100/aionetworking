@@ -8,7 +8,7 @@ from lib.actions.protocols import ActionProtocol
 from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
-from lib.conf.logging import Logger, logger_cv
+from lib.conf.logging import Logger
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 
@@ -30,6 +30,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
     logger: Logger = Logger('receiver')
+    pause_reading_on_buffer_size: int = None
     _context: contextvars.Context = field(default=None, init=False)
 
     async def start(self) -> None:
@@ -51,7 +52,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         context_cv.set(context_cv.get().copy())
         self.logger.debug('Creating new connection')
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
-                                   preaction=self.preaction, requester=self.requester, dataformat=self.dataformat)
+                                   preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
+                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size)
 
     def __getstate__(self):
         return dataclass_getstate(self)

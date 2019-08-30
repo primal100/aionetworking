@@ -13,7 +13,6 @@ from lib.conf.context import context_cv
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
 from lib.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from lib.requesters.protocols import RequesterProtocol
-from lib.wrappers.counters import Counter
 from lib.wrappers.schedulers import TaskScheduler
 
 from .protocols import AdaptorProtocol
@@ -81,7 +80,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None: ...
+    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int: ...
 
 
 @dataclass
@@ -176,7 +175,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
+    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
         scheduler = TaskScheduler()
         try:
             for i, msg_obj in enumerate(msgs):
@@ -190,3 +189,4 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
+        return len(buffer)

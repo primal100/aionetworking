@@ -12,7 +12,7 @@ from lib.compatibility import set_task_name, Protocol
 from lib.utils_logging import p
 from lib.wrappers.value_waiters import StatusWaiter
 
-from typing import ClassVar, AnyStr
+from typing import ClassVar, AnyStr, Sequence
 from lib.formats.types import MessageObjectType
 
 
@@ -119,6 +119,11 @@ class ManagedFile:
                 await d
         self.logger.debug('Writes completed for %s', self.path)
 
+    def _task_done(self, num: int) -> None:
+        for _ in range(0, num):
+            self._queue.task_done()
+        self.logger.info('Task done set for %s on file %s', p.no('item', num), self.path)
+
     async def manage(self) -> None:
         if self.previous:
             await self.previous.wait_closed()
@@ -129,9 +134,11 @@ class ManagedFile:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
                 while True:
-                    self.logger.debug('Retrieving item from queue for file %s', self.path)
-                    data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
-                    self.logger.info('Retrieved first item from queue')
+                    self.logger.info('Retrieving item from queue for file %s.' % self.path)
+                    try:
+                        data, fut = self._queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
                     futs = [fut]
                     try:
                         while not self._queue.empty():
@@ -140,8 +147,8 @@ class ManagedFile:
                                 data += item
                                 futs.append(fut)
                             except asyncio.QueueEmpty:
-                                self.logger.info('QueueEmpty error was caught for file %s', self.path)
-                        self.logger.debug('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
+                                self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
+                        self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
                         await f.write(data)
                         await f.flush()
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
@@ -151,9 +158,7 @@ class ManagedFile:
                         for fut in futs:
                             fut.set_exception(e)
                     finally:
-                        for _ in futs:
-                            self._queue.task_done()
-                    self.logger.info('Task done set for %s on file %s', p.no('item', len(futs)), self.path)
+                        asyncio.get_event_loop().call_soon(self._task_done, len(futs))
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
         except asyncio.CancelledError as e:

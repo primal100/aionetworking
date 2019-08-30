@@ -35,24 +35,26 @@ def buffered_file_storage_action() -> BufferedFileStorage:
     return action
 
 
-def protocol_factory_one_way_server() -> StreamServerProtocolFactory:
+def protocol_factory_one_way_server(pause_on_size) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
         action=buffered_file_storage_action(),
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        pause_reading_on_buffer_size=pause_on_size
+    )
     return factory
 
 
-def tcp_server_one_way() -> TCPServer:
-    return TCPServer(protocol_factory=protocol_factory_one_way_server(), host=host, port=port)
+def tcp_server_one_way(pause_on_size) -> TCPServer:
+    return TCPServer(protocol_factory=protocol_factory_one_way_server(pause_on_size), host=host, port=port)
 
 
-async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug):
+async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size):
     loop = asyncio.get_event_loop()
     loop.set_debug(asyncio_debug)
     loop.slow_callback_duration = slow_callback_duration
     json_msg =  b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
     msgs = [json_msg for _ in range(0, num_msgs)]
-    server = tcp_server_one_way()
+    server = tcp_server_one_way(pause_on_size)
     server_task = asyncio.create_task(server.start())
     await server.wait_started()
     client = tcp_client_one_way()
@@ -164,6 +166,8 @@ if __name__ == '__main__':
                         help='number of clients to send messages with')
     parser.add_argument('-n', '--num', default=1, type=int,
                         help='number of messages')
+    parser.add_argument('-p', '--pause_on_size', default=None, type=int,
+                        help='Pause Reading on transport on buffer size')
     parser.add_argument('-l', '--loop', default='selector', type=str,
                         help='loop to use')
     parser.add_argument('-d', '--loglevel', default='ERROR', type=str,
@@ -175,6 +179,7 @@ if __name__ == '__main__':
     args, _numeric_placeholders = parser.parse_known_args()
     num_clients = args.clients
     num_msgs = args.num
+    pause_on_size = args.pause_on_size
     loop_type = args.loop
     loglevel = args.loglevel
     scd = args.slow_duration
@@ -182,4 +187,4 @@ if __name__ == '__main__':
     if loop_type:
         set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
     receiver_debug_logging_extended(loglevel)
-    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug))
+    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size))
