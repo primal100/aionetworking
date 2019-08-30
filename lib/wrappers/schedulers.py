@@ -38,8 +38,8 @@ class TaskScheduler:
         return task
 
     def _process_promise_result(self, future: asyncio.Future):
-        kwargs = additional_cv.get()
         try:
+            kwargs = additional_cv.get()
             exception = future.exception()          #3.8 assignment expression
             if exception:
                 fail = fail_callback_cv.get()
@@ -50,14 +50,14 @@ class TaskScheduler:
         finally:
             self.task_done(future)
 
-    def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None, task_name: str = None,
-                       include_hierarchy: bool = True, separator: str = ':', **kwargs) -> asyncio.Future:
+    def create_promise(self, coro: Awaitable, success: Callable = None, fail: Callable = None,
+                       task_name: str = None, include_hierarchy: bool = True, separator: str = ':',
+                       **kwargs):
         success_callback_cv.set(success)
         fail_callback_cv.set(fail)
         additional_cv.set(kwargs)
-        task = self.task_with_callback(coro, self._process_promise_result, name=task_name, include_hierarchy=include_hierarchy,
-                                separator=separator)
-        return task
+        task = self.task_with_callback(coro, self._process_promise_result, name=task_name,
+                                       include_hierarchy=include_hierarchy, separator=separator)
 
     def create_future(self, name: Any) -> asyncio.Future:
         self._counter.increment()

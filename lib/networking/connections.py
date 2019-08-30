@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-import datetime
+from datetime import datetime
 
 from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
 
@@ -241,18 +241,16 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.finish_connection(exc)
 
     def _resume_reading(self, fut: asyncio.Future):
-        interval = datetime.datetime.now() - self.last_received
-        self.logger.info('Buffer processed in %s seconds', interval.total_seconds())
-        self.logger.info('Resumed reading')
-        self.transport.resume_reading()
+        if not self.transport.is_reading():
+            self.transport.resume_reading()
+            self.logger.info('Reading resumed')
 
     def data_received(self, data: bytes) -> None:
-        self.last_received = datetime.datetime.now()
         self.logger.info('Data received')
         if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()
-                self.logger.info('Paused Reading')
+                self.logger.info('Reading Paused')
         task = self._adaptor.on_data_received(data)
         task.add_done_callback(self._resume_reading)
 

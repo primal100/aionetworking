@@ -69,7 +69,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.on_buffer_received(buffer)
         timestamp = timestamp or datetime.now()
         if self.preaction:
-            self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp), name=f"{self.context['peer']}-Preaction")
+            self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
+                                               name=f"{self.context['peer']}-Preaction")
         msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
         task = self._scheduler.create_task(self.process_msgs(msgs_generator, buffer))
         task.add_done_callback(self._scheduler.task_done)
@@ -127,16 +128,16 @@ class SenderAdaptor(BaseAdaptorProtocol):
         return await self.encode_send_wait(msg_decoded)
 
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None:
-        last_timestamp = None
+        prev_timestamp = None
         self.logger.debug("Playing recording from file %s", file_path)
         async for packet in get_recording_from_file(file_path):
             if (not hosts or packet.sender in hosts) and not packet.sent_by_server:
                 if timing:
-                    if last_timestamp:
-                        timedelta = packet.timestamp - last_timestamp
+                    if prev_timestamp:
+                        timedelta = packet.timestamp - prev_timestamp
                         seconds = timedelta.total_seconds()
                         await asyncio.sleep(seconds)
-                    last_timestamp = packet.timestamp
+                    prev_timestamp = packet.timestamp
                 self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
@@ -176,29 +177,16 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self.encode_and_send_msg(response)
 
     async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
-        self.logger.info('Processing messages')
-        tasks = []
-        i = 0
+        scheduler = TaskScheduler()
         try:
-            decoding_task_creation_start = time.time()
             for i, msg_obj in enumerate(msgs):
                 if not self.action.filter(msg_obj):
-                    if i == 0:
-                        first = True
-                    else:
-                        first = False
-                    task = self._scheduler.create_promise(self.action.do_one(msg_obj, first=first), self._on_success, self._on_exception,
+                    scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
                                                           task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
                                                           msg_obj=msg_obj)
-                    tasks.append(task)
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            #self.logger.info('Created tasks')
-            total_time = time.time() - decoding_task_creation_start
-            self.logger.info('Decoding & Task creation took %s seconds', total_time)
-            self.action.set_qsize(i+1)
-            await asyncio.wait(tasks)
-            self.logger.info('Tasks complete for %s messages', i+1)
+            await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
