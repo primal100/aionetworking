@@ -47,7 +47,7 @@ def tcp_server_one_way(port, pause_on_size) -> TCPServer:
     return TCPServer(protocol_factory=protocol_factory_one_way_server(pause_on_size), host=host, port=port)
 
 
-async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times):
+async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times, timeout):
     loop = asyncio.get_event_loop()
     loop.set_debug(asyncio_debug)
     loop.slow_callback_duration = slow_callback_duration
@@ -66,10 +66,10 @@ async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, paus
                 coro = loop.run_in_executor(executor, client.open_send_msgs, msgs, 0, 1, override)
                 coros.append(coro)
             await asyncio.wait(coros)
-            await asyncio.wait_for(server.wait_num_has_connected(num_clients), timeout=2)
-            await asyncio.wait_for(server.wait_num_connections(0), timeout=2)
-            await asyncio.wait_for(server.close(), timeout=2)
-            await asyncio.wait_for(server_task, timeout=2)
+            await asyncio.wait_for(server.wait_num_has_connected(num_clients), timeout=timeout)
+            await asyncio.wait_for(server.wait_num_connections(0), timeout=timeout)
+            await asyncio.wait_for(server.close(), timeout=timeout)
+            await asyncio.wait_for(server_task, timeout=timeout)
 
 
 def logger_formatter() -> logging.Formatter:
@@ -179,12 +179,14 @@ if __name__ == '__main__':
                         help='number of clients to send messages with')
     parser.add_argument('-n', '--num', default=1, type=int,
                         help='number of messages'),
-    parser.add_argument('-t', '--times', type=int, default=1,
+    parser.add_argument('-i', '--times', type=int, default=1,
                         help='number of times to run benchmark')
     parser.add_argument('-p', '--pause_on_size', default=None, type=int,
                         help='Pause Reading on transport on buffer size')
     parser.add_argument('-l', '--loop', default='selector', type=str,
                         help='loop to use')
+    parser.add_argument('-t', '--timeout', default=5, type=int,
+                        help='timeout for benchmark wait_for')
     parser.add_argument('-r', '--loglevel', default='ERROR', type=str,
                         help='receiver log level')
     parser.add_argument('-s', '--senderloglevel', default='ERROR', type=str,
@@ -201,9 +203,10 @@ if __name__ == '__main__':
     loop_type = args.loop
     loglevel = args.loglevel
     sender_loglevel = args.senderloglevel
+    timeout = args.timeout
     scd = args.slow_duration
     asyncio_debug = args.asyncio_debug
     if loop_type:
         set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
     setup_logging(loglevel, sender_loglevel)
-    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times))
+    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times, timeout=timeout))
