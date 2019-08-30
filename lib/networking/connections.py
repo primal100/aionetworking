@@ -1,9 +1,8 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
-
-from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
+from timeit import timeit
+from .exceptions import MessageFromNotAuthorizedHost
 
 from lib.compatibility import singledispatchmethod, set_task_name
 from lib.conf.context import context_cv
@@ -241,22 +240,19 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.close()
         self.finish_connection(exc)
 
-    def _resume_reading(self, fut: asyncio.Future):
-        self._unprocessed_data -= fut.result()
-        if (self.pause_reading_on_buffer_size is not None and not self.transport.is_reading() and
-                not self.transport.is_closing()):
-                if self.pause_reading_on_buffer_size >= self._unprocessed_data:
-                    self.transport.resume_reading()
-                    self._adaptor.logger.info('Reading resumed')
+    def _resume_reading(self):
+        self.transport.resume_reading()
 
     def data_received(self, data: bytes) -> None:
-        self._unprocessed_data += len(data)
-        if self.pause_reading_on_buffer_size is not None:
+        #self._unprocessed_data += len(data)
+        """if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()
-                self.logger.info('Reading Paused')
+                self.logger.info('Reading Paused')"""
         task = self._adaptor.on_data_received(data)
-        task.add_done_callback(self._resume_reading)
+        self.transport.pause_reading()
+        asyncio.get_event_loop().call_soon(self._resume_reading)
+        #task.add_done_callback(self._resume_reading)
 
     def eof_received(self) -> bool:
         return False

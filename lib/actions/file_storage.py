@@ -12,7 +12,7 @@ from lib.compatibility import set_task_name, Protocol
 from lib.utils_logging import p
 from lib.wrappers.value_waiters import StatusWaiter
 
-from typing import ClassVar, AnyStr, Sequence
+from typing import ClassVar, AnyStr, List
 from lib.formats.types import MessageObjectType
 
 
@@ -119,10 +119,12 @@ class ManagedFile:
                 await d
         self.logger.debug('Writes completed for %s', self.path)
 
-    def _task_done(self, num: int) -> None:
-        for _ in range(0, num):
+    def _task_done(self, futures: List[asyncio.Future]) -> None:
+        num = 0
+        for i, fut in enumerate(futures):
+            fut.set_result(True)
             self._queue.task_done()
-        self.logger.info('Task done set for %s on file %s', p.no('item', num), self.path)
+        self.logger.info('Task done set for %s on file %s', p.no('item', num + 1), self.path)
 
     async def manage(self) -> None:
         if self.previous:
@@ -133,6 +135,8 @@ class ManagedFile:
             async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
+                write_seconds = 0
+                start_time = time.time()
                 while True:
                     self.logger.info('Retrieving item from queue for file %s.' % self.path)
                     try:
@@ -147,24 +151,29 @@ class ManagedFile:
                                 data += item
                                 futs.append(fut)
                             except asyncio.QueueEmpty:
-                                self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
+                                self.logger.error('QueueEmpty error was unexpectedly caught for file %s', self.path)
                         self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
+                        start = time.time()
                         await f.write(data)
                         await f.flush()
+                        end = time.time()
+                        write_seconds += (end - start)
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
-                        for fut in futs:
-                            fut.set_result(True)
                     except Exception as e:
                         for fut in futs:
                             fut.set_exception(e)
                     finally:
-                        asyncio.get_event_loop().call_soon(self._task_done, len(futs))
+                        asyncio.get_event_loop().call_soon(self._task_done, futs)
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
         except asyncio.CancelledError as e:
             self.logger.info('File %s closing due to task being cancelled', self.path)
             raise e
         finally:
+            end_time = time.time()
+            self.logger.info('Was writing to file for %s seconds', write_seconds)
+            total_seconds = end_time - start_time
+            self.logger.info('Was writing to file %s percent of the time', (write_seconds / total_seconds * 100))
             self._cleanup()
 
 

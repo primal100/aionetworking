@@ -89,7 +89,7 @@ class BaseServer(BaseReceiver, Protocol):
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
         await self._stop_server()
         self.logger.info('%s stopped', self.name)
-        await self.protocol_factory.close_actions()
+        await self.protocol_factory.close()
         self._status.set_stopped()
 
     async def wait_num_connections(self, num: int):
@@ -102,7 +102,7 @@ class BaseServer(BaseReceiver, Protocol):
         await self.protocol_factory.wait_all_closed()
 
     async def wait_all_tasks_done(self) -> None:
-        await self.protocol_factory.close()
+        await self.protocol_factory.close_actions()
 
     def is_started(self) -> bool:
         return self._status.is_started()

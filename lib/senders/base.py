@@ -1,7 +1,8 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
-import logging
+import datetime
+import os
 
 from dataclasses import dataclass, field
 from lib.networking.types import ProtocolFactoryType, ConnectionType
@@ -103,22 +104,17 @@ class BaseClient(BaseSender, Protocol):
     @run_in_loop
     async def open_send_msgs(self, msgs: Sequence[AnyStr], interval: int = None, start_interval: int = 0,
                              override: dict = None) -> None:
-        stats_formatter = logging.Formatter("{msg} {msgs.sent} {sent.kb:.2f}KB {send_rate.kb:.2f}KB/s {msgs.send_rate:.2f}/s {msgs.send_interval}/s {interval}/s", style="{")
-        handler = logging.StreamHandler()
-        handler.setFormatter(stats_formatter)
-        sender_stats_logger = logging.getLogger('sender.stats')
-        sender_stats_logger.addHandler(handler)
-        sender_stats_logger.setLevel(logging.INFO)
-        sender_stats_logger.propagate = False
         if override:
             for k, v in override.items():
                 setattr(self, k, v)
         async with self as conn:
+            self.logger.info('starting connection')
             await asyncio.sleep(start_interval)
             for msg in msgs:
                 if interval is not None:
                     await asyncio.sleep(interval)
                 conn.send_data(msg)
+        self.logger.info('closing connection')
 
     @run_in_loop
     async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:

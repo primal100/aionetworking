@@ -115,3 +115,5 @@ class Counters(DefaultDict[Any, Counter]):
     def get_num(self, key: Any) -> int:
         return self[key].num
 
+    def remove(self, key: Any) -> None:
+        self.pop(key, None)
