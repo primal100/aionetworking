@@ -1,9 +1,10 @@
 from abc import abstractmethod
 import asyncio
+import aiofiles
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
-import time
+from tempfile import mkdtemp
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
@@ -23,6 +24,9 @@ from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Opt
 
 def not_implemented_callable(*args, **kwargs) -> None:
     raise NotImplementedError
+
+
+encoded_msg = b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
 
 
 @dataclass
@@ -72,12 +76,17 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     async def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         if not self.first:
             self.first = datetime.now()
-        self.received += len(buffer)
+        buffer_len = len(buffer)
+        num_received = int(buffer_len / self.message_size)
+        self.received += buffer_len
+        data = b''
+        for _ in range(0, num_received):
+            data += encoded_msg
         if self.received == self.expected:
             self.last = datetime.now()
             interval = (self.last - self.first).total_seconds()
             print(f"{self.expected} took {interval} seconds")
-            print(f"Average:{self.expected / 79 / interval}/s")
+            print(f"Average:{self.expected / self.message_size / interval}/s")
         """self.logger.on_buffer_received(buffer)
         #num = int(len(buffer) / 79)
         #self.logger.on_buffer_decoded(num)
