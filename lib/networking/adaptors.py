@@ -80,7 +80,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
-    async def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
+    async def process_msgs(self, buffer: bytes, timestamp: datetime = None):
         self.num_buffers += 1
         if not self.first:
             self.first = datetime.now()
@@ -93,8 +93,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for i in range(0, num_msgs):
             obj = JSONObject(encoded_msg, json.loads(encoded_msg), context=self.context)
             coros.append(self.action.do_one(obj))
-        task = self._scheduler.create_task(asyncio.wait(coros))
-        await task
+        await asyncio.wait(coros)
         self.processed_msgs += num_msgs
         print('processed', self.processed_msgs)
         if self.processed_msgs == self.expected_msgs:
@@ -104,7 +103,10 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             interval = (self.last - self.first).total_seconds()
             print(f"{self.received_msgs} took {interval} seconds")
             print(f"Average:{self.received_msgs / interval}/s")
-        self._scheduler.task_done(task)
+
+    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
+        task = self._scheduler.create_task(self.process_msgs(buffer, timestamp))
+        task.add_done_callback(self._scheduler.task_done)
         """self.logger.on_buffer_received(buffer)
         #num = int(len(buffer) / 79)
         #self.logger.on_buffer_decoded(num)
@@ -122,8 +124,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
         self.logger.connection_finished(exc)
 
-    @abstractmethod
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int: ...
+    #@abstractmethod
+    #async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int: ...
 
 
 @dataclass
@@ -218,7 +220,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
+    """async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
         scheduler = TaskScheduler()
         try:
             for i, msg_obj in enumerate(msgs):
@@ -232,4 +234,4 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
-        return len(buffer)
+        return len(buffer)"""
