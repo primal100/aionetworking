@@ -63,7 +63,7 @@ async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, paus
             coros = []
             for i in range(0, num_clients):
                 override = {'srcip': f'127.0.0.{i + 1}', 'port': port}
-                coro = loop.run_in_executor(executor, client.open_send_msgs, msgs, 0, 1, override)
+                coro = loop.run_in_executor(executor, client.open_send_msgs, msgs, 0.000015, 1, override)
                 coros.append(coro)
             await asyncio.wait(coros)
             await asyncio.wait_for(server.wait_num_has_connected(num_clients), timeout=timeout)
