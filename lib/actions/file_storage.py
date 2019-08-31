@@ -23,6 +23,7 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
+    max_concat: int = 1000
     logger: Logger = field(default_factory=logger_cv.get)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: ManagedFile = field(default=None)
@@ -145,14 +146,16 @@ class ManagedFile:
                         data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
                     futs = [fut]
                     try:
-                        while not self._queue.empty():
+                        i = 0
+                        while not self._queue.empty() and i <= self.max_concat:
                             try:
                                 item, fut = self._queue.get_nowait()
                                 data += item
                                 futs.append(fut)
                             except asyncio.QueueEmpty:
                                 self.logger.error('QueueEmpty error was unexpectedly caught for file %s', self.path)
-                        self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
+                        self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
+                                         self.path)
                         start = time.time()
                         await f.write(data)
                         await f.flush()
@@ -244,6 +247,7 @@ class BufferedFileStorage(BaseFileStorage):
 
     close_file_after_inactivity: int = 10
     buffering: int = -1
+    max_concat: int = 1000
 
     async def _write_to_file(self, path: Path, data: AnyStr) -> None:
         async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,

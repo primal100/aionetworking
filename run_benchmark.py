@@ -27,36 +27,35 @@ def tcp_client_one_way():
     return TCPClient(protocol_factory=protocol_factory_one_way_client(), host=host, port=port)
 
 
-def buffered_file_storage_action() -> BufferedFileStorage:
+def buffered_file_storage_action(max_concat) -> BufferedFileStorage:
     tempdir = mkdtemp()
     action = BufferedFileStorage(base_path=Path(Path(tempdir) / 'Data'), binary=True, close_file_after_inactivity=5,
-                                 path='Encoded/{msg.sender}_{msg.name}.{msg.name}')
+                                 path='Encoded/{msg.sender}_{msg.name}.{msg.name}', max_concat=max_concat)
     return action
 
 
-def protocol_factory_one_way_server(pause_on_size) -> StreamServerProtocolFactory:
+def protocol_factory_one_way_server(max_concat) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
-        action=buffered_file_storage_action(),
+        action=buffered_file_storage_action(max_concat),
         dataformat=JSONObject,
-        pause_reading_on_buffer_size=pause_on_size
     )
     return factory
 
 
-def tcp_server_one_way(port, pause_on_size) -> TCPServer:
-    return TCPServer(protocol_factory=protocol_factory_one_way_server(pause_on_size), host=host, port=port)
+def tcp_server_one_way(port, max_concat) -> TCPServer:
+    return TCPServer(protocol_factory=protocol_factory_one_way_server(max_concat), host=host, port=port)
 
 
-async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times, timeout):
+async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times, timeout, max_concat):
     loop = asyncio.get_event_loop()
     loop.set_debug(asyncio_debug)
     loop.slow_callback_duration = slow_callback_duration
-    json_msg =  b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
+    json_msg = b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
     msgs = [json_msg for _ in range(0, num_msgs)]
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_clients) as executor:
         for i in range(0, times):
             port = 8880 + i
-            server = tcp_server_one_way(port, pause_on_size)
+            server = tcp_server_one_way(port, max_concat)
             server_task = asyncio.create_task(server.start())
             await server.wait_started()
             client = tcp_client_one_way()
@@ -195,6 +194,8 @@ if __name__ == '__main__':
                         help='enable asyncio debug mode')
     parser.add_argument('-d', '--slow-duration', type=float, default=0.1,
                         help='asyncio slow_callback_duration paramater')
+    parser.add_argument('-m', '--max-concat', type=int, default=1000,
+                        help='max items to concat in file storage action')
     args, _numeric_placeholders = parser.parse_known_args()
     num_clients = args.clients
     num_msgs = args.num
@@ -205,8 +206,9 @@ if __name__ == '__main__':
     sender_loglevel = args.senderloglevel
     timeout = args.timeout
     scd = args.slow_duration
+    max_concat = args.max_concat
     asyncio_debug = args.asyncio_debug
     if loop_type:
         set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
     setup_logging(loglevel, sender_loglevel)
-    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times, timeout=timeout))
+    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times, timeout, max_concat))
