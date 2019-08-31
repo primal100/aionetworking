@@ -246,6 +246,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport.resume_reading()
 
     def data_received(self, data: bytes) -> None:
+        print('received', len(data) / self.message_size)
         self.total_received += (len(data) / self.message_size)
         print('data received', self.total_received)
         self._adaptor.on_data_received(data)
