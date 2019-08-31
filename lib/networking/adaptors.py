@@ -87,7 +87,6 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         buffer_len = len(buffer)
         num_msgs = int(buffer_len / self.message_size)
         coros = []
-        print('num msgs', num_msgs)
         self.received_msgs += num_msgs
         print('received', self.received_msgs)
         for i in range(0, num_msgs):
