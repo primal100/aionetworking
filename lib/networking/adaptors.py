@@ -50,6 +50,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
+        #self.queue = asyncio.Queue()
+        #asyncio.create_task(self.manage_file)
         self.codec: BaseCodec = self.dataformat.get_codec()
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
@@ -82,11 +84,10 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.first = datetime.now()
         buffer_len = len(buffer)
         num_received = int(buffer_len / self.message_size)
-        self.received_msgs +=  num_received
+        self.received_msgs += num_received
         self.received_bytes += buffer_len
-        data = b''
-        for _ in range(0, num_received):
-            data += encoded_msg
+        objs = self.codec.decode_buffer(buffer)
+        await asyncio.wait([self.action.do_one(obj) for obj in objs])
         if self.received_msgs == self.expected_msgs:
             self.last = datetime.now()
             print(f"Buffers received: {self.num_buffers}")

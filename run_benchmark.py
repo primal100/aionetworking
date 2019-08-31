@@ -29,6 +29,7 @@ def tcp_client_one_way():
 
 def buffered_file_storage_action(max_concat) -> BufferedFileStorage:
     tempdir = mkdtemp()
+    print(tempdir)
     action = BufferedFileStorage(base_path=Path(Path(tempdir) / 'Data'), binary=True, close_file_after_inactivity=5,
                                  path='Encoded/{msg.sender}_{msg.name}.{msg.name}', max_concat=max_concat)
     return action
