@@ -65,11 +65,12 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self.preaction.do_one(buffer_obj)
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
-        self.logger.on_buffer_received(buffer)
-        num = int(len(buffer) / 90)
-        self.logger.on_buffer_decoded(num)
-        self.logger.on_msg_processed({'jsonrpc': '2.0', 'id': 1, 'method': 'login', 'params': ['user1', 'password']})
-        """timestamp = timestamp or datetime.now()
+        pass
+        """self.logger.on_buffer_received(buffer)
+        #num = int(len(buffer) / 79)
+        #self.logger.on_buffer_decoded(num)
+        #self.logger.on_msg_processed({'jsonrpc': '2.0', 'id': 1, 'method': 'login', 'params': ['user1', 'password']})
+        timestamp = timestamp or datetime.now()
         if self.preaction:
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")

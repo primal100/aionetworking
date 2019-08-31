@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from timeit import timeit
+from datetime import datetime
 from .exceptions import MessageFromNotAuthorizedHost
 
 from lib.compatibility import singledispatchmethod, set_task_name
@@ -227,6 +227,11 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
 @dataclass
 class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
     transport: asyncio.Transport = None
+    received: int = 0
+    expected: int = 3950000
+    message_size: int = 79
+    first: datetime = None
+    last: datetime = None
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
@@ -244,12 +249,20 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport.resume_reading()
 
     def data_received(self, data: bytes) -> None:
+        if not self.first:
+            self.first = datetime.now()
+        self.received += len(data)
+        if self.received == self.expected:
+            self.last = datetime.now()
+            interval = (self.last - self.first).total_seconds()
+            print(f"{self.expected} took {interval} seconds")
+            print(f"Average:{self.expected / 79/ interval}/s")
         #self._unprocessed_data += len(data)
         """if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()
                 self.logger.info('Reading Paused')"""
-        self._adaptor.on_data_received(data)
+        #self._adaptor.on_data_received(data)
         #self.transport.pause_reading()
         #asyncio.get_event_loop().call_soon(self._resume_reading)
         #task.add_done_callback(self._resume_reading)

@@ -161,7 +161,7 @@ def setup_logging(level, sender_loglevel):
     connection_logger.setLevel(receiver_level)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler())
-    stats_logger.setLevel(logging.INFO)
+    stats_logger.setLevel(logging.ERROR)
     stats_logger.propagate = False
     sender_stats_logger = logging.getLogger('sender.stats')
     sender_stats_logger.addHandler(sender_stats_handler())
