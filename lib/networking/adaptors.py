@@ -85,6 +85,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
+        print("buffer length", buffer_len)
         num_msgs = int(buffer_len / self.message_size)
         coros = []
         self.received_msgs += num_msgs
@@ -92,7 +93,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for i in range(0, num_msgs):
             obj = JSONObject(encoded_msg, json.loads(encoded_msg), context=self.context)
             coros.append(self.action.do_one(obj))
-        await asyncio.wait(coros)
+        task = self._scheduler.create_task(asyncio.wait(coros))
+        await task
         self.processed_msgs += num_msgs
         print('processed', self.processed_msgs)
         if self.processed_msgs == self.expected_msgs:
@@ -102,6 +104,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             interval = (self.last - self.first).total_seconds()
             print(f"{self.received_msgs} took {interval} seconds")
             print(f"Average:{self.received_msgs / interval}/s")
+        self._scheduler.task_done(task)
         """self.logger.on_buffer_received(buffer)
         #num = int(len(buffer) / 79)
         #self.logger.on_buffer_decoded(num)
