@@ -39,11 +39,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     preaction: ActionProtocol = None
     send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
-    received: int = 0
-    expected: int = 3950000
+    received_bytes: int = 0
+    expected_msgs: int = 50000
+    expected_bytes: int = 3950000
     message_size: int = 79
     first: datetime = None
     last: datetime = None
+    num_buffers: int = 0
+    received_msgs: int = 9
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -74,20 +77,23 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self.preaction.do_one(buffer_obj)
 
     async def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
+        self.num_buffers += 1
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
         num_received = int(buffer_len / self.message_size)
-        self.received += buffer_len
+        self.received_msgs +=  num_received
+        self.received_bytes += buffer_len
         data = b''
-        print(num_received)
         for _ in range(0, num_received):
             data += encoded_msg
-        if self.received == self.expected:
+        if self.received_msgs == self.expected_msgs:
             self.last = datetime.now()
+            print(f"Buffers received: {self.num_buffers}")
+            print(f"Msgs per buffer: {self.num_buffers / self.expected_msgs}")
             interval = (self.last - self.first).total_seconds()
-            print(f"{self.expected} took {interval} seconds")
-            print(f"Average:{self.expected / self.message_size / interval}/s")
+            print(f"{self.received_msgs} took {interval} seconds")
+            print(f"Average:{self.received_msgs / interval}/s")
         """self.logger.on_buffer_received(buffer)
         #num = int(len(buffer) / 79)
         #self.logger.on_buffer_decoded(num)
