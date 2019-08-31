@@ -251,7 +251,8 @@ class BufferedFileStorage(BaseFileStorage):
 
     async def _write_to_file(self, path: Path, data: AnyStr) -> None:
         async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
-                                    timeout=self.close_file_after_inactivity, logger=self.logger) as f:
+                                    timeout=self.close_file_after_inactivity, logger=self.logger,
+                                    max_concat=self.max_concat) as f:
             await f.write(data)
 
     async def close(self) -> None:
