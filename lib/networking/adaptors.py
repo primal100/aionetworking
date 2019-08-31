@@ -4,7 +4,8 @@ import aiofiles
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
-from tempfile import mkdtemp
+import json
+from lib.formats.contrib.json import JSONObject
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
@@ -46,7 +47,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     first: datetime = None
     last: datetime = None
     num_buffers: int = 0
-    received_msgs: int = 9
+    received_msgs: int = 0
+    processed_msgs: int = 0
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -83,12 +85,15 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
-        num_received = int(buffer_len / self.message_size)
-        self.received_msgs += num_received
-        self.received_bytes += buffer_len
-        objs = self.codec.decode_buffer(buffer)
-        await asyncio.wait([self.action.do_one(obj) for obj in objs])
-        if self.received_msgs == self.expected_msgs:
+        num_msgs = int(buffer_len / self.message_size)
+        coros = []
+        self.received_msgs += num_msgs
+        for i in range(0, num_msgs):
+            obj = JSONObject(encoded_msg, json.loads(encoded_msg), context=self.context)
+            coros.append(self.action.do_one(obj))
+        await asyncio.wait(coros)
+        self.processed_msgs += num_msgs
+        if self.processed_msgs == self.expected_msgs:
             self.last = datetime.now()
             print(f"Buffers received: {self.num_buffers}")
             print(f"Msgs per buffer: {self.num_buffers / self.expected_msgs}")
