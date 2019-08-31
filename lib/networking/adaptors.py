@@ -94,7 +94,6 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             coros.append(self.action.do_one(obj))
         await asyncio.wait(coros)
         self.processed_msgs += num_msgs
-        print('num msgs', num_msgs)
         print('processed', self.processed_msgs)
         if self.processed_msgs == self.expected_msgs:
             self.last = datetime.now()
