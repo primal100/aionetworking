@@ -31,41 +31,49 @@ str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 ###Coroutines###
 async def time_coro(coro):
-    start_time = time.time()
+    start_time = datetime.datetime.now()
     await coro
-    return time.time() - start_time
+    return datetime.datetime.now() - start_time
 
 
 ###Coroutines###
 async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool = False, cleanup: Callable = None,
-                    cleanup_args=(), num_items: int = None, num_bytes: int = None, ignore_first: bool = True, **kwargs):
+                    cleanup_args=(), num_items: int = None, num_bytes: int = None, ignore_first: bool = True,
+                    name: str = None, **kwargs):
     times = []
+    name = name or async_func.__name__
     if not quiet:
-        print("Running", async_func.__name__)
+        print("Running", name)
     total = 0
     if ignore_first:
         await time_coro(async_func(*args, **kwargs))
-        await cleanup(*cleanup_args)
+        if cleanup:
+            await cleanup(*cleanup_args)
     for _ in range(0, num_times):
         time_taken = await time_coro(async_func(*args, **kwargs))
-        await cleanup(*cleanup_args)
+        if cleanup:
+            await cleanup(*cleanup_args)
         times.append(str(time_taken))
-        total += time_taken
-        if not quiet:
-            print(time_taken)
+        total += time_taken.total_seconds()
+        #if not quiet:
+        #    print('Time taken', time_taken)
     average = total / num_times
     if not quiet:
+        print('Num Items:', num_items)
         print("Average time taken:", average)
         if num_items:
             average_per_item = average / num_items
-            items_per_second = 1 / average_per_item
-            print('Num Items:', num_items)
+            print("Average per item", average_per_item)
+            try:
+                items_per_second = 1 / average_per_item
+            except ZeroDivisionError:
+                items_per_second = 0
             print("Average per item:", average_per_item)
             print("Items per second:", items_per_second)
             if num_bytes:
                 print("Bytes per second:", (num_bytes / average))
                 times = '\t'.join(times)
-                print(f"{async_func.__name__}\t{num_bytes}\t{num_items}\t{times}")
+                print(f"{name}\t{num_bytes}\t{num_items}\t{times}")
 
 
 ###Dataclasses###

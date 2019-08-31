@@ -249,9 +249,9 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()
                 self.logger.info('Reading Paused')"""
-        task = self._adaptor.on_data_received(data)
-        self.transport.pause_reading()
-        asyncio.get_event_loop().call_soon(self._resume_reading)
+        self._adaptor.on_data_received(data)
+        #self.transport.pause_reading()
+        #asyncio.get_event_loop().call_soon(self._resume_reading)
         #task.add_done_callback(self._resume_reading)
 
     def eof_received(self) -> bool:

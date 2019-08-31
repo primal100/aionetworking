@@ -195,8 +195,8 @@ class ConnectionLogger(Logger):
     def on_msg_sent(self, data: bytes) -> None:
         self.debug('Message sent')
 
-    def on_msg_processed(self, msg: MessageObjectType) -> None:
-        self.debug('Finished processing message %s', msg.uid)
+    def on_msg_processed(self, msg: Any) -> None:
+        self.debug('Finished processing message')
 
     def on_msg_filtered(self, msg: MessageObjectType) -> None:
         self.debug('Filtered msg %s', msg.uid)
@@ -370,9 +370,9 @@ class ConnectionLoggerStats(ConnectionLogger):
         super().on_buffer_received(msg)
         self._stats_logger.on_buffer_received(msg)
 
-    def on_msg_processed(self, msg: MessageObjectType) -> None:
-        super().on_msg_processed(msg)
-        self._stats_logger.on_msg_processed(msg.encoded)
+    def on_msg_processed(self, data: Any) -> None:
+        super().on_msg_processed(data)
+        self._stats_logger.on_msg_processed(data)
 
     def on_msg_filtered(self, msg: MessageObjectType) -> None:
         super().on_msg_processed(msg)

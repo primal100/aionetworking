@@ -64,16 +64,19 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future:
+    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         self.logger.on_buffer_received(buffer)
-        timestamp = timestamp or datetime.now()
+        num = int(len(buffer) / 90)
+        self.logger.on_buffer_decoded(num)
+        self.logger.on_msg_processed({'jsonrpc': '2.0', 'id': 1, 'method': 'login', 'params': ['user1', 'password']})
+        """timestamp = timestamp or datetime.now()
         if self.preaction:
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")
         msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
         task = self._scheduler.create_task(self.process_msgs(msgs_generator, buffer))
         task.add_done_callback(self._scheduler.task_done)
-        return task
+        return task"""
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
         await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
