@@ -35,6 +35,11 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     preaction: ActionProtocol = None
     send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
+    received: int = 0
+    expected: int = 3950000
+    message_size: int = 79
+    first: datetime = None
+    last: datetime = None
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -65,7 +70,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self.preaction.do_one(buffer_obj)
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
-        pass
+        if not self.first:
+            self.first = datetime.now()
+        self.received += len(buffer)
+        if self.received == self.expected:
+            self.last = datetime.now()
+            interval = (self.last - self.first).total_seconds()
+            print(f"{self.expected} took {interval} seconds")
+            print(f"Average:{self.expected / 79 / interval}/s")
         """self.logger.on_buffer_received(buffer)
         #num = int(len(buffer) / 79)
         #self.logger.on_buffer_decoded(num)
