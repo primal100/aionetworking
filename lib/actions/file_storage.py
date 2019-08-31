@@ -146,14 +146,15 @@ class ManagedFile:
                         data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
                     futs = [fut]
                     try:
-                        i = 0
-                        while not self._queue.empty() and i <= self.max_concat:
+                        i = 1
+                        while not self._queue.empty() and i < self.max_concat:
                             try:
                                 item, fut = self._queue.get_nowait()
                                 data += item
                                 futs.append(fut)
                             except asyncio.QueueEmpty:
                                 self.logger.error('QueueEmpty error was unexpectedly caught for file %s', self.path)
+                            i += 1
                         self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
                                          self.path)
                         start = time.time()
