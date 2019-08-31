@@ -244,7 +244,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport.resume_reading()
 
     def data_received(self, data: bytes) -> None:
-        self._adaptor.on_data_received(data)
+        asyncio.create_task(self._adaptor.on_data_received(data))
         #self._unprocessed_data += len(data)
         """if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):

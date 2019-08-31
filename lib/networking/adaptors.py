@@ -69,7 +69,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
+    async def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         if not self.first:
             self.first = datetime.now()
         self.received += len(buffer)
