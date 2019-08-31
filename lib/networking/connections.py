@@ -140,6 +140,8 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     aliases: dict = field(default_factory=dict)
     pause_reading_on_buffer_size: int = None
     _unprocessed_data: int = field(default=0, init=False)
+    total_received: int = 0
+    message_size: int = 79
     #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
 
     def _raise_message_from_not_authorized_host(self, host: str) -> NoReturn:
@@ -244,6 +246,8 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport.resume_reading()
 
     def data_received(self, data: bytes) -> None:
+        self.total_received += (len(data) / self.message_size)
+        print('data received', self.total_received)
         self._adaptor.on_data_received(data)
         #self._unprocessed_data += len(data)
         """if self.pause_reading_on_buffer_size is not None:
