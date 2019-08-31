@@ -80,6 +80,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         num_received = int(buffer_len / self.message_size)
         self.received += buffer_len
         data = b''
+        print(num_received)
         for _ in range(0, num_received):
             data += encoded_msg
         if self.received == self.expected:
