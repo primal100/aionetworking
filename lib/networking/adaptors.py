@@ -49,6 +49,9 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     num_buffers: int = 0
     received_msgs: int = 0
     processed_msgs: int = 0
+    current_data: bytes = b''
+    lock: asyncio.Lock = asyncio.Lock()
+    futs: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -80,18 +83,32 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         await self.preaction.do_one(buffer_obj)
 
+    async def manage_file(self):
+        self.action.base_path.mkdir(exist_ok=True, parents=True)
+        path = self.action.base_path.joinpath('hello.bin')
+        async with aiofiles.open(path, mode='ab') as f:
+            while True:
+                data = self.current_data
+                futs = self.futs.copy()
+                self.futs = []
+                self.current_data = b''
+                await f.write(data)
+                for fut in futs:
+                    fut.set_result(True)
+
     async def process_msgs(self, buffer: bytes, timestamp: datetime = None):
         self.num_buffers += 1
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
         num_msgs = int(buffer_len / self.message_size)
-        coros = []
+        futs = []
         self.received_msgs += num_msgs
-        """for i in range(0, num_msgs):
-            obj = JSONObject(encoded_msg, json.loads(encoded_msg), context=self.context)
-            coros.append(self.action.do_one(obj))
-        await asyncio.wait(coros)"""
+        for i in range(0, num_msgs):
+            fut = asyncio.Future()
+            futs.append(fut)
+            self.futs.append(fut)
+        await asyncio.wait(futs)
         self.processed_msgs += num_msgs
         if self.processed_msgs == self.expected_msgs:
             self.last = datetime.now()
@@ -194,6 +211,10 @@ class SenderAdaptor(BaseAdaptorProtocol):
 class ReceiverAdaptor(BaseAdaptorProtocol):
     is_receiver = True
     action: ActionProtocol = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.task = asyncio.create_task(self.manage_file())
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         try:
