@@ -52,6 +52,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     current_data: bytes = b''
     lock: asyncio.Lock = asyncio.Lock()
     futs: list = field(default_factory=list)
+    finished: asyncio.Event = field(default_factory=asyncio.Event)
+    has_data: asyncio.Event = field(default_factory=asyncio.Event)
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
@@ -88,13 +90,17 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         path = self.action.base_path.joinpath('hello.bin')
         async with aiofiles.open(path, mode='ab') as f:
             while True:
-                data = self.current_data
-                futs = self.futs.copy()
-                self.futs = []
-                self.current_data = b''
-                await f.write(data)
-                for fut in futs:
-                    fut.set_result(True)
+                await self.has_data.wait()
+                if self.current_data:
+                    data = self.current_data
+                    futs = self.futs.copy()
+                    self.futs = []
+                    self.current_data = b''
+                    await f.write(data)
+                    for fut in futs:
+                        fut.set_result(True)
+                    if not self.current_data:
+                        self.has_data.clear()
 
     async def process_msgs(self, buffer: bytes, timestamp: datetime = None):
         self.num_buffers += 1
@@ -105,9 +111,12 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         futs = []
         self.received_msgs += num_msgs
         for i in range(0, num_msgs):
+            self.finished.clear()
+            self.current_data += encoded_msg
             fut = asyncio.Future()
             futs.append(fut)
             self.futs.append(fut)
+        self.has_data.set()
         await asyncio.wait(futs)
         self.processed_msgs += num_msgs
         if self.processed_msgs == self.expected_msgs:
@@ -117,6 +126,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             interval = (self.last - self.first).total_seconds()
             print(f"{self.received_msgs} took {interval} seconds")
             print(f"Average:{self.received_msgs / interval}/s")
+        if not self.current_data and not self.has_data.is_set():
+            self.finished.set()
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         task = self._scheduler.create_task(self.process_msgs(buffer, timestamp))
@@ -215,6 +226,11 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.task = asyncio.create_task(self.manage_file())
+
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        await self.finished.wait()
+        self.task.cancel()
+        await super().close(exc)
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         try:
