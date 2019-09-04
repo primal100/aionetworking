@@ -85,17 +85,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
-        print("buffer length", buffer_len)
         num_msgs = int(buffer_len / self.message_size)
         coros = []
         self.received_msgs += num_msgs
-        print('received', self.received_msgs)
-        for i in range(0, num_msgs):
+        """for i in range(0, num_msgs):
             obj = JSONObject(encoded_msg, json.loads(encoded_msg), context=self.context)
             coros.append(self.action.do_one(obj))
-        await asyncio.wait(coros)
+        await asyncio.wait(coros)"""
         self.processed_msgs += num_msgs
-        print('processed', self.processed_msgs)
         if self.processed_msgs == self.expected_msgs:
             self.last = datetime.now()
             print(f"Buffers received: {self.num_buffers}")
