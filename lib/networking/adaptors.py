@@ -85,7 +85,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         if not self.first:
             self.first = datetime.now()
         buffer_len = len(buffer)
-        num_msgs = int(buffer_len / self.message_size)
+        num_msgs = round(buffer_len / self.message_size)
         coros = []
         self.received_msgs += num_msgs
         for i in range(0, num_msgs):
