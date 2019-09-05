@@ -92,8 +92,11 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             coros.append(self.action.do_one(encoded_msg))
         await asyncio.wait(coros)
         self.processed_msgs += num_msgs
+        self.last = datetime.now()
         if self.processed_msgs == self.expected_msgs:
-            self.last = datetime.now()
+            pass
+
+    def _finish(self):
             print(f"Buffers received: {self.num_buffers}")
             print(f"Msgs per buffer: {self.num_buffers / self.expected_msgs}")
             interval = (self.last - self.first).total_seconds()
@@ -193,6 +196,10 @@ class SenderAdaptor(BaseAdaptorProtocol):
 class ReceiverAdaptor(BaseAdaptorProtocol):
     is_receiver = True
     action: ActionProtocol = None
+
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        await super().close()
+        self._finish()
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         try:
