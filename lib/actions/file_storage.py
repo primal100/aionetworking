@@ -179,38 +179,39 @@ class ManagedFile:
             await self.previous.wait_closed()
         try:
             self._status.set_starting()
-            self.logger.info('Opening file %s', self.path)
+            #self.logger.info('Opening file %s', self.path)
             async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
-                self.logger.debug('File %s opened', self.path)
+                #self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
-                write_seconds = 0
-                start_time = time.time()
+                #write_seconds = 0
+                #start_time = time.time()
                 while True:
-                    self.logger.info('Retrieving item from queue for file %s.', self.path)
+                    #self.logger.info('Retrieving item from queue for file %s.', self.path)
                     data, futs = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
-                    self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
-                                         self.path)
-                    start = time.time()
-                    try:
-                        await f.write(data)
-                        await f.flush()
-                        asyncio.get_event_loop().call_soon(self._queue.task_done, len(data), futs)
-                    except Exception as e:
-                        self._queue.task_done(len(data), futs, exc=e)
-                    finally:
-                        end = time.time()
-                        write_seconds += (end - start)
-                        self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
+                    #self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
+                    #                     self.path)
+                    #start = time.time()
+                    #try:
+                    await f.write(data)
+                    await f.flush()
+                    asyncio.get_event_loop().call_soon(self._queue.task_done, len(data), futs)
+                    #except Exception as e:
+                    #    self._queue.task_done(len(data), futs, exc=e)
+                    #finally:
+                    #    pass
+                        #end = time.time()
+                        #write_seconds += (end - start)
+                        #self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
         except asyncio.CancelledError as e:
             self.logger.info('File %s closing due to task being cancelled', self.path)
             raise e
         finally:
-            end_time = time.time()
-            self.logger.info('Was writing to file for %s seconds', write_seconds)
-            total_seconds = end_time - start_time
-            self.logger.info('Was writing to file %s percent of the time', (write_seconds / total_seconds * 100))
+            #end_time = time.time()
+            #self.logger.info('Was writing to file for %s seconds', write_seconds)
+            #total_seconds = end_time - start_time
+            #self.logger.info('Was writing to file %s percent of the time', (write_seconds / total_seconds * 100))
             self._cleanup()
 
 
@@ -239,6 +240,7 @@ class BaseFileStorage(BaseAction, Protocol):
 
     async def start(self) -> None:
         ManagedFile.open(self._file_path)
+        self._status.set_started()
 
     def _get_full_path(self, msg: AnyStr) -> str:
         return self._file_path
@@ -264,7 +266,6 @@ class BaseFileStorage(BaseAction, Protocol):
         #msg.logger.debug('Data written to file %s', path)
 
     async def do_one(self, msg: AnyStr) -> None:
-        self._status.set_started()
         await self.write_one(msg)
 
 
@@ -289,10 +290,10 @@ class BufferedFileStorage(BaseFileStorage):
     max_concat: int = 1000
 
     async def _write_to_file(self, path: str, data: AnyStr) -> None:
-        async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
-                                    timeout=self.close_file_after_inactivity, logger=self.logger,
-                                    max_concat=self.max_concat) as f:
-            await f.write(data)
+        f = ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
+                             timeout=self.close_file_after_inactivity, logger=self.logger,
+                             max_concat=self.max_concat)
+        await f.write(data)
 
     async def close(self) -> None:
         self._status.set_stopping()

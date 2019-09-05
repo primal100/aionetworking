@@ -97,11 +97,11 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             pass
 
     def _finish(self):
-            print(f"Buffers received: {self.num_buffers}")
-            print(f"Msgs per buffer: {self.expected_msgs / self.num_buffers}")
-            interval = (self.last - self.first).total_seconds()
-            print(f"{self.received_msgs} took {interval} seconds")
-            print(f"Average:{self.received_msgs / interval}/s")
+        print(f"Buffers received: {self.num_buffers}")
+        print(f"Msgs per buffer: {self.expected_msgs / self.num_buffers}")
+        interval = (self.last - self.first).total_seconds()
+        print(f"{self.received_msgs} took {interval} seconds")
+        print(f"Average:{self.received_msgs / interval}/s")
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None:
         task = self._scheduler.create_task(self.process_msgs(buffer, timestamp))
