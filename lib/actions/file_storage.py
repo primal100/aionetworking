@@ -16,6 +16,61 @@ from typing import ClassVar, AnyStr, List
 from lib.formats.types import MessageObjectType
 
 
+class DataHolder:
+
+    def __init__(self, max: int = 80000):
+        self._data = b''
+        self._futs = []
+        self._max = max
+        self._all_tasks_done_event = asyncio.Event()
+        self._has_event = asyncio.Event()
+        self._not_full_event = asyncio.Event()
+        self._not_full_event.set()
+        self._to_process = 0
+
+    async def put(self, b: bytes) -> asyncio.Future:
+        fut = asyncio.Future()
+        self._futs.append(fut)
+        await self._not_full_event.wait()
+        self._to_process += len(b)
+        self._all_tasks_done_event.clear()
+        self._has_event.set()
+        self._data += b
+        if self._to_process > self._max:
+            self._not_full_event.clear()
+        return fut
+
+    def get_nowait(self):
+        if not self._data:
+            raise asyncio.QueueEmpty
+        d = self._data
+        self._has_event.clear()
+        self._not_full_event.set()
+        self._data = b''
+        futs = self._futs.copy()
+        self._futs = []
+        return d, futs
+
+    async def get(self):
+        if not self._data:
+            await self._has_event.wait()
+        return self.get_nowait()
+
+    async def join(self):
+        await self._all_tasks_done_event.wait()
+
+    def task_done(self, num: int, futs: List[asyncio.Future], exc: BaseException = None):
+        if exc:
+            for fut in futs:
+                fut.set_exception(exc)
+        else:
+            for fut in futs:
+                fut.set_result(True)
+        self._to_process -= num
+        if self._to_process == 0:
+            self._all_tasks_done_event.set()
+
+
 @dataclass
 class ManagedFile:
 
@@ -27,7 +82,7 @@ class ManagedFile:
     logger: Logger = field(default_factory=logger_cv.get)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: ManagedFile = field(default=None)
-    _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
+    _queue: DataHolder = field(default_factory=DataHolder, init=False, repr=False, hash=False, compare=False)
     _open_files: ClassVar = {}
 
     @classmethod
@@ -90,8 +145,7 @@ class ManagedFile:
         self._status.set_stopped()
 
     async def write(self, data: AnyStr) -> None:
-        fut = asyncio.Future()
-        self._queue.put_nowait((data, fut))
+        fut = await self._queue.put(data)
         await fut
 
     async def close(self) -> None:
@@ -120,11 +174,11 @@ class ManagedFile:
                 await d
         self.logger.debug('Writes completed for %s', self.path)
 
-    def _task_done(self, futures: List[asyncio.Future]) -> None:
+    def _task_done(self, num: int, futures: List[asyncio.Future]) -> None:
         num = 0
         for i, fut in enumerate(futures):
             fut.set_result(True)
-            self._queue.task_done()
+        self._queue.task_done(num)
         self.logger.info('Task done set for %s on file %s', p.no('item', num + 1), self.path)
 
     async def manage(self) -> None:
@@ -139,35 +193,21 @@ class ManagedFile:
                 write_seconds = 0
                 start_time = time.time()
                 while True:
-                    self.logger.info('Retrieving item from queue for file %s.' % self.path)
-                    try:
-                        data, fut = self._queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
-                    futs = [fut]
-                    try:
-                        i = 1
-                        while not self._queue.empty() and i < self.max_concat:
-                            try:
-                                item, fut = self._queue.get_nowait()
-                                data += item
-                                futs.append(fut)
-                            except asyncio.QueueEmpty:
-                                self.logger.error('QueueEmpty error was unexpectedly caught for file %s', self.path)
-                            i += 1
-                        self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
+                    self.logger.info('Retrieving item from queue for file %s.', self.path)
+                    data, futs = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
+                    self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)),
                                          self.path)
-                        start = time.time()
+                    start = time.time()
+                    try:
                         await f.write(data)
                         await f.flush()
+                        asyncio.get_event_loop().call_soon(self._queue.task_done, len(data), futs)
+                    except Exception as e:
+                        self._queue.task_done(len(data), futs, exc=e)
+                    finally:
                         end = time.time()
                         write_seconds += (end - start)
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
-                    except Exception as e:
-                        for fut in futs:
-                            fut.set_exception(e)
-                    finally:
-                        asyncio.get_event_loop().call_soon(self._task_done, futs)
         except asyncio.TimeoutError:
             self.logger.info('File %s closing due to timeout', self.path)
         except asyncio.CancelledError as e:
@@ -218,11 +258,12 @@ class BaseFileStorage(BaseAction, Protocol):
     async def _write_to_file(self, path: Path, data: AnyStr): ...
 
     async def write_one(self, msg: MessageObjectType) -> Path:
-        path = self._get_full_path(msg)
-        msg.logger.debug('Writing to file %s', path)
-        data = self._get_data(msg)
-        await self._write_to_file(path, data)
-        msg.logger.debug('Data written to file %s', path)
+        #path = self._get_full_path(msg)
+        path = Path(self.base_path / 'test.bin')
+        #msg.logger.debug('Writing to file %s', path)
+        #data = self._get_data(msg)
+        await self._write_to_file(path, msg)
+        #msg.logger.debug('Data written to file %s', path)
         return path
 
     async def do_one(self, msg: MessageObjectType) -> None:
