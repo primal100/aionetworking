@@ -47,7 +47,7 @@ def tcp_server_one_way(port, max_concat) -> TCPServer:
     return TCPServer(protocol_factory=protocol_factory_one_way_server(max_concat), host=host, port=port)
 
 
-async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times, timeout, max_concat):
+async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, pause_on_size, times, timeout, interval, max_concat):
     loop = asyncio.get_event_loop()
     loop.set_debug(asyncio_debug)
     loop.slow_callback_duration = slow_callback_duration
@@ -63,7 +63,7 @@ async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, paus
             coros = []
             for i in range(0, num_clients):
                 override = {'srcip': f'127.0.0.{i + 1}', 'port': port}
-                coro = loop.run_in_executor(executor, client.open_send_msgs, msgs, 0, 1, override)
+                coro = loop.run_in_executor(executor, client.open_send_msgs, msgs, interval, 1, override)
                 coros.append(coro)
             await asyncio.wait(coros)
             await asyncio.wait_for(server.wait_num_has_connected(num_clients), timeout=timeout)
@@ -177,6 +177,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clients', default=1, type=int,
                         help='number of clients to send messages with')
+    parser.add_argument('-f', '--interval', default=0, type=float,
+                        help='interval between sending of messages')
     parser.add_argument('-n', '--num', default=1, type=int,
                         help='number of messages'),
     parser.add_argument('-i', '--times', type=int, default=1,
@@ -208,8 +210,9 @@ if __name__ == '__main__':
     timeout = args.timeout
     scd = args.slow_duration
     max_concat = args.max_concat
+    interval = args.interval
     asyncio_debug = args.asyncio_debug
     if loop_type:
         set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
     setup_logging(loglevel, sender_loglevel)
-    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times, timeout, max_concat))
+    asyncio.run(run(num_clients, num_msgs, scd, asyncio_debug, pause_on_size, times, timeout, interval, max_concat))
