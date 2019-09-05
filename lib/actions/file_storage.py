@@ -74,7 +74,7 @@ class DataHolder:
 @dataclass
 class ManagedFile:
 
-    path: Path
+    path: str
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
@@ -86,7 +86,7 @@ class ManagedFile:
     _open_files: ClassVar = {}
 
     @classmethod
-    def open(cls, path, *args, **kwargs) -> ManagedFile:
+    def open(cls, path: str, *args, **kwargs) -> ManagedFile:
         try:
             f = cls._open_files[path]
             if not f.is_closing():
@@ -112,13 +112,13 @@ class ManagedFile:
         return len(cls._open_files)
 
     def __post_init__(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        #self.path.parent.mkdir(parents=True, exist_ok=True)
         self._task = asyncio.create_task(self.manage())
-        set_task_name(self._task, f"ManagedFile:{self.path.name}")
+        set_task_name(self._task, f"ManagedFile:{self.path}")
 
-    def is_in(self, path) -> bool:
+    def is_in(self, path: Path) -> bool:
         try:
-            self.path.relative_to(path)
+            Path(self.path).relative_to(path)
             return True
         except ValueError:
             return False
@@ -173,13 +173,6 @@ class ManagedFile:
                 self.logger.error(d.exception())
                 await d
         self.logger.debug('Writes completed for %s', self.path)
-
-    def _task_done(self, num: int, futures: List[asyncio.Future]) -> None:
-        num = 0
-        for i, fut in enumerate(futures):
-            fut.set_result(True)
-        self._queue.task_done(num)
-        self.logger.info('Task done set for %s on file %s', p.no('item', num + 1), self.path)
 
     async def manage(self) -> None:
         if self.previous:
@@ -241,32 +234,36 @@ class BaseFileStorage(BaseAction, Protocol):
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
         self._status.is_started()
+        self.base_path.mkdir(exist_ok=True, parents=True)
+        self._file_path = str(self.base_path / 'data.bin')
 
-    def _get_full_path(self, msg: MessageObjectType) -> Path:
-        return self.base_path / self._get_path(msg)
+    async def start(self) -> None:
+        ManagedFile.open(self._file_path)
 
-    def _get_path(self, msg: MessageObjectType) -> Path:
+    def _get_full_path(self, msg: AnyStr) -> str:
+        return self._file_path
+        #return self.base_path / self._get_path(msg)
+
+    def _get_path(self, msg: AnyStr) -> Path:
         return Path(self.path.format(msg=msg))
 
-    def _get_data(self, msg: MessageObjectType) -> AnyStr:
+    def _get_data(self, msg: AnyStr) -> AnyStr:
         data = getattr(msg, self.attr)
         if self.separator:
             data += self.separator
         return data
 
     @abstractmethod
-    async def _write_to_file(self, path: Path, data: AnyStr): ...
+    async def _write_to_file(self, path: str, data: AnyStr): ...
 
-    async def write_one(self, msg: MessageObjectType) -> Path:
+    async def write_one(self, msg: AnyStr) -> None:
         #path = self._get_full_path(msg)
-        path = Path(self.base_path / 'test.bin')
         #msg.logger.debug('Writing to file %s', path)
         #data = self._get_data(msg)
-        await self._write_to_file(path, msg)
+        await self._write_to_file(self._file_path, msg)
         #msg.logger.debug('Data written to file %s', path)
-        return path
 
-    async def do_one(self, msg: MessageObjectType) -> None:
+    async def do_one(self, msg: AnyStr) -> None:
         self._status.set_started()
         await self.write_one(msg)
 
@@ -275,7 +272,7 @@ class BaseFileStorage(BaseAction, Protocol):
 class FileStorage(BaseFileStorage):
     name = 'File Storage'
 
-    async def _write_to_file(self, path: Path, data: AnyStr) -> None:
+    async def _write_to_file(self, path: str, data: AnyStr) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         async with settings.FILE_OPENER(path, self.mode) as f:
             await f.write(data)
@@ -291,7 +288,7 @@ class BufferedFileStorage(BaseFileStorage):
     buffering: int = -1
     max_concat: int = 1000
 
-    async def _write_to_file(self, path: Path, data: AnyStr) -> None:
+    async def _write_to_file(self, path: str, data: AnyStr) -> None:
         async with ManagedFile.open(path, mode=self.mode, buffering=self.buffering,
                                     timeout=self.close_file_after_inactivity, logger=self.logger,
                                     max_concat=self.max_concat) as f:

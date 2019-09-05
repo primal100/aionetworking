@@ -98,7 +98,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     def _finish(self):
             print(f"Buffers received: {self.num_buffers}")
-            print(f"Msgs per buffer: {self.num_buffers / self.expected_msgs}")
+            print(f"Msgs per buffer: {self.expected_msgs / self.num_buffers}")
             interval = (self.last - self.first).total_seconds()
             print(f"{self.received_msgs} took {interval} seconds")
             print(f"Average:{self.received_msgs / interval}/s")
