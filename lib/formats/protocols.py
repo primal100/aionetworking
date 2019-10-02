@@ -48,7 +48,8 @@ class MessageObject(Protocol):
 class Codec(Protocol):
 
     @abstractmethod
-    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[bytes, Any], None, None]: ...
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
+        yield
 
     @abstractmethod
     def decode_one(self, encoded: bytes, **kwargs) -> Any: ...
@@ -57,13 +58,14 @@ class Codec(Protocol):
     def encode(self, decoded: Any, **kwargs) -> bytes: ...
 
     @abstractmethod
-    def decode_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]: ...
+    async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None, None]:
+        yield
 
     @abstractmethod
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType: ...
 
     @abstractmethod
-    def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+    async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         yield
 
     @abstractmethod
