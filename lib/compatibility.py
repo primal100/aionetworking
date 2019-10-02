@@ -17,13 +17,11 @@ else:
 def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
     if hasattr(task, "set_name"):
         task_name = get_task_name(task)
-        name = name if name else task_name
+        name = f"{task_name}_{name}" if name else task_name
         if include_hierarchy:
             prefix = get_current_task_name()
             if any(prefix == text for text in ("No Running Loop", "No Task")):
                 prefix = ''
-            else:
-                prefix += ':'
             prefix += task_name
             name = f"{prefix}{separator}{name}" if prefix else name
         task.set_name(name)

@@ -22,6 +22,9 @@ class ConnectionsManager:
         self._counters.clear()
         self._subscriptions.clear()
 
+    def clear_server(self, parent_name: str):
+        self._counters.remove(parent_name)
+
     def add_connection(self, connection: SimpleNetworkConnectionType) -> int:
         self._connections[connection.peer] = connection
         return self._counters.increment(connection.parent_name)

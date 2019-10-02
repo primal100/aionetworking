@@ -1,9 +1,8 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
 
-from .exceptions import MessageFromNotAuthorizedHost, ConnectionAlreadyClosedError
+from .exceptions import MessageFromNotAuthorizedHost
 
 from lib.compatibility import singledispatchmethod, set_task_name
 from lib.conf.context import context_cv
