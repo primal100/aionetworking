@@ -9,7 +9,7 @@ from lib import settings
 from lib.conf.context import context_cv
 from lib.conf.logging import ConnectionLogger, connection_logger_cv
 from lib.networking.connections_manager import connections_manager
-from lib.utils import aone, dataclass_getstate, dataclass_setstate
+from lib.utils import aone, dataclass_getstate, dataclass_setstate, anext
 
 from .protocols import MessageObject, Codec
 from typing import AsyncGenerator,  Generator, Any, Dict, Sequence, Type
@@ -132,7 +132,7 @@ class BaseCodec(Codec):
         return decoded
 
     def decode_one(self, encoded: bytes, **kwargs) -> Any:
-        return next(self.decode(encoded, **kwargs))
+        return anext(self.decode(encoded, **kwargs))
 
     async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         async for encoded, decoded in self.decode(encoded, **kwargs):
@@ -144,7 +144,7 @@ class BaseCodec(Codec):
             self.logger.on_msg_decoded(msg)
             yield msg
             i += 1
-        self.logger.on_buffer_decoded(i + 1)
+        self.logger.on_buffer_decoded(i)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
         return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, logger=self.logger, **kwargs)
@@ -153,7 +153,7 @@ class BaseCodec(Codec):
         self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
-        for item in self.decode_buffer(encoded, **kwargs):
+        async for item in self.decode_buffer(encoded, **kwargs):
             yield item
 
     async def one_from_file(self, file_path: Path, **kwargs) -> MessageObjectType:
