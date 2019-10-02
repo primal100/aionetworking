@@ -116,7 +116,7 @@ def stats_formatter() -> logging.Formatter:
 
 def sender_stats_formatter() -> logging.Formatter:
     return logging.Formatter(
-        "{msg} {msgs.sent} {sent.kb:.2f}KB {send_rate.kb:.2f}KB/s {msgs.send_rate:.2f}/s {msgs.send_interval}/s {interval}/s",
+        "{msg} {start} {end} {msgs.sent} {sent.kb:.2f}KB {send_rate.kb:.2f}KB/s {msgs.send_rate:.2f}/s {msgs.send_interval}/s {interval}/s",
         style="{")
 
 
@@ -126,7 +126,7 @@ def sender_stats_handler() -> logging.Handler:
     return handler
 
 
-def stats_logging_handler() -> logging.Handler:
+def receiver_stats_handler() -> logging.Handler:
     handler = logging_handler_cls()
     handler.setFormatter(stats_formatter())
     return handler
@@ -163,11 +163,11 @@ def setup_logging(level, sender_loglevel, asyncio_debug):
     connection_logger.propagate = False
     connection_logger.setLevel(receiver_level)
     stats_logger = logging.getLogger('receiver.stats')
-    stats_logger.addHandler(stats_logging_handler())
+    stats_logger.addHandler(receiver_stats_handler())
     stats_logger.setLevel(logging.INFO)
     stats_logger.propagate = False
     sender_stats_logger = logging.getLogger('sender.stats')
-    sender_stats_logger.addHandler(stats_logging_handler())
+    sender_stats_logger.addHandler(sender_stats_handler())
     sender_stats_logger.setLevel(logging.INFO)
     sender_stats_logger.propagate = False
     asyncio_logger = logging.getLogger('asyncio')

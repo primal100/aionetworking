@@ -150,7 +150,6 @@ class ManagedFile:
                                 self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
                         self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
                         await f.write(data)
-                        #await f.flush()
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
                         for fut in futs:
                             fut.set_result(True)
