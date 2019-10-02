@@ -130,7 +130,7 @@ class ManagedFile:
         try:
             self._status.set_starting()
             self.logger.info('Opening file %s', self.path)
-            async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
+            async with settings.FILE_OPENER(self.path, mode=self.mode) as f:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
                 while True:
@@ -150,7 +150,7 @@ class ManagedFile:
                                 self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
                         self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
                         await f.write(data)
-                        await f.flush()
+                        #await f.flush()
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
                         for fut in futs:
                             fut.set_result(True)
