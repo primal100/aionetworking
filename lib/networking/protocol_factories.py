@@ -2,7 +2,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 import contextvars
-import os
 
 from lib.actions.protocols import ActionProtocol
 from lib.conf.context import context_cv
@@ -94,6 +93,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
 
     async def close(self) -> None:
         await self.close_actions()
+        connections_manager.clear_server(self.full_name)
 
 
 @dataclass

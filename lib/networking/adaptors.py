@@ -182,7 +182,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                 if not self.action.filter(msg_obj):
                     scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
                                              task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
-                                              msg_obj=msg_obj)
+                                             msg_obj=msg_obj)
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
