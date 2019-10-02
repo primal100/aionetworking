@@ -3,7 +3,6 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
-import time
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
@@ -18,7 +17,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional
+from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional, AsyncIterator
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -80,7 +79,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int: ...
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int: ...
 
 
 @dataclass
@@ -175,7 +174,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
         scheduler = TaskScheduler()
         try:
             async for msg_obj in msgs:
@@ -186,7 +185,6 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.sleep(0)
             await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
