@@ -139,12 +139,13 @@ class SenderAdaptor(BaseAdaptorProtocol):
                 self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
-        for msg in msgs:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+        async for msg in msgs:
             if msg.request_id:
                 self._scheduler.set_result(msg.request_id, msg)
             else:
                 self._notification_queue.put_nowait(msg)
+        return len(buffer)
 
 
 @dataclass
