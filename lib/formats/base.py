@@ -125,7 +125,7 @@ class BaseCodec(Codec):
     def __post_init__(self):
         pass
 
-    def decode(self, encoded: bytes, **kwargs) -> Generator[Sequence[bytes, Any], None, None]:
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
         yield (encoded, encoded)
 
     def encode(self, decoded: Any, **kwargs) -> bytes:
@@ -134,15 +134,16 @@ class BaseCodec(Codec):
     def decode_one(self, encoded: bytes, **kwargs) -> Any:
         return next(self.decode(encoded, **kwargs))
 
-    def _from_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]:
-        for encoded, decoded in self.decode(encoded, **kwargs):
+    async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+        async for encoded, decoded in self.decode(encoded, **kwargs):
             yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
 
-    def decode_buffer(self, encoded: bytes, **kwargs) -> Generator[MessageObjectType, None, None]:
+    async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         i = 0
-        for i, msg in enumerate(self._from_buffer(encoded, **kwargs)):
+        async for msg in self._from_buffer(encoded, **kwargs):
             self.logger.on_msg_decoded(msg)
             yield msg
+            i += 1
         self.logger.on_buffer_decoded(i + 1)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:

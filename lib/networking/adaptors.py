@@ -178,11 +178,11 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
         scheduler = TaskScheduler()
         try:
-            for i, msg_obj in enumerate(msgs):
+            async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
                     scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
-                                                          task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
-                                                          msg_obj=msg_obj)
+                                             task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
+                                              msg_obj=msg_obj)
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
