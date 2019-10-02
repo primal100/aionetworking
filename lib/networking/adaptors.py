@@ -3,7 +3,6 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
-import time
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
@@ -18,7 +17,7 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional
+from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional, AsyncIterator
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -80,7 +79,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int: ...
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int: ...
 
 
 @dataclass
@@ -140,12 +139,13 @@ class SenderAdaptor(BaseAdaptorProtocol):
                 self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
-    def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> None:
-        for msg in msgs:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+        async for msg in msgs:
             if msg.request_id:
                 self._scheduler.set_result(msg.request_id, msg)
             else:
                 self._notification_queue.put_nowait(msg)
+        return len(buffer)
 
 
 @dataclass
@@ -175,18 +175,17 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    async def process_msgs(self, msgs: Iterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
         scheduler = TaskScheduler()
         try:
-            for i, msg_obj in enumerate(msgs):
+            async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
                     scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
-                                                          task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
-                                                          msg_obj=msg_obj)
+                                             task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
+                                              msg_obj=msg_obj)
                     self.logger.debug('Task created for %s', msg_obj.uid)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.sleep(0)
             await scheduler.join()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)

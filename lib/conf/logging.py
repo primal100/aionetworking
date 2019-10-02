@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import binascii
 import logging
 import contextvars
-from datetime import datetime
 from dataclasses import dataclass, field
 
 #from pydantic import ValidationError
@@ -53,13 +52,13 @@ class BaseLogger(logging.LoggerAdapter, ABC):
 @dataclass
 class Logger(BaseLogger):
     logger_name: str
-    datefmt: str = '%Y-%M-%d %H:%M:%S'
+    datefmt: str = '%Y-%m-%d %H:%M:%S.%f'
     extra: dict = None
     stats_interval: Union[float, int] = 0
     stats_fixed_start_time: bool = True
     _is_closing: bool = field(default=False, init=False)
 
-    def __init__(self, logger_name: str, datefmt: str = '%Y-%M-%d %H:%M:%S', extra: Dict = None,
+    def __init__(self, logger_name: str, datefmt: str = '%Y-%m-%d %H:%M:%S.%f', extra: Dict = None,
                  stats_interval: Optional[Union[int, float]] = 0, stats_fixed_start_time: bool = True):
         self.logger_name = logger_name
         self.datefmt = datefmt
@@ -208,7 +207,7 @@ class ConnectionLogger(Logger):
 
 @dataclass
 class StatsTracker:
-    datefmt: str = '%Y-%M-%d %H:%M:%S'
+    datefmt: str = '%Y-%m-%d %H:%M:%S.%f'
     start: LoggingDatetime = field(default=None, init=False)
     end: LoggingDatetime = field(default=None, init=False)
     sent: BytesSize = field(default_factory=BytesSize, init=False)
