@@ -3,7 +3,7 @@ from .base import BaseMessageObject
 from collections import namedtuple
 from pathlib import Path
 from .contrib.pickle import PickleCodec
-from typing import Generator, AsyncGenerator
+from typing import AsyncGenerator
 
 
 recorded_packet = namedtuple("recorded_packet", ["sent_by_server", "timestamp", "sender", "data"])
@@ -12,8 +12,8 @@ recorded_packet = namedtuple("recorded_packet", ["sent_by_server", "timestamp", 
 @dataclass
 class BufferCodec(PickleCodec):
 
-    def decode(self, encoded: bytes, **kwargs) -> recorded_packet:
-        for encoded, decoded in super().decode(encoded, **kwargs):
+    async def decode(self, encoded: bytes, **kwargs) -> recorded_packet:
+        async for encoded, decoded in super().decode(encoded, **kwargs):
             yield encoded, recorded_packet(*decoded)
 
     def encode(self, decoded: bytes, received_timestamp=None, **kwargs) -> bytes:
@@ -40,9 +40,9 @@ def get_recording_codec() -> PickleCodec:
     return BufferCodec(BufferObject)
 
 
-def get_recording(data: bytes) -> Generator[recorded_packet, None, None]:
+async def get_recording(data: bytes) -> AsyncGenerator[recorded_packet, None]:
     codec = get_recording_codec()
-    for item in codec.decode_buffer(data):
+    async for item in codec.decode_buffer(data):
         yield item.decoded
 
 

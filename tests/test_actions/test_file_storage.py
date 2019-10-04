@@ -22,6 +22,7 @@ class TestJsonFileStorage:
         assert expected_file.exists()
         item = await json_codec.one_from_file(expected_file)
         assert item == json_objects[1]
+        await asyncio.get_event_loop().shutdown_asyncgens()
 
     def test_01_filter(self, file_storage_action, json_object):
         assert file_storage_action.filter(json_object) is False
