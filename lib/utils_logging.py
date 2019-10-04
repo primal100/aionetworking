@@ -207,6 +207,10 @@ class MsgsCount:
         return self.filtered / (self.total_done or 1)
 
     @property
+    def percent_failed(self) -> float:
+        return self.failed / (self.total_done or 1)
+
+    @property
     def percent_processed(self) -> float:
         return self.processed / (self.total_done or 1)
 
