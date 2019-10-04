@@ -74,6 +74,12 @@ async def run(num_clients, num_msgs, slow_callback_duration, asyncio_debug, paus
             await asyncio.wait_for(server_task, timeout=timeout)
 
 
+def asyncio_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "{asctime} - {relativeCreated} - {levelname} - {module} - {funcName} - {name} - {message}", style='{'
+    )
+
+
 def logger_formatter() -> logging.Formatter:
     return logging.Formatter(
         "{asctime} - {relativeCreated} - {levelname} - {taskname} - {module} - {funcName} - {name} - {message}", style='{'
@@ -94,6 +100,12 @@ def raw_received_formatter() -> logging.Formatter:
 
 def logging_handler_cls() -> logging.Handler:
     return logging.StreamHandler()
+
+
+def asyncio_logging_handler() -> logging.Handler:
+    handler = logging_handler_cls()
+    handler.setFormatter(asyncio_formatter())
+    return handler
 
 
 def receiver_logging_handler() -> logging.Handler:
@@ -171,7 +183,7 @@ def setup_logging(level, sender_loglevel, asyncio_debug):
     sender_stats_logger.setLevel(logging.INFO)
     sender_stats_logger.propagate = False
     asyncio_logger = logging.getLogger('asyncio')
-    asyncio_logger.addHandler(main_handler)
+    asyncio_logger.addHandler(asyncio_logging_handler())
     if asyncio_debug:
         asyncio_logger.setLevel(receiver_level)
     else:
