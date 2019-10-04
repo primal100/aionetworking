@@ -154,13 +154,10 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     action: ActionProtocol = None
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
-        try:
-            self.logger.manage_error(exc)
-            response = self.action.on_exception(msg_obj, exc)
-            if response:
-                self.encode_and_send_msg(response)
-        finally:
-            self.logger.on_msg_processed(msg_obj)
+        self.logger.on_msg_failed(msg_obj, exc)
+        response = self.action.on_exception(msg_obj, exc)
+        if response:
+            self.encode_and_send_msg(response)
 
     def _on_success(self, result, msg_obj: MessageObjectType) -> None:
         try:

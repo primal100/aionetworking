@@ -191,6 +191,7 @@ class MsgsCount:
     received: int = 0
     processed: int = 0
     filtered: int = 0
+    failed: int = 0
     first_received = None
     last_received = None
     first_sent = None
@@ -198,12 +199,16 @@ class MsgsCount:
     last_processed = None
 
     @property
+    def total_done(self) -> int:
+        return self.processed + self.filtered + self.failed
+
+    @property
     def percent_filtered(self) -> float:
-        return self.filtered / ((self.processed + self.filtered) or 1)
+        return self.filtered / (self.total_done or 1)
 
     @property
     def percent_processed(self) -> float:
-        return self.processed / (self.received or 1)
+        return self.processed / (self.total_done or 1)
 
     @property
     def receive_interval(self) -> LoggingTimeDelta:

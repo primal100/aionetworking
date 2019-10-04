@@ -200,6 +200,10 @@ class ConnectionLogger(Logger):
     def on_msg_filtered(self, msg: MessageObjectType) -> None:
         self.debug('Filtered msg %s', msg.uid)
 
+    def on_msg_failed(self, msg: MessageObjectType, exc: BaseException) -> None:
+        self.error('Failed to process msg %s', msg.uid)
+        self.manage_error(exc)
+
     def connection_finished(self, exc: Optional[BaseException] = None) -> None:
         self.manage_error(exc)
         self.info('%s connection from %s to %s has been closed', self.connection_type, self.client, self.server)
@@ -214,14 +218,20 @@ class StatsTracker:
     received: BytesSize = field(default_factory=BytesSize, init=False)
     processed: BytesSize = field(default_factory=BytesSize, init=False)
     filtered: BytesSize = field(default_factory=BytesSize, init=False)
+    failed: BytesSize = field(default_factory=BytesSize, init=False)
     largest_buffer: BytesSize = field(default_factory=BytesSize, init=False)
     msgs: MsgsCount = field(default_factory=MsgsCount, init=False)
 
-    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'largest_buffer', 'send_rate',
-             'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent', 'msgs_per_buffer')
+    attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed', 'largest_buffer',
+             'send_rate', 'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent',
+             'msgs_per_buffer', 'not_decoded', 'not_decoded_rate')
 
     def __post_init__(self):
         self.start = LoggingDatetime(datefmt=self.datefmt)
+
+    @property
+    def total_done(self) -> int:
+        return self.processed + self.failed + self.filtered
 
     @property
     def processing_rate(self) -> float:
@@ -237,7 +247,7 @@ class StatsTracker:
 
     @property
     def msgs_per_buffer(self) -> float:
-        return self.msgs.processed / (self.msgs.received or 1)
+        return self.msgs.total_done / (self.msgs.received or 1)
 
     @property
     def interval(self) -> LoggingTimeDelta:
@@ -245,11 +255,19 @@ class StatsTracker:
 
     @property
     def average_buffer_size(self) -> float:
-        return self.received / ( self.msgs.received or 1)
+        return self.received / (self.msgs.received or 1)
 
     @property
     def average_sent(self) -> float:
         return self.sent / (self.msgs.sent or 1)
+
+    @property
+    def not_decoded(self) -> int:
+        return self.received - self.total_done
+
+    @property
+    def not_decoded_rate(self) -> float:
+        return self.not_decoded / (self.received or 1)
 
     def __iter__(self) -> Generator[Any, None, None]:
         yield from self.attrs
@@ -276,10 +294,14 @@ class StatsTracker:
         self.msgs.filtered += 1
         self.filtered += len(data)
 
+    def on_msg_failed(self, data: bytes) -> None:
+        self.msgs.failed += 1
+        self.failed += len(data)
+
     def on_msg_sent(self, msg: bytes) -> None:
-        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         if not self.msgs.first_sent:
             self.msgs.first_sent = self.msgs.last_sent
+        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         self.msgs.sent += 1
         self.sent += len(msg)
 
@@ -293,9 +315,6 @@ class StatsLogger(Logger):
     _stats: StatsTracker = field(default=None, init=False, compare=False)
     _scheduler: TaskScheduler = field(init=False, default_factory=TaskScheduler, compare=False)
     stats_cls = StatsTracker
-    _total_received = BytesSize()
-    _total_processed = BytesSize()
-    _total_filtered = BytesSize()
 
     def __init__(self, logger_name: str, extra: dict, *args, **kwargs):
         self._logged_last = False
@@ -318,9 +337,6 @@ class StatsLogger(Logger):
     def stats(self, tag: str) -> None:
         self._first = False
         self.info(tag)
-        self._total_received += self._stats.received
-        self._total_processed += self._stats.processed
-        self._total_filtered += self._stats.filtered
         self.reset()
 
     def periodic_log(self) -> None:
@@ -340,13 +356,14 @@ class StatsLogger(Logger):
     async def wait_closed(self):
         await self._scheduler.close()
 
-    def on_msg_filtered(self, msg: MessageObjectType):
-        self._stats.on_msg_filtered(msg)
-        if self._is_closing:
-            self._check_last_message_processed()
+    def on_msg_filtered(self, data: bytes):
+        self._stats.on_msg_filtered(data)
 
-    def on_msg_processed(self, msg: MessageObjectType):
-        self._stats.on_msg_processed(msg)
+    def on_msg_processed(self, data: bytes):
+        self._stats.on_msg_processed(data)
+
+    def on_msg_failed(self, data: bytes):
+        self._stats.on_msg_failed(data)
 
     def __getattr__(self, item):
         if self._stats:
@@ -376,6 +393,10 @@ class ConnectionLoggerStats(ConnectionLogger):
     def on_msg_filtered(self, msg: MessageObjectType) -> None:
         super().on_msg_processed(msg)
         self._stats_logger.on_msg_filtered(msg.encoded)
+
+    def on_msg_failed(self, msg: MessageObjectType, exc: BaseException) -> None:
+        super().on_msg_failed(msg, exc)
+        self._stats_logger.on_msg_failed(msg.encoded)
 
     def on_msg_sent(self, msg: bytes) -> None:
         super().on_msg_sent(msg)
