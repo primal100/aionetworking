@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import concurrent.futures
 import json
 from dataclasses import dataclass
 
@@ -9,6 +10,10 @@ from typing import Any, AsyncGenerator, Tuple
 
 encoded_msg = b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
 decoded_msg = {'jsonrpc': '2.0', 'id': 1, 'method': 'login', 'params': ['user1', 'password']}
+
+executor = None
+#executor = concurrent.futures.ThreadPoolExecutor()
+#executor = concurrent.futures.ProcessPoolExecutor()
 
 
 @dataclass
@@ -20,18 +25,28 @@ class JSONCodec(BaseCodec):
     """
 
     def _decode(self, encoded: bytes):
-        return [(encoded_msg, decoded_msg) for _ in range(0, encoded.count(b'jsonrpc'))]
-
-    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Tuple[bytes, Any], None]:
-        for item in await asyncio.get_event_loop().run_in_executor(None, self._decode, encoded):
-            yield item
-        """pos = 0
+        items = []
+        pos = 0
         end = len(encoded)
         while pos < end:
             start = pos
             data = encoded.decode()
             msg, pos = json.JSONDecoder().raw_decode(data, idx=pos)
-            yield (encoded[start:pos], msg)"""
+            items.append((encoded[start:pos], msg))
+        return items
+
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Tuple[bytes, Any], None]:
+        if executor:
+            for item in await asyncio.get_event_loop().run_in_executor(executor, self._decode, encoded):
+                yield item
+        else:
+            pos = 0
+            end = len(encoded)
+            while pos < end:
+                start = pos
+                data = encoded.decode()
+                msg, pos = json.JSONDecoder().raw_decode(data, idx=pos)
+                yield (encoded[start:pos], msg)
 
     def encode(self, decoded: Any, **kwargs) -> bytes:
         return json.dumps(decoded).encode()
