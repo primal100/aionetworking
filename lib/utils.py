@@ -45,10 +45,12 @@ async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool
     total = 0
     if ignore_first:
         await time_coro(async_func(*args, **kwargs))
-        await cleanup(*cleanup_args)
+        if cleanup:
+            await cleanup(*cleanup_args)
     for _ in range(0, num_times):
         time_taken = await time_coro(async_func(*args, **kwargs))
-        await cleanup(*cleanup_args)
+        if cleanup:
+            await cleanup(*cleanup_args)
         times.append(str(time_taken))
         total += time_taken
         if not quiet:

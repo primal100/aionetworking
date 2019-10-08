@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 from lib.formats.contrib.json import JSONObject
 from lib.formats.recording import get_recording
 from lib.utils import alist
@@ -6,16 +7,18 @@ from lib.utils import alist
 
 class TestJsonCodec:
 
-    def test_00_decode(self, json_codec, json_buffer, decoded_result):
-        decoded = list(json_codec.decode(json_buffer))
+    @pytest.mark.asyncio
+    async def test_00_decode(self, json_codec, json_buffer, decoded_result):
+        decoded = await alist(json_codec.decode(json_buffer))
         assert decoded == decoded_result
 
     def test_01_encode(self, json_codec, json_rpc_login_request, json_rpc_login_request_encoded):
         encoded = json_codec.encode(json_rpc_login_request)
         assert encoded == json_rpc_login_request_encoded
 
-    def test_02_decode_buffer(self, json_codec, json_buffer, json_objects, timestamp):
-        decoded = list(json_codec.decode_buffer(json_buffer, received_timestamp=timestamp))
+    @pytest.mark.asyncio
+    async def test_02_decode_buffer(self, json_codec, json_buffer, json_objects, timestamp):
+        decoded = await alist(json_codec.decode_buffer(json_buffer, received_timestamp=timestamp))
         assert decoded == json_objects
 
     def test_03_from_decoded(self, json_codec, json_rpc_login_request, json_object, timestamp):
@@ -31,6 +34,7 @@ class TestJsonCodec:
     async def test_05_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
         obj = await json_codec.one_from_file(file_containing_multi_json, received_timestamp=timestamp)
         assert obj == json_object
+        await asyncio.get_event_loop().shutdown_asyncgens()
 
 
 class TestJsonObject:
@@ -58,9 +62,10 @@ class TestJsonObject:
 
 
 class TestBufferObject:
-    def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
+    @pytest.mark.asyncio
+    async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
         buffer_obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
         buffer_obj2 = buffer_codec.from_decoded(json_encoded_multi[1], received_timestamp=timestamp)
         recording = buffer_obj1.encoded + buffer_obj2.encoded
-        packets = list(get_recording(recording))
+        packets = await alist(get_recording(recording))
         assert packets == json_recording_data

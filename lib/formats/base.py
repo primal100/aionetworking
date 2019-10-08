@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,10 +10,10 @@ from lib import settings
 from lib.conf.context import context_cv
 from lib.conf.logging import ConnectionLogger, connection_logger_cv
 from lib.networking.connections_manager import connections_manager
-from lib.utils import aone, dataclass_getstate, dataclass_setstate, anext
+from lib.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator,  Generator, Any, Dict, Sequence, Type
+from typing import AsyncGenerator, Any, Dict, Sequence, Type
 from lib.compatibility import Protocol
 from .types import MessageObjectType, CodecType
 
@@ -132,7 +133,7 @@ class BaseCodec(Codec):
         return decoded
 
     def decode_one(self, encoded: bytes, **kwargs) -> Any:
-        return anext(self.decode(encoded, **kwargs))
+        return aone(self.decode(encoded, **kwargs))
 
     async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         async for encoded, decoded in self.decode(encoded, **kwargs):
