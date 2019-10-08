@@ -33,7 +33,7 @@ class PyCrateAsnCodec(BaseCodec):
     """
     asn_class: Type[ASNProtocol] = None
 
-    def decode(self, encoded: bytes, **kwargs):
+    async def decode(self, encoded: bytes, **kwargs):
         char = Charpy(encoded)
         while char._cur < char._len_bit:
             start = int(char._cur / 8)
