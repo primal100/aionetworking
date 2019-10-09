@@ -112,6 +112,7 @@ class JSONRPCServer(BaseAction):
         return {"jsonrpc": self.version, "error": error, "id": request_id}
 
 
+@dataclass
 class BaseJSONRPCApp:
     exception_codes = {}
     is_requester = False

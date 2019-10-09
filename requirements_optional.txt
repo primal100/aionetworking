@@ -3,3 +3,4 @@ asyncssh
 passlib
 aiofile
 aiosqlite
+aio-pika

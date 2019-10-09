@@ -72,17 +72,6 @@ class BaseMessageObject(MessageObject, Protocol):
         if isinstance(self.decoded, (list, tuple, dict)):
             return self.decoded[item]
 
-    def is_subscribed(self, subscribe_key: Any) -> bool:
-        return connections_manager.peer_is_subscribed(self.full_sender, subscribe_key)
-
-    def subscribe(self, subscribe_key: Any) -> None:
-        self.logger.debug('Subscribing to key %s', subscribe_key)
-        connections_manager.subscribe(self.full_sender, subscribe_key)
-
-    def unsubscribe(self, subscribe_key: Any) -> None:
-        self.logger.debug('Unsubscribing from key %s', subscribe_key)
-        connections_manager.unsubscribe(self.full_sender, subscribe_key)
-
     @property
     def uid(self) -> Any:
         try:
