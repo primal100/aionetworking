@@ -224,7 +224,7 @@ class StatsTracker:
 
     attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed', 'largest_buffer',
              'send_rate', 'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent',
-             'msgs_per_buffer', 'not_decoded', 'not_decoded_rate')
+             'msgs_per_buffer', 'not_decoded', 'not_decoded_rate', 'total_done')
 
     def __post_init__(self):
         self.start = LoggingDatetime(datefmt=self.datefmt)
@@ -299,9 +299,9 @@ class StatsTracker:
         self.failed += len(data)
 
     def on_msg_sent(self, msg: bytes) -> None:
+        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         if not self.msgs.first_sent:
             self.msgs.first_sent = self.msgs.last_sent
-        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         self.msgs.sent += 1
         self.sent += len(msg)
 

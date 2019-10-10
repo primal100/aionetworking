@@ -129,7 +129,7 @@ class ManagedFile:
         try:
             self._status.set_starting()
             self.logger.info('Opening file %s', self.path)
-            async with settings.FILE_OPENER(self.path, mode=self.mode) as f:
+            async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
                 while True:

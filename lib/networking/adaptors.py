@@ -153,6 +153,15 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     is_receiver = True
     action: ActionProtocol = None
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.action.supports_notifications:
+            self._scheduler.create_task(self._send_notifications(), name='Notifications')
+
+    async def _send_notifications(self):
+        async for item in self.action.get_notifications():
+            self.encode_and_send_msg(item)
+
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         self.logger.on_msg_failed(msg_obj, exc)
         response = self.action.on_exception(msg_obj, exc)

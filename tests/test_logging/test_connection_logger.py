@@ -46,7 +46,7 @@ class TestConnectionLoggerNoStats:
     def test_01_on_buffer_received(self, receiver_connection_logger, caplog, json_rpc_login_request_encoded,
                                    debug_logging):
         receiver_connection_logger.on_buffer_received(json_rpc_login_request_encoded)
-        assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Received buffer')
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
         if isinstance(json_rpc_login_request_encoded, bytes):
             json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
@@ -82,7 +82,7 @@ class TestConnectionLoggerStats:
     def test_01_on_buffer_received(self, receiver_connection_logger_stats, json_rpc_login_request_encoded, caplog, debug_logging):
         assert receiver_connection_logger_stats._stats_logger.received == 0
         receiver_connection_logger_stats.on_buffer_received(json_rpc_login_request_encoded)
-        assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Received buffer')
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
         if isinstance(json_rpc_login_request_encoded, bytes):
             json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)

@@ -9,7 +9,7 @@ from lib.formats.types import MessageObjectType
 from lib.wrappers.value_waiters import StatusWaiter
 from lib.utils import dataclass_getstate, dataclass_setstate
 
-from typing import Any, AnyStr, TypeVar, Type
+from typing import Any, AnyStr, TypeVar, Type, AsyncGenerator
 
 
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")
@@ -20,6 +20,7 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 
 @dataclass
 class BaseAction(Protocol):
+    supports_notifications = False
     name = 'receiver action'
     logger: LoggerType = Logger('receiver.actions')
     _status: StatusWaiter = field(default_factory=StatusWaiter)
@@ -43,6 +44,9 @@ class BaseAction(Protocol):
     def filter(self, msg: MessageObjectType) -> bool:
         return msg.filter()
 
+    async def get_notifications(self) -> AsyncGenerator[None, None]:
+        yield
+
     async def start(self) -> None: ...
 
     def is_closing(self) -> None:
@@ -50,7 +54,7 @@ class BaseAction(Protocol):
 
     async def close(self) -> None: ...
 
-    def on_decode_error(self, data: AnyStr, exc: BaseException) -> Any:
+    def on_decode_error(self, data: bytes, exc: BaseException) -> Any:
         pass
 
     def on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any:

@@ -1,24 +1,16 @@
-import pytest
 from pytest_lazyfixture import lazy_fixture
 import asyncio
-from dataclasses import dataclass
 from datetime import timedelta
-from typing import Tuple
 
 from lib.conf.context import context_cv
 from lib.conf.logging import connection_logger_cv, logger_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import TCPServerConnection, TCPClientConnection
-from lib.networking.connections_manager import ConnectionsManager
 from lib.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory
-from lib.networking.types import SimpleNetworkConnectionType
-
-from lib.receivers.base import BaseServer
-
 
 from tests.mock import MockTCPTransport
 
-from tests.test_actions.conftest import *
+from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
 
 
@@ -46,6 +38,22 @@ async def one_way_sender_adaptor(context_client, sender_connection_logger, deque
     context_cv.set(context_client)
     connection_logger_cv.set(sender_connection_logger)
     yield SenderAdaptor(JSONObject, send=deque.append)
+
+
+@pytest.fixture
+def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context,
+                             receiver_connection_logger) -> ReceiverAdaptor:
+    context_cv.set(context)
+    connection_logger_cv.set(receiver_connection_logger)
+    return ReceiverAdaptor(JSONObject, action=echo_action,
+                           preaction=buffered_file_storage_recording_action)
+
+
+@pytest.fixture
+async def two_way_sender_adaptor(echo_requester, context_client, sender_connection_logger, deque) -> SenderAdaptor:
+    context_cv.set(context_client)
+    connection_logger_cv.set(sender_connection_logger)
+    yield SenderAdaptor(JSONObject, send=deque.append, requester=echo_requester)
 
 
 @pytest.fixture

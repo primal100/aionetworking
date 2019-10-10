@@ -9,22 +9,13 @@ import binascii
 import logging
 import os
 import shutil
-try:
-    from pycrate_asn1dir.TCAP_MAP import TCAP_MAP_Messages
-except ImportError:
-    TCAP_MAP_Messages = None
 from pathlib import Path
 
 from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
-from lib.actions.jsonrpc import JSONRPCServer
-from lib.actions.contrib.jsonrpc_crud import SampleJSONRPCSQLiteServer
-from lib.requesters.jsonrpc import SampleJSONRPCClient
-from lib.conf.logging import ConnectionLogger, Logger, StatsLogger, StatsTracker, ConnectionLoggerStats
+from lib.conf.logging import ConnectionLoggerStats
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.contrib.pickle import PickleCodec, PickleObject
 from lib.formats.contrib.types import JSONObjectType
-from lib.formats.contrib.TCAP_MAP import TCAPMAPASNObject
-from lib.formats.contrib.asn1 import PyCrateAsnCodec
 from lib.formats.recording import BufferObject
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
@@ -36,11 +27,11 @@ from lib.receivers.base import BaseServer
 from lib.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
 from lib.senders.base import BaseClient
 from lib.senders.clients import TCPClient, pipe_client
-from lib.utils import pipe_address_by_os, set_loop_policy
+from lib.utils import set_loop_policy
 from lib.wrappers.counters import Counters, Counter
 from lib.wrappers.schedulers import TaskScheduler
 
-from tests.mock import MockTCPTransport, MockDatagramTransport
+from tests.mock import MockDatagramTransport
 
 from typing import Dict, Any, List, Tuple, Union, Callable, Optional, Type
 
@@ -251,60 +242,9 @@ def sender_connection_logger_stats(sender_connection_logger, context_client, cap
     return sender_logger.get_connection_logger(extra=context_client)
 
 
-
-@pytest.fixture
-def asn_codec(context) -> PyCrateAsnCodec:
-    return PyCrateAsnCodec(TCAPMAPASNObject, context=context,
-                           asn_class=TCAPMAPASNObject.asn_class)
-
-
 @pytest.fixture
 def pickle_codec(context, receiver_connection_logger) -> PickleCodec:
     return PickleCodec(PickleObject, context=context, logger=receiver_connection_logger)
-
-
-@pytest.fixture
-def asn_client_codec(context_client) -> PyCrateAsnCodec:
-    return PyCrateAsnCodec(TCAPMAPASNObject, context=context_client,
-                           asn_class=TCAPMAPASNObject.asn_class)
-
-
-@pytest.fixture
-def asn_buffer() -> bytes:
-    return b"bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0e\x81\xa4H\x04\x84\x00\x01\xffI\x04\xa5\x05\x00\x01k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x0e\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00lj\xa2h\x02\x01\x010c\x02\x018\xa3^\xa1\\0Z\x04\x10K\x9da\x91\x10u6e\x8c\xfeY\x88\x0c\xd2\xac'\x04\x10K\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8\x04\x10\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x04\x10C\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x8c\x04\x10\xa2U\x1a\x05\x8c\xdb\x00\x00K\x8dy\xf7\xca\xffP\x12e\x16H\x04\xa5\x05\x00\x01I\x04\x84\x00\x01\xffl\x08\xa1\x06\x02\x01\x02\x02\x018d<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b"
-
-
-@pytest.fixture
-def asn_encoded_hex() -> Tuple[bytes, bytes, bytes, bytes]:
-    return (
-        b'62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f0',
-        b'6581a44804840001ff4904a50500016b2a2828060700118605010101a01d611b80020780a109060704000001000e03a203020100a305a1030201006c6aa2680201013063020138a35ea15c305a04104b9d6191107536658cfe59880cd2ac2704104b8c43a2542050120467f333c00f42d804108c43a2542050120467f333c00f42d84b041043a2542050120467f333c00f42d84b8c0410a2551a058cdb00004b8d79f7caff5012',
-        b'65164804a50500014904840001ff6c08a106020102020138',
-        b'643c4904571800006b2a2828060700118605010101a01d611b80020780a109060704000001000503a203020100a305a1030201006c08a30602010102010b'
-    )
-
-
-@pytest.fixture
-def asn_encoded_multi(asn_encoded_hex) -> List[bytes]:
-    return [binascii.unhexlify(h) for h in asn_encoded_hex]
-
-
-@pytest.fixture
-def asn_decoded_multi(asn_encoded_multi) -> List[Tuple]:
-    decoder = TCAP_MAP_Messages.TCAP_MAP_Message
-    decoded = []
-    for encoded in asn_encoded_multi:
-        decoder.from_ber(encoded)
-        decoded.append(decoder())
-    return decoded
-
-
-@pytest.fixture
-def asn_objects(asn_encoded_multi, asn_decoded_multi, timestamp, context) -> List[TCAPMAPASNObject]:
-    TCAPMAPASNObject.next_otid = 0x00000000
-    return [TCAPMAPASNObject(encoded, asn_decoded_multi[i], context=context,
-            received_timestamp=timestamp) for i, encoded in
-            enumerate(asn_encoded_multi)]
 
 
 @pytest.fixture
@@ -317,82 +257,9 @@ def data_dir():
     shutil.rmtree(TEST_DATA_DIR)
 
 
-@pytest.fixture()
-def asn_objects_many(request, asn_codec, context) -> List[TCAPMAPASNObject]:
-    encoded = b'd<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b'
-    return [next(asn_codec.decode_buffer(encoded)) for _ in range(0, request.param)]
-
-
-@pytest.fixture()
-def asn_objects_thousand(asn_codec, context) -> List[TCAPMAPASNObject]:
-    encoded = b'd<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b'
-    return [next(asn_codec.decode_buffer(encoded)) for _ in range(0, 1000)]
-
-
-@pytest.fixture
-def asn_one_hex() -> str:
-    return '62474804000000016b1e281c060700118605010101a011600f80020780a1090607040000010014026c1fa11d0201ff02012d30158007911497427533f38101008207911497797908f0'
-
-
-@pytest.fixture
-def asn_one_encoded() -> bytes:
-    return b'bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0'
-
-
-@pytest.fixture
-def asn_one_decoded() -> Tuple:
-    return ('begin', {'otid': b'\x00\x00\x00\x01', 'dialoguePortion': {
-            'direct-reference': (0, 0, 17, 773, 1, 1, 1), 'encoding': ('single-ASN1-type', ('DialoguePDU', (
-            'dialogueRequest', {'protocol-version': (1, 1), 'application-context-name': (0, 4, 0, 0, 1, 0, 20, 2)})))},
-                                                                'components': [('basicROS', ('invoke', {
-                                                                    'invokeId': ('present', -1),
-                                                                    'opcode': ('local', 45), 'argument': (
-                                                                    'RoutingInfoForSM-Arg',
-                                                                    {'msisdn': b'\x91\x14\x97Bu3\xf3',
-                                                                     'sm-RP-PRI': False,
-                                                                     'serviceCentreAddress': b'\x91\x14\x97yy\x08\xf0'})}))]})
-
-
-@pytest.fixture
-def asn_object(asn_one_encoded, asn_one_decoded, context) -> TCAPMAPASNObject:
-    return TCAPMAPASNObject(asn_one_encoded, asn_one_decoded, context=context,
-                           received_timestamp=datetime(2019, 1, 1, 1, 1))
-
-
-@pytest.fixture
-def file_containing_asn(tmpdir, asn_one_encoded) -> Path:
-    p = Path(tmpdir.mkdir("encoded").join("testasn"))
-    p.write_bytes(asn_one_encoded)
-    return p
-
-
-@pytest.fixture
-def file_containing_multi_asn(tmpdir, asn_buffer) -> Path:
-    p = Path(tmpdir.mkdir("encoded").join("testasn"))
-    p.write_bytes(asn_buffer)
-    return p
-
-
 @pytest.fixture
 def json_codec_no_context() -> JSONCodec:
     return JSONCodec(JSONObject, context={})
-
-
-@pytest.fixture
-def default_notes(user1) -> Dict:
-    return {0: {'id': 0, 'name': '1stnote', 'text': 'Hello, World!', 'user': user1[0]}}
-
-
-@pytest.fixture
-def after_create_notes(user1, default_notes) -> Dict:
-    notes = default_notes.copy()
-    notes.update({1: {'id': 1, 'name': 'Hello', 'text': 'This is my second note', 'user': user1[0]}})
-    return notes
-
-
-@pytest.fixture
-def after_update_notes(user1) -> Dict:
-    return {0: {'id': 0, 'name': '1stnote', 'text': 'Updating my first note', 'user': user1[0]}}
 
 
 @pytest.fixture
@@ -420,14 +287,6 @@ async def json_rpc_action_no_process_queue(json_rpc_app) -> JSONRPCServer:
 @pytest.fixture
 def json_rpc_requester() -> SampleJSONRPCClient:
     return SampleJSONRPCClient()
-
-
-@pytest.fixture
-async def managed_file_short_timeout(tmp_path) -> ManagedFile:
-    path = tmp_path/'managed_file1'
-    f = ManagedFile.get_file(path, timeout=0.0001)
-    yield f
-    await f.close()
 
 
 @pytest.fixture
@@ -545,8 +404,8 @@ def json_rpc_login_response_encoded(user1) -> bytes:
 
 
 @pytest.fixture
-def json_buffer() -> str:
-    return '{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
+def json_buffer() -> bytes:
+    return b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
 @pytest.fixture

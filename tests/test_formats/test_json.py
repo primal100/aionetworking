@@ -53,13 +53,6 @@ class TestJsonObject:
     def test_02_filter(self, json_object):
         assert json_object.filter() is False
 
-    def test_03_subscribe_unsubscribe(self, json_object, connections_manager, simple_network_connection):
-        connections_manager.add_connection(simple_network_connection)
-        json_object.subscribe("test")
-        assert json_object.is_subscribed("test") is True
-        json_object.unsubscribe("test")
-        assert json_object.is_subscribed("test") is False
-
 
 class TestBufferObject:
     @pytest.mark.asyncio

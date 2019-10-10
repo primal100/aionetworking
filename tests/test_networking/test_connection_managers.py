@@ -33,19 +33,3 @@ class TestNetworkConnections:
         connections = list(connections_manager)
         assert connections == simple_network_connections
 
-    def test_02_subscribe_notify_unsubscribe(self, connections_manager, simple_network_connection, queue):
-        connections_manager.add_connection(simple_network_connection)
-        connections_manager.notify("test", "message sent")
-        assert queue.qsize() == 0
-        connections_manager.subscribe(simple_network_connection.peer, "test")
-        assert connections_manager.is_subscribed(simple_network_connection, "test") is True
-        assert connections_manager.peer_is_subscribed(simple_network_connection.peer, "test") is True
-        connections_manager.notify("test", "message sent")
-        assert queue.qsize() == 1
-        assert queue.get_nowait() == "message sent"
-        assert queue.qsize() == 0
-        connections_manager.unsubscribe(simple_network_connection.peer, "test")
-        assert connections_manager.is_subscribed(simple_network_connection, "test") is False
-        assert connections_manager.peer_is_subscribed(simple_network_connection.peer, "test") is False
-        connections_manager.notify("test", "message sent")
-        assert queue.qsize() == 0
