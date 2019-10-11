@@ -3,7 +3,7 @@ import pytest
 import pickle
 from pathlib import Path
 
-from lib.networking.adaptors import MethodNotFoundError
+from lib.networking.exceptions import MethodNotFoundError
 from lib.formats.recording import get_recording_from_file
 from lib.utils import alist
 

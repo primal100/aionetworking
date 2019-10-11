@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from .protocols import RequesterProtocol
+from .base import BaseRequester
 
 
 @dataclass
-class EchoRequester(RequesterProtocol):
+class EchoRequester(BaseRequester):
     methods = ('echo', 'make_exception')
     notification_methods = ('subscribe',)
     last_id = 0

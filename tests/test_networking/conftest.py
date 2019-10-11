@@ -48,7 +48,7 @@ def echo_recording_data() -> List:
 
 @pytest.fixture
 async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context,
-                             receiver_connection_logger) -> ReceiverAdaptor:
+                                   receiver_connection_logger) -> ReceiverAdaptor:
     context_cv.set(context)
     connection_logger_cv.set(receiver_connection_logger)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
@@ -168,21 +168,23 @@ def connection_is_stored(connection_args):
 
 
 @pytest.fixture
-def protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                    receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
+async def protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
+                                          receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     logger_cv.set(receiver_logger)
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
         dataformat=JSONObject)
+    await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
+    await factory.close()
 
 
 @pytest.fixture
-def protocol_factory_two_way_server(echo_action, buffered_file_storage_recording_action,
+async def protocol_factory_two_way_server(echo_action, buffered_file_storage_recording_action,
                                     receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     logger_cv.set(receiver_logger)
@@ -190,32 +192,38 @@ def protocol_factory_two_way_server(echo_action, buffered_file_storage_recording
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
         dataformat=JSONObject)
+    await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
+    await factory.close()
 
 
 @pytest.fixture
-def protocol_factory_one_way_client(sender_logger, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_one_way_client(sender_logger, initial_client_context) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     logger_cv.set(sender_logger)
     factory = StreamClientProtocolFactory(
         dataformat=JSONObject)
+    await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
+    await factory.close()
 
 
 @pytest.fixture
-def protocol_factory_two_way_client(echo_requester, sender_logger, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_two_way_client(echo_requester, sender_logger, initial_client_context) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     logger_cv.set(sender_logger)
     factory = StreamClientProtocolFactory(
         requester=echo_requester,
         dataformat=JSONObject)
+    await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
+    await factory.close()
 
 
 @pytest.fixture

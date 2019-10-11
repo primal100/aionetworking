@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 import warnings
 
 from lib.compatibility import Protocol
@@ -9,7 +9,7 @@ from lib.formats.types import MessageObjectType
 from lib.wrappers.value_waiters import StatusWaiter
 from lib.utils import dataclass_getstate, dataclass_setstate
 
-from typing import Any, AnyStr, TypeVar, Type, AsyncGenerator
+from typing import Any, TypeVar, Type, AsyncGenerator
 
 
 warnings.filterwarnings("ignore", message="fields may not start with an underscore")
@@ -22,8 +22,8 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 class BaseAction(Protocol):
     supports_notifications = False
     name = 'receiver action'
-    logger: LoggerType = Logger('receiver.actions')
-    _status: StatusWaiter = field(default_factory=StatusWaiter)
+    logger: InitVar[LoggerType] = Logger('receiver')
+    _status: StatusWaiter = field(default_factory=StatusWaiter, compare=False, repr=False)
 
     timeout: int = 5
 
@@ -32,8 +32,8 @@ class BaseAction(Protocol):
         from lib.definitions import ACTIONS
         return ACTIONS[name]
 
-    def __post_init__(self) -> None:
-        self.logger = self.logger.get_child(name='actions')
+    def __post_init__(self, logger) -> None:
+        self.logger = logger.get_child(name='actions')
 
     def __getstate__(self):
         return dataclass_getstate(self)

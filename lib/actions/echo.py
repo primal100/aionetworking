@@ -13,7 +13,7 @@ class InvalidRequestError(BaseException):
 @dataclass
 class EchoAction(BaseAction):
     supports_notifications = True
-    _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False)
+    _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, compare=False, repr=False)
 
     async def get_notifications(self) -> AsyncGenerator[None, None]:
         while True:

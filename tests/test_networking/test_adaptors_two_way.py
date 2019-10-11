@@ -2,11 +2,10 @@ import pytest
 import asyncio
 
 from pathlib import Path
-import json
 
 from lib.formats.recording import get_recording_from_file
 from lib.networking.exceptions import MethodNotFoundError
-from lib.utils import alist, time_coro
+from lib.utils import alist
 
 
 class TestTwoWayReceiverAdaptor:

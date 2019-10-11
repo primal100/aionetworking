@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import abstractmethod
 
 from lib.conf.logging import Logger, get_connection_logger_sender
 
@@ -18,3 +19,9 @@ class RequesterProtocol(Protocol):
     def swap_cls(cls, name: str):
         from lib import definitions
         return definitions.REQUESTERS[name]
+
+    @abstractmethod
+    async def start(self): ...
+
+    @abstractmethod
+    async def close(self): ...
