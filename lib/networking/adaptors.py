@@ -70,8 +70,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")
         msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        task = self._scheduler.create_task(self.process_msgs(msgs_generator, buffer))
-        task.add_done_callback(self._scheduler.task_done)
+        task = self._scheduler.task_with_callback(self.process_msgs(msgs_generator, buffer), name='Process_Msgs')
         return task
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
@@ -156,7 +155,15 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.action.supports_notifications:
-            self._scheduler.create_task(self._send_notifications(), name='Notifications')
+            self._notifications_task = self._scheduler.task_with_callback(self._send_notifications(), name='Notifications')
+        else:
+            self._notifications_task = None
+
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        if self._notifications_task:
+            self._notifications_task.cancel()
+            await asyncio.sleep(0.1)        ###Not sure why this is needed, fixes runtime error during tests
+        await super().close(exc)
 
     async def _send_notifications(self):
         async for item in self.action.get_notifications():

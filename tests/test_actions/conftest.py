@@ -1,3 +1,4 @@
+import asyncio
 import json
 from lib.actions.file_storage import ManagedFile, FileStorage, BufferedFileStorage
 from lib.actions.echo import EchoAction
@@ -39,6 +40,7 @@ async def buffered_file_storage_recording_action(tmp_path) -> BufferedFileStorag
     yield action
     if not action.is_closing():
         await action.close()
+    await asyncio.sleep(1)
 
 
 @pytest.fixture
@@ -82,33 +84,63 @@ def echo_encoded_multi(echo, echo_notification_request) -> List[Dict]:
 
 
 @pytest.fixture
-def echo_request_object(echo) -> JSONObject:
-    return JSONObject(json.dumps(echo), echo)
+def echo_encoded() -> bytes:
+    return b'{"id": 1, "method": "echo"}'
 
 
 @pytest.fixture
-def echo_response_object(echo_response) -> JSONObject:
-    return JSONObject(json.dumps(echo_response), echo_response)
+def echo_request_object(echo_encoded, echo) -> JSONObject:
+    return JSONObject(echo_encoded, echo)
 
 
 @pytest.fixture
-def echo_notification_request_object(echo_notification_request) -> JSONObject:
-    return JSONObject(json.dumps(echo_notification_request), echo_notification_request)
+def echo_response_encoded() -> bytes:
+    return b'{"id": 1, "result": "echo"}'
 
 
 @pytest.fixture
-def echo_notification_object(echo_notification) -> JSONObject:
-    return JSONObject(json.dumps(echo_notification), echo_notification)
+def echo_response_object(echo_response_encoded, echo_response) -> JSONObject:
+    return JSONObject(echo_response_encoded, echo_response)
 
 
 @pytest.fixture
-def echo_exception_request_object(echo_exception_request) -> JSONObject:
-    return JSONObject(json.dumps(echo_exception_request), echo_exception_request)
+def echo_notification_client_encoded() -> bytes:
+    return b'{"method": "send_notification"}'
 
 
 @pytest.fixture
-def echo_exception_response_object(echo_exception_response) -> JSONObject:
-    return JSONObject(json.dumps(echo_exception_response), echo_exception_response)
+def echo_notification_request_object(echo_notification_client_encoded, echo_notification_request) -> JSONObject:
+    return JSONObject(echo_notification_client_encoded, echo_notification_request)
+
+
+@pytest.fixture
+def echo_notification_server_encoded() -> bytes:
+    return b'{"result": "notification"}'
+
+
+@pytest.fixture
+def echo_notification_object(echo_notification_server_encoded, echo_notification) -> JSONObject:
+    return JSONObject(echo_notification_server_encoded, echo_notification)
+
+
+@pytest.fixture
+def echo_exception_request_encoded() -> bytes:
+    return b'{"id": 1, "method": "echo_typo"}'
+
+
+@pytest.fixture
+def echo_exception_request_object(echo_exception_request_encoded, echo_exception_request) -> JSONObject:
+    return JSONObject(echo_exception_request_encoded, echo_exception_request)
+
+
+@pytest.fixture
+def echo_exception_response_encoded() -> bytes:
+    return b'{"id": 1, "error": "InvalidRequestError"}'
+
+
+@pytest.fixture
+def echo_exception_response_object(echo_exception_response_encoded, echo_exception_response) -> JSONObject:
+    return JSONObject(echo_exception_response_encoded, echo_exception_response)
 
 
 @pytest.fixture
@@ -117,8 +149,8 @@ def echo_request_invalid_json(echo) -> bytes:
 
 
 @pytest.fixture
-def echo_decode_error_response(echo_request_invalid_json)  -> Dict:
-    return {'error': 'JSON was invalid', 'request': echo_request_invalid_json}
+def echo_decode_error_response(echo_request_invalid_json) -> Dict:
+    return {'error': 'JSON was invalid'}
 
 
 @pytest.fixture

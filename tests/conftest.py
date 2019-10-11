@@ -903,11 +903,11 @@ def tcp_client_two_way(protocol_factory_two_way_client, sender_logger, sock, pee
 
 
 @pytest.fixture
-def two_way_receiver_adaptor(json_rpc_action, buffered_file_storage_pre_action_binary, context,
-                             receiver_connection_logger, deque) -> ReceiverAdaptor:
-    return ReceiverAdaptor(JSONObject, action=json_rpc_action,
-                           context=context, logger=receiver_connection_logger,
-                           preaction=buffered_file_storage_pre_action_binary, send=deque.append)
+async def two_way_receiver_adaptor(echo_action, buffered_file_storage_pre_action_binary, context,
+                                   receiver_connection_logger, queue) -> ReceiverAdaptor:
+    yield ReceiverAdaptor(JSONObject, action=echo_action,
+                          context=context, logger=receiver_connection_logger,
+                          preaction=buffered_file_storage_pre_action_binary, send=queue.put_nowait)
 
 
 @pytest.fixture

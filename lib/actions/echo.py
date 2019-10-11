@@ -21,7 +21,7 @@ class EchoAction(BaseAction):
             yield {'result': item}
 
     def on_decode_error(self, data: bytes, exc: BaseException) -> dict:
-        return {'error': 'JSON was invalid', 'request': data}
+        return {'error': 'JSON was invalid'}
 
     def on_exception(self, msg: MessageObjectType, exc: BaseException) -> dict:
         return {'id': msg.decoded['id'], 'error': exc.__class__.__name__}

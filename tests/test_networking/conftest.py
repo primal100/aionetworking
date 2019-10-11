@@ -1,6 +1,5 @@
 from pytest_lazyfixture import lazy_fixture
-import asyncio
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from lib.conf.context import context_cv
 from lib.conf.logging import connection_logger_cv, logger_cv
@@ -12,6 +11,7 @@ from tests.mock import MockTCPTransport
 
 from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
+from tests.test_requesters.conftest import *
 
 
 @pytest.fixture
@@ -25,6 +25,28 @@ def initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
+def client_context() -> dict:
+    return {'protocol_name': 'TCP Client', 'endpoint': 'TCP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000'}
+
+
+@pytest.fixture
+def json_client_codec(client_context) -> JSONCodec:
+    return JSONCodec(JSONObject, context=client_context)
+
+
+@pytest.fixture
+def echo_decode_error_response_encoded(echo_exception_request_encoded) -> bytes:
+    return b'{"error": "JSON was invalid"}'
+
+
+@pytest.fixture
+def echo_recording_data() -> List:
+    return [recorded_packet(sent_by_server=False, timestamp=datetime(2019, 1, 1, 1, 1), sender='127.0.0.1', data=b'{"id": 1, "method": "echo"}')]
+
+
+@pytest.fixture
 def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context,
                              receiver_connection_logger) -> ReceiverAdaptor:
     context_cv.set(context)
@@ -34,26 +56,26 @@ def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context_client, sender_connection_logger, deque) -> SenderAdaptor:
+async def one_way_sender_adaptor(context_client, sender_connection_logger, queue) -> SenderAdaptor:
     context_cv.set(context_client)
     connection_logger_cv.set(sender_connection_logger)
-    yield SenderAdaptor(JSONObject, send=deque.append)
+    yield SenderAdaptor(JSONObject, send=queue.put_nowait)
 
 
 @pytest.fixture
-def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context,
-                             receiver_connection_logger) -> ReceiverAdaptor:
+async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context,
+                                   receiver_connection_logger, queue) -> ReceiverAdaptor:
     context_cv.set(context)
     connection_logger_cv.set(receiver_connection_logger)
-    return ReceiverAdaptor(JSONObject, action=echo_action,
-                           preaction=buffered_file_storage_recording_action)
+    yield ReceiverAdaptor(JSONObject, action=echo_action, preaction=buffered_file_storage_recording_action,
+                          send=queue.put_nowait)
 
 
 @pytest.fixture
-async def two_way_sender_adaptor(echo_requester, context_client, sender_connection_logger, deque) -> SenderAdaptor:
+async def two_way_sender_adaptor(echo_requester, context_client, sender_connection_logger, queue) -> SenderAdaptor:
     context_cv.set(context_client)
     connection_logger_cv.set(sender_connection_logger)
-    yield SenderAdaptor(JSONObject, send=deque.append, requester=echo_requester)
+    yield SenderAdaptor(JSONObject, send=queue.put_nowait, requester=echo_requester)
 
 
 @pytest.fixture

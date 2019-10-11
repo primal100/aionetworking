@@ -27,9 +27,9 @@ class BaseMessageObject(MessageObject, Protocol):
 
     encoded: bytes
     decoded: Any = None
-    context: Dict[str, Any] = field(default_factory=context_cv.get)
+    context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
-    received_timestamp: datetime = field(default_factory=datetime.now, compare=False)
+    received_timestamp: datetime = field(default_factory=datetime.now, compare=False, repr=False, hash=False)
 
     def __post_init__(self):
         pass

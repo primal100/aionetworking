@@ -9,10 +9,11 @@ class EchoRequester(RequesterProtocol):
     last_id = 0
 
     def _make_request(self, method: str, request_id: bool):
-        request = {'method': method}
+        request = {}
         if request_id:
             self.last_id += 1
             request['id'] = self.last_id
+        request['method'] = method
         return request
 
     def echo(self):
