@@ -42,7 +42,8 @@ class TestConnectionShared:
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
 
     @pytest.mark.asyncio
-    async def test_02_send_data_adaptor_method(self, connection, json_rpc_login_request_encoded, transport, queue, peer_data):
+    async def test_02_send_data_adaptor_method(self, connection, json_rpc_login_request_encoded, transport, queue,
+                                               peer_data):
         connection.connection_made(transport)
         connection.send_data(json_rpc_login_request_encoded)
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
@@ -83,8 +84,12 @@ class TestConnectionOneWayServer:
 
 
 class TestConnectionOneWayClient:
+    def test_00_is_child(self, tcp_protocol_one_way_client):
+        assert tcp_protocol_one_way_client.is_child("TCP Client 127.0.0.1:0")
+        assert not tcp_protocol_one_way_client.is_child("UDP Client 127.0.0.1:0")
+
     @pytest.mark.asyncio
-    async def test_00_pickle(self, tcp_protocol_one_way_client):
+    async def test_01_pickle(self, tcp_protocol_one_way_client):
         data = pickle.dumps(tcp_protocol_one_way_client)
         protocol = pickle.loads(data)
         assert protocol == tcp_protocol_one_way_client

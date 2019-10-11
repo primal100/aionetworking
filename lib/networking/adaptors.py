@@ -153,6 +153,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     action: ActionProtocol = None
 
     def __post_init__(self) -> None:
+        self._loop_id = id(asyncio.get_event_loop())
         super().__post_init__()
         if self.action.supports_notifications:
             self._notifications_task = self._scheduler.task_with_callback(self._send_notifications(), name='Notifications')
@@ -162,7 +163,6 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     async def close(self, exc: Optional[BaseException] = None) -> None:
         if self._notifications_task:
             self._notifications_task.cancel()
-            await asyncio.sleep(0.1)        ###Not sure why this is needed, fixes runtime error during tests
         await super().close(exc)
 
     async def _send_notifications(self):
