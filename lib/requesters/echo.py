@@ -5,7 +5,7 @@ from .protocols import RequesterProtocol
 @dataclass
 class EchoRequester(RequesterProtocol):
     methods = ('echo', 'make_exception')
-    notification_methods = ('request_notification',)
+    notification_methods = ('subscribe',)
     last_id = 0
 
     def _make_request(self, method: str, request_id: bool):
@@ -22,5 +22,5 @@ class EchoRequester(RequesterProtocol):
     def make_exception(self):
         return self._make_request('echo_typo', True)
 
-    def request_notification(self):
+    def subscribe(self):
         return self._make_request('send_notification', False)

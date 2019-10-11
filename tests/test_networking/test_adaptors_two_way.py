@@ -135,7 +135,7 @@ class TestSenderAdaptorTwoWay:
     @pytest.mark.asyncio
     async def test_10_run_method_notification(self, two_way_sender_adaptor, echo_notification_client_encoded, queue,
                                               echo_notification_server_encoded, echo_notification_object, timestamp):
-        two_way_sender_adaptor.request_notification()
+        two_way_sender_adaptor.subscribe()
         msg = await queue.get()
         assert msg == echo_notification_client_encoded
         task2 = two_way_sender_adaptor.on_data_received(echo_notification_server_encoded, timestamp=timestamp)
@@ -146,4 +146,4 @@ class TestSenderAdaptorTwoWay:
     @pytest.mark.asyncio
     async def test_11_no_method(self, two_way_sender_adaptor):
         with pytest.raises(MethodNotFoundError):
-            two_way_sender_adaptor.ech("user1")
+            two_way_sender_adaptor.ech()
