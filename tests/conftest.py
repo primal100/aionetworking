@@ -195,8 +195,10 @@ def raw_received_handler(logging_handler_cls, raw_received_formatter) -> logging
 @pytest.fixture
 def log_buffers(raw_received_handler):
     logger = logging.getLogger('receiver.raw_received')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
     logger.addHandler(raw_received_handler)
+    yield
+    logger.setLevel(logging.ERROR)
 
 
 @pytest.fixture
@@ -206,7 +208,7 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logger.setLevel(default_level)
     logger.addHandler(receiver_logging_handler)
     logger = logging.getLogger('sender')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(default_level)
     logger.addHandler(receiver_logging_handler)
     actions_logger = logging.getLogger('receiver.actions')
     actions_logger.addHandler(receiver_logging_handler)
@@ -227,19 +229,23 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     connection_logger.setLevel(default_level)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
-    stats_logger.setLevel(logging.INFO)
+    stats_logger.setLevel(logging.ERROR)
     stats_logger.propagate = False
     asyncio.get_event_loop().set_debug(False)
     logger = logging.getLogger('asyncio')
     logger.addHandler(receiver_logging_handler)
     logger.setLevel(logging.ERROR)
+    yield
+    stats_logger.setLevel(logging.ERROR)
 
 
 @pytest.fixture
 def sender_connection_logger_stats(sender_connection_logger, context_client, caplog) -> ConnectionLoggerStats:
-    caplog.set_level(logging.INFO, "sender.stats")
-    caplog.set_level(logging.DEBUG, "sender.connection")
-    return sender_logger.get_connection_logger(extra=context_client)
+    caplog.set_level(logging.ERROR, "sender.stats")
+    caplog.set_level(logging.ERROR, "sender.connection")
+    yield sender_logger.get_connection_logger(extra=context_client)
+    caplog.set_level(logging.ERROR, "sender.stats")
+    caplog.set_level(logging.ERROR, "sender.connection")
 
 
 @pytest.fixture
@@ -851,17 +857,6 @@ def buffer_object_json2(buffer_json_2, timestamp, context) -> BufferObject:
 
 
 @pytest.fixture
-def protocol_factory_one_way_server_benchmark(buffered_file_storage_action_binary, receiver_logger) -> StreamServerProtocolFactory:
-    factory = StreamServerProtocolFactory(
-        action=buffered_file_storage_action_binary,
-        dataformat=TCAPMAPASNObject,
-        logger=receiver_logger)
-    if not factory.full_name:
-        factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
-    yield factory
-
-
-@pytest.fixture
 def protocol_factory_two_way_server(json_rpc_action, receiver_logger, buffered_file_storage_pre_action_binary) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
         action=json_rpc_action,
@@ -871,23 +866,6 @@ def protocol_factory_two_way_server(json_rpc_action, receiver_logger, buffered_f
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
-
-
-@pytest.fixture
-def protocol_factory_two_way_client(sender_logger, json_rpc_requester) -> StreamClientProtocolFactory:
-    factory = StreamClientProtocolFactory(
-        dataformat=JSONObject,
-        requester=json_rpc_requester,
-        logger=sender_logger)
-    if not factory.full_name:
-        factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
-    yield factory
-
-
-@pytest.fixture
-def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
-    return TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
-                     port=sock[1])
 
 
 @pytest.fixture

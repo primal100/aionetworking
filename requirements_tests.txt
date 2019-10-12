@@ -1,5 +1,4 @@
 pytest
 pytest-asyncio
 pytest-lazy-fixture
-pytest-benchmark
 #mypy
