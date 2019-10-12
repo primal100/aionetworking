@@ -2,7 +2,6 @@ from pytest_lazyfixture import lazy_fixture
 from datetime import timedelta, datetime
 
 from lib.conf.context import context_cv
-from lib.conf.logging import connection_logger_cv, logger_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import TCPServerConnection, TCPClientConnection
 from lib.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory
@@ -12,6 +11,11 @@ from tests.mock import MockTCPTransport
 from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
 from tests.test_requesters.conftest import *
+
+
+@pytest.fixture
+def critical_logging_only(caplog):
+    caplog.set_level(logging.CRITICAL, logger="receiver.connection")
 
 
 @pytest.fixture
@@ -47,10 +51,8 @@ def echo_recording_data() -> List:
 
 
 @pytest.fixture
-async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context,
-                                   receiver_connection_logger) -> ReceiverAdaptor:
+async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context) -> ReceiverAdaptor:
     context_cv.set(context)
-    connection_logger_cv.set(receiver_connection_logger)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                            preaction=buffered_file_storage_recording_action)
     yield adaptor
@@ -58,19 +60,16 @@ async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_s
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context_client, sender_connection_logger, queue) -> SenderAdaptor:
+async def one_way_sender_adaptor(context_client,queue) -> SenderAdaptor:
     context_cv.set(context_client)
-    connection_logger_cv.set(sender_connection_logger)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
     yield adaptor
     await adaptor.close()
 
 
 @pytest.fixture
-async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context,
-                                   receiver_connection_logger, queue) -> ReceiverAdaptor:
+async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context, queue) -> ReceiverAdaptor:
     context_cv.set(context)
-    connection_logger_cv.set(receiver_connection_logger)
     adaptor = ReceiverAdaptor(JSONObject, action=echo_action, preaction=buffered_file_storage_recording_action,
                               send=queue.put_nowait)
     yield adaptor
@@ -78,9 +77,8 @@ async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_
 
 
 @pytest.fixture
-async def two_way_sender_adaptor(echo_requester, context_client, sender_connection_logger, queue) -> SenderAdaptor:
+async def two_way_sender_adaptor(echo_requester, context_client, queue) -> SenderAdaptor:
     context_cv.set(context_client)
-    connection_logger_cv.set(sender_connection_logger)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait, requester=echo_requester)
     yield adaptor
     await adaptor.close()
@@ -169,9 +167,8 @@ def connection_is_stored(connection_args):
 
 @pytest.fixture
 async def protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                          receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
+                                          initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
-    logger_cv.set(receiver_logger)
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
@@ -185,9 +182,8 @@ async def protocol_factory_one_way_server(buffered_file_storage_action, buffered
 
 @pytest.fixture
 async def protocol_factory_two_way_server(echo_action, buffered_file_storage_recording_action,
-                                    receiver_logger, initial_server_context) -> StreamServerProtocolFactory:
+                                          initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
-    logger_cv.set(receiver_logger)
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
@@ -200,9 +196,8 @@ async def protocol_factory_two_way_server(echo_action, buffered_file_storage_rec
 
 
 @pytest.fixture
-async def protocol_factory_one_way_client(sender_logger, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_one_way_client(initial_client_context) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
-    logger_cv.set(sender_logger)
     factory = StreamClientProtocolFactory(
         dataformat=JSONObject)
     await factory.start()
@@ -213,9 +208,8 @@ async def protocol_factory_one_way_client(sender_logger, initial_client_context)
 
 
 @pytest.fixture
-async def protocol_factory_two_way_client(echo_requester, sender_logger, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_two_way_client(echo_requester, initial_client_context) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
-    logger_cv.set(sender_logger)
     factory = StreamClientProtocolFactory(
         requester=echo_requester,
         dataformat=JSONObject)
@@ -228,8 +222,7 @@ async def protocol_factory_two_way_client(echo_requester, sender_logger, initial
 
 @pytest.fixture
 async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                      receiver_logger, initial_server_context) -> TCPServerConnection:
-    logger_cv.set(receiver_logger)
+                                      initial_server_context) -> TCPServerConnection:
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
@@ -241,8 +234,7 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 
 
 @pytest.fixture
-async def tcp_protocol_one_way_client(sender_logger, initial_client_context) -> TCPClientConnection:
-    logger_cv.set(sender_logger)
+async def tcp_protocol_one_way_client(initial_client_context) -> TCPClientConnection:
     context_cv.set(initial_client_context)
     conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
     yield conn
@@ -253,8 +245,7 @@ async def tcp_protocol_one_way_client(sender_logger, initial_client_context) -> 
 
 @pytest.fixture
 async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recording_action,
-                                      receiver_logger, initial_server_context) -> TCPServerConnection:
-    logger_cv.set(receiver_logger)
+                                      initial_server_context) -> TCPServerConnection:
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
                                parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
@@ -266,8 +257,7 @@ async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
 
 
 @pytest.fixture
-async def tcp_protocol_two_way_client(echo_requester, sender_logger, initial_client_context) -> TCPClientConnection:
-    logger_cv.set(sender_logger)
+async def tcp_protocol_two_way_client(echo_requester, initial_client_context) -> TCPClientConnection:
     context_cv.set(initial_client_context)
     conn = TCPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
     yield conn

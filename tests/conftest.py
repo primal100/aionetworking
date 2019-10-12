@@ -223,7 +223,7 @@ def receiver_debug_logging_extended(receiver_logging_handler, connection_logging
     logging.getLogger('sender.data_received').setLevel(logging.ERROR)
     logging.getLogger('sender.raw_sent').setLevel(logging.ERROR)
     connection_logger.addHandler(connection_logging_handler)
-    connection_logger.propagate = Falsef
+    connection_logger.propagate = False
     connection_logger.setLevel(default_level)
     stats_logger = logging.getLogger('receiver.stats')
     stats_logger.addHandler(stats_logging_handler)
@@ -1057,10 +1057,10 @@ async def two_way_server_receiver(_two_way_server_receiver) -> BaseServer:
         await _two_way_server_receiver.close()
 
 
-@pytest.fixture
+"""@pytest.fixture
 async def one_way_server_started(one_way_server_receiver) -> BaseServer:
     await one_way_server_receiver.start()
-    yield one_way_server_receiver
+    yield one_way_server_receiver"""
 
 
 @pytest.fixture

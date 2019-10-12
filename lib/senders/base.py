@@ -101,7 +101,7 @@ class BaseClient(BaseSender, Protocol):
 
     @run_in_loop
     async def open_send_msgs(self, msgs: Sequence[AnyStr], interval: int = None, start_interval: int = 0,
-                             override: dict = None) -> None:
+                             override: dict = None, wait_responses: bool = False) -> None:
         if override:
             for k, v in override.items():
                 setattr(self, k, v)
@@ -111,6 +111,9 @@ class BaseClient(BaseSender, Protocol):
                 if interval is not None:
                     await asyncio.sleep(interval)
                 conn.send_data(msg)
+            if wait_responses:
+                for _ in msgs:
+                    await conn.wait_notification()
 
     @run_in_loop
     async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:

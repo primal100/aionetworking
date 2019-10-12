@@ -1,4 +1,4 @@
-import pytest
+from lib.receivers.base import BaseServer
 from lib.receivers.servers import TCPServer, pipe_server
 
 from tests.test_networking.conftest import *
@@ -23,9 +23,23 @@ async def tcp_server_one_way(protocol_factory_one_way_server, sock) -> TCPServer
 
 
 @pytest.fixture
+async def tcp_server_two_way(protocol_factory_two_way_server, sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1])
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
 async def tcp_server_one_way_quiet(tcp_server_one_way) -> TCPServer:
     tcp_server_one_way.quiet = True
     yield tcp_server_one_way
+
+
+@pytest.fixture
+async def tcp_server_two_way_quiet(tcp_server_two_way) -> TCPServer:
+    tcp_server_two_way.quiet = True
+    yield tcp_server_two_way
 
 
 @pytest.fixture
@@ -35,8 +49,22 @@ async def tcp_server_one_way_started(tcp_server_one_way) -> TCPServer:
 
 
 @pytest.fixture
+async def tcp_server_two_way_started(tcp_server_two_way) -> TCPServer:
+    await tcp_server_two_way.start()
+    yield tcp_server_two_way
+
+
+@pytest.fixture
 async def pipe_server_one_way(protocol_factory_one_way_server, pipe_path) -> BaseServer:
     server = pipe_server(protocol_factory=protocol_factory_one_way_server, path=pipe_path)
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def pipe_server_two_way(protocol_factory_two_way_server, pipe_path) -> BaseServer:
+    server = pipe_server(protocol_factory=protocol_factory_two_way_server, path=pipe_path)
     yield server
     if server.is_started():
         await server.close()
@@ -49,9 +77,21 @@ async def pipe_server_one_way_quiet(pipe_server_one_way) -> BaseServer:
 
 
 @pytest.fixture
+async def pipe_server_two_way_quiet(pipe_server_two_way) -> BaseServer:
+    pipe_server_two_way.quiet = True
+    yield pipe_server_two_way
+
+
+@pytest.fixture
 async def pipe_server_one_way_started(pipe_server_one_way) -> BaseServer:
     await pipe_server_one_way.start()
     yield pipe_server_one_way
+
+
+@pytest.fixture
+async def pipe_server_two_way_started(pipe_server_two_way) -> BaseServer:
+    await pipe_server_two_way.start()
+    yield pipe_server_two_way
 
 
 @pytest.fixture
@@ -71,8 +111,19 @@ def server_quiet(receiver_args) -> BaseServer:
 
 server_client_params = [
     lazy_fixture((tcp_server_one_way.__name__,)),
+    lazy_fixture((tcp_server_two_way.__name__,)),
     pytest.param(
         lazy_fixture((pipe_server_one_way.__name__,)),
+        marks=pytest.mark.skipif(
+            "not supports_pipe_or_unix_connections()")
+    ),
+    pytest.param(
+        lazy_fixture((pipe_server_one_way.__name__,)),
+        marks=pytest.mark.skipif(
+            "not supports_pipe_or_unix_connections()")
+    ),
+    pytest.param(
+        lazy_fixture((pipe_server_two_way.__name__,)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
@@ -85,9 +136,17 @@ def server_args(request) -> Tuple:
 @pytest.fixture(params=[
     lazy_fixture(
         (tcp_server_one_way.__name__, tcp_server_one_way_started.__name__, tcp_server_one_way_quiet.__name__)),
+    lazy_fixture(
+        (tcp_server_two_way.__name__, tcp_server_two_way_started.__name__, tcp_server_two_way_quiet.__name__)),
     pytest.param(
         lazy_fixture((pipe_server_one_way.__name__, pipe_server_one_way_started.__name__,
                       pipe_server_one_way_quiet.__name__)),
+        marks=pytest.mark.skipif(
+            "not supports_pipe_or_unix_connections()")
+    ),
+    pytest.param(
+        lazy_fixture((pipe_server_two_way.__name__, pipe_server_two_way_started.__name__,
+                      pipe_server_two_way_quiet.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),

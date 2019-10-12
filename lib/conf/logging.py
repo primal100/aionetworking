@@ -158,12 +158,14 @@ class ConnectionLogger(Logger):
             return binascii.hexlify(data).decode('utf-8')
 
     def _raw_received(self, data: bytes, *args, **kwargs) -> None:
-        msg = self._convert_raw_to_hex(data)
-        self._raw_received_logger.debug(msg, *args, **kwargs)
+        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+            msg = self._convert_raw_to_hex(data)
+            self._raw_received_logger.debug(msg, *args, **kwargs)
 
     def _raw_sent(self, data: bytes, *args, **kwargs) -> None:
-        msg = self._convert_raw_to_hex(data)
-        self._raw_sent_logger.debug(msg, *args, **kwargs)
+        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+            msg = self._convert_raw_to_hex(data)
+            self._raw_sent_logger.debug(msg, *args, **kwargs)
 
     def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'RECEIVED'}, **kwargs)

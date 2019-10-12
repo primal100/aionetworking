@@ -4,7 +4,7 @@ class TestEchoRequester:
         assert request == echo
 
     def test_01_send_notification(self, echo_requester, echo_notification_request):
-        request = echo_requester.request_notification()
+        request = echo_requester.subscribe()
         assert request == echo_notification_request
 
     def test_02_make_exception(self, echo_requester, echo_exception_request):

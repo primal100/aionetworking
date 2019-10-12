@@ -141,7 +141,10 @@ class SenderAdaptor(BaseAdaptorProtocol):
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
         async for msg in msgs:
             if msg.request_id:
-                self._scheduler.set_result(msg.request_id, msg)
+                try:
+                    self._scheduler.set_result(msg.request_id, msg)
+                except KeyError:
+                    self._notification_queue.put_nowait(msg)
             else:
                 self._notification_queue.put_nowait(msg)
         return len(buffer)

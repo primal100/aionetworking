@@ -34,7 +34,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
 
     async def start(self) -> None:
         self._context = contextvars.copy_context()
-        self.logger = self._context.get(logger_cv)
+        self.logger = logger_cv.get()
         coros = []
         if self.action:
             coros.append(self.action.start())
