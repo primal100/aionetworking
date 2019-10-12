@@ -53,6 +53,7 @@ class TestStatsTracker:
         expected_keys = ['start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed',
                            'largest_buffer', 'send_rate', 'processing_rate', 'receive_rate', 'interval',
                            'average_buffer_size', 'average_sent', 'msgs_per_buffer', 'not_decoded', 'not_decoded_rate',
+
                            'total_done']
         assert sorted(list(d)) == sorted(expected_keys)
 

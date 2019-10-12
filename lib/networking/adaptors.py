@@ -1,12 +1,13 @@
 from abc import abstractmethod
 import asyncio
+import contextvars
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError
 from lib.actions.protocols import ActionProtocol
-from lib.compatibility import Protocol
+from lib.compatibility import Protocol, set_task_name
 from lib.conf.logging import connection_logger_cv, ConnectionLogger
 from lib.conf.context import context_cv
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
@@ -17,11 +18,14 @@ from lib.wrappers.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Iterator, Generator, Dict, Sequence, Type, Optional, AsyncIterator
+from typing import Any, Callable, Generator, Dict, Sequence, Type, Optional, AsyncIterator
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
     raise NotImplementedError
+
+
+msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
 @dataclass
@@ -178,7 +182,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
-    def _on_success(self, result, msg_obj: MessageObjectType) -> None:
+    def _on_success(self, result: Any, msg_obj: MessageObjectType) -> None:
         try:
             if result:
                 self.encode_and_send_msg(result)
@@ -191,18 +195,22 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         if response:
             self.encode_and_send_msg(response)
 
+    async def _process_msg(self, msg_obj):
+        try:
+            result = await self.action.do_one(msg_obj)
+            self._on_success(result, msg_obj)
+        except BaseException as e:
+            self._on_exception(e, msg_obj)
+
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
-        scheduler = TaskScheduler()
+        tasks = []
         try:
             async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
-                    scheduler.create_promise(self.action.do_one(msg_obj), self._on_success, self._on_exception,
-                                             task_name=f"{self.context['peer']}-Process-id-{msg_obj.uid}",
-                                             msg_obj=msg_obj)
-                    self.logger.debug('Task created for %s', msg_obj.uid)
+                    tasks.append(asyncio.create_task(self._process_msg(msg_obj)))
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await scheduler.join()
+            await asyncio.wait(tasks)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
         return len(buffer)

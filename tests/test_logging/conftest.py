@@ -15,7 +15,10 @@ async def receiver_logger() -> Logger:
 @pytest.fixture
 async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
+    caplog.set_level(logging.DEBUG, "receiver.data_received")
     yield receiver_logger.get_connection_logger(extra=context)
+    caplog.set_level(logging.ERROR, "receiver.connection")
+    caplog.set_level(logging.ERROR, "receiver.data_received")
 
 
 @pytest.fixture
@@ -32,16 +35,22 @@ def sender_connection_logger(sender_logger, context_client) -> ConnectionLogger:
 async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "receiver.stats")
     caplog.set_level(logging.DEBUG, "receiver.connection")
+    caplog.set_level(logging.DEBUG, "receiver.data_received")
     logger = receiver_logger.get_connection_logger(extra=context)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
     await logger.wait_closed()
+    caplog.set_level(logging.ERROR, "receiver.data_received")
+    caplog.set_level(logging.ERROR, "receiver.stats")
+    caplog.set_level(logging.ERROR, "receiver.connection")
 
 
 @pytest.fixture
 def debug_logging(caplog) -> None:
     caplog.set_level(logging.DEBUG)
+    yield
+    caplog.set_level(logging.ERROR)
 
 
 @pytest.fixture
