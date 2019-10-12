@@ -40,7 +40,7 @@ class UnixSocketServer(BaseServer):
     name = "Unix Socket Server"
     peer_prefix = 'unix'
 
-    path: Union[str, Path] = field(default_factory=unix_address)
+    path: Union[str, Path] = field(default_factory=unix_address, metadata={'pickle': True})
     ssl: SSLContext = None
     ssl_handshake_timeout: int = None
 

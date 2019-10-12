@@ -37,7 +37,7 @@ class TCPClient(BaseNetworkClient):
 
 @dataclass
 class UnixSocketClient(BaseClient):
-    name = "Unix socket Client"
+    name = "Unix Socket Client"
     peer_prefix = 'unix'
     path: Union[str, Path] = None
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
@@ -48,7 +48,8 @@ class UnixSocketClient(BaseClient):
     @property
     def src(self) -> str:
         if self.transport:
-            return str(self.transport.get_extra_info('socket').fd)
+            _socket = self.transport.get_extra_info('socket')
+            return str(_socket.fd)
         return ''
 
     @property

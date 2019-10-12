@@ -35,13 +35,14 @@ class TestTwoWayReceiverAdaptor:
         assert msg == echo_notification_server_encoded
 
     @pytest.mark.asyncio
-    async def test_03_on_exception(self, two_way_receiver_adaptor, echo_exception_request_encoded,
+    async def test_03_on_exception(self, two_way_receiver_adaptor, echo_exception_request_encoded, caplog,
                                    echo_exception_response_encoded, timestamp, queue, critical_logging_only):
         task = two_way_receiver_adaptor.on_data_received(echo_exception_request_encoded, timestamp)
         msg = await queue.get()
         await two_way_receiver_adaptor.close()
         assert task.done()
         assert msg == echo_exception_response_encoded
+        caplog.clear()
 
     @pytest.mark.asyncio
     async def test_04_response_on_decode_error(self, two_way_receiver_adaptor, echo_request_invalid_json, timestamp,

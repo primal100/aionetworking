@@ -6,7 +6,7 @@ from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import TCPServerConnection, TCPClientConnection
 from lib.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory
 
-from tests.mock import MockTCPTransport
+from tests.mock import MockTCPTransport, MockAFInetSocket, MockAFUnixSocket
 
 from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
@@ -96,23 +96,43 @@ async def file_containing_json_recording(tmpdir, buffer_codec, json_encoded_mult
 
 
 @pytest.fixture
-def extra(peername, sock) -> dict:
-    return {'peername': peername, 'sockname': sock}
+def extra_inet(peername, sock) -> dict:
+    return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket()}
 
 
 @pytest.fixture
-def extra_client(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername}
+def extra_client_inet(peername, sock) -> dict:
+    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket()}
 
 
 @pytest.fixture
-async def tcp_transport(queue, extra) -> asyncio.Transport:
-    yield MockTCPTransport(queue, extra=extra)
+def extra_unix(peername, sock) -> dict:
+    return {'peername': peername, 'sockname': sock, 'socket': MockAFUnixSocket()}
 
 
 @pytest.fixture
-async def tcp_transport_client(queue, extra_client) -> asyncio.Transport:
-    yield MockTCPTransport(queue, extra=extra_client)
+def extra_client_unix(peername, sock) -> dict:
+    return {'peername': sock, 'sockname': peername, 'socket': MockAFUnixSocket()}
+
+
+@pytest.fixture
+async def tcp_transport(queue, extra_inet) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra_inet)
+
+
+@pytest.fixture
+async def tcp_transport_client(queue, extra_client_inet) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra_client_inet)
+
+
+@pytest.fixture
+async def unix_transport(queue, extra_unix) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra_unix)
+
+
+@pytest.fixture
+async def unix_transport_client(queue, extra_client_unix) -> asyncio.Transport:
+    yield MockTCPTransport(queue, extra=extra_client_unix)
 
 
 @pytest.fixture

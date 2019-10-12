@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+import socket
 
 from .exceptions import MessageFromNotAuthorizedHost
 
@@ -83,12 +84,9 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self.logger.get_connection_logger(extra=self.context)
 
     def _delete_connection(self) -> None:
-        try:
-            if self.store_connections:
-                num = connections_manager.remove_connection(self)
-                self.logger.log_num_connections('closed', num)
-        finally:
-            self._status.set_stopped()
+        if self.store_connections:
+            num = connections_manager.remove_connection(self)
+            self.logger.log_num_connections('closed', num)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
@@ -97,13 +95,14 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
                 set_task_name(task, "CloseAdaptor")
                 await asyncio.wait_for(task, timeout=self.timeout)
         finally:
-            self._delete_connection()
+            self._status.set_stopped()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
         self._adaptor.logger.info('Finishing connection')
         self._status.set_stopping()
         self._close_task = asyncio.create_task(self._close(exc))
         set_task_name(self._close_task, f"Close:{self.peer}")
+        self._delete_connection()
 
     def close(self):
         self.finish_connection(None)
@@ -175,22 +174,23 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             return self._update_context_pipe(transport)
         sockname = transport.get_extra_info('sockname')
         peer = transport.get_extra_info('peername')
-        if peer:
-            # TCP INET transport
-            self.context['peer'] = addr_tuple_to_str(peer)
-            self.context['sock'] = addr_tuple_to_str(sockname)
-            self.context['host'], self.context['port'] = peer
-            self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
-            self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
-        else:
+        _socket = transport.get_extra_info('socket')
+        if hasattr(socket, 'AF_UNIX') and _socket.family == socket.AF_UNIX:
             # AF_UNIX server transport
-            fd = transport.get_extra_info('socket').fileno()
+            fd = _socket.fileno()
             self.context['fd'] = fd
             self.context['peer'] = str(fd)
             self.context['sock'] = sockname
             self.context['alias'] = self.context['peer']
             self.context['server'] = self.context['sock']
             self.context['client'] = self.context['fd']
+        else:
+            # SOCK_STREAM INET/INET6 transport
+            self.context['peer'] = addr_tuple_to_str(peer)
+            self.context['sock'] = addr_tuple_to_str(sockname)
+            self.context['host'], self.context['port'] = peer
+            self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
+            self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
 
     def _update_context_pipe(self, transport: asyncio.BaseTransport) -> None:
         addr = transport.get_extra_info('addr')

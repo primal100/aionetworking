@@ -1,10 +1,9 @@
 import asyncio
 import pytest
+import logging
 from pathlib import Path
 
-from lib.conf.logging import connection_logger_cv
-from lib.formats.recording import get_recording_from_file
-from lib.utils import alist
+from lib.actions.echo import InvalidRequestError
 
 ###Required for skipif in fixture params###
 from lib.compatibility import datagram_supported
@@ -42,20 +41,17 @@ class TestOneWayServer:
 class TestTwoWayServer:
     @pytest.mark.asyncio
     async def test_00_send_and_send_recording(self, two_way_server_started, two_way_client, tmp_path, echo_response_object,
-                                              echo_exception_response_object, echo_notification_object, critical_logging_only):
+                                              echo_exception_response_object, echo_notification_object):
         async with two_way_client as conn:
             echo_response = await conn.echo()
-            exception_response = await conn.make_exception()
             conn.subscribe()
             notification = await conn.wait_notification()
         assert echo_response == echo_response_object
-        assert exception_response == echo_exception_response_object
         assert notification == echo_notification_object
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()
         async with two_way_client as conn2:
             await conn2.play_recording(recording_file_path)
-            await asyncio.wait_for(conn2.wait_notification(), timeout=1)
             await asyncio.wait_for(conn2.wait_notification(), timeout=1)
             await asyncio.wait_for(conn2.wait_notification(), timeout=1)
 

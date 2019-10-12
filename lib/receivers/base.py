@@ -66,7 +66,10 @@ class BaseServer(BaseReceiver, Protocol):
         sockets = self.server.sockets
         for sock in sockets:
             sock_name = sock.getsockname()
-            listening_on = ':'.join([str(v) for v in sock_name])
+            if isinstance(sock_name, (tuple, list)):
+                listening_on = ':'.join([str(v) for v in sock_name])
+            else:
+                listening_on = sock_name
             print(f"Serving {self.name} on {listening_on}")
 
     async def start(self) -> None:

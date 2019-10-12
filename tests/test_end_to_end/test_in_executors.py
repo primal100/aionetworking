@@ -2,12 +2,13 @@ import asyncio
 import concurrent.futures
 import pytest
 from pathlib import Path
+import os
 from lib.utils import supports_pipe_or_unix_connections
 
 
 class TestOneWaySenderInExecutors:
     @pytest.mark.asyncio
-    @pytest.mark.skipif(isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop),
+    @pytest.mark.skipif(os.name =='nt' and isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop),
                         reason="Event loops only run in main thread for Proactor")
     async def test_00_send_in_loop_in_other_thread(self, one_way_server_started, one_way_client,
                                                    json_rpc_login_request_encoded, tmp_path):
@@ -29,7 +30,7 @@ class TestOneWaySenderInExecutors:
     @pytest.mark.asyncio
     async def test_01_send_in_other_process(self, one_way_server_started, one_way_client,
                                             json_rpc_login_request_encoded, tmp_path):
-        num = 5000
+        num = 10
         msgs = [json_rpc_login_request_encoded for _ in range(0, num)]
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await asyncio.get_event_loop().run_in_executor(executor, one_way_client.open_send_msgs, msgs, 0.00025, 2)
@@ -45,7 +46,7 @@ class TestOneWaySenderInExecutors:
 
 class TestTwoWaySenderInExecutors:
     @pytest.mark.asyncio
-    @pytest.mark.skipif(isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop),
+    @pytest.mark.skipif(os.name=='nt' and isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop),
                         reason="Event loops only run in main thread for Proactor")
     async def test_00_send_in_loop_in_other_thread(self, two_way_server_started, two_way_client, echo_encoded, tmp_path):
 

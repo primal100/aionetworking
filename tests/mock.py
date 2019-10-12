@@ -1,8 +1,21 @@
 import asyncio
+import socket
 from asyncio.transports import Transport, DatagramTransport
-import collections
 
 from typing import Any
+
+
+class MockAFInetSocket:
+    family = socket.AF_INET
+
+
+class MockAFUnixSocket:
+    @property
+    def family(self):
+        return getattr(socket, "AF_UNIX", None)
+
+    def fileno(self) -> int:
+        return 1
 
 
 class MockTransportMixin:

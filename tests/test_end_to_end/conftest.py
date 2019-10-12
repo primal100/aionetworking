@@ -68,7 +68,6 @@ def two_way_client(two_way_receiver_sender_args):
 def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, initial_server_context,
                                               receiver_logger) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
-    logger_cv.set(receiver_logger)
     factory = StreamServerProtocolFactory(
         action=buffered_file_storage_action,
         dataformat=JSONObject,

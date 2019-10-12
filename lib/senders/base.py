@@ -14,7 +14,7 @@ from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate,
 from lib.wrappers.value_waiters import StatusWaiter
 from .protocols import SenderProtocol
 
-from typing import Type
+from typing import Type, Optional
 
 
 @dataclass
@@ -53,7 +53,7 @@ class BaseClient(BaseSender, Protocol):
     peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
     conn: ConnectionType = field(init=False, default=None)
-    transport: asyncio.BaseTransport = field(init=False, compare=False, default=None)
+    transport: Optional[asyncio.BaseTransport] = field(init=False, compare=False, default=None)
     timeout: int = 5
 
     def __post_init__(self):
@@ -75,6 +75,7 @@ class BaseClient(BaseSender, Protocol):
     async def _close_connection(self):
         self.conn.close()
         await self.conn.wait_closed()
+        self.transport = None
 
     def is_started(self) -> bool:
         return self._status.is_started()
