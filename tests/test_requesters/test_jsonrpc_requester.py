@@ -1,22 +1,12 @@
-import pytest
-from lib.requesters.jsonrpc import MethodNotFoundError
+class TestEchoRequester:
+    def test_00_send_echo(self, echo_requester, echo):
+        request = echo_requester.echo()
+        assert request == echo
 
+    def test_01_send_notification(self, echo_requester, echo_notification_request):
+        request = echo_requester.subscribe()
+        assert request == echo_notification_request
 
-class TestJSONRequester:
-    def test_01_method_with_args(self, json_rpc_requester, json_rpc_login_request, user1):
-        json_rpc_login_request.pop('id')
-        json_request = json_rpc_requester.login(*user1)
-        assert json_request == json_rpc_login_request
-
-    def test_01_method_with_kwargs(self, json_rpc_requester, json_rpc_update_request, user1):
-        json_rpc_update_request.pop('id')
-        json_request = json_rpc_requester.update(id=0, text='Updating my first note')
-        assert json_request == json_rpc_update_request
-
-    def test_02_notification(self, json_rpc_requester, json_rpc_subscribe_request, user1):
-        json_request = json_rpc_requester.subscribe_to_user(user1[0])
-        assert json_request == json_rpc_subscribe_request
-
-    def test_03_no_such_method(self, json_rpc_requester, json_rpc_update_request, user1):
-        with pytest.raises(MethodNotFoundError):
-            json_rpc_requester.updat(id=0, text='Updating my first note')
+    def test_02_make_exception(self, echo_requester, echo_exception_request):
+        request = echo_requester.make_exception()
+        assert request == echo_exception_request

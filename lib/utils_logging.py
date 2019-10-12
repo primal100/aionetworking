@@ -57,6 +57,9 @@ class LoggingTimeDelta:
             self.td = timedelta()
         self._divisor = self.td.total_seconds() or 1.00
 
+    def __int__(self):
+        return int(self._divisor)
+
     def __getattr__(self, item: str) -> Any:
         return getattr(self.td, item)
 

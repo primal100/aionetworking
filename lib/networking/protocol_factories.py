@@ -7,7 +7,7 @@ from lib.actions.protocols import ActionProtocol
 from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
-from lib.conf.logging import Logger
+from lib.conf.logging import Logger, logger_cv
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 
@@ -30,10 +30,11 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     logger: Logger = Logger('receiver')
     pause_reading_on_buffer_size: int = None
-    _context: contextvars.Context = field(default=None, init=False)
+    _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
 
     async def start(self) -> None:
         self._context = contextvars.copy_context()
+        self.logger = logger_cv.get()
         coros = []
         if self.action:
             coros.append(self.action.start())
@@ -52,7 +53,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         self.logger.debug('Creating new connection')
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size)
+                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -88,10 +89,13 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.action.close())
         if self.preaction:
             coros.append(self.preaction.close())
+        if self.requester:
+            coros.append(self.requester.close())
         if coros:
             await asyncio.wait(coros)
 
     async def close(self) -> None:
+        await self.wait_num_connected(0)
         await self.close_actions()
         connections_manager.clear_server(self.full_name)
 

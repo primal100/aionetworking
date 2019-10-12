@@ -158,12 +158,14 @@ class ConnectionLogger(Logger):
             return binascii.hexlify(data).decode('utf-8')
 
     def _raw_received(self, data: bytes, *args, **kwargs) -> None:
-        msg = self._convert_raw_to_hex(data)
-        self._raw_received_logger.debug(msg, *args, **kwargs)
+        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+            msg = self._convert_raw_to_hex(data)
+            self._raw_received_logger.debug(msg, *args, **kwargs)
 
     def _raw_sent(self, data: bytes, *args, **kwargs) -> None:
-        msg = self._convert_raw_to_hex(data)
-        self._raw_sent_logger.debug(msg, *args, **kwargs)
+        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+            msg = self._convert_raw_to_hex(data)
+            self._raw_sent_logger.debug(msg, *args, **kwargs)
 
     def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
@@ -224,7 +226,7 @@ class StatsTracker:
 
     attrs = ('start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed', 'largest_buffer',
              'send_rate', 'processing_rate', 'receive_rate', 'interval', 'average_buffer_size', 'average_sent',
-             'msgs_per_buffer', 'not_decoded', 'not_decoded_rate')
+             'msgs_per_buffer', 'not_decoded', 'not_decoded_rate', 'total_done')
 
     def __post_init__(self):
         self.start = LoggingDatetime(datefmt=self.datefmt)
@@ -299,9 +301,9 @@ class StatsTracker:
         self.failed += len(data)
 
     def on_msg_sent(self, msg: bytes) -> None:
+        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         if not self.msgs.first_sent:
             self.msgs.first_sent = self.msgs.last_sent
-        self.msgs.last_sent = LoggingDatetime(self.datefmt)
         self.msgs.sent += 1
         self.sent += len(msg)
 

@@ -70,8 +70,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")
         msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
-        task = self._scheduler.create_task(self.process_msgs(msgs_generator, buffer))
-        task.add_done_callback(self._scheduler.task_done)
+        task = self._scheduler.task_with_callback(self.process_msgs(msgs_generator, buffer), name='Process_Msgs')
         return task
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
@@ -142,7 +141,10 @@ class SenderAdaptor(BaseAdaptorProtocol):
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
         async for msg in msgs:
             if msg.request_id:
-                self._scheduler.set_result(msg.request_id, msg)
+                try:
+                    self._scheduler.set_result(msg.request_id, msg)
+                except KeyError:
+                    self._notification_queue.put_nowait(msg)
             else:
                 self._notification_queue.put_nowait(msg)
         return len(buffer)
@@ -152,6 +154,23 @@ class SenderAdaptor(BaseAdaptorProtocol):
 class ReceiverAdaptor(BaseAdaptorProtocol):
     is_receiver = True
     action: ActionProtocol = None
+
+    def __post_init__(self) -> None:
+        self._loop_id = id(asyncio.get_event_loop())
+        super().__post_init__()
+        if self.action.supports_notifications:
+            self._notifications_task = self._scheduler.task_with_callback(self._send_notifications(), name='Notifications')
+        else:
+            self._notifications_task = None
+
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        if self._notifications_task:
+            self._notifications_task.cancel()
+        await super().close(exc)
+
+    async def _send_notifications(self):
+        async for item in self.action.get_notifications():
+            self.encode_and_send_msg(item)
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
         self.logger.on_msg_failed(msg_obj, exc)

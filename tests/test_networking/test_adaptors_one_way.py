@@ -16,9 +16,11 @@ class TestOneWayReceiverAdaptor:
                                        json_rpc_login_request_encoded, json_rpc_logout_request_encoded,
                                        timestamp, json_recording_data, json_codec, json_objects,
                                        buffered_file_storage_action):
-        one_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
-        one_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp)
+        task1 = one_way_receiver_adaptor.on_data_received(json_rpc_login_request_encoded, timestamp)
+        task2 = one_way_receiver_adaptor.on_data_received(json_rpc_logout_request_encoded, timestamp)
         await one_way_receiver_adaptor.close()
+        assert task1.done()
+        assert task2.done()
         expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         assert expected_file.read_bytes() == json_buffer
@@ -38,33 +40,36 @@ class TestSenderAdaptorOneWay:
     async def test_01_close(self, one_way_receiver_adaptor):
         await one_way_receiver_adaptor.close()
 
-    def test_02_send(self, one_way_sender_adaptor, json_rpc_login_request_encoded, deque):
+    @pytest.mark.asyncio
+    async def test_02_send(self, one_way_sender_adaptor, json_rpc_login_request_encoded, queue):
         one_way_sender_adaptor.send(json_rpc_login_request_encoded)
-        assert deque.pop() == json_rpc_login_request_encoded
+        assert queue.get_nowait() == json_rpc_login_request_encoded
 
-    def test_03_send_data(self, one_way_sender_adaptor, json_rpc_login_request_encoded, deque):
+    @pytest.mark.asyncio
+    async def test_03_send_data(self, one_way_sender_adaptor, json_rpc_login_request_encoded, queue):
         one_way_sender_adaptor.send_data(json_rpc_login_request_encoded)
-        assert deque.pop() == json_rpc_login_request_encoded
+        assert queue.get_nowait() == json_rpc_login_request_encoded
 
     def test_04_encode_and_send_msg(self, one_way_sender_adaptor, json_rpc_login_request_encoded,
-                                    json_rpc_login_request, deque):
+                                    json_rpc_login_request, queue):
         one_way_sender_adaptor.encode_and_send_msg(json_rpc_login_request)
-        assert deque.pop() == json_rpc_login_request_encoded
+        assert queue.get_nowait() == json_rpc_login_request_encoded
 
-    def test_05_encode_and_msgs(self, one_way_sender_adaptor, json_decoded_multi, json_encoded_multi, deque):
+    def test_05_encode_and_msgs(self, one_way_sender_adaptor, json_decoded_multi, json_encoded_multi, queue):
         one_way_sender_adaptor.encode_and_send_msgs(json_decoded_multi)
-        assert list(deque) == json_encoded_multi
+        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
 
     @pytest.mark.asyncio
-    async def test_06_play_recording(self, one_way_sender_adaptor, file_containing_json_recording, json_encoded_multi, deque):
+    async def test_06_play_recording(self, one_way_sender_adaptor, file_containing_json_recording: Path,
+                                     json_encoded_multi, queue):
         await asyncio.wait_for(one_way_sender_adaptor.play_recording(file_containing_json_recording, timing=False),
                                timeout=0.1)
-        assert list(deque) == json_encoded_multi
+        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
 
     @pytest.mark.asyncio
-    async def test_07_play_recording_delay(self, one_way_sender_adaptor, file_containing_json_recording,
-                                           json_encoded_multi, deque):
+    async def test_07_play_recording_delay(self, one_way_sender_adaptor, file_containing_json_recording: Path,
+                                           json_encoded_multi, queue):
         coro = one_way_sender_adaptor.play_recording(file_containing_json_recording, timing=True)
         time_taken = await time_coro(coro)
-        assert list(deque) == json_encoded_multi
+        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
         assert time_taken > 1.1

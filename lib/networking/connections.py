@@ -18,20 +18,7 @@ from .protocols import (
 from .types import AdaptorType, SenderAdaptorType
 
 from typing import NoReturn, Optional, Tuple, Type, Dict, Any
-from abc import abstractmethod
-from lib.compatibility import Protocol, TypedDict
-
-
-class PipeExtraDict(TypedDict):
-    addr: Any
-    pipe: Any
-
-
-class PipeTransport(Protocol):
-    _extra: TypedDict
-
-    @abstractmethod
-    def get_extra_info(self, name: Any, default: Any = ...) -> Any: ...
+from lib.compatibility import Protocol
 
 
 @dataclass
@@ -183,18 +170,20 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             return False
 
     @singledispatchmethod
-    def _update_context(self, transport: asyncio.Transport, peer: Tuple[str, int] = None):
+    def _update_context(self, transport: asyncio.Transport, peer: Tuple[str, int] = None) -> None:
+        if hasattr(transport, "_extra") and all(k in transport._extra for k in ['addr', 'pipe']):
+            return self._update_context_pipe(transport)
         sockname = transport.get_extra_info('sockname')
         peer = transport.get_extra_info('peername')
         if peer:
-            #TCP INET transport
+            # TCP INET transport
             self.context['peer'] = addr_tuple_to_str(peer)
             self.context['sock'] = addr_tuple_to_str(sockname)
             self.context['host'], self.context['port'] = peer
             self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
             self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
         else:
-            #AF_UNIX server transport
+            # AF_UNIX server transport
             fd = transport.get_extra_info('socket').fileno()
             self.context['fd'] = fd
             self.context['peer'] = str(fd)
@@ -203,17 +192,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             self.context['server'] = self.context['sock']
             self.context['client'] = self.context['fd']
 
-    @_update_context.register
-    def _update_context_udp(self, transport: asyncio.DatagramTransport, peer: Tuple[str, int] = None):
-        sockname = transport.get_extra_info('sockname')
-        self.context['peer'] = addr_tuple_to_str(peer)
-        self.context['sock'] = addr_tuple_to_str(sockname)
-        self.context['host'], self.context['port'] = peer
-        self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
-        self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
-
-    @_update_context.register
-    def _update_context_pipe(self, transport: PipeTransport, peer: Tuple[str, int] = None):
+    def _update_context_pipe(self, transport: asyncio.BaseTransport) -> None:
         addr = transport.get_extra_info('addr')
         handle = transport.get_extra_info('pipe').handle
         self.context['addr'] = addr
@@ -222,6 +201,15 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         self.context['alias'] = str(handle)
         self.context['server'] = self.context['addr']
         self.context['client'] = self.context['handle']
+
+    @_update_context.register
+    def _update_context_udp(self, transport: asyncio.DatagramTransport, peer: Tuple[str, int] = None) -> None:
+        sockname = transport.get_extra_info('sockname')
+        self.context['peer'] = addr_tuple_to_str(peer)
+        self.context['sock'] = addr_tuple_to_str(sockname)
+        self.context['host'], self.context['port'] = peer
+        self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
+        self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
 
 
 @dataclass

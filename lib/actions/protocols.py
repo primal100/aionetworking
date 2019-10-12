@@ -4,7 +4,7 @@ import warnings
 
 from lib.formats.types import MessageObjectType
 
-from typing import Iterator, Any, AnyStr, TypeVar
+from typing import AsyncGenerator, Any, AnyStr, TypeVar
 from lib.compatibility import Protocol
 
 
@@ -15,6 +15,7 @@ ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 
 
 class ActionProtocol(Protocol):
+    supports_notifications = False
 
     @abstractmethod
     def filter(self, msg: MessageObjectType) -> bool: ...
@@ -23,10 +24,14 @@ class ActionProtocol(Protocol):
     async def do_one(self, msg: MessageObjectType) -> Any: ...
 
     @abstractmethod
-    def on_decode_error(self, data: AnyStr, exc: BaseException) -> Any: ...
+    def on_decode_error(self, data: bytes, exc: BaseException) -> Any: ...
 
     @abstractmethod
     def on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any: ...
+
+    @abstractmethod
+    async def get_notifications(self) -> AsyncGenerator[None, None]:
+        yield
 
     @abstractmethod
     async def start(self) -> None: ...

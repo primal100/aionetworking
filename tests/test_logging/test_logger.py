@@ -9,7 +9,7 @@ class TestLogger:
     def test_00_init(self, receiver_logger):
         assert receiver_logger.logger.name == 'receiver'
         assert receiver_logger.extra == {}
-        assert receiver_logger.datefmt == '%Y-%M-%d %H:%M:%S'
+        assert receiver_logger.datefmt == '%Y-%m-%d %H:%M:%S.%f'
 
     @pytest.mark.asyncio
     async def test_01_process(self, receiver_logger):
