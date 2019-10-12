@@ -2,15 +2,15 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from ssl import SSLContext
-import itertools
 import os
-import tempfile
 import sys
 
 from dataclasses import dataclass, field
 from contextvars import ContextVar
 
 from .base import BaseServer, BaseNetworkServer
+from lib.networking.connections import UDPServerConnection
+from lib.networking.protocol_factories import DatagramServerProtocolFactory
 from lib.networking.ssl import ServerSideSSL
 from lib.utils import unix_address, pipe_address
 
@@ -93,7 +93,8 @@ def pipe_server(path: Union[str, Path] = None, **kwargs):
 
 class DatagramServer(asyncio.AbstractServer):
 
-    def __init__(self, protocol_factory, host, port, family=None, proto=None, flags=None, sock=None, start_serving=True,
+    def __init__(self, protocol_factory: DatagramServerProtocolFactory, host: str, port: int,
+                 family=None, proto=None, flags=None, sock=None, start_serving: bool=True,
                  loop=None):
         self._loop = loop
         self._sock = sock
@@ -104,29 +105,25 @@ class DatagramServer(asyncio.AbstractServer):
         self._flags = flags
         self._protocol_factory = protocol_factory
         self._transport: Optional[asyncio.DatagramTransport] = None
-        self._protocol: Optional[asyncio.DatagramProtocol] = None
+        self._protocol: Optional[UDPServerConnection] = None
         self._serving = asyncio.Event()
-        self._serve_lock = asyncio.Lock()
-        self._serving_forever_fut = asyncio.Future()
         if start_serving:
             asyncio.create_task(self.start_serving())
 
     async def start_serving(self):
-        await self._serve_lock.acquire()
         if self.is_serving():
             return
         self._transport, self._protocol = await self._loop.create_datagram_endpoint(
             self._protocol_factory, local_addr=(self._host, self._port), family=self._family,
             proto=self._proto, flags=self._flags, sock=self._sock)
         self._serving.set()
-        self._serve_lock.release()
 
     def is_serving(self) -> bool:
         return self._serving.is_set()
 
     @property
     def sockets(self) -> List[socket.socket]:
-        if self._serving:
+        if self._transport:
             return [self._transport.get_extra_info('socket')]
         return []
 
@@ -134,14 +131,10 @@ class DatagramServer(asyncio.AbstractServer):
         return self._loop
 
     def close(self):
-        self._transport.close()
-        if (self._serving_forever_fut is not None and
-                not self._serving_forever_fut.done()):
-            self._serving_forever_fut.cancel()
-            self._serving_forever_fut = None
+        self._protocol.close()
 
     async def wait_closed(self):
-        return self._transport.is_closing()
+        return self._protocol.wait_closed()
 
 
 @dataclass

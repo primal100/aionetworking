@@ -119,6 +119,9 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     def is_connected(self) -> bool:
         return self._status.is_started()
 
+    def data_received(self, data: bytes) -> None:
+        self._adaptor.on_data_received(data)
+
 
 @dataclass
 class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
@@ -264,6 +267,11 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
 
     def send(self, msg: bytes) -> None:
         self.transport.sendto(msg, self._peer)
+
+    def close(self):
+        if not self.transport.is_closing():
+            self.transport.abort()
+        self.finish_connection(None)
 
 
 @dataclass

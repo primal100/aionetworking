@@ -12,7 +12,7 @@ from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 
 from .connections_manager import connections_manager
-from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection
+from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection, UDPClientConnection
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
@@ -111,7 +111,7 @@ class StreamClientProtocolFactory(BaseProtocolFactory):
 
 
 @dataclass
-class UDPProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
+class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
     connection_cls: NetworkConnectionType = UDPServerConnection
     transport = None
     sock = None
@@ -126,7 +126,7 @@ class UDPProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
     def connection_lost(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
         for conn in filter(self.is_owner, connections_manager):
-            conn.finish_connection(exc)
+            conn.connection_lost(exc)
 
     def error_received(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
@@ -134,8 +134,22 @@ class UDPProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
         conn = connections_manager.get(addr_tuple_to_str(addr), None)
         if conn:
-            conn.on_data_received(data)
+            conn.data_received(data)
         else:
-            conn = self._new_connection()
+            conn = self._context.run(self._new_connection)
             conn.initialize_connection(self.transport, addr)
-            conn.on_data_received(data)
+            conn.data_received(data)
+
+    async def close(self) -> None:
+        self.transport.abort()
+        await super().close()
+
+
+@dataclass
+class DatagramServerProtocolFactory(BaseDatagramProtocolFactory):
+    connection_cls: NetworkConnectionType = UDPServerConnection
+
+
+@dataclass
+class DatagramClientProtocolFactory(BaseDatagramProtocolFactory):
+    connection_cls: NetworkConnectionType = UDPClientConnection
