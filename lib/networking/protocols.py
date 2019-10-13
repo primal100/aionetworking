@@ -94,9 +94,6 @@ class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
     _adaptor: AdaptorType = field(default=None, init=False)
 
 
-TransportType = TypeVar('TransportType', bound=asyncio.BaseTransport)
-
-
 @dataclass
 class NetworkConnectionProtocol(ConnectionDataclassProtocol, Protocol):
     @abstractmethod

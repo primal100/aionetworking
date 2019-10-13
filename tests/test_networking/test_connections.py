@@ -12,7 +12,7 @@ class TestConnectionShared:
 
     @pytest.mark.asyncio
     async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager,
-                                           connection_is_stored):
+                                           connection_is_stored, protocol_name):
         assert not transport.is_closing()
         assert connections_manager.total == 0
         assert connection.logger
@@ -23,7 +23,7 @@ class TestConnectionShared:
         assert not transport.is_closing()
         assert connection._adaptor.context == adaptor.context
         assert connection._adaptor == adaptor
-        assert connection.peer == f"tcp_{adaptor.context['peer']}"
+        assert connection.peer == f"{protocol_name}_{adaptor.context['peer']}"
         assert connection.logger is not None
         assert connection.transport == transport
         total_connections = 1 if connection_is_stored else 0
@@ -51,15 +51,15 @@ class TestConnectionShared:
 
 class TestConnectionOneWayServer:
     @pytest.mark.asyncio
-    async def test_00_data_received(self, tmp_path, tcp_protocol_one_way_server, json_rpc_login_request_encoded,
+    async def test_00_data_received(self, tmp_path, one_way_server_connection, json_rpc_login_request_encoded,
                                     json_rpc_logout_request_encoded, json_recording_data, json_codec,
-                                    json_objects, tcp_transport):
-        tcp_protocol_one_way_server.connection_made(tcp_transport)
-        tcp_protocol_one_way_server.data_received(json_rpc_login_request_encoded)
+                                    json_objects, one_way_server_transport):
+        one_way_server_connection.connection_made(one_way_server_transport)
+        one_way_server_connection.data_received(json_rpc_login_request_encoded)
         await asyncio.sleep(1.2)
-        tcp_protocol_one_way_server.data_received(json_rpc_logout_request_encoded)
-        tcp_protocol_one_way_server.connection_lost(None)
-        await asyncio.wait_for(tcp_protocol_one_way_server.wait_closed(), timeout=1)
+        one_way_server_connection.data_received(json_rpc_logout_request_encoded)
+        one_way_server_connection.connection_lost(None)
+        await asyncio.wait_for(one_way_server_connection.wait_closed(), timeout=1)
         expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         msgs = await alist(json_codec.from_file(expected_file))
@@ -72,39 +72,39 @@ class TestConnectionOneWayServer:
         packets[1] = packets[1]._replace(timestamp=json_recording_data[1].timestamp)
         assert packets == json_recording_data
 
-    def test_01_is_child(self, tcp_protocol_one_way_server):
-        assert tcp_protocol_one_way_server.is_child("TCP Server 127.0.0.1:8888")
-        assert not tcp_protocol_one_way_server.is_child("UDP Server 127.0.0.1:8888")
+    def test_01_is_child(self, one_way_server_connection, one_way_server_protocol_name):
+        assert one_way_server_connection.is_child(f"{one_way_server_protocol_name.upper()} Server 127.0.0.1:8888")
+        assert not one_way_server_connection.is_child("ABC Server 127.0.0.1:8888")
 
     @pytest.mark.asyncio
-    async def test_02_pickle(self, tcp_protocol_one_way_server):
-        data = pickle.dumps(tcp_protocol_one_way_server)
+    async def test_02_pickle(self, one_way_server_connection):
+        data = pickle.dumps(one_way_server_connection)
         protocol = pickle.loads(data)
-        assert protocol == tcp_protocol_one_way_server
+        assert protocol == one_way_server_connection
 
 
 class TestConnectionOneWayClient:
-    def test_00_is_child(self, tcp_protocol_one_way_client):
-        assert tcp_protocol_one_way_client.is_child("TCP Client 127.0.0.1:0")
-        assert not tcp_protocol_one_way_client.is_child("UDP Client 127.0.0.1:0")
+    def test_00_is_child(self, one_way_client_connection, one_way_client_protocol_name):
+        assert one_way_client_connection.is_child(f"{one_way_client_protocol_name.upper()} Client 127.0.0.1:0")
+        assert not one_way_client_connection.is_child("ABC Client 127.0.0.1:8888")
 
     @pytest.mark.asyncio
-    async def test_01_pickle(self, tcp_protocol_one_way_client):
-        data = pickle.dumps(tcp_protocol_one_way_client)
+    async def test_01_pickle(self, one_way_client_connection):
+        data = pickle.dumps(one_way_client_connection)
         protocol = pickle.loads(data)
-        assert protocol == tcp_protocol_one_way_client
+        assert protocol == one_way_client_connection
 
 
 class TestConnectionTwoWayServer:
     @pytest.mark.asyncio
-    async def test_00_on_data_received(self, tmp_path, tcp_protocol_two_way_server, echo_encoded,
+    async def test_00_on_data_received(self, tmp_path, two_way_server_connection, echo_encoded,
                                        echo_response_encoded,  timestamp, echo_recording_data, queue,
-                                       tcp_transport, peername):
-        tcp_protocol_two_way_server.connection_made(tcp_transport)
-        tcp_protocol_two_way_server.data_received(echo_encoded)
+                                       two_way_server_transport, peername):
+        two_way_server_connection.connection_made(two_way_server_transport)
+        two_way_server_connection.data_received(echo_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
-        tcp_protocol_two_way_server.connection_lost(None)
-        await asyncio.wait_for(tcp_protocol_two_way_server.wait_closed(), timeout=1)
+        two_way_server_connection.connection_lost(None)
+        await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peername
         assert msg == echo_response_encoded
         expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
@@ -114,14 +114,14 @@ class TestConnectionTwoWayServer:
         assert packets == echo_recording_data
 
     @pytest.mark.asyncio
-    async def test_01_on_data_received_notification(self, tmp_path, tcp_protocol_two_way_server,
+    async def test_01_on_data_received_notification(self, tmp_path, two_way_server_connection,
                                                     echo_notification_client_encoded, echo_notification_server_encoded,
-                                                    timestamp, echo_recording_data, queue, tcp_transport, peername):
-        tcp_protocol_two_way_server.connection_made(tcp_transport)
-        tcp_protocol_two_way_server.data_received(echo_notification_client_encoded)
+                                                    timestamp, echo_recording_data, queue, two_way_server_transport, peername):
+        two_way_server_connection.connection_made(two_way_server_transport)
+        two_way_server_connection.data_received(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
-        tcp_protocol_two_way_server.connection_lost(None)
-        await asyncio.wait_for(tcp_protocol_two_way_server.wait_closed(), timeout=1)
+        two_way_server_connection.connection_lost(None)
+        await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peername
         assert msg == echo_notification_server_encoded
         expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
@@ -132,52 +132,53 @@ class TestConnectionTwoWayServer:
 
 class TestConnectionTwoWayClient:
     @pytest.mark.asyncio
-    async def test_00_send_data_and_wait(self, tcp_protocol_two_way_client, echo_encoded, echo_response_encoded,
-                                         echo_response_object, tcp_transport_client, queue):
-        tcp_protocol_two_way_client.connection_made(tcp_transport_client)
-        task = asyncio.create_task(tcp_protocol_two_way_client.send_data_and_wait(1, echo_encoded))
+    async def test_00_send_data_and_wait(self, two_way_client_connection, echo_encoded, echo_response_encoded,
+                                         echo_response_object, two_way_client_transport, queue):
+        two_way_client_connection.connection_made(two_way_client_transport)
+        task = asyncio.create_task(two_way_client_connection.send_data_and_wait(1, echo_encoded))
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
-        tcp_protocol_two_way_client.data_received(echo_response_encoded)
+        two_way_client_connection.data_received(echo_response_encoded)
         result = await asyncio.wait_for(task, timeout=1)
         assert result == echo_response_object
 
     @pytest.mark.asyncio
-    async def test_01_send_notification_and_wait(self, tcp_protocol_two_way_client, echo_notification_client_encoded,
+    async def test_01_send_notification_and_wait(self, two_way_client_connection, echo_notification_client_encoded,
                                                  echo_notification_server_encoded, echo_notification_object,
-                                                 tcp_transport_client, queue):
-        tcp_protocol_two_way_client.connection_made(tcp_transport_client)
-        tcp_protocol_two_way_client.send_data(echo_notification_client_encoded)
+                                                 two_way_client_transport, queue):
+        two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_connection.send_data(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_notification_client_encoded
-        tcp_protocol_two_way_client.data_received(echo_notification_server_encoded)
-        result = await asyncio.wait_for(tcp_protocol_two_way_client.wait_notification(), timeout=1)
+        two_way_client_connection.data_received(echo_notification_server_encoded)
+        result = await asyncio.wait_for(two_way_client_connection.wait_notification(), timeout=1)
         assert result == echo_notification_object
 
     @pytest.mark.asyncio
-    async def test_02_requester(self, tcp_protocol_two_way_client, echo_encoded, echo_response_encoded,
-                                echo_response_object, tcp_transport_client, queue):
-        tcp_protocol_two_way_client.connection_made(tcp_transport_client)
-        task = asyncio.create_task(tcp_protocol_two_way_client.echo())
+    async def test_02_requester(self, two_way_client_connection, echo_encoded, echo_response_encoded,
+                                echo_response_object, two_way_client_transport, queue):
+        two_way_client_connection.connection_made(two_way_client_transport)
+        task = asyncio.create_task(two_way_client_connection.echo())
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
-        tcp_protocol_two_way_client.data_received(echo_response_encoded)
+        two_way_client_connection.data_received(echo_response_encoded)
         result = await asyncio.wait_for(task, timeout=1)
         assert result == echo_response_object
 
     @pytest.mark.asyncio
-    async def test_03_requester_notification(self, tcp_protocol_two_way_client, echo_notification_client_encoded,
+    async def test_03_requester_notification(self, two_way_client_connection, echo_notification_client_encoded,
                                              echo_notification_server_encoded, echo_notification_object,
-                                             tcp_transport_client, queue):
-        tcp_protocol_two_way_client.connection_made(tcp_transport_client)
-        tcp_protocol_two_way_client.subscribe()
+                                             two_way_client_transport, queue):
+        two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_connection.subscribe()
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_notification_client_encoded
-        tcp_protocol_two_way_client.data_received(echo_notification_server_encoded)
-        result = await asyncio.wait_for(tcp_protocol_two_way_client.wait_notification(), timeout=1)
+        two_way_client_connection.data_received(echo_notification_server_encoded)
+        result = await asyncio.wait_for(two_way_client_connection.wait_notification(), timeout=1)
         assert result == echo_notification_object
 
     @pytest.mark.asyncio
-    async def test_04_no_method(self, two_way_sender_adaptor):
+    async def test_04_no_method(self, two_way_client_connection, two_way_client_transport):
+        two_way_client_connection.connection_made(two_way_client_transport)
         with pytest.raises(MethodNotFoundError):
-            two_way_sender_adaptor.ech()
+            two_way_client_connection.ech()
