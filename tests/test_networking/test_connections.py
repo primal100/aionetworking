@@ -18,6 +18,7 @@ class TestConnectionShared:
         assert connection.logger
         assert connection.transport is None
         connection.connection_made(transport)
+        transport.set_protocol(connection)
         await connection.wait_connected()
         assert connection.is_connected()
         assert not transport.is_closing()
@@ -30,7 +31,7 @@ class TestConnectionShared:
         assert connections_manager.total == total_connections
         if connection_is_stored:
             assert connections_manager.get(connection.peer) == connection
-        connection.connection_lost(None)
+        connection.close()
         assert transport.is_closing()
         await connection.wait_closed()
         assert connections_manager.total == 0
@@ -38,6 +39,7 @@ class TestConnectionShared:
     @pytest.mark.asyncio
     async def test_01_send(self, connection, json_rpc_login_request_encoded, transport, queue, peer_data):
         connection.connection_made(transport)
+        transport.set_protocol(connection)
         connection.send(json_rpc_login_request_encoded)
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
 
@@ -45,6 +47,7 @@ class TestConnectionShared:
     async def test_02_send_data_adaptor_method(self, connection, json_rpc_login_request_encoded, transport, queue,
                                                peer_data):
         connection.connection_made(transport)
+        transport.set_protocol(connection)
         connection.send_data(json_rpc_login_request_encoded)
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
 
@@ -52,13 +55,14 @@ class TestConnectionShared:
 class TestConnectionOneWayServer:
     @pytest.mark.asyncio
     async def test_00_data_received(self, tmp_path, one_way_server_connection, json_rpc_login_request_encoded,
-                                    json_rpc_logout_request_encoded, json_recording_data, json_codec,
-                                    json_objects, one_way_server_transport):
+                                    json_rpc_logout_request_encoded, json_recording_data, json_codec, json_objects,
+                                    one_way_server_transport):
         one_way_server_connection.connection_made(one_way_server_transport)
+        one_way_server_transport.set_protocol(one_way_server_connection)
         one_way_server_connection.data_received(json_rpc_login_request_encoded)
         await asyncio.sleep(1.2)
         one_way_server_connection.data_received(json_rpc_logout_request_encoded)
-        one_way_server_connection.connection_lost(None)
+        one_way_server_connection.close()
         await asyncio.wait_for(one_way_server_connection.wait_closed(), timeout=1)
         expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
@@ -101,9 +105,10 @@ class TestConnectionTwoWayServer:
                                        echo_response_encoded,  timestamp, echo_recording_data, queue,
                                        two_way_server_transport, peername):
         two_way_server_connection.connection_made(two_way_server_transport)
+        two_way_server_transport.set_protocol(two_way_server_connection)
         two_way_server_connection.data_received(echo_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
-        two_way_server_connection.connection_lost(None)
+        two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peername
         assert msg == echo_response_encoded
@@ -118,9 +123,10 @@ class TestConnectionTwoWayServer:
                                                     echo_notification_client_encoded, echo_notification_server_encoded,
                                                     timestamp, echo_recording_data, queue, two_way_server_transport, peername):
         two_way_server_connection.connection_made(two_way_server_transport)
+        two_way_server_transport.set_protocol(two_way_server_connection)
         two_way_server_connection.data_received(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
-        two_way_server_connection.connection_lost(None)
+        two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peername
         assert msg == echo_notification_server_encoded
@@ -135,6 +141,7 @@ class TestConnectionTwoWayClient:
     async def test_00_send_data_and_wait(self, two_way_client_connection, echo_encoded, echo_response_encoded,
                                          echo_response_object, two_way_client_transport, queue):
         two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_transport.set_protocol(two_way_client_connection)
         task = asyncio.create_task(two_way_client_connection.send_data_and_wait(1, echo_encoded))
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
@@ -147,6 +154,7 @@ class TestConnectionTwoWayClient:
                                                  echo_notification_server_encoded, echo_notification_object,
                                                  two_way_client_transport, queue):
         two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_transport.set_protocol(two_way_client_connection)
         two_way_client_connection.send_data(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_notification_client_encoded
@@ -158,6 +166,7 @@ class TestConnectionTwoWayClient:
     async def test_02_requester(self, two_way_client_connection, echo_encoded, echo_response_encoded,
                                 echo_response_object, two_way_client_transport, queue):
         two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_transport.set_protocol(two_way_client_connection)
         task = asyncio.create_task(two_way_client_connection.echo())
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
@@ -170,6 +179,7 @@ class TestConnectionTwoWayClient:
                                              echo_notification_server_encoded, echo_notification_object,
                                              two_way_client_transport, queue):
         two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_transport.set_protocol(two_way_client_connection)
         two_way_client_connection.subscribe()
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_notification_client_encoded
@@ -180,5 +190,6 @@ class TestConnectionTwoWayClient:
     @pytest.mark.asyncio
     async def test_04_no_method(self, two_way_client_connection, two_way_client_transport):
         two_way_client_connection.connection_made(two_way_client_transport)
+        two_way_client_transport.set_protocol(two_way_client_connection)
         with pytest.raises(MethodNotFoundError):
             two_way_client_connection.ech()

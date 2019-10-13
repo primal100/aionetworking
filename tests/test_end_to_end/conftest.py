@@ -20,6 +20,12 @@ def echo_exception_response_object(echo_exception_response_encoded, echo_excepti
     lazy_fixture(
         (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
     pytest.param(
+        lazy_fixture((udp_server_one_way_started.__name__, udp_client_one_way.__name__,
+                      udp_client_one_way_connected.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
+    pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
                       pipe_client_one_way_connected.__name__)),
         marks=pytest.mark.skipif(
@@ -33,6 +39,12 @@ def one_way_receiver_sender_args(request):
 @pytest.fixture(params=[
     lazy_fixture(
         (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__)),
+    pytest.param(
+        lazy_fixture((udp_server_two_way_started.__name__, udp_client_two_way.__name__,
+                      udp_client_two_way_connected.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
     pytest.param(
         lazy_fixture((pipe_server_two_way_started.__name__, pipe_client_two_way.__name__,
                       pipe_client_two_way_connected.__name__)),

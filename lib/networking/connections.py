@@ -55,9 +55,13 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     def __setstate__(self, state):
         dataclass_setstate(self, state)
 
+    @staticmethod
+    def get_peername(peer_prefix: str, peer: str) -> str:
+        return f"{peer_prefix}_{peer}"
+
     @property
     def peer(self) -> str:
-        return f"{self.peer_prefix}_{self.context.get('peer')}"
+        return self.get_peername(self.peer_prefix, self.context.get('peer'))
 
     def _set_adaptor(self) -> None:
         connection_logger_cv.set(self._get_connection_logger())
@@ -216,7 +220,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
 
 @dataclass
 class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
-    transport: asyncio.Transport = None
+    transport: asyncio.Transport = field(default=None, init=False, repr=False, compare=False)
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
@@ -254,7 +258,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
 @dataclass
 class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
     _peer: Tuple[str, int] = field(default=None, init=False)
-    transport: DatagramTransportWrapper = None
+    transport: DatagramTransportWrapper = field(default=None, init=False, repr=False, compare=False)
 
     def connection_made(self, transport: DatagramTransportWrapper) -> None:
         self.transport = transport
@@ -293,5 +297,5 @@ class UDPServerConnection(BaseUDPConnection):
 class UDPClientConnection(BaseUDPConnection, SenderAdaptorGetattr):
     name = 'UDP Client'
     adaptor_cls: Type[AdaptorType] = SenderAdaptor
-    store_connections = False
+    store_connections = True
 

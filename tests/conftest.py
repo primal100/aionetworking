@@ -714,16 +714,6 @@ def peer_str() -> str:
 
 
 @pytest.fixture
-async def udp_transport(queue, extra) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(queue, extra=extra)
-
-
-@pytest.fixture
-async def udp_transport_client(queue, extra_client) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(queue, extra=extra_client)
-
-
-@pytest.fixture
 async def counter() -> Counter:
     yield Counter()
 

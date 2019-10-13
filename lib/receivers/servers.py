@@ -13,6 +13,7 @@ from lib.networking.connections import UDPServerConnection
 from lib.networking.protocol_factories import DatagramServerProtocolFactory
 from lib.networking.ssl import ServerSideSSL
 from lib.utils import unix_address, pipe_address
+from lib.wrappers.value_waiters import StatusWaiter
 
 import socket
 from typing import List, Optional, Union
@@ -94,32 +95,40 @@ def pipe_server(path: Union[str, Path] = None, **kwargs):
 class DatagramServer(asyncio.AbstractServer):
 
     def __init__(self, protocol_factory: DatagramServerProtocolFactory, host: str, port: int,
-                 family=None, proto=None, flags=None, sock=None, start_serving: bool=True,
-                 loop=None):
-        self._loop = loop
+                 family: int = 0, proto: int = 0, flags: int = 0, sock = None, start_serving: bool=True,
+                 reuse_address: bool = None, reuse_port: bool = None, allow_broadcast: bool = None, loop = None):
+        self._loop = loop or asyncio.get_event_loop()
         self._sock = sock
         self._host = host
         self._port = port
         self._family = family
         self._proto = proto
         self._flags = flags
+        self._reuse_address = reuse_address
+        self._reuse_port = reuse_port
+        self._allow_broadcast = allow_broadcast
         self._protocol_factory = protocol_factory
         self._transport: Optional[asyncio.DatagramTransport] = None
         self._protocol: Optional[UDPServerConnection] = None
-        self._serving = asyncio.Event()
+        self._status = StatusWaiter()
         if start_serving:
             asyncio.create_task(self.start_serving())
+            self._status.set_starting()
 
     async def start_serving(self):
         if self.is_serving():
             return
         self._transport, self._protocol = await self._loop.create_datagram_endpoint(
             self._protocol_factory, local_addr=(self._host, self._port), family=self._family,
-            proto=self._proto, flags=self._flags, sock=self._sock)
-        self._serving.set()
+            allow_broadcast=self._allow_broadcast, proto=self._proto, flags=self._flags, sock=self._sock,
+            reuse_address=self._reuse_address, reuse_port=self._reuse_port)
+        self._status.set_started()
+
+    async def wait_started(self):
+        await self._status.wait_started()
 
     def is_serving(self) -> bool:
-        return self._serving.is_set()
+        return self._status.is_started()
 
     @property
     def sockets(self) -> List[socket.socket]:
@@ -130,11 +139,18 @@ class DatagramServer(asyncio.AbstractServer):
     def get_loop(self):
         return self._loop
 
+    def _set_stopped(self, task: asyncio.Task):
+        if task.exception():
+            raise task.exception()
+        self._status.set_stopped()
+
     def close(self):
-        self._protocol.close()
+        task = asyncio.create_task(self._protocol_factory.close())
+        task.add_done_callback(self._set_stopped)
+        self._status.set_stopping()
 
     async def wait_closed(self):
-        return self._protocol.wait_closed()
+        await self._status.wait_stopped()
 
 
 @dataclass
@@ -145,5 +161,5 @@ class UDPServer(BaseNetworkServer):
     async def _get_server(self) -> DatagramServer:
         server = DatagramServer(
             self.protocol_factory, self.host, self.port, loop=self.loop)
-        await server.start_serving()
+        await server.wait_started()
         return server

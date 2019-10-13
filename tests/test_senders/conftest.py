@@ -1,22 +1,22 @@
 from tests.test_receivers.conftest import *
 
-from lib.senders.clients import BaseNetworkClient, TCPClient, pipe_client
+from lib.senders.clients import BaseNetworkClient, TCPClient, UDPClient, pipe_client
 
 
 @pytest.fixture
-def tcp_client_one_way(protocol_factory_one_way_client, sock, peername):
+def tcp_client_one_way(protocol_factory_one_way_client, sock, peername) -> TCPClient:
     return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
                      srcport=0)
 
 
 @pytest.fixture
-def tcp_client_two_way(protocol_factory_two_way_client, sock, peername):
+def tcp_client_two_way(protocol_factory_two_way_client, sock, peername) -> TCPClient:
     return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
                      srcport=0)
 
 
 @pytest.fixture
-async def tcp_client_one_way_connected(server_started, protocol_factory_one_way_client, sock, peername):
+async def tcp_client_one_way_connected(server_started, protocol_factory_one_way_client, sock, peername) -> TCPClient:
     client = TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
                        srcport=0)
     async with client:
@@ -24,9 +24,37 @@ async def tcp_client_one_way_connected(server_started, protocol_factory_one_way_
 
 
 @pytest.fixture
-async def tcp_client_two_way_connected(server_started, protocol_factory_two_way_client, sock, peername):
+async def tcp_client_two_way_connected(server_started, protocol_factory_two_way_client, sock, peername) -> TCPClient:
     client = TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
                        srcport=0)
+    async with client:
+        yield client
+
+
+@pytest.fixture
+def udp_client_one_way(udp_protocol_factory_one_way_client, sock, peername) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+                     srcport=0)
+
+
+@pytest.fixture
+def udp_client_two_way(udp_protocol_factory_two_way_client, sock, peername) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+                     srcport=0)
+
+
+@pytest.fixture
+async def udp_client_one_way_connected(server_started, udp_protocol_factory_one_way_client, sock, peername) -> UDPClient:
+    client = UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+                       srcport=0)
+    async with client:
+        yield client
+
+
+@pytest.fixture
+async def udp_client_two_way_connected(server_started, udp_protocol_factory_two_way_client, sock, peername) -> UDPClient:
+    client = UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1],
+                       srcip=peername[0], srcport=0)
     async with client:
         yield client
 
@@ -75,6 +103,18 @@ def client_connected(receiver_sender_args) -> BaseNetworkClient:
         (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
     lazy_fixture(
         (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__)),
+    pytest.param(
+        lazy_fixture(
+        (udp_server_one_way_started.__name__, udp_client_one_way.__name__, udp_client_one_way_connected.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
+    pytest.param(
+        lazy_fixture(
+        (udp_server_two_way_started.__name__, udp_client_two_way.__name__, udp_client_two_way_connected.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
                       pipe_client_one_way_connected.__name__)),

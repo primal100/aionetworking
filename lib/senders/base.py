@@ -73,7 +73,7 @@ class BaseClient(BaseSender, Protocol):
         return f"{self.name} {self.src}"
 
     async def _close_connection(self):
-        self.conn.close()
+        self.transport.close()
         await self.conn.wait_closed()
         self.transport = None
 

@@ -3,6 +3,9 @@ import concurrent.futures
 import pytest
 from pathlib import Path
 import os
+
+###Required for skipif in fixture params###
+from lib.compatibility import datagram_supported
 from lib.utils import supports_pipe_or_unix_connections
 
 

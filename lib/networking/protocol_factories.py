@@ -8,6 +8,7 @@ from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger, logger_cv
+from .transports import DatagramTransportWrapper
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 
@@ -125,19 +126,27 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
-        for conn in filter(self.is_owner, connections_manager):
+        connections = filter(self.is_owner, connections_manager)
+        for conn in list(connections):
             conn.connection_lost(exc)
 
     def error_received(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
 
+    def new_peer(self, addr: Tuple[str, int] = None) -> NetworkConnectionType:
+        conn = self._context.run(self._new_connection)
+        peername = addr or self.transport.get_extra_info('peername')
+        transport = DatagramTransportWrapper(self.transport, peername)
+        conn.connection_made(transport)
+        return conn
+
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
-        conn = connections_manager.get(addr_tuple_to_str(addr), None)
+        peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr))
+        conn = connections_manager.get(peer, None)
         if conn:
             conn.data_received(data)
         else:
-            conn = self._context.run(self._new_connection)
-            conn.initialize_connection(self.transport, addr)
+            conn = self.new_peer(addr)
             conn.data_received(data)
 
     async def close(self) -> None:

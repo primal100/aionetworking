@@ -7,11 +7,10 @@ py38 = sys.version_info >= (3, 8)
 
 if py38:
     from typing import Protocol, TypedDict
-    from functools import cached_property, singledispatchmethod
+    from functools import cached_property
 else:
     from typing_extensions import Protocol, TypedDict
     from cached_property import cached_property
-    from singledispatchmethod import singledispatchmethod
 
 
 def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
@@ -49,5 +48,7 @@ def get_current_task_name():
 
 
 def datagram_supported(loop: asyncio.AbstractEventLoop = None):
+    if not hasattr(asyncio, "ProactorEventLoop"):
+        return True
     loop = loop or asyncio.get_event_loop()
     return py38 or not isinstance(loop, asyncio.ProactorEventLoop)

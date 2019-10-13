@@ -221,15 +221,23 @@ async def unix_transport_client(queue, extra_client_unix) -> asyncio.Transport:
 
 
 @pytest.fixture
-async def udp_transport_server(queue, extra_inet, peername) -> DatagramTransportWrapper:
-    transport = MockDatagramTransport(queue, extra=extra_inet)
-    yield DatagramTransportWrapper(transport, peername)
+async def udp_transport_server(queue, extra_inet) -> MockDatagramTransport:
+    yield MockDatagramTransport(queue, extra=extra_inet)
 
 
 @pytest.fixture
-async def udp_transport_client(queue, extra_client_inet, sock) ->DatagramTransportWrapper:
-    transport = MockDatagramTransport(queue, extra=extra_client_inet)
-    yield DatagramTransportWrapper(transport, sock)
+async def udp_transport_client(queue, extra_client_inet) -> MockDatagramTransport:
+    yield MockDatagramTransport(queue, extra=extra_client_inet)
+
+
+@pytest.fixture
+async def udp_transport_wrapper_server(udp_transport_server, queue, peername) -> DatagramTransportWrapper:
+    yield DatagramTransportWrapper(udp_transport_server, peername)
+
+
+@pytest.fixture
+async def udp_transport_wrapper_client(udp_transport_client, sock) -> DatagramTransportWrapper:
+    yield DatagramTransportWrapper(udp_transport_client, sock)
 
 
 @pytest.fixture
@@ -250,41 +258,6 @@ def true() -> bool:
 @pytest.fixture
 def false() -> bool:
     return False
-
-
-@pytest.fixture
-def protocol_factory(connection_args):
-    return connection_args[0]
-
-
-@pytest.fixture
-def connection(connection_args):
-    return connection_args[1]
-
-
-@pytest.fixture
-def transport(connection_args):
-    return connection_args[2]
-
-
-@pytest.fixture
-def adaptor(connection_args):
-    return connection_args[3]
-
-
-@pytest.fixture
-def peer_data(connection_args):
-    return connection_args[4]
-
-
-@pytest.fixture
-def connection_is_stored(connection_args):
-    return connection_args[5]
-
-
-@pytest.fixture
-def protocol_name(connection_args):
-    return connection_args[6]
 
 
 @pytest.fixture
@@ -354,7 +327,8 @@ async def udp_protocol_factory_one_way_server(buffered_file_storage_action, buff
     if not factory.full_name:
         factory.set_name('UDP Server 127.0.0.1:8888', 'udp')
     yield factory
-    await factory.close()
+    if factory.transport and not factory.transport.is_closing():
+        await factory.close()
 
 
 @pytest.fixture
@@ -369,7 +343,8 @@ async def udp_protocol_factory_two_way_server(echo_action, buffered_file_storage
     if not factory.full_name:
         factory.set_name('UDP Server 127.0.0.1:8888', 'udp')
     yield factory
-    await factory.close()
+    if factory.transport and not factory.transport.is_closing():
+        await factory.close()
 
 
 @pytest.fixture
@@ -381,7 +356,8 @@ async def udp_protocol_factory_one_way_client(udp_initial_client_context) -> Dat
     if not factory.full_name:
         factory.set_name('UDP Client 127.0.0.1:0', 'udp')
     yield factory
-    await factory.close()
+    if factory.transport and not factory.transport.is_closing():
+        await factory.close()
 
 
 @pytest.fixture
@@ -394,7 +370,8 @@ async def udp_protocol_factory_two_way_client(echo_requester, udp_initial_client
     if not factory.full_name:
         factory.set_name('UDP Client 127.0.0.1:0', 'udp')
     yield factory
-    await factory.close()
+    if factory.transport and not factory.transport.is_closing():
+        await factory.close()
 
 
 @pytest.fixture
@@ -405,8 +382,8 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
                                parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -415,8 +392,8 @@ async def tcp_protocol_one_way_client(initial_client_context) -> TCPClientConnec
     context_cv.set(initial_client_context)
     conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -428,8 +405,8 @@ async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
                                parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -439,8 +416,8 @@ async def tcp_protocol_two_way_client(echo_requester, initial_client_context) ->
     conn = TCPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='tcp',
                                parent_name="TCP Client 127.0.0.1:0")
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -452,8 +429,8 @@ async def udp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
                                parent_name="UDP Server 127.0.0.1:8888", peer_prefix='udp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -462,8 +439,8 @@ async def udp_protocol_one_way_client(udp_initial_client_context) -> UDPClientCo
     context_cv.set(udp_initial_client_context)
     conn = UDPClientConnection(dataformat=JSONObject, peer_prefix='udp', parent_name="UDP Client 127.0.0.1:0")
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
 
 
@@ -475,8 +452,8 @@ async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
                                parent_name="UDP Server 127.0.0.1:8888", peer_prefix='udp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await asyncio.wait_for(conn.wait_closed(), timeout=1)
 
 
@@ -486,9 +463,44 @@ async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context
     conn = UDPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='udp',
                                parent_name="UDP Client 127.0.0.1:0")
     yield conn
-    if not conn.is_closing():
-        conn.connection_lost(None)
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
     await conn.wait_closed()
+
+
+@pytest.fixture
+def protocol_factory(connection_args):
+    return connection_args[0]
+
+
+@pytest.fixture
+def connection(connection_args):
+    return connection_args[1]
+
+
+@pytest.fixture
+def transport(connection_args):
+    return connection_args[2]
+
+
+@pytest.fixture
+def adaptor(connection_args):
+    return connection_args[3]
+
+
+@pytest.fixture
+def peer_data(connection_args):
+    return connection_args[4]
+
+
+@pytest.fixture
+def connection_is_stored(connection_args):
+    return connection_args[5]
+
+
+@pytest.fixture
+def protocol_name(connection_args):
+    return connection_args[6]
 
 
 @pytest.fixture(params=[
@@ -504,19 +516,19 @@ async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context
                   tcp_transport_client.__name__, two_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_one_way_server.__name__, udp_protocol_one_way_server.__name__,
-            udp_transport_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True]  +
+            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True]  +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_one_way_client.__name__, udp_protocol_one_way_client.__name__,
-            udp_transport_client.__name__, udp_one_way_sender_adaptor.__name__, sock.__name__)) + [False] + [
+            udp_transport_wrapper_client.__name__, udp_one_way_sender_adaptor.__name__, sock.__name__)) + [True] + [
         "udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_server.__name__, udp_protocol_two_way_server.__name__,
-            udp_transport_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_client.__name__, udp_protocol_two_way_client.__name__,
-            udp_transport_client.__name__, udp_two_way_sender_adaptor.__name__, sock.__name__)) + [False] + [
+            udp_transport_wrapper_client.__name__, udp_two_way_sender_adaptor.__name__, sock.__name__)) + [True] + [
         "udp"],
 ])
 def connection_args(request):
@@ -554,7 +566,7 @@ def two_way_server_protocol_name(two_way_server_connection_args):
             two_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_two_way_server.__name__, udp_protocol_two_way_server.__name__,
-            udp_transport_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
     ["udp"],
 ])
 def two_way_server_connection_args(request):
@@ -587,7 +599,7 @@ def two_way_client_protocol_name(two_way_server_connection_args):
             tcp_transport_client.__name__, two_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_two_way_client.__name__, udp_protocol_two_way_client.__name__,
-            udp_transport_client.__name__, udp_two_way_sender_adaptor.__name__, sock.__name__)) + [False] +
+            udp_transport_wrapper_client.__name__, udp_two_way_sender_adaptor.__name__, sock.__name__)) + [True] +
     ["udp"],
 ])
 def two_way_client_connection_args(request):
@@ -620,7 +632,7 @@ def one_way_server_protocol_name(one_way_server_connection_args):
             one_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_one_way_server.__name__, udp_protocol_one_way_server.__name__,
-            udp_transport_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
     ["udp"],
 ])
 def one_way_server_connection_args(request):
@@ -653,8 +665,92 @@ def one_way_client_protocol_name(one_way_client_connection_args):
             tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_one_way_client.__name__, udp_protocol_one_way_client.__name__,
-            udp_transport_client.__name__, udp_one_way_sender_adaptor.__name__, sock.__name__)) + [False] +
+            udp_transport_wrapper_client.__name__, udp_one_way_sender_adaptor.__name__, sock.__name__)) + [True] +
     ["udp"],
 ])
 def one_way_client_connection_args(request):
+    return request.param
+
+
+@pytest.fixture
+def stream_protocol_factory(stream_connection_args):
+    return stream_connection_args[0]
+
+
+@pytest.fixture
+def stream_connection(stream_connection_args):
+    return stream_connection_args[1]
+
+
+@pytest.fixture
+def stream_transport(stream_connection_args):
+    return stream_connection_args[2]
+
+
+@pytest.fixture
+def stream_connection_is_stored(stream_connection_args):
+    return stream_connection_args[5]
+
+
+@pytest.fixture(params=[
+    lazy_fixture((
+            protocol_factory_one_way_server.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__,
+            one_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+    lazy_fixture((
+            protocol_factory_one_way_client.__name__, tcp_protocol_one_way_client.__name__,
+            tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
+    lazy_fixture((
+            protocol_factory_two_way_server.__name__, tcp_protocol_two_way_server.__name__, tcp_transport.__name__,
+            two_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+    lazy_fixture((protocol_factory_two_way_client.__name__, tcp_protocol_two_way_client.__name__,
+                  tcp_transport_client.__name__, two_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
+])
+def stream_connection_args(request):
+    return request.param
+
+
+@pytest.fixture
+def datagram_protocol_factory(datagram_connection_args):
+    return datagram_connection_args[0]
+
+
+@pytest.fixture
+def datagram_connection(datagram_connection_args):
+    return datagram_connection_args[1]
+
+
+@pytest.fixture
+def datagram_transport(datagram_connection_args):
+    return datagram_connection_args[2]
+
+
+@pytest.fixture
+def datagram_peer_data(datagram_connection_args):
+    return datagram_connection_args[4]
+
+
+@pytest.fixture
+def datagram_connection_is_stored(datagram_connection_args):
+    return datagram_connection_args[5]
+
+
+@pytest.fixture(params=[
+    lazy_fixture((
+            udp_protocol_factory_one_way_server.__name__, udp_protocol_one_way_server.__name__,
+            udp_transport_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+    ["udp"],
+    lazy_fixture((
+            udp_protocol_factory_one_way_client.__name__, udp_protocol_one_way_client.__name__,
+            udp_transport_client.__name__, udp_one_way_sender_adaptor.__name__, sock.__name__)) + [True] + [
+        "udp"],
+    lazy_fixture((
+            udp_protocol_factory_two_way_server.__name__, udp_protocol_two_way_server.__name__,
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+    ["udp"],
+    lazy_fixture((
+            udp_protocol_factory_two_way_client.__name__, udp_protocol_two_way_client.__name__,
+            udp_transport_wrapper_server.__name__, udp_two_way_sender_adaptor.__name__, sock.__name__)) + [True] + [
+        "udp"],
+])
+def datagram_connection_args(request):
     return request.param

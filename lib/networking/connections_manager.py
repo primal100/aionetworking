@@ -45,8 +45,10 @@ class ConnectionsManager:
         tasks = [conn.close_actions() for conn in self if conn.parent_name == parent_name]
         await asyncio.wait(tasks)
 
-    def get(self, key: str) -> SimpleNetworkConnectionType:
-        return self._connections[key]
+    def get(self, key: str, default: bool = "_raise") -> SimpleNetworkConnectionType:
+        if default == "_raise":
+            return self._connections[key]
+        return self._connections.get(key, default)
 
     def __iter__(self) -> None:
         for conn in self._connections.values():
