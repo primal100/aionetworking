@@ -115,6 +115,7 @@ class BaseClient(BaseSender, Protocol):
             if wait_responses:
                 for _ in msgs:
                     await conn.wait_notification()
+            await asyncio.sleep(0.1) ##Workaround for bpo-38471
 
     @run_in_loop
     async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:

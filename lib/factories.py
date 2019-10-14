@@ -15,3 +15,7 @@ def list_defaultdict() -> DefaultDict:
 
 def future_defaultdict() -> DefaultDict:
     return defaultdict(asyncio.Future)
+
+
+def queue_defaultdict() -> DefaultDict:
+    return defaultdict(asyncio.Queue)

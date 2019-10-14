@@ -89,12 +89,6 @@ def items(request):
     return request.param
 
 
-@pytest.fixture
-def context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
-
 
 @pytest.fixture
 def context_client() -> Dict[str, Any]:

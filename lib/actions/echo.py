@@ -2,8 +2,9 @@ import asyncio
 from lib.actions.base import BaseAction
 from lib.formats.types import MessageObjectType
 from dataclasses import dataclass, field
+from lib.factories import queue_defaultdict
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, DefaultDict
 
 
 class InvalidRequestError(BaseException):
@@ -13,11 +14,12 @@ class InvalidRequestError(BaseException):
 @dataclass
 class EchoAction(BaseAction):
     supports_notifications = True
-    _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, compare=False, repr=False)
+    _queues: DefaultDict[str, asyncio.Queue] = field(default_factory=queue_defaultdict, init=False, compare=False, repr=False)
 
-    async def get_notifications(self) -> AsyncGenerator[None, None]:
+    async def get_notifications(self, peer: str) -> AsyncGenerator[None, None]:
+        queue = self._queues[peer]
         while True:
-            item = await self._queue.get()
+            item = await queue.get()
             yield {'result': item}
 
     def on_decode_error(self, data: bytes, exc: BaseException) -> dict:
@@ -32,6 +34,6 @@ class EchoAction(BaseAction):
             id_ = msg.decoded.get('id')
             return {'id': id_, 'result': 'echo'}
         elif method == 'send_notification':
-            self._queue.put_nowait('notification')
+            self._queues[msg.full_sender].put_nowait('notification')
         else:
             raise InvalidRequestError(f'{method} is not recognised as a valid method')

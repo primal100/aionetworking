@@ -53,6 +53,7 @@ class TestOneWayServerDatagramProtocolFactory:
         protocol_factory.datagram_received(json_rpc_logout_request_encoded, peername)
         assert connections_manager.total == 1
         assert id(connections_manager.get(full_peername)) == id(new_connection)
+        udp_transport_server.close()
         await asyncio.wait_for(protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0
@@ -88,6 +89,7 @@ class TestOneWayClientDatagramProtocolFactory:
         assert msg == (sock, json_rpc_login_request_encoded)
         assert udp_protocol_factory_one_way_client.logger == new_connection.logger
         assert udp_protocol_factory_one_way_client.is_owner(new_connection)
+        udp_transport_client.close()
         await asyncio.wait_for(protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0
@@ -124,6 +126,7 @@ class TestTwoWayServerDatagramProtocolFactory:
         assert msg == (peername, echo_response_encoded)
         assert connections_manager.total == 1
         assert id(connections_manager.get(full_peername)) == id(new_connection)
+        udp_transport_server.close()
         await asyncio.wait_for(protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0
@@ -160,6 +163,7 @@ class TestTwoWayClientDatagramProtocolFactory:
         assert udp_protocol_factory_two_way_client.logger == new_connection.logger
         assert udp_protocol_factory_two_way_client.is_owner(new_connection)
         assert id(connections_manager.get(full_peername)) == id(new_connection)
+        udp_transport_client.close()
         await asyncio.wait_for(protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0

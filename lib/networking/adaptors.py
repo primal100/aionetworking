@@ -173,7 +173,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         await super().close(exc)
 
     async def _send_notifications(self):
-        async for item in self.action.get_notifications():
+        async for item in self.action.get_notifications(self.context['peer']):
             self.encode_and_send_msg(item)
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:

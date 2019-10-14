@@ -109,8 +109,8 @@ def echo_notification_client_encoded() -> bytes:
 
 
 @pytest.fixture
-def echo_notification_request_object(echo_notification_client_encoded, echo_notification_request) -> JSONObject:
-    return JSONObject(echo_notification_client_encoded, echo_notification_request)
+def echo_notification_request_object(echo_notification_client_encoded, echo_notification_request, context) -> JSONObject:
+    return JSONObject(echo_notification_client_encoded, echo_notification_request, context=context)
 
 
 @pytest.fixture

@@ -54,10 +54,11 @@ class TestTwoWayServer:
         await asyncio.sleep(0.1)
         async with two_way_client as conn2:
             await conn2.play_recording(recording_file_path)
-            msg1 = await asyncio.wait_for(conn2.wait_notification(), timeout=1)
-            msg2 = await asyncio.wait_for(conn2.wait_notification(), timeout=1)
+            echo_response = await asyncio.wait_for(conn2.wait_notification(), timeout=1)
+            notification = await asyncio.wait_for(conn2.wait_notification(), timeout=1)
             await asyncio.sleep(0.1)  # Workaround for bpo-38471
-        await asyncio.sleep(0.2)
+        assert echo_response == echo_response_object
+        assert notification == echo_notification_object
 
 
 
