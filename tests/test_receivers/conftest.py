@@ -89,9 +89,9 @@ async def udp_server_one_way_started(udp_server_one_way) -> UDPServer:
 
 
 @pytest.fixture
-async def udp_server_two_way_started(udp_server_one_way) -> UDPServer:
-    await udp_server_one_way.start()
-    yield udp_server_one_way
+async def udp_server_two_way_started(udp_server_two_way) -> UDPServer:
+    await udp_server_two_way.start()
+    yield udp_server_two_way
 
 
 @pytest.fixture

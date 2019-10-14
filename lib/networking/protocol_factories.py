@@ -149,9 +149,8 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
             conn = self.new_peer(addr)
             conn.data_received(data)
 
-    async def close(self) -> None:
-        self.transport.abort()
-        await super().close()
+    def close_transport(self) -> None:
+        self.transport.close()
 
 
 @dataclass

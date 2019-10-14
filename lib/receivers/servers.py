@@ -145,9 +145,8 @@ class DatagramServer(asyncio.AbstractServer):
         self._status.set_stopped()
 
     def close(self):
-        task = asyncio.create_task(self._protocol_factory.close())
-        task.add_done_callback(self._set_stopped)
-        self._status.set_stopping()
+        self._protocol_factory.close_transport()
+        self._status.set_stopped()
 
     async def wait_closed(self):
         await self._status.wait_stopped()
