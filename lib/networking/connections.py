@@ -96,9 +96,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             if self._adaptor:
-                task = asyncio.create_task(self._adaptor.close(exc))
-                set_task_name(task, "CloseAdaptor")
-                await asyncio.wait_for(task, timeout=self.timeout)
+                await asyncio.wait_for(self._adaptor.close(exc), timeout=self.timeout)
         finally:
             self._status.set_stopped()
 
@@ -167,8 +165,9 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         if not self.transport.is_closing():
             self.transport.close()
 
-    def initialize_connection(self, transport: TransportType) -> bool:
+    def initialize_connection(self, transport: TransportType, **extra_context) -> bool:
         self._status.set_starting()
+        self.context.update(extra_context)
         self._update_context(transport)
         try:
             if self.context.get('host'):

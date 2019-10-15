@@ -16,7 +16,7 @@ class SSHClient(TCPClientProtocol, asyncssh.SSHClient):
         super().__init__(*args, **kwargs)
 
     def send(self, msg):
-        raise ClientException('Cannot send from connection protocol')
+        raise ClientException('Cannot send from sftp connection protocol')
 
 
 class SFTPClient(BaseAsyncioClient):

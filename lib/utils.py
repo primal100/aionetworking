@@ -1,4 +1,5 @@
 import asyncio
+from aiofiles.os import wrap
 import datetime
 import io
 import os
@@ -13,9 +14,9 @@ import tempfile
 from dataclasses import fields, MISSING
 from functools import wraps
 
+from .compatibility import Protocol
 from pathlib import Path
 from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
-from typing_extensions import Protocol
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 try:
@@ -30,6 +31,12 @@ str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 
 ###Coroutines###
+arename = wrap(os.rename)
+aremove = wrap(os.remove)
+amkdir = wrap(os.mkdir)
+armdir = wrap(os.rmdir)
+
+
 async def time_coro(coro):
     start_time = time.time()
     await coro
