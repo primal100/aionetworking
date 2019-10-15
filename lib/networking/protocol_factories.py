@@ -136,7 +136,7 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
     def new_peer(self, addr: Tuple[str, int] = None) -> NetworkConnectionType:
         conn = self._context.run(self._new_connection)
         peername = addr or self.transport.get_extra_info('peername')
-        transport = DatagramTransportWrapper(self.transport, peername)
+        transport = DatagramTransportWrapper(self.transport, addr)
         conn.connection_made(transport)
         return conn
 

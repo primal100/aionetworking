@@ -6,7 +6,6 @@ class DatagramTransportWrapper:
     def __init__(self, transport: transports.DatagramTransport, peer: Tuple[str, int] = None):
         self._transport = transport
         self._peer = peer
-        self._is_closing = False
 
     def __getattr__(self, name):
         return getattr(self._transport, name)
@@ -17,7 +16,10 @@ class DatagramTransportWrapper:
         return self._transport.get_extra_info(name, default=default)
 
     def write(self, data: Any) -> None:
-        self._transport.sendto(data, self._peer)
+        if self._peer:
+            self._transport.sendto(data, self._peer)
+        else:
+            self._transport.sendto(data)
 
 
 TransportType = Union[transports.Transport, DatagramTransportWrapper]

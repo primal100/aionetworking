@@ -14,7 +14,6 @@ class TestOneWayServer:
     @pytest.mark.asyncio
     async def test_00_send_and_send_recording(self, one_way_server_started, one_way_client, tmp_path, json_buffer,
                                               json_decoded_multi, json_rpc_login_request_encoded, json_recording_data):
-
         async with one_way_client as conn:
             conn.encode_and_send_msgs(json_decoded_multi)
             await asyncio.sleep(0.1) # Workaround for bpo-38471
@@ -51,7 +50,6 @@ class TestTwoWayServer:
         assert notification == echo_notification_object
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()
-        await asyncio.sleep(0.1)
         async with two_way_client as conn2:
             await conn2.play_recording(recording_file_path)
             echo_response = await asyncio.wait_for(conn2.wait_notification(), timeout=1)
@@ -59,6 +57,3 @@ class TestTwoWayServer:
             await asyncio.sleep(0.1)  # Workaround for bpo-38471
         assert echo_response == echo_response_object
         assert notification == echo_notification_object
-
-
-

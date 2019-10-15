@@ -135,8 +135,10 @@ class BaseNetworkClient(BaseClient, Protocol):
     actual_srcport: int = field(default=None, init=False, compare=False)
 
     @property
-    def local_addr(self) -> Tuple[str, int]:
-        return self.srcip, self.srcport
+    def local_addr(self) -> Optional[Tuple[str, int]]:
+        if self.srcip:
+            return self.srcip, self.srcport
+        return None
 
     @property
     def actual_local_addr(self) -> Tuple[str, int]:

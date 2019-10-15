@@ -105,6 +105,7 @@ class UDPClient(BaseNetworkClient):
         protocol_factory: DatagramClientProtocolFactory
         self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
             self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr)
+        self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         self.conn = protocol_factory.new_peer()
         await self.conn.wait_connected()
         return self.conn

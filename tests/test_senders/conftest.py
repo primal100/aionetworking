@@ -32,30 +32,24 @@ async def tcp_client_two_way_connected(server_started, protocol_factory_two_way_
 
 
 @pytest.fixture
-def udp_client_one_way(udp_protocol_factory_one_way_client, sock, peername) -> UDPClient:
-    return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
-                     srcport=0)
+def udp_client_one_way(udp_protocol_factory_one_way_client, sock) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1])
 
 
 @pytest.fixture
-def udp_client_two_way(udp_protocol_factory_two_way_client, sock, peername) -> UDPClient:
-    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
-                     srcport=0)
+def udp_client_two_way(udp_protocol_factory_two_way_client, sock) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1])
 
 
 @pytest.fixture
-async def udp_client_one_way_connected(server_started, udp_protocol_factory_one_way_client, sock, peername) -> UDPClient:
-    client = UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
-                       srcport=0)
-    async with client:
-        yield client
+async def udp_client_one_way_connected(server_started, udp_client_one_way) -> UDPClient:
+    async with udp_client_one_way:
+        yield udp_client_one_way
 
 
 @pytest.fixture
-async def udp_client_two_way_connected(server_started, udp_protocol_factory_two_way_client, sock, peername) -> UDPClient:
-    client = UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1],
-                       srcip=peername[0], srcport=0)
-    async with client:
+async def udp_client_two_way_connected(server_started, udp_client_two_way) -> UDPClient:
+    async with udp_client_two_way:
         yield client
 
 
