@@ -1,6 +1,7 @@
 import asyncio
 import socket
 from asyncio.transports import Transport, DatagramTransport
+from asyncio import BaseProtocol
 
 from typing import Any
 
@@ -26,6 +27,10 @@ class MockTransportMixin:
 
     def close(self):
         self._is_closing = True
+        asyncio.get_event_loop().call_soon(self._protocol.connection_lost, None)
+
+    def set_protocol(self, protocol: BaseProtocol) -> None:
+        self._protocol = protocol
 
 
 class MockTCPTransport(MockTransportMixin, Transport):

@@ -8,11 +8,12 @@ from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger, logger_cv
+from .transports import DatagramTransportWrapper
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
 
 from .connections_manager import connections_manager
-from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection
+from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection, UDPClientConnection
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
@@ -111,7 +112,7 @@ class StreamClientProtocolFactory(BaseProtocolFactory):
 
 
 @dataclass
-class UDPProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
+class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
     connection_cls: NetworkConnectionType = UDPServerConnection
     transport = None
     sock = None
@@ -125,17 +126,35 @@ class UDPProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory):
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
-        for conn in filter(self.is_owner, connections_manager):
-            conn.finish_connection(exc)
+        connections = filter(self.is_owner, connections_manager)
+        for conn in list(connections):
+            conn.connection_lost(exc)
 
     def error_received(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
 
+    def new_peer(self, addr: Tuple[str, int] = None) -> NetworkConnectionType:
+        conn = self._context.run(self._new_connection)
+        peername = addr or self.transport.get_extra_info('peername')
+        transport = DatagramTransportWrapper(self.transport, addr)
+        conn.connection_made(transport)
+        return conn
+
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
-        conn = connections_manager.get(addr_tuple_to_str(addr), None)
+        peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr))
+        conn = connections_manager.get(peer, None)
         if conn:
-            conn.on_data_received(data)
+            conn.data_received(data)
         else:
-            conn = self._new_connection()
-            conn.initialize_connection(self.transport, addr)
-            conn.on_data_received(data)
+            conn = self.new_peer(addr)
+            conn.data_received(data)
+
+
+@dataclass
+class DatagramServerProtocolFactory(BaseDatagramProtocolFactory):
+    connection_cls: NetworkConnectionType = UDPServerConnection
+
+
+@dataclass
+class DatagramClientProtocolFactory(BaseDatagramProtocolFactory):
+    connection_cls: NetworkConnectionType = UDPClientConnection

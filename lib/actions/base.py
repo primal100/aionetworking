@@ -44,7 +44,7 @@ class BaseAction(Protocol):
     def filter(self, msg: MessageObjectType) -> bool:
         return msg.filter()
 
-    async def get_notifications(self) -> AsyncGenerator[None, None]:
+    async def get_notifications(self, peer: str) -> AsyncGenerator[None, None]:
         yield
 
     async def start(self) -> None: ...

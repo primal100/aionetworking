@@ -30,7 +30,7 @@ class ActionProtocol(Protocol):
     def on_exception(self, msg: MessageObjectType, exc: BaseException) -> Any: ...
 
     @abstractmethod
-    async def get_notifications(self) -> AsyncGenerator[None, None]:
+    async def get_notifications(self, peer: str) -> AsyncGenerator[None, None]:
         yield
 
     @abstractmethod

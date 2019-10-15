@@ -9,6 +9,18 @@ from typing import Dict, Any, List, NamedTuple, Tuple
 
 
 @pytest.fixture
+def peer() -> str:
+    return '127.0.0.1:60000'
+
+
+@pytest.fixture
+def context(peer) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
+            'peer': peer, 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000'}
+
+
+@pytest.fixture
 def json_codec(context) -> JSONCodec:
     return JSONCodec(JSONObject, context=context)
 

@@ -21,12 +21,13 @@ class TestClientStartStop:
         assert client.is_closing()
 
     @pytest.mark.asyncio
-    async def test_01_client_stop(self, server_started, client_connected):
-        await client_connected.close()
-        assert client_connected.is_closing()
+    async def test_01_client_stop(self, server_started, client):
+        await client.connect()
+        await client.close()
+        assert client.is_closing()
 
     @pytest.mark.asyncio
-    async def test_03_client_pickle(self, client):
+    async def test_02_client_pickle(self, client):
         data = pickle.dumps(client)
         new_client = pickle.loads(data)
         assert new_client == client

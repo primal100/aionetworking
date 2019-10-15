@@ -69,13 +69,6 @@ def timestamp() -> datetime:
 
 
 @pytest.fixture
-def context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
-
-
-@pytest.fixture
 def response(request):
     if request.param:                               #3.8 assignment expression
         return request.getfixturevalue(request.param)
@@ -95,12 +88,6 @@ def items(request):
         return request.getfixturevalue(request.param)
     return request.param
 
-
-@pytest.fixture
-def context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
 
 
 @pytest.fixture
@@ -718,16 +705,6 @@ async def queue() -> asyncio.Queue:
 @pytest.fixture
 def peer_str() -> str:
     return '127.0.0.1:60000'
-
-
-@pytest.fixture
-async def udp_transport(queue, extra) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(queue, extra=extra)
-
-
-@pytest.fixture
-async def udp_transport_client(queue, extra_client) -> asyncio.DatagramTransport:
-    yield MockDatagramTransport(queue, extra=extra_client)
 
 
 @pytest.fixture

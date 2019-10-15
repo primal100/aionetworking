@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import socket
 import sys
 
+from lib.networking.protocol_factories import DatagramClientProtocolFactory
 from lib.networking.types import ConnectionType
 from lib.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
@@ -101,7 +102,10 @@ class UDPClient(BaseNetworkClient):
     transport: asyncio.DatagramTransport = field(init=False, compare=False, default=None)
 
     async def _open_connection(self) -> ConnectionType:
-        self.transport, self.conn = await self.loop.create_datagram_endpoint(
+        protocol_factory: DatagramClientProtocolFactory
+        self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
             self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr)
+        self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
+        self.conn = protocol_factory.new_peer()
         await self.conn.wait_connected()
         return self.conn

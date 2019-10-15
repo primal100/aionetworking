@@ -3,6 +3,9 @@ import concurrent.futures
 import pytest
 from pathlib import Path
 import os
+
+###Required for skipif in fixture params###
+from lib.compatibility import datagram_supported
 from lib.utils import supports_pipe_or_unix_connections
 
 
@@ -19,7 +22,6 @@ class TestOneWaySenderInExecutors:
             await asyncio.get_event_loop().run_in_executor(executor, one_way_client.open_send_msgs,
                                                            msgs, None)
         await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()
@@ -35,7 +37,6 @@ class TestOneWaySenderInExecutors:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await asyncio.get_event_loop().run_in_executor(executor, one_way_client.open_send_msgs, msgs, 0.00025, 2)
         await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
-        await asyncio.wait_for(one_way_server_started.wait_num_connections(0), timeout=1)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()

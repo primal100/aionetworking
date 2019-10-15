@@ -73,7 +73,7 @@ class BaseClient(BaseSender, Protocol):
         return f"{self.name} {self.src}"
 
     async def _close_connection(self):
-        self.conn.close()
+        self.transport.close()
         await self.conn.wait_closed()
         self.transport = None
 
@@ -115,6 +115,7 @@ class BaseClient(BaseSender, Protocol):
             if wait_responses:
                 for _ in msgs:
                     await conn.wait_notification()
+            await asyncio.sleep(0.1) ##Workaround for bpo-38471
 
     @run_in_loop
     async def open_play_recording(self, path: Path, hosts: Sequence = (), timing: bool = True) -> None:
@@ -134,8 +135,10 @@ class BaseNetworkClient(BaseClient, Protocol):
     actual_srcport: int = field(default=None, init=False, compare=False)
 
     @property
-    def local_addr(self) -> Tuple[str, int]:
-        return self.srcip, self.srcport
+    def local_addr(self) -> Optional[Tuple[str, int]]:
+        if self.srcip:
+            return self.srcip, self.srcport
+        return None
 
     @property
     def actual_local_addr(self) -> Tuple[str, int]:
