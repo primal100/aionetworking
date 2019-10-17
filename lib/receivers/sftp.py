@@ -4,10 +4,10 @@ import asyncio
 import datetime
 from dataclasses import dataclass, field, InitVar
 from functools import partial
-from passlib.hash import pbkdf2_sha256
 
 from lib import settings
 from lib.wrappers.schedulers import TaskScheduler
+from lib.networking.protocol_factories import BaseProtocolFactory
 from lib.networking.connections import NetworkConnectionProtocol
 from lib.utils import aremove
 from .base import BaseNetworkServer
@@ -100,12 +100,6 @@ class SSHServer(NetworkConnectionProtocol, asyncssh.SSHServer):
 
 
 @dataclass
-class SSHServerPublicKeyAuth(SSHServer):
-    def public_key_auth_supported(self):
-        return True
-
-
-@dataclass
 class BaseSSHServerPswAuth(SSHServer):
 
     def get_password(self, username: str) -> str:
@@ -130,44 +124,27 @@ class BaseSSHServerPswAuth(SSHServer):
         return authorized
 
 
-class SSHServerPswAuthLogins(BaseSSHServerPswAuth):
-    hash_algorithm = pbkdf2_sha256
-
-    def __init__(self, *args, logins: Dict[str, str] = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logins = logins
-
-    def hash_password(self, password: str) -> str:
-        return self.hash_algorithm.hash(password)
-
-    def check_user_password(self, username: str, password: str) -> bool:
-        pw_hash = self.get_password(username)
-        if not pw_hash:
-            self.logger.error('Could not find user %s', username)
-        return self.hash_algorithm.verify(password, pw_hash)
-
-    def get_password(self, username: str) -> Union[str, bool]:
-        return self.logins.get(username)
-
-    def password_auth_supported(self) -> bool:
-        return bool(self.logins)
+@dataclass
+class SFTPServerProtocolFactory(BaseProtocolFactory):
+    full_name = 'SFTP Server'
+    peer_prefix = 'sftp'
+    connection_cls = SSHServer
 
 
 @dataclass
 class SFTPServer(BaseNetworkServer):
-    protocol_factory = SSHServer
+    protocol_factory = SFTPServerProtocolFactory
     sftp_factory = SFTPFactory
     name = 'SFTP Server'
-    peer_prefix = 'tcp'
-    sftploglevel: InitVar[int] = 1
+    peer_prefix = 'sftp'
+    sftp_log_level: InitVar[int] = 1
     allow_scp: bool = False
     server_host_key: Path = ()
     passphrase: str = None
-    authorized_keys: Path = None
     extra_sftp_kwargs: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self, sftploglevel) -> None:
-        asyncssh.logging.set_debug_level(sftploglevel)
+    def __post_init__(self, sftp_log_level) -> None:
+        asyncssh.logging.set_debug_level(sftp_log_level)
 
     @property
     def sftp_kwargs(self) -> Dict[str, Any]:
@@ -175,30 +152,13 @@ class SFTPServer(BaseNetworkServer):
             'allow_scp': self.allow_scp,
             'server_host_keys': self.server_host_key,
             'passphrase': self.passphrase,
-            'authorized_client_keys': str(self.authorized_keys) if self.authorized_keys else None
         }
         kwargs.update(self.extra_sftp_kwargs)
         return kwargs
 
-    @property
-    def connection_kwargs(self) -> Dict[str, Any]:
-        return {'public_key_auth_supported': bool(self.authorized_keys)}
-
-    async def get_server(self):
-        server_factory = partial(self.protocol_factory, **self.connection_kwargs)
-        return await asyncssh.create_server(server_factory, self.host, self.port, sftp_factory=self.sftp_factory,
+    async def _get_server(self) -> asyncio.AbstractServer:
+        return await asyncssh.create_server(self.protocol_factory, self.host, self.port, sftp_factory=self.sftp_factory,
                                             **self.sftp_kwargs)
 
-
-@dataclass
-class SFTPServerPswAuth(SFTPServer):
-    protocol_factory = SSHServerPswAuthLogins
-    logins: Dict[str, str] = field(default_factory=dict)
-
-    @property
-    def connection_kwargs(self) -> Dict[str, Any]:
-        kwargs = super().connection_kwargs
-        kwargs['logins'] = self.logins
-        return kwargs
 
 
