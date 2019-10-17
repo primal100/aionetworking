@@ -35,7 +35,7 @@ class SFTPFactory(asyncssh.SFTPServer):
                  remove_tmp_files=True):
         self._scheduler = TaskScheduler()
         conn.set_extra_info(sftp_factory=self)
-        self._adaptor = conn.get_extra_info('adaptor')
+        self._sftp_connection = conn.get_extra_info('adaptor')
         if chroot:
             root = base_upload_dir.joinpath(conn.get_extra_info('username'))
             root.mkdir(parents=True, exist_ok=True)
@@ -47,7 +47,7 @@ class SFTPFactory(asyncssh.SFTPServer):
     async def _handle_data(self, name: str, data: AnyStr):
         file_stat = await aiofiles.os.stat(name)
         timestamp = datetime.datetime.fromtimestamp(file_stat.st_ctime)
-        self._adaptor.on_data_received(data, timestamp=timestamp)
+        self._sftp_connection.data_received(data, timestamp=timestamp)
         if self._remove_tmp_files:
             await aremove(name)
 
@@ -83,7 +83,7 @@ class SSHServer(NetworkConnectionProtocol, asyncssh.SSHServer):
             'recv_compression': conn.get_extra_info('recv_compression'),
         }
         self.initialize_connection(conn, **extra_context)
-        self.conn.set_extra_info(adaptor=self._adaptor)
+        self.conn.set_extra_info(sftp_connection=self)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
