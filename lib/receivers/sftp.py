@@ -13,42 +13,32 @@ from lib.utils import aremove
 from .base import BaseNetworkServer
 from .exceptions import ServerException
 
-from typing import Dict, Any, Optional, AnyStr, Union
+from typing import Dict, Any, Optional, AnyStr
 from pathlib import Path
-
-
-def create_queue_if_not_exists(conn):
-    queue = conn.get_extra_info('file_queue')
-    if not queue:
-        queue = asyncio.Queue()
-        conn.set_extra_info(file_queue=queue)
-    return queue
 
 
 @dataclass
 class SFTPFactory(asyncssh.SFTPServer):
-    chroot: bool = True
-    base_upload_dir: Path = settings.HOME.joinpath('sftp')
-    remove_tmp_files: bool = True
+    chroot = True
+    remove_tmp_files = True
+    base_upload_dir: Path = settings.TEMPDIR / "sftp_received"
 
-    def __init__(self, conn, chroot: bool = True, base_upload_dir: Path = settings.HOME.joinpath('sftp'),
-                 remove_tmp_files=True):
+    def __init__(self, conn, base_upload_dir: Path = settings.HOME.joinpath('sftp')):
         self._scheduler = TaskScheduler()
         conn.set_extra_info(sftp_factory=self)
         self._sftp_connection = conn.get_extra_info('adaptor')
-        if chroot:
+        if self.chroot:
             root = base_upload_dir.joinpath(conn.get_extra_info('username'))
             root.mkdir(parents=True, exist_ok=True)
             super().__init__(conn, chroot=root)
         else:
             super().__init__(conn)
-        self._remove_tmp_files = remove_tmp_files
 
     async def _handle_data(self, name: str, data: AnyStr):
         file_stat = await aiofiles.os.stat(name)
         timestamp = datetime.datetime.fromtimestamp(file_stat.st_ctime)
         self._sftp_connection.data_received(data, timestamp=timestamp)
-        if self._remove_tmp_files:
+        if self.remove_tmp_files:
             await aremove(name)
 
     async def _process_completed_file(self, name: str, mode: str):
@@ -142,6 +132,7 @@ class SFTPServer(BaseNetworkServer):
     server_host_key: Path = ()
     passphrase: str = None
     extra_sftp_kwargs: Dict[str, Any] = field(default_factory=dict)
+    base_upload_dir: Path = settings.TEMPDIR / "sftp_received"
 
     def __post_init__(self, sftp_log_level) -> None:
         asyncssh.logging.set_debug_level(sftp_log_level)
@@ -157,7 +148,8 @@ class SFTPServer(BaseNetworkServer):
         return kwargs
 
     async def _get_server(self) -> asyncio.AbstractServer:
-        return await asyncssh.create_server(self.protocol_factory, self.host, self.port, sftp_factory=self.sftp_factory,
+        return await asyncssh.create_server(self.protocol_factory, self.host, self.port,
+                                            sftp_factory=partial(self.sftp_factory, self.base_upload_dir),
                                             **self.sftp_kwargs)
 
 

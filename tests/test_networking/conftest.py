@@ -6,9 +6,12 @@ from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import TCPServerConnection, TCPClientConnection, UDPServerConnection, UDPClientConnection
 from lib.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory, \
     DatagramServerProtocolFactory, DatagramClientProtocolFactory
+from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
+from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from lib.networking.transports import DatagramTransportWrapper
 
-from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket
+
+from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn
 
 from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
@@ -41,6 +44,15 @@ def udp_initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
+def sftp_initial_server_context() -> Dict[str, Any]:
+    return {'endpoint': 'SFTP Server 127.0.0.1:8888'}
+
+
+@pytest.fixture
+def sftp_initial_client_context() -> Dict[str, Any]:
+    return {'endpoint': 'SFTP Client 127.0.0.1:0'}
+
+@pytest.fixture
 def context() -> Dict[str, Any]:
     return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
@@ -69,6 +81,20 @@ def udp_client_context() -> dict:
 
 
 @pytest.fixture
+def sftp_context() -> Dict[str, Any]:
+    return {'protocol_name': 'SFTP Server', 'endpoint': 'SFTP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
+            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000', 'username': 'testuser'}
+
+
+@pytest.fixture
+def sftp_client_context() -> dict:
+    return {'protocol_name': 'SFTP Client', 'endpoint': 'SFTP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.1:60000', 'username': 'testuser'}
+
+
+@pytest.fixture
 def json_client_codec(client_context) -> JSONCodec:
     return JSONCodec(JSONObject, context=client_context)
 
@@ -87,7 +113,7 @@ def echo_recording_data() -> List:
 async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context) -> ReceiverAdaptor:
     context_cv.set(context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
-                           preaction=buffered_file_storage_recording_action)
+                              preaction=buffered_file_storage_recording_action)
     yield adaptor
     await adaptor.close()
 
@@ -121,7 +147,7 @@ async def two_way_sender_adaptor(echo_requester, context_client, queue) -> Sende
 async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context) -> ReceiverAdaptor:
     context_cv.set(context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
-                           preaction=buffered_file_storage_recording_action)
+                              preaction=buffered_file_storage_recording_action)
     yield adaptor
     await adaptor.close()
 
@@ -191,6 +217,17 @@ def extra_client_inet(peername, sock) -> dict:
 
 
 @pytest.fixture
+def extra_inet_sftp(peername, sock) -> dict:
+    return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket(),
+            'username': 'testuser'}
+
+
+@pytest.fixture
+def extra_client_inet_sftp(peername, sock) -> dict:
+    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket(), 'username': 'testuser'}
+
+
+@pytest.fixture
 def extra_unix(peername, sock) -> dict:
     return {'peername': peername, 'sockname': sock, 'socket': MockAFUnixSocket()}
 
@@ -238,6 +275,16 @@ async def udp_transport_wrapper_server(udp_transport_server, queue, peername) ->
 @pytest.fixture
 async def udp_transport_wrapper_client(udp_transport_client, sock) -> DatagramTransportWrapper:
     yield DatagramTransportWrapper(udp_transport_client, sock)
+
+
+@pytest.fixture
+async def sftp_transport(extra_inet_sftp) -> MockSFTPConn:
+    yield MockSFTPConn(extra=extra_inet_sftp)
+
+
+@pytest.fixture
+async def sftp_transport_client(extra_client_inet_sftp) -> MockSFTPConn:
+    yield MockSFTPConn(extra=extra_client_inet_sftp)
 
 
 @pytest.fixture
@@ -375,6 +422,33 @@ async def udp_protocol_factory_two_way_client(echo_requester, udp_initial_client
 
 
 @pytest.fixture
+async def sftp_protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
+                                               sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
+    context_cv.set(sftp_initial_server_context)
+    factory = SFTPOSAuthProtocolFactory(
+        preaction=buffered_file_storage_recording_action,
+        action=buffered_file_storage_action,
+        dataformat=JSONObject)
+    await factory.start()
+    if not factory.full_name:
+        factory.set_name('SFTP Server 127.0.0.1:8888', 'tcp')
+    yield factory
+    await factory.close()
+
+
+@pytest.fixture
+async def sftp_protocol_factory_one_way_client(sftp_initial_client_context) -> SFTPClientProtocolFactory:
+    context_cv.set(sftp_initial_client_context)
+    factory = SFTPClientProtocolFactory(
+        dataformat=JSONObject)
+    await factory.start()
+    if not factory.full_name:
+        factory.set_name('SFTP Client 127.0.0.1:0', 'sftp')
+    yield factory
+    await factory.close()
+
+
+@pytest.fixture
 async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
                                       initial_server_context) -> TCPServerConnection:
     context_cv.set(initial_server_context)
@@ -466,6 +540,24 @@ async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
     await conn.wait_closed()
+
+
+@pytest.fixture
+async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
+                                       sftp_initial_server_context) -> SFTPServerOSAuthProtocol:
+    context_cv.set(sftp_initial_server_context)
+    protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
+                               parent_name="SFTP Server 127.0.0.1:8888", peer_prefix='sftp',
+                               preaction=buffered_file_storage_recording_action)
+    yield protocol
+
+
+@pytest.fixture
+async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
+    context_cv.set(initial_client_context)
+    conn = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
+                               base_path=tmpdir.joinpath('sftp_sent'))
+    yield conn
 
 
 @pytest.fixture

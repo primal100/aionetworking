@@ -14,7 +14,7 @@ from lib.utils import inherit_on_type_checking_only
 from .types import AdaptorType
 
 from lib.compatibility import Protocol
-from typing import Any, AsyncGenerator, Generator, Optional, Sequence, TypeVar, Union, Dict, Tuple, Type
+from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union, Dict, Tuple, Type
 
 
 class ProtocolFactoryProtocol(Protocol):
@@ -73,7 +73,7 @@ class ConnectionProtocol(Protocol):
     def is_connected(self) -> bool: ...
 
     @abstractmethod
-    def send(self, data: bytes) -> None: ...
+    def send(self, data: bytes) -> Optional[asyncio.Future]: ...
 
 
 @dataclass

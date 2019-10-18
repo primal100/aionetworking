@@ -69,10 +69,10 @@ class BaseClient(BaseSender, Protocol):
     def src(self) -> str: ...
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         return f"{self.name} {self.src}"
 
-    async def _close_connection(self):
+    async def _close_connection(self) -> None:
         self.transport.close()
         await self.conn.wait_closed()
         self.transport = None
@@ -125,7 +125,7 @@ class BaseClient(BaseSender, Protocol):
 
 @dataclass
 class BaseNetworkClient(BaseClient, Protocol):
-    name = "Network client"
+    name = "Network Client"
 
     host: str = '127.0.0.1'
     port: int = 4000

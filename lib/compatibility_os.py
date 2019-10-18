@@ -14,9 +14,9 @@ if os.name == 'posix':
 
 
 elif os.name == 'nt':
+    import pywintypes
     import win32security
     import win32con
-    import pywintypes
 
     authentication_type = 'WINDOWS'
 

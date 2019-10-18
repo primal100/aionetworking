@@ -45,10 +45,16 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 
+    def on_msg_sent(self, msg_encoded: bytes, task: Optional[asyncio.Future]):
+        self.logger.on_msg_sent(msg_encoded)
+
     def send_data(self, msg_encoded: bytes) -> None:
         self.logger.on_sending_encoded_msg(msg_encoded)
-        self.send(msg_encoded)
-        self.logger.on_msg_sent(msg_encoded)
+        fut = self.send(msg_encoded)
+        if fut:
+            fut.add_done_callback(partial(self.on_msg_sent, msg_encoded))
+        else:
+            self.on_msg_sent(msg_encoded, None)
 
     def _encode_msg(self, decoded: Any) -> MessageObjectType:
         return self.codec.from_decoded(decoded)
