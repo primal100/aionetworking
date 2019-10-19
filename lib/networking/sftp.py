@@ -11,12 +11,13 @@ from .exceptions import ProtocolException
 
 from lib import settings
 from lib.wrappers.schedulers import TaskScheduler
+from lib.compatibility import cached_property
 from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocol_factories import BaseProtocolFactory
 from .connections import NetworkConnectionProtocol
 from lib.utils import aremove
 
-from typing import Optional, AnyStr
+from typing import Optional, AnyStr, Union
 from pathlib import Path
 
 
@@ -28,19 +29,23 @@ class SFTPFactory(asyncssh.SFTPServer):
 
     def __init__(self, conn, base_upload_dir: Path = settings.HOME.joinpath('sftp')):
         self._scheduler = TaskScheduler()
-        conn.set_extra_info(sftp_factory=self)
-        self._sftp_connection = conn.get_extra_info('adaptor')
+        self._conn = conn
+        self._conn.set_extra_info(sftp_factory=self)
         if self.chroot:
-            root = base_upload_dir.joinpath(conn.get_extra_info('username'))
+            root = base_upload_dir.joinpath(self._conn.get_extra_info('username'))
             root.mkdir(parents=True, exist_ok=True)
-            super().__init__(conn, chroot=root)
+            super().__init__(self._conn, chroot=root)
         else:
-            super().__init__(conn)
+            super().__init__(self._conn)
+
+    @cached_property
+    def sftp_connection(self):
+        return self._conn.get_extra_info('sftp_connection')
 
     async def _handle_data(self, name: str, data: AnyStr):
         file_stat = await aiofiles.os.stat(name)
         timestamp = datetime.datetime.fromtimestamp(file_stat.st_ctime)
-        self._sftp_connection.data_received(data, timestamp=timestamp)
+        self.sftp_connection.data_received(data, timestamp=timestamp)
         if self.remove_tmp_files:
             await aremove(name)
 
@@ -60,10 +65,11 @@ class SFTPFactory(asyncssh.SFTPServer):
 
 @dataclass
 class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
+    name = 'SFTP Server'
     conn = None
     adaptor_cls = ReceiverAdaptor
 
-    def connection_made(self, conn: asyncssh.SSHServerConnection) -> None:
+    def connection_made(self, conn: Union[asyncssh.SSHServerConnection, asyncssh.SSHClientConnection]) -> None:
         self.conn = conn
         extra_context = {
             'username': conn.get_extra_info('username')
@@ -84,7 +90,7 @@ class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
             sftp_factory = self.conn.get_extra_info('sftp_factory')
             await sftp_factory.wait_closed()
         finally:
-            await super().close()
+            await super()._close(exc)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.finish_connection(exc)
@@ -127,6 +133,8 @@ class SFTPServerProtocolFactory(BaseProtocolFactory):
 
 @dataclass
 class SFTPClientProtocol(SFTPServerProtocol):
+    name = 'SFTP Client'
+    store_connections = False
     adaptor_cls = SenderAdaptor
     sftp = None
     cwd = None
@@ -136,6 +144,7 @@ class SFTPClientProtocol(SFTPServerProtocol):
     base_path: Path = settings.TEMPDIR / "sftp_sent"
 
     def __post_init__(self):
+        super().__post_init__()
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def set_sftp(self, sftp):

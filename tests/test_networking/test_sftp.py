@@ -3,7 +3,6 @@ import pytest
 import pickle
 from pathlib import Path
 
-from lib.networking.exceptions import MethodNotFoundError
 from lib.formats.recording import get_recording_from_file
 from lib.utils import alist
 
@@ -11,29 +10,27 @@ from lib.utils import alist
 class TestConnectionShared:
 
     @pytest.mark.asyncio
-    async def test_00_connection_made_lost(self, connection, sftp_conn, adaptor, connections_manager,
-                                           connection_is_stored, protocol_name):
-        assert not transport.is_closing()
+    async def test_00_connection_made_lost(self, sftp_protocol, sftp_conn, sftp_adaptor, connections_manager,
+                                           sftp_connection_is_stored, sftp_factory):
         assert connections_manager.total == 0
-        assert connection.logger
-        assert connection.transport is None
-        connection.connection_made(transport)
-        transport.set_protocol(connection)
-        await connection.wait_connected()
-        assert connection.is_connected()
-        assert not transport.is_closing()
-        assert connection._adaptor.context == adaptor.context
-        assert connection._adaptor == adaptor
-        assert connection.peer == f"{protocol_name}_{adaptor.context['peer']}"
-        assert connection.logger is not None
-        assert connection.transport == transport
-        total_connections = 1 if connection_is_stored else 0
+        assert sftp_protocol.logger
+        assert sftp_protocol.conn is None
+        sftp_protocol.connection_made(sftp_conn)
+        await sftp_protocol.wait_connected()
+        assert sftp_protocol.is_connected()
+        assert sftp_protocol._adaptor.context == sftp_adaptor.context
+        assert sftp_protocol._adaptor == sftp_adaptor
+        assert sftp_factory.sftp_connection == sftp_protocol
+        assert sftp_conn.get_extra_info('sftp_factory') == sftp_factory
+        assert sftp_protocol.peer == f"sftp_{sftp_adaptor.context['peer']}"
+        assert sftp_protocol.logger is not None
+        assert sftp_protocol.conn == sftp_conn
+        total_connections = 1 if sftp_connection_is_stored else 0
         assert connections_manager.total == total_connections
-        if connection_is_stored:
-            assert connections_manager.get(connection.peer) == connection
-        connection.close()
-        assert transport.is_closing()
-        await connection.wait_closed()
+        if sftp_connection_is_stored:
+            assert connections_manager.get(sftp_protocol.peer) == sftp_protocol
+        sftp_conn.close()
+        await sftp_protocol.wait_closed()
         assert connections_manager.total == 0
 
 

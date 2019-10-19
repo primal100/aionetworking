@@ -178,6 +178,7 @@ class ConnectionLogger(Logger):
 
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
+        self.info(self.extra)
 
     def on_buffer_received(self, data: bytes) -> None:
         self.info("Received buffer containing %s bytes", len(data))

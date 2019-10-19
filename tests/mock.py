@@ -33,9 +33,14 @@ class MockTransportMixin:
         self._protocol = protocol
 
 
-class MockSFTPConn(MockTransportMixin):
-    def __init__(self, extra: Dict[Any, Any]):
+class MockSFTPConn:
+
+    def __init__(self, conn, extra: Dict[Any, Any]):
+        self._owner = conn
         self._extra = extra
+
+    def close(self):
+        asyncio.get_event_loop().call_soon(self._owner.connection_lost, None)
 
     def set_extra_info(self, **kwargs):
         self._extra.update(**kwargs)
