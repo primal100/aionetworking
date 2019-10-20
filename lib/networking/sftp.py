@@ -1,11 +1,9 @@
 from datetime import datetime
 from lib.conf.context import context_cv
 
-
 import asyncssh
 import aiofiles.os
 import asyncio
-import datetime
 from dataclasses import dataclass
 from .exceptions import ProtocolException
 
@@ -44,7 +42,7 @@ class SFTPFactory(asyncssh.SFTPServer):
 
     async def _handle_data(self, name: str, data: AnyStr):
         file_stat = await aiofiles.os.stat(name)
-        timestamp = datetime.datetime.fromtimestamp(file_stat.st_ctime)
+        timestamp = datetime.fromtimestamp(file_stat.st_ctime)
         self.sftp_connection.data_received(data, timestamp=timestamp)
         if self.remove_tmp_files:
             await aremove(name)
@@ -165,13 +163,13 @@ class SFTPClientProtocol(SFTPServerProtocol):
         real_remote_path = await self.sftp.realpath(remote_path)
         kwargs['remotepath'] = kwargs.get('remotepath', str(real_remote_path))
         await self.sftp.put(str(file_path), **kwargs)
+        if self.remove_tmp_files:
+            await aremove(file_path)
 
     def send(self, data: bytes) -> asyncio.Task:
         file_path = self.get_tmp_path()
         self.logger.debug("Using temp path for sending file: %s", file_path)
         task = asyncio.create_task(self._put_data(file_path, data))
-        if self.remove_tmp_files:
-            file_path.unlink()
         return task
 
 

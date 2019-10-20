@@ -11,6 +11,7 @@ from lib.networking.protocol_factories import (StreamServerProtocolFactory, Stre
 from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
 from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from lib.networking.transports import DatagramTransportWrapper
+from lib.compatibility_tests import AsyncMock
 
 from typing import Union
 
@@ -19,6 +20,17 @@ from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket
 from tests.test_actions.conftest import *   ###Required for tests
 from tests.test_logging.conftest import *
 from tests.test_requesters.conftest import *
+
+from unittest.mock import Mock
+
+
+@pytest.fixture
+def patch_datetime_now(monkeypatch):
+
+    def return_fake_time():
+        return datetime(1970, 1, 1, 1, 1, 1)
+
+    monkeypatch.setattr(datetime, 'now', return_fake_time)
 
 
 @pytest.fixture
@@ -850,10 +862,34 @@ def sftp_conn_server(request, extra_inet_sftp, sftp_protocol) -> MockSFTPConn:
 
 
 @pytest.fixture
-def sftp_conn_client(request, extra_client_inet_sftp, sftp_protocol) -> MockSFTPConn:
+def sftp_conn_client(request, extra_inet_sftp, sftp_protocol) -> MockSFTPConn:
     if is_lazy_fixture(sftp_protocol):
         sftp_protocol = request.getfixturevalue(sftp_protocol.name)
-    yield MockSFTPConn(sftp_protocol, extra=extra_client_inet_sftp)
+    yield MockSFTPConn(sftp_protocol, extra=extra_inet_sftp)
+
+
+@pytest.fixture
+def sftp_factory_server(sftp_conn_server, tmpdir) -> SFTPFactory:
+    path = Path(tmpdir) / "sftp_received"
+    yield SFTPFactory(sftp_conn_server, base_upload_dir=path)
+
+
+@pytest.fixture
+def sftp_one_way_conn_server(extra_inet_sftp, sftp_protocol_one_way_server) -> MockSFTPConn:
+    yield MockSFTPConn(sftp_protocol_one_way_server, extra=extra_inet_sftp)
+
+
+@pytest.fixture
+def sftp_one_way_conn_client(extra_client_inet_sftp, sftp_protocol_one_way_client) -> MockSFTPConn:
+    yield MockSFTPConn(sftp_protocol_one_way_client, extra=extra_client_inet_sftp)
+
+
+@pytest.fixture
+def sftp_factory_client(sftp_one_way_conn_client, tmpdir) -> SFTPFactory:
+    path = Path(tmpdir) / "sftp_received"
+    sftp_factory = SFTPFactory(sftp_one_way_conn_client, base_upload_dir=path)
+    sftp_factory.put = AsyncMock()
+    yield sftp_factory
 
 
 @pytest.fixture
@@ -921,5 +957,4 @@ def sftp_peer(sftp_connection_args) -> Tuple[str, int]:
 @pytest.fixture
 def sftp_connection_is_stored(sftp_connection_args) -> bool:
     return sftp_connection_args[5]
-
 
