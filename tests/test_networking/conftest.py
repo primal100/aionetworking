@@ -367,7 +367,7 @@ async def protocol_factory_one_way_server(buffered_file_storage_action, buffered
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
@@ -382,7 +382,7 @@ async def protocol_factory_two_way_server(echo_action, buffered_file_storage_rec
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
     yield factory
@@ -394,7 +394,7 @@ async def protocol_factory_one_way_client(initial_client_context) -> StreamClien
     context_cv.set(initial_client_context)
     factory = StreamClientProtocolFactory(
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
@@ -407,7 +407,7 @@ async def protocol_factory_two_way_client(echo_requester, initial_client_context
     factory = StreamClientProtocolFactory(
         requester=echo_requester,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('TCP Client 127.0.0.1:0', 'tcp')
     yield factory
@@ -422,7 +422,7 @@ async def udp_protocol_factory_one_way_server(buffered_file_storage_action, buff
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('UDP Server 127.0.0.1:8888', 'udp')
     yield factory
@@ -438,7 +438,7 @@ async def udp_protocol_factory_two_way_server(echo_action, buffered_file_storage
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('UDP Server 127.0.0.1:8888', 'udp')
     yield factory
@@ -451,7 +451,7 @@ async def udp_protocol_factory_one_way_client(udp_initial_client_context) -> Dat
     context_cv.set(udp_initial_client_context)
     factory = DatagramClientProtocolFactory(
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('UDP Client 127.0.0.1:0', 'udp')
     yield factory
@@ -465,7 +465,7 @@ async def udp_protocol_factory_two_way_client(echo_requester, udp_initial_client
     factory = DatagramClientProtocolFactory(
         requester=echo_requester,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('UDP Client 127.0.0.1:0', 'udp')
     yield factory
@@ -863,7 +863,7 @@ async def sftp_protocol_factory_one_way_server(buffered_file_storage_action, buf
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
         dataformat=JSONObject)
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('SFTP Server 127.0.0.1:8888', 'sftp')
     yield factory
@@ -877,7 +877,7 @@ async def sftp_protocol_factory_one_way_client(sftp_initial_client_context, tmpd
         dataformat=JSONObject,
         base_path=Path(tmpdir) / 'sftp_sent',
     )
-    await factory.start()
+    #await factory.start()
     if not factory.full_name:
         factory.set_name('SFTP Client 127.0.0.1:0', 'sftp')
     yield factory

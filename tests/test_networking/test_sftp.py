@@ -38,8 +38,8 @@ class TestConnectionShared:
 class TestConnectionServer:
     @pytest.mark.asyncio
     async def test_00_data_received(self, tmp_path, sftp_protocol_one_way_server, json_rpc_login_request_encoded,
-                                    json_rpc_logout_request_encoded, json_recording_data, json_codec, json_objects,
-                                    sftp_one_way_conn_server):
+                                    sftp_factory_server, json_rpc_logout_request_encoded, json_recording_data, json_codec,
+                                    json_objects, sftp_one_way_conn_server):
         sftp_protocol_one_way_server.connection_made(sftp_one_way_conn_server)
         sftp_protocol_one_way_server.data_received(json_rpc_login_request_encoded)
         await asyncio.sleep(1.2)

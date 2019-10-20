@@ -1,4 +1,6 @@
+import asyncssh
 from lib.receivers.base import BaseServer
+from lib.receivers.sftp import SFTPServer
 from lib.receivers.servers import TCPServer, UDPServer, pipe_server
 
 from tests.test_networking.conftest import *
@@ -135,6 +137,35 @@ async def pipe_server_two_way_started(pipe_server_two_way) -> BaseServer:
 
 
 @pytest.fixture
+async def ssh_host_key(tmp_path) -> Path:
+    private_path = Path(tmp_path) / 'skey'
+    skey = asyncssh.generate_private_key('ssh-rsa')
+    skey.write_private_key(str(private_path))
+    yield private_path
+
+
+@pytest.fixture
+async def sftp_server(sftp_protocol_factory_one_way_server, sock, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_one_way_server, host=sock[0], port=sock[1],
+                        server_host_key=ssh_host_key)
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def sftp_server_quiet(sftp_server) -> SFTPServer:
+    sftp_server.quiet = True
+    yield sftp_server
+
+
+@pytest.fixture
+async def sftp_server_started(sftp_server) -> SFTPServer:
+    await sftp_server.start()
+    yield sftp_server
+
+
+@pytest.fixture
 def server_receiver(receiver_args) -> BaseServer:
     return receiver_args[0]
 
@@ -201,6 +232,8 @@ def server_args(request) -> Tuple:
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
+    lazy_fixture(
+        (sftp_server.__name__, sftp_server_started.__name__, sftp_server_quiet.__name__)),
     ])
 def receiver_args(request):
     return request.param
