@@ -145,8 +145,8 @@ async def ssh_host_key(tmp_path) -> Path:
 
 
 @pytest.fixture
-async def sftp_server(sftp_protocol_factory_one_way_server, sock, ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_one_way_server, host=sock[0], port=sock[1],
+async def sftp_server(sftp_protocol_factory_server, sock, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server, host=sock[0], port=sock[1],
                         server_host_key=ssh_host_key)
     yield server
     if server.is_started():

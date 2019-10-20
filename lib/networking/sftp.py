@@ -60,7 +60,7 @@ class SFTPFactory(asyncssh.SFTPServer):
 
 
 @dataclass
-class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
+class BaseSFTPProtocol(NetworkConnectionProtocol):
     name = 'SFTP Server'
     conn = None
     adaptor_cls = ReceiverAdaptor
@@ -84,7 +84,8 @@ class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             sftp_factory = self.conn.get_extra_info('sftp_factory')
-            await sftp_factory.wait_closed()
+            if sftp_factory:
+                await sftp_factory.wait_closed()
         finally:
             await super()._close(exc)
 
@@ -96,6 +97,11 @@ class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
 
 
 @dataclass
+class SFTPServerProtocol(BaseSFTPProtocol, asyncssh.SSHServer):
+    pass
+
+
+@dataclass
 class SFTPServerProtocolFactory(BaseProtocolFactory):
     full_name = 'SFTP Server'
     peer_prefix = 'sftp'
@@ -103,7 +109,7 @@ class SFTPServerProtocolFactory(BaseProtocolFactory):
 
 
 @dataclass
-class SFTPClientProtocol(SFTPServerProtocol):
+class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
     name = 'SFTP Client'
     store_connections = False
     adaptor_cls = SenderAdaptor

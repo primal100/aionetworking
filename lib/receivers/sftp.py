@@ -40,7 +40,7 @@ class SFTPServer(BaseNetworkServer):
 
     async def _get_server(self) -> asyncio.AbstractServer:
         return await asyncssh.create_server(self.protocol_factory, self.host, self.port,
-                                            sftp_factory=partial(self.sftp_factory, self.base_upload_dir),
+                                            sftp_factory=partial(self.sftp_factory, base_upload_dir=self.base_upload_dir),
                                             **self.sftp_kwargs)
 
 

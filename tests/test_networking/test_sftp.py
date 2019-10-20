@@ -115,7 +115,7 @@ class TestConnectionServerOSAuth:
 class TestConnectionClient:
 
     @pytest.mark.asyncio
-    async def test_00_send(self, sftp_protocol_one_way_client, sftp_protocol_factory_one_way_client, sftp_factory_client,
+    async def test_00_send(self, sftp_protocol_one_way_client, sftp_factory_client,
                            sftp_one_way_conn_client, json_rpc_login_request_encoded, patch_datetime_now, tmpdir):
         sftp_protocol_one_way_client.connection_made(sftp_one_way_conn_client)
         sftp_factory_client.realpath = AsyncMock(return_value='.')

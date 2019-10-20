@@ -1,6 +1,7 @@
 from tests.test_receivers.conftest import *
 
 from lib.senders.clients import BaseNetworkClient, TCPClient, UDPClient, pipe_client
+from lib.senders.sftp import SFTPClient
 
 
 @pytest.fixture
@@ -75,6 +76,26 @@ async def pipe_client_two_way_connected(server_started, protocol_factory_two_way
     client = pipe_client(protocol_factory=protocol_factory_two_way_client, path=pipe_path)
     async with client:
         yield client
+
+
+@pytest.fixture
+def sftp_client(sftp_protocol_factory_client, sock, peername, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
+                      srcip=peername[0], srcport=0, username=sftp_username_password[0],
+                      password=sftp_username_password[1])
+
+
+@pytest.fixture
+def sftp_client_wrong_password(sftp_protocol_factory_client, sock, peername, sftp_username_password, patch_os_auth_failure) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
+                      srcip=peername[0], srcport=0, username=sftp_username_password[0],
+                      password='abcdefgh')
+
+
+@pytest.fixture
+async def sftp_client_connected(server_started, sftp_client_one_way) -> SFTPClient:
+    async with sftp_client_one_way:
+        yield sftp_client_one_way
 
 
 @pytest.fixture
