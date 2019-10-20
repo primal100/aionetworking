@@ -1,5 +1,6 @@
 from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
-from datetime import timedelta, datetime
+import datetime
+import os
 
 from lib.conf.context import context_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
@@ -26,11 +27,56 @@ from unittest.mock import Mock
 
 @pytest.fixture
 def patch_datetime_now(monkeypatch):
+    FAKE_TIME = datetime.datetime(2019, 1, 1, 1, 1, 1)
 
-    def return_fake_time():
-        return datetime(1970, 1, 1, 1, 1, 1)
+    class FreezeDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return FAKE_TIME
 
-    monkeypatch.setattr(datetime, 'now', return_fake_time)
+    monkeypatch.setattr(datetime, 'datetime', FreezeDatetime)
+
+
+@pytest.fixture
+def sftp_username_password():
+    return 'testuser', 'abcd1234@'
+
+
+@pytest.fixture
+def patch_os_auth_ok():
+    if os.name == 'posix':
+        import pamela
+        pamela.authenticate = Mock()
+        return pamela.authenticate
+    elif os.name == 'nt':
+        import pywintypes
+        import win32security
+        win32security.LogonUser = Mock()
+        return win32security.LogonUser
+
+
+@pytest.fixture
+def patch_os_auth_failure():
+    if os.name == 'posix':
+        import pamela
+        pamela.authenticate = Mock(side_effect=pamela.PAMError())
+        return pamela.authenticate
+    elif os.name == 'nt':
+        import pywintypes
+        import win32security
+        win32security.LogonUser = Mock(side_effect=pywintypes.error())
+        return win32security.LogonUser
+
+
+@pytest.fixture
+def patch_os_call_args(sftp_username_password):
+    if os.name == 'posix':
+        return sftp_username_password
+    elif os.name == 'nt':
+        import pywintypes
+        import win32con
+        user, password = sftp_username_password
+        return (user, '.', password, win32con.LOGON32_LOGON_BATCH, win32con.LOGON32_PROVIDER_DEFAULT)
 
 
 @pytest.fixture
@@ -97,7 +143,7 @@ def udp_client_context() -> dict:
 
 
 @pytest.fixture
-def sftp_context() -> Dict[str, Any]:
+def sftp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'SFTP Server', 'endpoint': 'SFTP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000', 'username': 'testuser'}
@@ -122,7 +168,7 @@ def echo_decode_error_response_encoded(echo_exception_request_encoded) -> bytes:
 
 @pytest.fixture
 def echo_recording_data() -> List:
-    return [recorded_packet(sent_by_server=False, timestamp=datetime(2019, 1, 1, 1, 1), sender='127.0.0.1', data=b'{"id": 1, "method": "echo"}')]
+    return [recorded_packet(sent_by_server=False, timestamp=datetime.datetime(2019, 1, 1, 1, 1), sender='127.0.0.1', data=b'{"id": 1, "method": "echo"}')]
 
 
 @pytest.fixture
@@ -216,7 +262,7 @@ async def file_containing_json_recording(tmpdir, buffer_codec, json_encoded_mult
     obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
     await asyncio.sleep(1)
     obj2 = buffer_codec.from_decoded(json_encoded_multi[1],
-                                     received_timestamp=timestamp + timedelta(seconds=1, microseconds=200000))
+                                     received_timestamp=timestamp + datetime.timedelta(seconds=1, microseconds=200000))
     p = Path(tmpdir.mkdir("recording") / "json.recording")
     p.write_bytes(obj1.encoded + obj2.encoded)
     return p
@@ -233,7 +279,7 @@ def extra_client_inet(peername, sock) -> dict:
 
 
 @pytest.fixture
-def extra_inet_sftp(peername, sock) -> dict:
+def extra_server_inet_sftp(peername, sock) -> dict:
     return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket(),
             'username': 'testuser'}
 
@@ -838,7 +884,7 @@ async def sftp_protocol_factory_one_way_client(sftp_initial_client_context) -> S
 
 @pytest.fixture
 def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                       sftp_initial_server_context) -> SFTPServerOSAuthProtocol:
+                                 sftp_initial_server_context) -> SFTPServerOSAuthProtocol:
     context_cv.set(sftp_initial_server_context)
     protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name="SFTP Server 127.0.0.1:8888", peer_prefix='sftp',
@@ -855,28 +901,28 @@ def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPCli
 
 
 @pytest.fixture
-def sftp_conn_server(request, extra_inet_sftp, sftp_protocol) -> MockSFTPConn:
+def sftp_conn_server(request, extra_server_inet_sftp, sftp_protocol) -> MockSFTPConn:
     if is_lazy_fixture(sftp_protocol):
         sftp_protocol = request.getfixturevalue(sftp_protocol.name)
-    yield MockSFTPConn(sftp_protocol, extra=extra_inet_sftp)
+    yield MockSFTPConn(sftp_protocol, extra=extra_server_inet_sftp)
 
 
 @pytest.fixture
-def sftp_conn_client(request, extra_inet_sftp, sftp_protocol) -> MockSFTPConn:
+def sftp_conn_client(request, extra_client_inet_sftp, sftp_protocol) -> MockSFTPConn:
     if is_lazy_fixture(sftp_protocol):
         sftp_protocol = request.getfixturevalue(sftp_protocol.name)
-    yield MockSFTPConn(sftp_protocol, extra=extra_inet_sftp)
+    yield MockSFTPConn(sftp_protocol, extra=extra_client_inet_sftp)
 
 
 @pytest.fixture
-def sftp_factory_server(sftp_conn_server, tmpdir) -> SFTPFactory:
+def sftp_factory_server(sftp_one_way_conn_server, tmpdir) -> SFTPFactory:
     path = Path(tmpdir) / "sftp_received"
-    yield SFTPFactory(sftp_conn_server, base_upload_dir=path)
+    yield SFTPFactory(sftp_one_way_conn_server, base_upload_dir=path)
 
 
 @pytest.fixture
-def sftp_one_way_conn_server(extra_inet_sftp, sftp_protocol_one_way_server) -> MockSFTPConn:
-    yield MockSFTPConn(sftp_protocol_one_way_server, extra=extra_inet_sftp)
+def sftp_one_way_conn_server(extra_server_inet_sftp, sftp_protocol_one_way_server) -> MockSFTPConn:
+    yield MockSFTPConn(sftp_protocol_one_way_server, extra=extra_server_inet_sftp)
 
 
 @pytest.fixture
@@ -902,8 +948,8 @@ def sftp_factory(request, sftp_conn, tmpdir) -> SFTPFactory:
 
 @pytest.fixture
 async def sftp_one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                        sftp_context) -> ReceiverAdaptor:
-    context_cv.set(sftp_context)
+                                        sftp_server_context) -> ReceiverAdaptor:
+    context_cv.set(sftp_server_context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                               preaction=buffered_file_storage_recording_action)
     yield adaptor

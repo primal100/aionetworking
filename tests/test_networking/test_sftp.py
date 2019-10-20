@@ -35,7 +35,7 @@ class TestConnectionShared:
         assert connections_manager.total == 0
 
 
-class TestConnectionOneWayServer:
+class TestConnectionServer:
     @pytest.mark.asyncio
     async def test_00_data_received(self, tmp_path, sftp_protocol_one_way_server, json_rpc_login_request_encoded,
                                     json_rpc_logout_request_encoded, json_recording_data, json_codec, json_objects,
@@ -68,12 +68,55 @@ class TestConnectionOneWayServer:
         protocol = pickle.loads(data)
         assert protocol == sftp_protocol_one_way_server
 
+    @pytest.mark.asyncio
+    async def test_03_close(self, sftp_protocol_one_way_server, sftp_one_way_conn_server,
+                            sftp_factory_server, json_rpc_login_request_encoded, json_rpc_login_request_object,
+                            tmp_path, json_codec, json_recording_data):
+        sftp_protocol_one_way_server.connection_made(sftp_one_way_conn_server)
+        file_path = Path(tmp_path) / "test"
+        f = file_path.open(mode='wb')
+        f.write(json_rpc_login_request_encoded)
+        sftp_factory_server.close(f)
+        await sftp_factory_server.wait_closed()
+        assert not file_path.exists()
+        sftp_one_way_conn_server.close()
+        await asyncio.wait_for(sftp_protocol_one_way_server.wait_closed(), timeout=1)
+        expected_file = Path(tmp_path / 'Data/Encoded/127.0.0.1_JSON.JSON')
+        assert expected_file.exists()
+        msgs = await alist(json_codec.from_file(expected_file))
+        assert msgs == [json_rpc_login_request_object]
+        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        assert expected_file.exists()
+        packets = await alist((get_recording_from_file(expected_file)))
+        packets[0] = packets[0]._replace(timestamp=json_recording_data[0].timestamp)
+        assert packets[0] == json_recording_data[0]
 
-class TestConnectionOneWayClient:
+
+class TestConnectionServerOSAuth:
+
+    def test_00_password_auth_supported(self, sftp_protocol_one_way_server):
+        assert sftp_protocol_one_way_server.password_auth_supported()
+
+    @pytest.mark.asyncio
+    async def test_01_password_auth_successful(self, sftp_protocol_one_way_server, sftp_username_password,
+                                               patch_os_auth_ok, patch_os_call_args):
+        result = await sftp_protocol_one_way_server.validate_password(*sftp_username_password)
+        assert result is True
+        patch_os_auth_ok.assert_called_with(*patch_os_call_args)
+
+    @pytest.mark.asyncio
+    async def test_02_password_auth_failure(self, sftp_protocol_one_way_server, sftp_username_password,
+                                            patch_os_auth_failure, patch_os_call_args):
+        result = await sftp_protocol_one_way_server.validate_password(*sftp_username_password)
+        assert result is False
+        patch_os_auth_failure.assert_called_with(*patch_os_call_args)
+
+
+class TestConnectionClient:
 
     @pytest.mark.asyncio
     async def test_00_send(self, sftp_protocol_one_way_client, sftp_protocol_factory_one_way_client, sftp_factory_client,
-                           sftp_one_way_conn_client, json_rpc_login_request_encoded, patch_datetime_now):
+                           sftp_one_way_conn_client, json_rpc_login_request_encoded, patch_datetime_now, tmpdir):
         sftp_protocol_one_way_client.connection_made(sftp_one_way_conn_client)
         sftp_factory_client.realpath = AsyncMock(return_value='.')
         await sftp_protocol_one_way_client.set_sftp(sftp_factory_client)
@@ -81,20 +124,28 @@ class TestConnectionOneWayClient:
         sftp_factory_client.realpath = AsyncMock(return_value=str(Path('/')))
         task = sftp_protocol_one_way_client.send(json_rpc_login_request_encoded)
         await task
-        sftp_factory_client.realpath.assert_awaited_with('.FILE19700101010100101000')
-        sftp_factory_client.put.assert_awaited_with(json_rpc_login_request_encoded)
+        sftp_factory_client.realpath.assert_awaited_with('.FILE20190101010101000000')
+        sftp_factory_client.put.assert_awaited_with(str(Path(tmpdir) / "sftp_sent/FILE20190101010101000000"),
+                                                    remotepath=str(Path('/')))
 
     @pytest.mark.asyncio
-    async def test_01_send_data_adaptor_method(self, connection, json_rpc_login_request_encoded, transport, queue,
-                                               peer_data):
-        connection.connection_made(transport)
-        transport.set_protocol(connection)
-        connection.send_data(json_rpc_login_request_encoded)
-        assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
+    async def test_01_send_data_adaptor_method(self, sftp_protocol_one_way_client, json_rpc_login_request_encoded,
+                                               sftp_factory_client, sftp_one_way_conn_client, patch_datetime_now,
+                                               tmpdir):
+        sftp_protocol_one_way_client.connection_made(sftp_one_way_conn_client)
+        sftp_factory_client.realpath = AsyncMock(return_value='.')
+        await sftp_protocol_one_way_client.set_sftp(sftp_factory_client)
+        sftp_factory_client.realpath.assert_awaited_with('.')
+        sftp_factory_client.realpath = AsyncMock(return_value=str(Path('/')))
+        sftp_protocol_one_way_client.send_data(json_rpc_login_request_encoded)
+        await sftp_protocol_one_way_client.wait_tasks_done()
+        sftp_factory_client.realpath.assert_awaited_with('.FILE20190101010101000000')
+        sftp_factory_client.put.assert_awaited_with(str(Path(tmpdir) / "sftp_sent/FILE20190101010101000000"),
+                                                    remotepath=str(Path('/')))
 
-    def test_02_is_child(self, one_way_client_connection, one_way_client_protocol_name):
-        assert one_way_client_connection.is_child(f"{one_way_client_protocol_name.upper()} Client 127.0.0.1:0")
-        assert not one_way_client_connection.is_child("ABC Client 127.0.0.1:8888")
+    def test_02_is_child(self, one_way_client_connection, sftp_protocol_one_way_client):
+        assert sftp_protocol_one_way_client.is_child("SFTP Client 127.0.0.1:0")
+        assert not sftp_protocol_one_way_client.is_child("ABC Client 127.0.0.1:0")
 
     @pytest.mark.asyncio
     async def test_03_pickle(self, one_way_client_connection):

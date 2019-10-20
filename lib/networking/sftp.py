@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from lib.conf.context import context_cv
 
 import asyncssh
@@ -41,9 +41,7 @@ class SFTPFactory(asyncssh.SFTPServer):
         return self._conn.get_extra_info('sftp_connection')
 
     async def _handle_data(self, name: str, data: AnyStr):
-        file_stat = await aiofiles.os.stat(name)
-        timestamp = datetime.fromtimestamp(file_stat.st_ctime)
-        self.sftp_connection.data_received(data, timestamp=timestamp)
+        self.sftp_connection.data_received(data)
         if self.remove_tmp_files:
             await aremove(name)
 
@@ -98,31 +96,6 @@ class SFTPServerProtocol(NetworkConnectionProtocol, asyncssh.SSHServer):
 
 
 @dataclass
-class BaseSFTPServerPswAuth(SFTPServerProtocol):
-
-    def get_password(self, username: str) -> str:
-        raise NotImplementedError
-
-    def begin_auth(self, username: str) -> bool:
-        return True
-
-    def password_auth_supported(self) -> bool:
-        return True
-
-    def check_user_password(self, username: str, password: str) -> bool:
-        raise NotImplementedError
-
-    def validate_password(self, username: str, password: str) -> bool:
-        self.logger.info('Beginning password authentication for user %s', username)
-        authorized = self.check_user_password(username, password)
-        if authorized:
-            self.logger.info('SFTP User % successfully authorized', username)
-        else:
-            self.logger.error('SFTP Login with user %s failed', username)
-        return authorized
-
-
-@dataclass
 class SFTPServerProtocolFactory(BaseProtocolFactory):
     full_name = 'SFTP Server'
     peer_prefix = 'sftp'
@@ -143,6 +116,7 @@ class SFTPClientProtocol(SFTPServerProtocol):
 
     def __post_init__(self):
         super().__post_init__()
+        self._scheduler = TaskScheduler()
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def set_sftp(self, sftp):
@@ -150,7 +124,7 @@ class SFTPClientProtocol(SFTPServerProtocol):
         self.cwd = await self.sftp.realpath('.')
 
     def get_filename(self):
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
         return self.prefix + timestamp
 
     def get_tmp_path(self):
@@ -166,11 +140,14 @@ class SFTPClientProtocol(SFTPServerProtocol):
         if self.remove_tmp_files:
             await aremove(file_path)
 
-    def send(self, data: bytes) -> asyncio.Task:
+    def send(self, data: bytes) -> asyncio.Future:
         file_path = self.get_tmp_path()
         self.logger.debug("Using temp path for sending file: %s", file_path)
-        task = asyncio.create_task(self._put_data(file_path, data))
+        task = self._scheduler.task_with_callback(self._put_data(file_path, data))
         return task
+
+    async def wait_tasks_done(self) -> None:
+        await self._scheduler.close()
 
 
 @dataclass

@@ -92,21 +92,18 @@ class SSHServer(NetworkConnectionProtocol, asyncssh.SSHServer):
 @dataclass
 class BaseSSHServerPswAuth(SSHServer):
 
-    def get_password(self, username: str) -> str:
-        raise NotImplementedError
-
     def begin_auth(self, username: str) -> bool:
         return True
 
     def password_auth_supported(self) -> bool:
         return True
 
-    def check_user_password(self, username: str, password: str) -> bool:
+    async def check_password(self, username: str, password: str) -> bool:
         raise NotImplementedError
 
-    def validate_password(self, username: str, password: str) -> bool:
+    async def validate_password(self, username: str, password: str) -> bool:
         self.logger.info('Beginning password authentication for user %s', username)
-        authorized = self.check_user_password(username, password)
+        authorized = await self.check_user_password(username, password)
         if authorized:
             self.logger.info('SFTP User % successfully authorized', username)
         else:
