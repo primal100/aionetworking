@@ -1,6 +1,5 @@
 import asyncio
 import pytest
-import logging
 from pathlib import Path
 
 from lib.actions.echo import InvalidRequestError
@@ -13,7 +12,7 @@ from lib.utils import supports_pipe_or_unix_connections
 class TestOneWayServer:
     @pytest.mark.asyncio
     async def test_00_send_and_send_recording(self, one_way_server_started, one_way_client, tmp_path, json_buffer,
-                                              json_decoded_multi, json_rpc_login_request_encoded, json_recording_data):
+                                              json_decoded_multi, json_recording_data):
         async with one_way_client as conn:
             conn.encode_and_send_msgs(json_decoded_multi)
             await asyncio.sleep(0.1) # Workaround for bpo-38471

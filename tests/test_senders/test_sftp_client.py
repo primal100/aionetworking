@@ -1,6 +1,5 @@
 import pickle
 import pytest
-import logging
 import asyncssh
 
 from lib.receivers.exceptions import ServerException
@@ -35,9 +34,7 @@ class TestClientStartStop:
         assert new_client == sftp_client
 
     @pytest.mark.asyncio
-    async def test_03_client_wrong_password(self, sftp_server_started, sftp_client_wrong_password, caplog):
-        caplog.set_level(logging.CRITICAL)
+    async def test_03_client_wrong_password(self, sftp_server_started, sftp_client_wrong_password):
         assert not sftp_client_wrong_password.is_started()
         with pytest.raises(asyncssh.misc.PermissionDenied):
             await sftp_client_wrong_password.connect()
-        caplog.clear()

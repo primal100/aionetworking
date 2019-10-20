@@ -31,6 +31,8 @@ def echo_exception_response_object(echo_exception_response_encoded, echo_excepti
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
+    lazy_fixture(
+        (sftp_server_started.__name__, sftp_client.__name__, sftp_client_connected.__name__)),
 ])
 def one_way_receiver_sender_args(request):
     return request.param

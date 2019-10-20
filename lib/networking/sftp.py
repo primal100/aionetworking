@@ -116,44 +116,55 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
     sftp = None
     cwd = None
     mode = 'wb'
+    strftime: str = "%Y%m%d%H%M%S%f"
     remove_tmp_files: bool = True
     prefix: str = 'FILE'
     base_path: Path = settings.TEMPDIR / "sftp_sent"
+    remote_path: str = '/'
 
     def __post_init__(self):
         super().__post_init__()
+        self._name_lock = asyncio.Lock()
+        self._last_file_name = None
         self._scheduler = TaskScheduler()
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def set_sftp(self, sftp):
         self.sftp = sftp
-        self.cwd = await self.sftp.realpath('.')
+        self.remote_path = await self.sftp.realpath(self.remote_path)
 
     def get_filename(self):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+        timestamp = datetime.datetime.now().strftime(self.strftime)
         return self.prefix + timestamp
 
-    def get_tmp_path(self):
-        return self.base_path / self.get_filename()
+    async def get_tmp_path(self):
+        async with self._name_lock:
+            name = None
+            while not name or name == self._last_file_name:
+                name = self.base_path / self.get_filename()
+                await asyncio.sleep(0)
+            self._last_file_name = name
+            return name
 
-    async def _put_data(self, file_path: Path, data: bytes, **kwargs):
+    async def _put_data(self, data: bytes):
+        file_path = await self.get_tmp_path()
+        self.logger.debug("Using temp path for sending file: %s", file_path)
         async with settings.FILE_OPENER(file_path, self.mode) as f:
             await f.write(data)
-        remote_path = self.cwd + file_path.name
-        real_remote_path = await self.sftp.realpath(remote_path)
-        kwargs['remotepath'] = kwargs.get('remotepath', str(real_remote_path))
-        await self.sftp.put(str(file_path), **kwargs)
+        await self.sftp.put(file_path, remotepath=self.remote_path)
         if self.remove_tmp_files:
             await aremove(file_path)
 
     def send(self, data: bytes) -> asyncio.Future:
-        file_path = self.get_tmp_path()
-        self.logger.debug("Using temp path for sending file: %s", file_path)
-        task = self._scheduler.task_with_callback(self._put_data(file_path, data))
+        task = self._scheduler.task_with_callback(self._put_data(data))
         return task
 
     async def wait_tasks_done(self) -> None:
         await self._scheduler.close()
+
+    async def wait_closed(self) -> None:
+        await self.wait_tasks_done()
+        await super().wait_closed()
 
 
 @dataclass
@@ -162,6 +173,7 @@ class SFTPClientProtocolFactory(BaseProtocolFactory):
     remove_tmp_files: bool = True
     prefix: str = 'FILE'
     base_path: Path = settings.TEMPDIR / "sftp_sent"
+    remote_path: str = '/'
 
     def _new_connection(self) -> SFTPClientProtocol:
         context_cv.set(context_cv.get().copy())
@@ -169,5 +181,6 @@ class SFTPClientProtocolFactory(BaseProtocolFactory):
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
-                                   remove_tmp_files = self.remove_tmp_files, prefix=self.prefix, base_path=self.base_path)
+                                   remove_tmp_files = self.remove_tmp_files, prefix=self.prefix, base_path=self.base_path,
+                                   remote_path=self.remote_path)
 
