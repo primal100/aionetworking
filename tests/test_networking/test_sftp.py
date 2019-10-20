@@ -157,24 +157,24 @@ class TestConnectionClient:
 class TestSFTPProtocolFactories:
 
     @pytest.mark.asyncio
-    async def test_00_connection_lifecycle(self, stream_protocol_factory, stream_connection, stream_transport,
-                                           stream_connection_is_stored):
-        new_connection = stream_protocol_factory()
-        assert stream_protocol_factory.logger == new_connection.logger
-        assert new_connection == stream_connection
-        assert stream_protocol_factory.is_owner(new_connection)
-        new_connection.connection_made(stream_transport)
-        new_connection.transport.set_protocol(new_connection)
-        if stream_connection_is_stored:
-            await asyncio.wait_for(stream_protocol_factory.wait_num_connected(1), timeout=1)
+    async def test_00_connection_lifecycle(self, sftp_protocol_factory, sftp_protocol, sftp_conn,
+                                           sftp_connection_is_stored, sftp_factory):
+        new_connection = sftp_protocol_factory()
+        assert sftp_protocol_factory.logger == new_connection.logger
+        assert new_connection == sftp_protocol
+        assert sftp_protocol_factory.is_owner(new_connection)
+        new_connection.connection_made(sftp_conn)
+        sftp_conn._owner = new_connection
+        if sftp_connection_is_stored:
+            await asyncio.wait_for(sftp_protocol_factory.wait_num_connected(1), timeout=1)
         await asyncio.wait_for(new_connection.wait_connected(), timeout=1)
-        new_connection.transport.close()
-        await asyncio.wait_for(stream_protocol_factory.close(), timeout=1)
+        sftp_conn.close()
+        await asyncio.wait_for(sftp_protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
 
     @pytest.mark.asyncio
-    async def test_01_pickle_protocol_factory(self, stream_protocol_factory):
-        data = pickle.dumps(stream_protocol_factory)
+    async def test_01_pickle_protocol_factory(self, sftp_protocol_factory):
+        data = pickle.dumps(sftp_protocol_factory)
         factory = pickle.loads(data)
-        assert factory == stream_protocol_factory
-        await stream_protocol_factory.close()
+        assert factory == sftp_protocol_factory
+        await sftp_protocol_factory.close()

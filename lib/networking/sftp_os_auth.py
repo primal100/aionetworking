@@ -23,7 +23,6 @@ class SFTPServerOSAuthProtocol(SFTPServerProtocol):
 
 @dataclass
 class SFTPOSAuthProtocolFactory(BaseProtocolFactory):
-    full_name = 'SFTP Server'
     peer_prefix = 'sftp'
     connection_cls = SFTPServerOSAuthProtocol
 

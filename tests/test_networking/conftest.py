@@ -865,16 +865,18 @@ async def sftp_protocol_factory_one_way_server(buffered_file_storage_action, buf
         dataformat=JSONObject)
     await factory.start()
     if not factory.full_name:
-        factory.set_name('SFTP Server 127.0.0.1:8888', 'tcp')
+        factory.set_name('SFTP Server 127.0.0.1:8888', 'sftp')
     yield factory
     await factory.close()
 
 
 @pytest.fixture
-async def sftp_protocol_factory_one_way_client(sftp_initial_client_context) -> SFTPClientProtocolFactory:
+async def sftp_protocol_factory_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocolFactory:
     context_cv.set(sftp_initial_client_context)
     factory = SFTPClientProtocolFactory(
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        base_path=Path(tmpdir) / 'sftp_sent',
+    )
     await factory.start()
     if not factory.full_name:
         factory.set_name('SFTP Client 127.0.0.1:0', 'sftp')
@@ -896,7 +898,7 @@ def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_sto
 def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
     context_cv.set(sftp_initial_client_context)
     conn = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
-                               base_path=Path(tmpdir) / 'sftp_sent')
+                              base_path=Path(tmpdir) / 'sftp_sent')
     yield conn
 
 
