@@ -85,7 +85,8 @@ class BaseClient(BaseSender, Protocol):
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
-        context_cv.set({'endpoint': self.full_name})
+        #context_cv.set({'endpoint': self.full_name})
+        context_cv.set({})
         logger_cv.set(self.logger)
         await self.protocol_factory.start()
         self.logger.info("Opening %s connection to %s", self.name, self.dst)

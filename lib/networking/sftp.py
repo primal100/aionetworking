@@ -59,6 +59,32 @@ class SFTPFactory(asyncssh.SFTPServer):
         await self._scheduler.close()
 
 
+class SFTPItem:
+    def __init__(self, conn, name):
+        self._conn = conn
+        self._name = name
+        self._value = None
+
+    def __bool__(self):
+        if not self._value:
+            str(self)
+        return bool(self._value)
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __str__(self):
+        if self._value:
+            return self._value
+        value = self._conn.get_extra_info(self._name)
+        if value:
+            self._value = str(value)
+        return str(value)
+
+    def __repr__(self):
+        return str(self._value)
+
+
 @dataclass
 class BaseSFTPProtocol(NetworkConnectionProtocol):
     name = 'SFTP Server'
@@ -68,18 +94,22 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
     def connection_made(self, conn: Union[asyncssh.SSHServerConnection, asyncssh.SSHClientConnection]) -> None:
         self.conn = conn
         extra_context = {
-            'username': conn.get_extra_info('username')
-            #'client_version': conn.get_extra_info('client_version'),
-            #'server_version': conn.get_extra_info('server_version'),
-            #'send_cipher': conn.get_extra_info('send_cipher'),
-            #'send_mac': conn.get_extra_info('send_mac'),
-            #'send_compression': conn.get_extra_info('send_compression'),
-            #'recv_cipher': conn.get_extra_info('recv_cipher'),
-            #'recv_mac': conn.get_extra_info('recv_mac'),
-            #'recv_compression': conn.get_extra_info('recv_compression'),
+            'username': SFTPItem(self.conn, 'username'),
+            'client_version': SFTPItem(self.conn, 'client_version'),
+            'server_version': SFTPItem(self.conn, 'server_version'),
+            'send_cipher': SFTPItem(self.conn, 'send_cipher'),
+            'send_mac': SFTPItem(self.conn, 'send_mac'),
+            'send_compression': SFTPItem(self.conn, 'send_compression'),
+            'recv_cipher': SFTPItem(self.conn, 'recv_cipher'),
+            'recv_mac': SFTPItem(self.conn, 'recv_mac'),
+            'recv_compression': SFTPItem(self.conn, 'recv_compression'),
         }
         self.initialize_connection(conn, **extra_context)
         self.conn.set_extra_info(sftp_connection=self)
+
+    async def wait_context_set(self) -> None:
+        while not self.context['send_cipher'] or not self.context['username']:
+            await asyncio.sleep(0.000001)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
@@ -142,7 +172,7 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
             name = None
             while not name or name == self._last_file_name:
                 name = self.base_path / self.get_filename()
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.000001)
             self._last_file_name = name
             return name
 

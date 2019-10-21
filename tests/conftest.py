@@ -89,10 +89,9 @@ def items(request):
     return request.param
 
 
-
 @pytest.fixture
 def context_client() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Client', 'endpoint': 'TCP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+    return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
 
@@ -106,7 +105,7 @@ def context_unix_server() -> Dict[str, Any]:
 
 @pytest.fixture
 def context_unix_client() -> Dict[str, Any]:
-    return {'protocol_name': 'Unix Client', 'endpoint': 'Unix Client /tmp/test', 'addr': '/tmp/test',
+    return {'protocol_name': 'Unix Client', 'addr': '/tmp/test',
             'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'server': '/tmp/test', 'client': '/tmp/test.1',
             'fd': 1}
 
@@ -120,7 +119,7 @@ def context_pipe_server(pipe_path) -> Dict[str, Any]:
 
 @pytest.fixture
 def context_pipe_client(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Client', 'endpoint': f'Windows Pipe Client {pipe_path}', 'addr': str(pipe_path),
+    return {'protocol_name': 'TCP Client', 'addr': str(pipe_path),
             'peer': f'{pipe_path}.12345', 'alias': 12346, 'server':str(pipe_path), 'client': '12345',
             'handle': 12346}
 

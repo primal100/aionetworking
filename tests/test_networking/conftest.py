@@ -1,4 +1,5 @@
 from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
+import asyncssh
 import datetime
 import os
 
@@ -91,7 +92,7 @@ def initial_server_context() -> Dict[str, Any]:
 
 @pytest.fixture
 def initial_client_context() -> Dict[str, Any]:
-    return {'endpoint': 'TCP Client 127.0.0.1:0'}
+    return {}
 
 
 @pytest.fixture
@@ -101,7 +102,7 @@ def udp_initial_server_context() -> Dict[str, Any]:
 
 @pytest.fixture
 def udp_initial_client_context() -> Dict[str, Any]:
-    return {'endpoint': 'UDP Client 127.0.0.1:0'}
+    return {}
 
 
 @pytest.fixture
@@ -111,7 +112,7 @@ def sftp_initial_server_context() -> Dict[str, Any]:
 
 @pytest.fixture
 def sftp_initial_client_context() -> Dict[str, Any]:
-    return {'endpoint': 'SFTP Client 127.0.0.1:0'}
+    return {}
 
 
 @pytest.fixture
@@ -123,7 +124,7 @@ def context() -> Dict[str, Any]:
 
 @pytest.fixture
 def client_context() -> dict:
-    return {'protocol_name': 'TCP Client', 'endpoint': 'TCP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+    return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
 
@@ -137,7 +138,7 @@ def udp_server_context() -> Dict[str, Any]:
 
 @pytest.fixture
 def udp_client_context() -> dict:
-    return {'protocol_name': 'UDP Client', 'endpoint': 'UDP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+    return {'protocol_name': 'UDP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
 
@@ -146,14 +147,28 @@ def udp_client_context() -> dict:
 def sftp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'SFTP Server', 'endpoint': 'SFTP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'username': 'testuser'}
+            'client': '127.0.0.1:60000', 'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'send_cipher': 'chacha20-poly1305@openssh.com',
+            'send_mac': 'chacha20-poly1305@openssh.com',
+            'send_compression': 'zlib@openssh.com',
+            'recv_cipher': 'chacha20-poly1305@openssh.com',
+            'recv_mac': 'chacha20-poly1305@openssh.com',
+            'recv_compression': 'zlib@openssh.com'}
 
 
 @pytest.fixture
 def sftp_client_context() -> dict:
-    return {'protocol_name': 'SFTP Client', 'endpoint': 'SFTP Client 127.0.0.1:0', 'host': '127.0.0.1', 'port': 8888,
+    return {'protocol_name': 'SFTP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'username': 'testuser'}
+            'client': '127.0.0.1:60000', 'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'send_cipher': 'chacha20-poly1305@openssh.com',
+            'send_mac': 'chacha20-poly1305@openssh.com',
+            'send_compression': 'zlib@openssh.com',
+            'recv_cipher': 'chacha20-poly1305@openssh.com',
+            'recv_mac': 'chacha20-poly1305@openssh.com',
+            'recv_compression': 'zlib@openssh.com'}
 
 
 @pytest.fixture
@@ -215,7 +230,7 @@ async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_s
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context_client,queue) -> SenderAdaptor:
+async def one_way_sender_adaptor(context_client, queue) -> SenderAdaptor:
     context_cv.set(context_client)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
     yield adaptor
@@ -281,12 +296,27 @@ def extra_client_inet(peername, sock) -> dict:
 @pytest.fixture
 def extra_server_inet_sftp(peername, sock) -> dict:
     return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket(),
-            'username': 'testuser'}
+            'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'send_cipher': 'chacha20-poly1305@openssh.com',
+            'send_mac': 'chacha20-poly1305@openssh.com',
+            'send_compression': 'zlib@openssh.com',
+            'recv_cipher': 'chacha20-poly1305@openssh.com',
+            'recv_mac': 'chacha20-poly1305@openssh.com',
+            'recv_compression': 'zlib@openssh.com'}
 
 
 @pytest.fixture
 def extra_client_inet_sftp(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket(), 'username': 'testuser'}
+    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket(), 'username': 'testuser',
+            'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'send_cipher': 'chacha20-poly1305@openssh.com',
+            'send_mac': 'chacha20-poly1305@openssh.com',
+            'send_compression': 'zlib@openssh.com',
+            'recv_cipher': 'chacha20-poly1305@openssh.com',
+            'recv_mac': 'chacha20-poly1305@openssh.com',
+            'recv_compression': 'zlib@openssh.com'}
 
 
 @pytest.fixture
@@ -986,9 +1016,9 @@ def sftp_one_way_conn_client(extra_client_inet_sftp, sftp_protocol_one_way_clien
 
 
 @pytest.fixture
-def sftp_factory_client(sftp_one_way_conn_client, tmpdir) -> SFTPFactory:
-    path = Path(tmpdir) / "sftp_received"
-    sftp_factory = SFTPFactory(sftp_one_way_conn_client, base_upload_dir=path)
+async def sftp_factory_client(sftp_one_way_conn_client) -> SFTPFactory:
+    sftp_factory = asyncssh.SFTPClient(asyncio.get_event_loop(), None, None, None)
+    sftp_factory.realpath = AsyncMock(return_value='/')
     sftp_factory.put = AsyncMock()
     yield sftp_factory
 
