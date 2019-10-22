@@ -12,7 +12,7 @@ class TestConnectionShared:
 
     @pytest.mark.asyncio
     async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager,
-                                           connection_is_stored, protocol_name):
+                                           protocol_name):
         assert not transport.is_closing()
         assert connections_manager.total == 0
         assert connection.logger
@@ -24,13 +24,11 @@ class TestConnectionShared:
         assert not transport.is_closing()
         assert connection._adaptor.context == adaptor.context
         assert connection._adaptor == adaptor
-        assert connection.peer == f"{protocol_name}_{adaptor.context['peer']}"
+        assert connection.peer == f"{protocol_name}_{adaptor.context['own']}_{adaptor.context['peer']}"
         assert connection.logger is not None
         assert connection.transport == transport
-        total_connections = 1 if connection_is_stored else 0
-        assert connections_manager.total == total_connections
-        if connection_is_stored:
-            assert connections_manager.get(connection.peer) == connection
+        assert connections_manager.total == 1
+        assert connections_manager.get(connection.peer) == connection
         connection.close()
         assert transport.is_closing()
         await connection.wait_closed()

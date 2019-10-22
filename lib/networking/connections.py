@@ -27,7 +27,6 @@ from lib.compatibility import Protocol
 class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol, Protocol):
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
-    _close_task: asyncio.Task = field(default=None, init=False, compare=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get, metadata={'pickle': True})
     logger: Logger = field(default_factory=logger_cv.get, metadata={'pickle': True})
@@ -45,9 +44,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 
     def _start_adaptor(self) -> None:
         self._set_adaptor()
-        if self.store_connections:
-            num = connections_manager.add_connection(self)
-            self.logger.log_num_connections('opened', num)
+        num = connections_manager.add_connection(self)
+        self.logger.log_num_connections('opened', num)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -56,12 +54,12 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         dataclass_setstate(self, state)
 
     @staticmethod
-    def get_peername(peer_prefix: str, peer: str) -> str:
-        return f"{peer_prefix}_{peer}"
+    def get_peername(peer_prefix: str, peer: str, own: str) -> str:
+        return f"{peer_prefix}_{own}_{peer}"
 
     @property
     def peer(self) -> str:
-        return self.get_peername(self.peer_prefix, self.context.get('peer'))
+        return self.get_peername(self.peer_prefix, self.context.get('peer'), self.context.get('own'))
 
     def _set_adaptor(self) -> None:
         connection_logger_cv.set(self._get_connection_logger())
@@ -89,22 +87,22 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self.logger.get_connection_logger(extra=self.context)
 
     def _delete_connection(self) -> None:
-        if self.store_connections:
-            num = connections_manager.remove_connection(self)
-            self.logger.log_num_connections('closed', num)
+         connections_manager.remove_connection(self)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             if self._adaptor:
                 await asyncio.wait_for(self._adaptor.close(exc), timeout=self.timeout)
         finally:
+            num = connections_manager.decrement(self)
+            self.logger.log_num_connections('closed', num)
             self._status.set_stopped()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
         self._adaptor.logger.info('Finishing connection')
         self._status.set_stopping()
-        self._close_task = asyncio.create_task(self._close(exc))
-        set_task_name(self._close_task, f"Close:{self.peer}")
+        close_task = asyncio.create_task(self._close(exc))
+        set_task_name(close_task, f"Close:{self.peer}")
         self._delete_connection()
 
     def close(self):
@@ -165,6 +163,9 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         if not self.transport.is_closing():
             self.transport.close()
 
+    def log_context(self):
+        self.logger.info(self.context)
+
     def initialize_connection(self, transport: TransportType, **extra_context) -> bool:
         self._status.set_starting()
         self.context.update(extra_context)
@@ -173,6 +174,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             if self.context.get('host'):
                 self._check_peer()
             self._start_adaptor()
+            self.log_context()
             self._status.set_started()
             return True
         except MessageFromNotAuthorizedHost as exc:
@@ -189,11 +191,21 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             sockname = transport.get_extra_info('sockname', None)
             fd = _socket.fileno()
             self.context['fd'] = fd
-            self.context['peer'] = str(fd)
-            self.context['sock'] = sockname
-            self.context['alias'] = self.context['peer']
-            self.context['server'] = self.context['sock']
-            self.context['client'] = self.context['fd']
+            if self.adaptor_cls.is_receiver:
+                self.context['peer'] = str(fd)
+                self.context['addr'] = sockname
+                self.context['own'] = sockname
+                self.context['alias'] = self.context['peer']
+                self.context['server'] = sockname
+                self.context['client'] = self.context['fd']
+            else:
+                self.context['fd'] = fd
+                self.context['addr'] = transport.get_extra_info('peername')
+                self.context['peer'] = self.context['addr']
+                self.context['alias'] = self.context['peer']
+                self.context['own'] = str(fd)
+                self.context['server'] = self.context['addr']
+                self.context['client'] = self.context['fd']
             return
         if transport.get_extra_info('pipe', None):
             # Windows Named Pipe Transport
@@ -201,16 +213,18 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             handle = transport.get_extra_info('pipe').handle
             self.context['addr'] = addr
             self.context['handle'] = handle
-            self.context['peer'] = f"{addr}.{handle}"
-            self.context['alias'] = str(handle)
+            self.context['alias'] = str(handle) if self.adaptor_cls.is_receiver else addr
+            self.context['own'] = addr if self.adaptor_cls.is_receiver else str(handle)
             self.context['server'] = self.context['addr']
             self.context['client'] = self.context['handle']
+            self.context['peer'] = self.context['client'] if self.adaptor_cls.is_receiver else self.context['server']
             return
         # INET/INET6 transport
         peer = transport.get_extra_info('peername')
         sockname = transport.get_extra_info('sockname', None)
         self.context['peer'] = addr_tuple_to_str(peer)
         self.context['sock'] = addr_tuple_to_str(sockname)
+        self.context['own'] = self.context['sock']
         self.context['host'], self.context['port'] = peer
         self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
         self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
@@ -267,7 +281,6 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
         self.transport.write(msg)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
-        self.close()
         self.finish_connection(exc)
 
 
@@ -275,26 +288,22 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
 class TCPServerConnection(BaseStreamConnection):
     name = 'TCP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
-    store_connections = True
 
 
 @dataclass
 class TCPClientConnection(BaseStreamConnection, SenderAdaptorGetattr, asyncio.Protocol):
     name = 'TCP Client'
     adaptor_cls: Type[AdaptorType] = SenderAdaptor
-    store_connections = False
 
 
 @dataclass
 class UDPServerConnection(BaseUDPConnection):
     name = 'UDP Server'
     adaptor_cls: Type[AdaptorType] = ReceiverAdaptor
-    store_connections = True
 
 
 @dataclass
 class UDPClientConnection(BaseUDPConnection, SenderAdaptorGetattr):
     name = 'UDP Client'
     adaptor_cls: Type[AdaptorType] = SenderAdaptor
-    store_connections = True
 

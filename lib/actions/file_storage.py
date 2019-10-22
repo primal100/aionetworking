@@ -244,7 +244,3 @@ class BufferedFileStorage(BaseFileStorage):
         self._status.set_stopping()
         await ManagedFile.close_all(base_path=self.base_path)
         self._status.set_stopped()
-
-    def set_qsize(self, i):
-        self.logger.info('setting expected qsize to %s', i)
-        self._qsize = i

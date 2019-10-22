@@ -18,19 +18,23 @@ def echo_exception_response_object(echo_exception_response_encoded, echo_excepti
 
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__)),
+        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__,
+         tcp_server_context.__name__, tcp_client_context.__name__)),
     pytest.param(
         lazy_fixture((udp_server_one_way_started.__name__, udp_client_one_way.__name__,
-                      udp_client_one_way_connected.__name__)),
+                      udp_server_context.__name__, udp_client_context.__name__)),
         marks=pytest.mark.skipif(
             "not datagram_supported()")
     ),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
-                      pipe_client_one_way_connected.__name__)),
+                      context_pipe_server.__name__, context_pipe_client.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
+    lazy_fixture(
+        (sftp_server_started.__name__, sftp_client.__name__, sftp_server_context.__name__,
+         sftp_client_context.__name__)),
 ])
 def one_way_receiver_sender_args(request):
     return request.param
@@ -64,6 +68,16 @@ def one_way_server_started(one_way_receiver_sender_args) -> BaseServer:
 @pytest.fixture
 def one_way_client(one_way_receiver_sender_args) -> BaseNetworkClient:
     return one_way_receiver_sender_args[1]
+
+
+@pytest.fixture
+def one_way_server_context(one_way_receiver_sender_args) -> Dict[str, Any]:
+    return one_way_receiver_sender_args[2]
+
+
+@pytest.fixture
+def one_way_client_context(one_way_receiver_sender_args) -> Dict[str, Any]:
+    return one_way_receiver_sender_args[3]
 
 
 @pytest.fixture

@@ -10,3 +10,6 @@ class ConnectionAlreadyClosedError(BaseException):
     pass
 
 
+class ProtocolException(BaseException):
+    pass
+

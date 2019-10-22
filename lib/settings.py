@@ -1,9 +1,18 @@
 import os
 from pathlib import Path
 import aiofiles
+import tempfile
+import sys
 
 
 APP_NAME = 'Message Manager'
+
+
+def __getattr__(name):
+    if name == 'TEMPDIR':
+        return Path(tempfile.gettempdir()) / sys.modules[__name__].APP_NAME.replace(" ", "")
+
+
 ROOT_DIR = Path(__file__).parent.parent
 CONF_DIR = ROOT_DIR.joinpath('conf')
 LOGS_DIR = ROOT_DIR.joinpath('logs')

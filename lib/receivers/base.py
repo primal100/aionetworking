@@ -95,6 +95,9 @@ class BaseServer(BaseReceiver, Protocol):
         await self.protocol_factory.close()
         self._status.set_stopped()
 
+    def close_all_connections(self) -> None:
+        self.protocol_factory.close_all_connections(None)
+
     async def wait_num_connections(self, num: int):
         await self.protocol_factory.wait_num_connected(num)
 

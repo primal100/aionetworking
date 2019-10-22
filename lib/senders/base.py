@@ -49,6 +49,7 @@ class BaseSender(SenderProtocol, Protocol):
 
 @dataclass
 class BaseClient(BaseSender, Protocol):
+    expected_connection_exceptions = (ConnectionRefusedError,)
     name = "Client"
     peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
@@ -69,10 +70,10 @@ class BaseClient(BaseSender, Protocol):
     def src(self) -> str: ...
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         return f"{self.name} {self.src}"
 
-    async def _close_connection(self):
+    async def _close_connection(self) -> None:
         self.transport.close()
         await self.conn.wait_closed()
         self.transport = None
@@ -85,7 +86,8 @@ class BaseClient(BaseSender, Protocol):
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
-        context_cv.set({'endpoint': self.full_name})
+        #context_cv.set({'endpoint': self.full_name})
+        context_cv.set({})
         logger_cv.set(self.logger)
         await self.protocol_factory.start()
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
@@ -98,6 +100,7 @@ class BaseClient(BaseSender, Protocol):
         self._status.set_stopping()
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
+        await self.protocol_factory.close()
         self._status.set_stopped()
 
     @run_in_loop
@@ -125,7 +128,7 @@ class BaseClient(BaseSender, Protocol):
 
 @dataclass
 class BaseNetworkClient(BaseClient, Protocol):
-    name = "Network client"
+    name = "Network Client"
 
     host: str = '127.0.0.1'
     port: int = 4000

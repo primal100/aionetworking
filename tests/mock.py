@@ -3,7 +3,7 @@ import socket
 from asyncio.transports import Transport, DatagramTransport
 from asyncio import BaseProtocol
 
-from typing import Any
+from typing import Any, Dict
 
 
 class MockAFInetSocket:
@@ -31,6 +31,22 @@ class MockTransportMixin:
 
     def set_protocol(self, protocol: BaseProtocol) -> None:
         self._protocol = protocol
+
+
+class MockSFTPConn:
+
+    def __init__(self, conn, extra: Dict[Any, Any]):
+        self._owner = conn
+        self._extra = extra
+
+    def close(self):
+        asyncio.get_event_loop().call_soon(self._owner.connection_lost, None)
+
+    def set_extra_info(self, **kwargs):
+        self._extra.update(**kwargs)
+
+    def get_extra_info(self, item: Any, default: Any = None):
+        return self._extra.get(item, default)
 
 
 class MockTCPTransport(MockTransportMixin, Transport):

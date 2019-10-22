@@ -95,6 +95,11 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         if coros:
             await asyncio.wait(coros)
 
+    def close_all_connections(self, exc: Optional[Exception]) -> None:
+        connections = filter(self.is_owner, connections_manager)
+        for conn in list(connections):
+            conn.close()
+
     async def close(self) -> None:
         await self.wait_num_connected(0)
         await self.close_actions()
@@ -123,12 +128,16 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:
         self.transport = transport
         self.sock = self.transport.get_extra_info('sockname')
+        self.full_name.replace(':0', f':{self.sock[1]}')
 
-    def connection_lost(self, exc: Optional[Exception]) -> None:
-        self.logger.manage_error(exc)
+    def close_all_connections(self, exc: Optional[Exception]) -> None:
         connections = filter(self.is_owner, connections_manager)
         for conn in list(connections):
             conn.connection_lost(exc)
+
+    def connection_lost(self, exc: Optional[Exception]) -> None:
+        self.logger.manage_error(exc)
+        self.close_all_connections(exc)
 
     def error_received(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)
@@ -140,7 +149,7 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
         return conn
 
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
-        peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr))
+        peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr), addr_tuple_to_str(self.sock))
         conn = connections_manager.get(peer, None)
         if conn:
             conn.data_received(data)
