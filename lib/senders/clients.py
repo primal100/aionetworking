@@ -67,7 +67,7 @@ class UnixSocketClient(BaseClient):
 @dataclass
 class WindowsPipeClient(BaseClient):
     name = "Windows Pipe Client"
-    peer_prefix = 'str'
+    peer_prefix = 'pipe'
     path: Union[str, Path] = None
     pid: int = None
 
@@ -99,6 +99,7 @@ def pipe_client(path: Union[str, Path] = None, **kwargs):
 @dataclass
 class UDPClient(BaseNetworkClient):
     name = "UDP Client"
+    peer_prefix = 'udp'
     transport: asyncio.DatagramTransport = field(init=False, compare=False, default=None)
 
     async def _open_connection(self) -> ConnectionType:

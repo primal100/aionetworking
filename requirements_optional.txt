@@ -1,4 +1,6 @@
-psutil
-asyncssh
-passlib
-aiofile
+psutil>=5.6.3
+asyncssh>=1.18.0
+aiofile>=1.5.2
+uvloop;os_name=='posix'
+pamela;os_name=='posix'
+pywin32;os_name=='nt'

@@ -1,2 +1,4 @@
-aiofiles
-inflect
+aiofiles>=0.4.0
+inflect>=2.1.0
+typing-extensions;python_version<"3.8"
+cached-property;python_version<"3.8"

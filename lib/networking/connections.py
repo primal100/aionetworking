@@ -165,6 +165,9 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         if not self.transport.is_closing():
             self.transport.close()
 
+    def log_context(self):
+        self.logger.info(self.context)
+
     def initialize_connection(self, transport: TransportType, **extra_context) -> bool:
         self._status.set_starting()
         self.context.update(extra_context)
@@ -173,6 +176,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             if self.context.get('host'):
                 self._check_peer()
             self._start_adaptor()
+            self.log_context()
             self._status.set_started()
             return True
         except MessageFromNotAuthorizedHost as exc:
@@ -189,11 +193,19 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             sockname = transport.get_extra_info('sockname', None)
             fd = _socket.fileno()
             self.context['fd'] = fd
-            self.context['peer'] = str(fd)
-            self.context['sock'] = sockname
-            self.context['alias'] = self.context['peer']
-            self.context['server'] = self.context['sock']
-            self.context['client'] = self.context['fd']
+            if self.adaptor_cls.is_receiver:
+                self.context['peer'] = str(fd)
+                self.context['addr'] = sockname
+                self.context['alias'] = self.context['peer']
+                self.context['server'] = sockname
+                self.context['client'] = self.context['fd']
+            else:
+                self.context['fd'] = fd
+                self.context['addr'] = transport.get_extra_info('peername')
+                self.context['peer'] = self.context['addr']
+                self.context['alias'] = self.context['peer']
+                self.context['server'] = self.context['addr']
+                self.context['client'] = self.context['fd']
             return
         if transport.get_extra_info('pipe', None):
             # Windows Named Pipe Transport
@@ -201,10 +213,10 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             handle = transport.get_extra_info('pipe').handle
             self.context['addr'] = addr
             self.context['handle'] = handle
-            self.context['peer'] = f"{addr}.{handle}"
             self.context['alias'] = str(handle)
             self.context['server'] = self.context['addr']
             self.context['client'] = self.context['handle']
+            self.context['peer'] = self.context['client'] if self.adaptor_cls.is_receiver else self.context['server']
             return
         # INET/INET6 transport
         peer = transport.get_extra_info('peername')

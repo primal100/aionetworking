@@ -12,11 +12,13 @@ from lib.utils import supports_pipe_or_unix_connections
 class TestOneWayServer:
     @pytest.mark.asyncio
     async def test_00_send_and_send_recording(self, one_way_server_started, one_way_client, tmp_path, json_buffer,
-                                              json_decoded_multi, json_recording_data):
+                                              json_decoded_multi, json_recording_data, one_way_server_context,
+                                              one_way_client_context, connections_manager):
         async with one_way_client as conn:
             conn.encode_and_send_msgs(json_decoded_multi)
+            await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
+            assert conn.context.keys() == one_way_client_context.keys()
             await asyncio.sleep(0.1) # Workaround for bpo-38471
-        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()

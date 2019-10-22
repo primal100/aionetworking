@@ -97,34 +97,6 @@ def context_client() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def context_unix_server() -> Dict[str, Any]:
-    return {'protocol_name': 'Unix Server', 'endpoint': 'Unix Server /tmp/test', 'sock': '/tmp/test',
-            'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'server': '/tmp/test', 'client': '/tmp/test.1',
-            'fd': 1}
-
-
-@pytest.fixture
-def context_unix_client() -> Dict[str, Any]:
-    return {'protocol_name': 'Unix Client', 'addr': '/tmp/test',
-            'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'server': '/tmp/test', 'client': '/tmp/test.1',
-            'fd': 1}
-
-
-@pytest.fixture
-def context_pipe_server(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': f'Windows Pipe Server {pipe_path}',
-            'peer': '12345', 'alias': 12345, 'server':pipe_path, 'client': '12345',
-            'handle': 12345}
-
-
-@pytest.fixture
-def context_pipe_client(pipe_path) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Client', 'addr': str(pipe_path),
-            'peer': f'{pipe_path}.12345', 'alias': 12346, 'server':str(pipe_path), 'client': '12345',
-            'handle': 12346}
-
-
-@pytest.fixture
 def logger_formatter() -> logging.Formatter:
     return logging.Formatter(
         "{asctime} - {relativeCreated} - {levelname} - {module} - {funcName} - {name} - {message}", style='{'

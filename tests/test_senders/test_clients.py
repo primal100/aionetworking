@@ -11,11 +11,12 @@ from lib.utils import supports_pipe_or_unix_connections
 
 class TestClientStartStop:
     @pytest.mark.asyncio
-    async def test_00_client_start(self, server_started, client):
+    async def test_00_client_start(self, server_started, client, server_context, client_context, connections_manager):
         assert not client.is_started()
         async with client as conn:
             assert client.is_started()
             assert conn.transport
+            assert sorted(conn.context.keys()) == sorted(client_context.keys())
             assert client.transport
             assert client.conn
         assert client.is_closing()

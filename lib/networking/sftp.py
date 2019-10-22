@@ -111,6 +111,14 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
         while not self.context['send_cipher'] or not self.context['username']:
             await asyncio.sleep(0.000001)
 
+    def _log_context(self, task: asyncio.Task):
+        super().log_context()
+        self._scheduler.task_done(task)
+
+    def log_context(self):
+        task = self._scheduler.create_task(self.wait_context_set())
+        task.add_done_callback(self._log_context)
+
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             sftp_factory = self.conn.get_extra_info('sftp_factory')

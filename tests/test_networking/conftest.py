@@ -116,14 +116,14 @@ def sftp_initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def context() -> Dict[str, Any]:
+def tcp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
 
 
 @pytest.fixture
-def client_context() -> dict:
+def tcp_client_context() -> dict:
     return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000'}
@@ -172,8 +172,8 @@ def sftp_client_context() -> dict:
 
 
 @pytest.fixture
-def json_client_codec(client_context) -> JSONCodec:
-    return JSONCodec(JSONObject, context=client_context)
+def json_client_codec(tcp_client_context) -> JSONCodec:
+    return JSONCodec(JSONObject, context=tcp_client_context)
 
 
 @pytest.fixture
@@ -187,8 +187,8 @@ def echo_recording_data() -> List:
 
 
 @pytest.fixture
-async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context) -> ReceiverAdaptor:
-    context_cv.set(context)
+async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, tcp_server_context) -> ReceiverAdaptor:
+    context_cv.set(tcp_server_context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                               preaction=buffered_file_storage_recording_action)
     yield adaptor
@@ -196,16 +196,16 @@ async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_s
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context_client,queue) -> SenderAdaptor:
-    context_cv.set(context_client)
+async def one_way_sender_adaptor(tcp_client_context,queue) -> SenderAdaptor:
+    context_cv.set(tcp_client_context)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
     yield adaptor
     await adaptor.close()
 
 
 @pytest.fixture
-async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, context, queue) -> ReceiverAdaptor:
-    context_cv.set(context)
+async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_action, tcp_server_context, queue) -> ReceiverAdaptor:
+    context_cv.set(tcp_server_context)
     adaptor = ReceiverAdaptor(JSONObject, action=echo_action, preaction=buffered_file_storage_recording_action,
                               send=queue.put_nowait)
     yield adaptor
@@ -213,16 +213,16 @@ async def two_way_receiver_adaptor(echo_action, buffered_file_storage_recording_
 
 
 @pytest.fixture
-async def two_way_sender_adaptor(echo_requester, context_client, queue) -> SenderAdaptor:
-    context_cv.set(context_client)
+async def two_way_sender_adaptor(echo_requester, tcp_client_context, queue) -> SenderAdaptor:
+    context_cv.set(tcp_client_context)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait, requester=echo_requester)
     yield adaptor
     await adaptor.close()
 
 
 @pytest.fixture
-async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, context) -> ReceiverAdaptor:
-    context_cv.set(context)
+async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, tcp_server_context) -> ReceiverAdaptor:
+    context_cv.set(tcp_server_context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                               preaction=buffered_file_storage_recording_action)
     yield adaptor
@@ -230,8 +230,8 @@ async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_s
 
 
 @pytest.fixture
-async def one_way_sender_adaptor(context_client, queue) -> SenderAdaptor:
-    context_cv.set(context_client)
+async def one_way_sender_adaptor(tcp_client_context, queue) -> SenderAdaptor:
+    context_cv.set(tcp_client_context)
     adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
     yield adaptor
     await adaptor.close()
