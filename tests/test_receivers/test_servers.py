@@ -19,15 +19,15 @@ class TestServerStartStop:
         assert server_receiver.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
-        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(task, timeout=2)
 
     @pytest.mark.asyncio
     async def test_01_server_close(self, server_started):
         assert server_started.is_started()
         task = asyncio.create_task(server_started.close())
-        await asyncio.wait_for(server_started.wait_stopped(), timeout=1)
+        await asyncio.wait_for(server_started.wait_stopped(), timeout=2)
         assert not server_started.is_started()
-        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(task, timeout=2)
 
     @pytest.mark.asyncio
     async def test_02_server_wait_started(self, server_receiver, capsys):
@@ -37,7 +37,7 @@ class TestServerStartStop:
         assert not task.done()
         await server_receiver.start()
         assert server_receiver.is_started()
-        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(task, timeout=2)
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
 
@@ -49,7 +49,7 @@ class TestServerStartStop:
         assert not task.done()
         await server_started.close()
         assert server_started.is_closing()
-        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(task, timeout=2)
 
     @pytest.mark.asyncio
     async def test_04_server_already_started(self, server_started):
@@ -75,11 +75,11 @@ class TestServerStartStop:
     async def test_07_server_start_quiet(self, server_quiet, capsys):
         assert not server_quiet.is_started()
         task = asyncio.create_task(server_quiet.start())
-        await asyncio.wait_for(server_quiet.wait_started(), timeout=1)
+        await asyncio.wait_for(server_quiet.wait_started(), timeout=2)
         assert server_quiet.is_started()
         captured = capsys.readouterr()
         assert captured.out == ''
-        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(task, timeout=2)
 
     @pytest.mark.asyncio
     async def test_08_pickle_server(self, server_receiver):

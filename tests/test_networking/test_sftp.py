@@ -11,7 +11,7 @@ class TestConnectionShared:
 
     @pytest.mark.asyncio
     async def test_00_connection_made_lost(self, sftp_protocol, sftp_conn, sftp_adaptor, connections_manager,
-                                           sftp_connection_is_stored, sftp_factory):
+                                           sftp_factory):
         assert connections_manager.total == 0
         assert sftp_protocol.logger
         assert sftp_protocol.conn is None
@@ -23,13 +23,11 @@ class TestConnectionShared:
         assert sftp_protocol._adaptor == sftp_adaptor
         assert sftp_factory.sftp_connection == sftp_protocol
         assert sftp_conn.get_extra_info('sftp_factory') == sftp_factory
-        assert sftp_protocol.peer == f"sftp_{sftp_adaptor.context['peer']}"
+        assert sftp_protocol.peer == f"sftp_{sftp_adaptor.context['own']}_{sftp_adaptor.context['peer']}"
         assert sftp_protocol.logger is not None
         assert sftp_protocol.conn == sftp_conn
-        total_connections = 1 if sftp_connection_is_stored else 0
-        assert connections_manager.total == total_connections
-        if sftp_connection_is_stored:
-            assert connections_manager.get(sftp_protocol.peer) == sftp_protocol
+        assert connections_manager.total == 1
+        assert connections_manager.get(sftp_protocol.peer) == sftp_protocol
         sftp_conn.close()
         await sftp_protocol.wait_closed()
         assert connections_manager.total == 0
@@ -152,15 +150,14 @@ class TestSFTPProtocolFactories:
 
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, sftp_protocol_factory, sftp_protocol, sftp_conn,
-                                           sftp_connection_is_stored, sftp_factory):
+                                           sftp_factory):
         new_connection = sftp_protocol_factory()
         assert sftp_protocol_factory.logger == new_connection.logger
         assert new_connection == sftp_protocol
         assert sftp_protocol_factory.is_owner(new_connection)
         new_connection.connection_made(sftp_conn)
         sftp_conn._owner = new_connection
-        if sftp_connection_is_stored:
-            await asyncio.wait_for(sftp_protocol_factory.wait_num_connected(1), timeout=1)
+        await asyncio.wait_for(sftp_protocol_factory.wait_num_connected(1), timeout=1)
         await asyncio.wait_for(new_connection.wait_connected(), timeout=1)
         sftp_conn.close()
         await asyncio.wait_for(sftp_protocol_factory.close(), timeout=1)

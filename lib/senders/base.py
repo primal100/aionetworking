@@ -49,6 +49,7 @@ class BaseSender(SenderProtocol, Protocol):
 
 @dataclass
 class BaseClient(BaseSender, Protocol):
+    expected_connection_exceptions = (ConnectionRefusedError,)
     name = "Client"
     peer_prefix = ''
     protocol_factory:  ProtocolFactoryType = None
@@ -99,6 +100,7 @@ class BaseClient(BaseSender, Protocol):
         self._status.set_stopping()
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
+        await self.protocol_factory.close()
         self._status.set_stopped()
 
     @run_in_loop

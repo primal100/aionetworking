@@ -127,6 +127,10 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
         finally:
             await super()._close(exc)
 
+    def close(self):
+        if not self.is_closing():
+            self.conn.close()
+
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.finish_connection(exc)
 

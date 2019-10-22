@@ -53,7 +53,6 @@ class TestStatsTracker:
         expected_keys = ['start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed',
                            'largest_buffer', 'send_rate', 'processing_rate', 'receive_rate', 'interval',
                            'average_buffer_size', 'average_sent', 'msgs_per_buffer', 'not_decoded', 'not_decoded_rate',
-
                            'total_done']
         assert sorted(list(d)) == sorted(expected_keys)
 
@@ -64,10 +63,11 @@ class TestStatsLogger:
         msg, kwargs = stats_logger.process("abc", {})
         assert msg == 'abc'
         keys = list(kwargs['extra'].keys())
-        expected_keys = ['alias', 'average_buffer_size', 'average_sent', 'client', 'end', 'endpoint', 'failed', 'filtered', 'host',
-             'interval', 'largest_buffer', 'msgs', 'msgs_per_buffer', 'not_decoded', 'not_decoded_rate', 'peer', 'port',
-             'processed', 'processing_rate', 'protocol_name', 'receive_rate', 'received', 'send_rate', 'sent', 'server',
-             'sock', 'start', 'taskname', 'total_done']
+        expected_keys = ['alias', 'average_buffer_size', 'average_sent', 'client', 'end', 'endpoint', 'failed',
+                         'filtered', 'host', 'own', 'interval', 'largest_buffer', 'msgs', 'msgs_per_buffer',
+                         'not_decoded', 'not_decoded_rate', 'peer', 'port','processed', 'processing_rate',
+                         'protocol_name', 'receive_rate', 'received', 'send_rate', 'sent', 'server',
+                         'sock', 'start', 'taskname', 'total_done']
         if psutil:
             expected_keys.append('system')
         assert sorted(keys) == sorted(expected_keys)

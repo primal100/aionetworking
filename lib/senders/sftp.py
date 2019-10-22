@@ -12,6 +12,7 @@ from typing import Tuple
 class SFTPClient(BaseNetworkClient):
     name = "SFTP Client"
     protocol_factory = SFTPClientProtocolFactory
+    expected_connection_exceptions = (ConnectionRefusedError, asyncssh.misc.PermissionDenied)
     sftp_log_level: InitVar[int] = 1
     known_hosts: Path = None
     username: str = None
@@ -44,5 +45,5 @@ class SFTPClient(BaseNetworkClient):
     async def _close_connection(self) -> None:
         await self.conn.wait_tasks_done()
         self.sftp.exit()
-        self.sftp_conn.close()
+        self.conn.close()
         await self.conn.wait_closed()

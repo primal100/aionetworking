@@ -22,13 +22,25 @@ class TestClientStartStop:
         assert client.is_closing()
 
     @pytest.mark.asyncio
-    async def test_01_client_stop(self, server_started, client):
+    async def test_01_client_connect_close(self, server_started, client):
         await client.connect()
         await client.close()
         assert client.is_closing()
 
     @pytest.mark.asyncio
-    async def test_02_client_pickle(self, client):
+    async def test_02_tcp_client_cannot_connect(self, tcp_client_one_way):
+        with pytest.raises(ConnectionRefusedError):
+            await tcp_client_one_way.connect()
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not supports_pipe_or_unix_connections,
+                        reason='Pipe or UNIX Domain Connections not supported for this event loop on this platform')
+    async def test_03_pipe_client_cannot_connect(self, pipe_client_one_way):
+        with pytest.raises(FileNotFoundError):
+            await pipe_client_one_way.connect()
+
+    @pytest.mark.asyncio
+    async def test_04_client_pickle(self, client):
         data = pickle.dumps(client)
         new_client = pickle.loads(data)
         assert new_client == client

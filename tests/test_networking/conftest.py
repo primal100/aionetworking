@@ -119,35 +119,37 @@ def sftp_initial_client_context() -> Dict[str, Any]:
 def tcp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888'}
 
 
 @pytest.fixture
 def tcp_client_context() -> dict:
     return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000'}
 
 
 @pytest.fixture
 def udp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'UDP Server', 'endpoint': 'UDP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888'}
 
 
 @pytest.fixture
-def udp_client_context() -> dict:
+def udp_client_context() -> Dict[str, Any]:
     return {'protocol_name': 'UDP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000'}
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000'}
 
 
 @pytest.fixture
 def sftp_server_context() -> Dict[str, Any]:
     return {'protocol_name': 'SFTP Server', 'endpoint': 'SFTP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
             'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888',
+            'username': 'testuser', 'client_version':
+            'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
@@ -161,7 +163,9 @@ def sftp_server_context() -> Dict[str, Any]:
 def sftp_client_context() -> dict:
     return {'protocol_name': 'SFTP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000',
+            'username': 'testuser',
+            'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
@@ -968,21 +972,27 @@ async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp
 
 
 @pytest.fixture
-def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
+async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
                                  sftp_initial_server_context) -> SFTPServerOSAuthProtocol:
     context_cv.set(sftp_initial_server_context)
     protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name="SFTP Server 127.0.0.1:8888", peer_prefix='sftp',
                                preaction=buffered_file_storage_recording_action)
     yield protocol
+    if not protocol.is_closing():
+        protocol.close()
+        await protocol.wait_closed()
 
 
 @pytest.fixture
-def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
+async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
     context_cv.set(sftp_initial_client_context)
-    conn = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
+    protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
                               base_path=Path(tmpdir) / 'sftp_sent')
-    yield conn
+    yield protocol
+    if not protocol.is_closing():
+        protocol.close()
+        await protocol.wait_closed()
 
 
 @pytest.fixture

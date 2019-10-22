@@ -22,6 +22,7 @@ class TestNetworkConnections:
         await asyncio.sleep(0)
         assert not task.done()
         connections_manager.remove_connection(simple_network_connection)
+        connections_manager.decrement(simple_network_connection)
         assert connections_manager.num_connections(parent_name) == 0
         await asyncio.wait_for(task, timeout=1)
         await connections_manager.wait_num_has_connected(parent_name, 1)

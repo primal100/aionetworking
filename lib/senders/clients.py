@@ -67,6 +67,7 @@ class UnixSocketClient(BaseClient):
 @dataclass
 class WindowsPipeClient(BaseClient):
     name = "Windows Pipe Client"
+    expected_connection_exceptions = (FileNotFoundError,)
     peer_prefix = 'pipe'
     path: Union[str, Path] = None
     pid: int = None

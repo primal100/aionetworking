@@ -24,8 +24,10 @@ class ConnectionsManager:
         self._connections[connection.peer] = connection
         return self._counters.increment(connection.parent_name)
 
-    def remove_connection(self, connection: Any) -> int:
+    def remove_connection(self, connection: Any):
         self._connections.pop(connection.peer)
+
+    def decrement(self, connection) -> int:
         return self._counters.decrement(connection.parent_name)
 
     @property
