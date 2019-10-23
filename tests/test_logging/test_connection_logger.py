@@ -25,7 +25,7 @@ class TestConnectionLogger:
         assert caplog.text == "1\n"
 
     def test_04_sending_decoded_msg(self, connection_logger, json_object, caplog, debug_logging):
-        caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
+        caplog.handler.setFormatter(logging.Formatter("{msg_obj.uid}", style='{'))
         connection_logger.on_sending_decoded_msg(json_object)
         assert caplog.text == "1\n"
 
