@@ -34,6 +34,6 @@ class EchoAction(BaseAction):
             id_ = msg.decoded.get('id')
             return {'id': id_, 'result': 'echo'}
         elif method == 'send_notification':
-            self._queues[msg.full_sender].put_nowait('notification')
+            self._queues[msg.full_peer].put_nowait('notification')
         else:
             raise InvalidRequestError(f'{method} is not recognised as a valid method')
