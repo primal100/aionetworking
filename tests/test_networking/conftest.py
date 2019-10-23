@@ -8,10 +8,10 @@ from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import (TCPServerConnection, TCPClientConnection,
                                         UDPServerConnection, UDPClientConnection)
 from lib.networking.protocol_factories import (StreamServerProtocolFactory, StreamClientProtocolFactory,
-                                               DatagramServerProtocolFactory, DatagramClientProtocolFactory,
-                                               BaseProtocolFactory)
+                                               DatagramServerProtocolFactory, DatagramClientProtocolFactory)
 from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
 from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
+from lib.networking.ssl import ServerSideSSL, ClientSideSSL
 from lib.networking.transports import DatagramTransportWrapper
 from lib.compatibility_tests import AsyncMock
 
@@ -123,10 +123,41 @@ def tcp_server_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def tcp_client_context() -> dict:
+def tcp_client_context() -> Dict[str, Any]:
     return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
             'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
             'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000'}
+
+
+@pytest.fixture
+def tcp_server_context_ssl(tcp_server_context) -> Dict[str, Any]:
+    context = tcp_server_context.copy()
+    context['cipher'] = ('TLS_AES_256_GCM_SHA384', 'TLSv1.3', 256)
+    context['compression'] = None
+    context['peercert'] = {'subject': (
+    (('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),),
+    (('organizationName', 'Client'),), (('organizationalUnitName', 'Client'),), (('commonName', 'localhost'),)),
+                           'issuer': ((('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),),
+                                      (('localityName', 'Dublin'),), (('organizationName', 'Client'),),
+                                      (('organizationalUnitName', 'Client'),), (('commonName', 'localhost'),)),
+                           'version': 1, 'serialNumber': 'A25BD63FEFDB5025', 'notBefore': 'Feb 28 20:48:31 2019 GMT',
+                           'notAfter': 'Feb 28 20:48:31 2020 GMT'}
+    return context
+
+
+@pytest.fixture
+def tcp_client_context_ssl(tcp_client_context) -> Dict[str, Any]:
+    context = tcp_client_context.copy()
+    context['cipher'] = ('TLS_AES_256_GCM_SHA384', 'TLSv1.3', 256)
+    context['compression'] = None
+    context['peercert'] = {'subject': (
+    (('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),),
+    (('organizationName', 'Internet Widgits Pty Ltd'),), (('commonName', 'localhost'),)), 'issuer': (
+    (('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),),
+    (('organizationName', 'Internet Widgits Pty Ltd'),), (('commonName', 'localhost'),)), 'version': 1,
+                           'serialNumber': 'E44658C87CC6582E', 'notBefore': 'Feb 25 15:24:43 2019 GMT',
+                           'notAfter': 'Feb 25 15:24:43 2020 GMT'}
+    return context
 
 
 @pytest.fixture
@@ -1099,3 +1130,67 @@ def sftp_peer(sftp_connection_args) -> Tuple[str, int]:
 def sftp_connection_is_stored(sftp_connection_args) -> bool:
     return sftp_connection_args[5]
 
+
+@pytest.fixture
+def current_dir() -> Path:
+    return Path(os.path.abspath(os.path.dirname(__file__)))
+
+
+@pytest.fixture
+def ssl_dir(current_dir) -> Path:
+    return current_dir / "ssl"
+
+
+@pytest.fixture
+def ssl_server_dir(ssl_dir) -> Path:
+    return ssl_dir / "server"
+
+
+@pytest.fixture
+def ssl_client_dir(ssl_dir) -> Path:
+    return ssl_dir / "client"
+
+
+@pytest.fixture
+def ssl_server_cert(ssl_server_dir) -> Path:
+    return ssl_server_dir / "certificate.pem"
+
+
+@pytest.fixture
+def ssl_server_key(ssl_server_dir) -> Path:
+    return ssl_server_dir / "privkey.pem"
+
+
+@pytest.fixture
+def ssl_client_cert(ssl_client_dir) -> Path:
+    return ssl_client_dir / "certificate.pem"
+
+
+@pytest.fixture
+def ssl_client_key(ssl_client_dir) -> Path:
+    return ssl_client_dir / "privkey.pem"
+
+
+@pytest.fixture
+def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir) -> ServerSideSSL:
+    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
+                         cafile=ssl_client_cert, capath=ssl_client_dir, cadata=ssl_client_cert.read_text())
+
+
+@pytest.fixture
+def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir) -> ClientSideSSL:
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
+                         cafile=ssl_server_cert, capath=ssl_server_dir, cadata=ssl_server_cert.read_text())
+
+
+@pytest.fixture
+def server_side_no_ssl():
+    return ServerSideSSL(ssl=False)
+
+
+@pytest.fixture(params=[
+    lazy_fixture(server_side_ssl.__name__),
+    lazy_fixture(client_side_ssl.__name__),
+])
+def ssl_object(request):
+    return request.param

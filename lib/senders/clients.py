@@ -11,7 +11,7 @@ from lib.networking.types import ConnectionType
 from lib.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
 
-from typing import Union
+from typing import Union, Optional
 
 
 @dataclass
@@ -20,13 +20,18 @@ class TCPClient(BaseNetworkClient):
     peer_prefix = 'tcp'
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
 
-    #ssl: ClientSideSSL = None
-    ssl_context: SSLContext = None
+    ssl: ClientSideSSL = None
     ssl_handshake_timeout: int = None
 
-    """def __post_init__(self):
-        if self.ssl and not self.ssl_context:
-            self.ssl_context = self.ssl.context"""
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.ssl:
+            self.ssl.set_logger(self.logger)
+
+    @property
+    def ssl_context(self) -> Optional[SSLContext]:
+        if self.ssl:
+            return self.ssl.context
 
     async def _open_connection(self) -> ConnectionType:
         self.transport, self.conn = await self.loop.create_connection(
@@ -43,8 +48,18 @@ class UnixSocketClient(BaseClient):
     path: Union[str, Path] = None
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
 
-    ssl_context: SSLContext = None
+    ssl: ClientSideSSL = None
     ssl_handshake_timeout: int = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.ssl:
+            self.ssl.set_logger(self.logger)
+
+    @property
+    def ssl_context(self) -> Optional[SSLContext]:
+        if self.ssl:
+            return self.ssl.context
 
     @property
     def src(self) -> str:

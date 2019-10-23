@@ -33,6 +33,15 @@ async def tcp_server_two_way(protocol_factory_two_way_server, sock) -> TCPServer
 
 
 @pytest.fixture
+async def tcp_server_two_way_ssl(protocol_factory_two_way_server, sock, server_side_ssl) -> TCPServer:
+    #server_side_ssl.check_hostname = False
+    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1], ssl=server_side_ssl)
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
 async def tcp_server_one_way_quiet(tcp_server_one_way) -> TCPServer:
     tcp_server_one_way.quiet = True
     yield tcp_server_one_way
@@ -45,6 +54,12 @@ async def tcp_server_two_way_quiet(tcp_server_two_way) -> TCPServer:
 
 
 @pytest.fixture
+async def tcp_server_two_way_ssl_quiet(tcp_server_two_way_ssl) -> TCPServer:
+    tcp_server_two_way_ssl.quiet = True
+    yield tcp_server_two_way_ssl
+
+
+@pytest.fixture
 async def tcp_server_one_way_started(tcp_server_one_way) -> TCPServer:
     await tcp_server_one_way.start()
     yield tcp_server_one_way
@@ -54,6 +69,12 @@ async def tcp_server_one_way_started(tcp_server_one_way) -> TCPServer:
 async def tcp_server_two_way_started(tcp_server_two_way) -> TCPServer:
     await tcp_server_two_way.start()
     yield tcp_server_two_way
+
+
+@pytest.fixture
+async def tcp_server_two_way_ssl_started(tcp_server_two_way_ssl) -> TCPServer:
+    await tcp_server_two_way_ssl.start()
+    yield tcp_server_two_way_ssl
 
 
 @pytest.fixture
@@ -209,6 +230,8 @@ def server_args(request) -> Tuple:
         (tcp_server_one_way.__name__, tcp_server_one_way_started.__name__, tcp_server_one_way_quiet.__name__)),
     lazy_fixture(
         (tcp_server_two_way.__name__, tcp_server_two_way_started.__name__, tcp_server_two_way_quiet.__name__)),
+    lazy_fixture(
+        (tcp_server_two_way_ssl.__name__, tcp_server_two_way_ssl_started.__name__, tcp_server_two_way_ssl_quiet.__name__)),
     pytest.param(
         lazy_fixture(
         (udp_server_one_way.__name__, udp_server_one_way_started.__name__, udp_server_one_way_quiet.__name__)),

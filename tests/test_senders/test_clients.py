@@ -33,14 +33,7 @@ class TestClientStartStop:
             await tcp_client_one_way.connect()
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(not supports_pipe_or_unix_connections,
-                        reason='Pipe or UNIX Domain Connections not supported for this event loop on this platform')
-    async def test_03_pipe_client_cannot_connect(self, pipe_client_one_way):
-        with pytest.raises(FileNotFoundError):
-            await pipe_client_one_way.connect()
-
-    @pytest.mark.asyncio
-    async def test_04_client_pickle(self, client):
+    async def test_03_client_pickle(self, client):
         data = pickle.dumps(client)
         new_client = pickle.loads(data)
         assert new_client == client
