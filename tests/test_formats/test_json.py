@@ -43,8 +43,8 @@ class TestJsonObject:
         assert codec == json_codec
 
     def test_01_properties(self, json_object, timestamp):
-        assert json_object.sender == '127.0.0.1'
-        assert json_object.full_sender == '127.0.0.1:60000'
+        assert json_object.peer == '127.0.0.1'
+        assert json_object.full_peer == '127.0.0.1:60000'
         assert json_object.uid == 1
         assert json_object.request_id == 1
         assert json_object.timestamp == timestamp

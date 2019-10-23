@@ -131,8 +131,8 @@ class ConnectionLogger(Logger):
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling('raw_sent', cls=Logger)
-        self._data_received_logger = self.get_sibling('data_received', cls=Logger)
-        self._data_sent_logger = self.get_sibling('data_sent', cls=Logger)
+        self._msg_received_logger = self.get_sibling('msg_received', cls=Logger)
+        self._msg_sent_logger = self.get_sibling('msg_sent', cls=Logger)
 
     @property
     def connection_type(self) -> str:
@@ -167,14 +167,14 @@ class ConnectionLogger(Logger):
             msg = self._convert_raw_to_hex(data)
             self._raw_sent_logger.debug(msg, *args, **kwargs)
 
-    def _data_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
+    def _msg_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
+        self._msg_received_logger.debug(msg, *args, detail={'msg_obj': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
 
-    def _data_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        self._data_received_logger.debug(msg, *args, detail={'data': msg_obj, 'direction': 'SENT'}, **kwargs)
+    def _msg_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
+        self._msg_sent_logger.debug(msg, *args, detail={'msg_obj': msg_obj, 'direction': 'SENT'}, **kwargs)
 
     def on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
-        self._data_received(msg_obj)
+        self._msg_received(msg_obj)
 
     def new_connection(self) -> None:
         self.info('New %s connection from %s to %s', self.connection_type, self.client, self.server)
@@ -188,7 +188,7 @@ class ConnectionLogger(Logger):
         self.info("Decoded %s in buffer", p.no('message', num))
 
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
-        self._data_sent(msg_obj)
+        self._msg_sent(msg_obj)
 
     def on_sending_encoded_msg(self, data: bytes) -> None:
         self.debug("Sending message")

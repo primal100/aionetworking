@@ -49,11 +49,11 @@ class BaseMessageObject(MessageObject, Protocol):
         return cls.codec_cls(cls, **kwargs)
 
     @property
-    def sender(self) -> str:
+    def peer(self) -> str:
         return self.context['alias']
 
     @property
-    def full_sender(self) -> str:
+    def full_peer(self) -> str:
         return self.context['peer']
 
     def __getstate__(self):

@@ -1,9 +1,58 @@
 import pytest
 import logging
+import os
 from tests.conftest import get_fixture
 from tests.test_formats.conftest import *
 
 from lib.conf.logging import Logger, ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
+from lib.conf.log_filters import PeerFilter, MessageFilter
+from lib.types import Expression
+
+
+@pytest.fixture
+def peer_filter() -> PeerFilter:
+    connection_logger = logging.getLogger('receiver.connection')
+    return PeerFilter(['127.0.0.1'], [connection_logger])
+
+
+@pytest.fixture
+def message_filter() -> MessageFilter:
+    msg_received_logger = logging.getLogger('receiver.msg_received')
+    return MessageFilter(Expression.from_string("method == istr login"), [msg_received_logger])
+
+
+@pytest.fixture()
+def log_record() -> logging.LogRecord:
+    record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
+                             'New %s connection from %s to %s', ('TCP Server', '127.0.0.1:60000', '127.0.0.1:8888'),
+                             None, func='new_connection', sinfo=None)
+    record.alias = '127.0.0.1'
+    return record
+
+
+@pytest.fixture()
+def log_record_not_included() -> logging.LogRecord:
+    record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
+                             'New %s connection from %s to %s', ('TCP Server', '127.0.0.2:60000', '127.0.0.1:8888'),
+                             None, func='new_connection', sinfo=None)
+    record.alias = '127.0.0.2'
+    return record
+
+
+@pytest.fixture()
+def log_record_msg_object(json_rpc_login_request_object) -> logging.LogRecord:
+    record = logging.LogRecord('receiver.msg_received', logging.DEBUG, os.path.abspath(__file__), 180,
+                             'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
+    record.msg_obj = json_rpc_login_request_object
+    return record
+
+
+@pytest.fixture()
+def log_record_msg_object_not_included(json_rpc_logout_request_object) -> logging.LogRecord:
+    record = logging.LogRecord('receiver.msg_received', logging.DEBUG, os.path.abspath(__file__), 180,
+                             'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
+    record.msg_obj = json_rpc_logout_request_object
+    return record
 
 
 @pytest.fixture
@@ -15,10 +64,26 @@ async def receiver_logger() -> Logger:
 @pytest.fixture
 async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
-    caplog.set_level(logging.DEBUG, "receiver.data_received")
+    caplog.set_level(logging.DEBUG, "receiver.msg_received")
     yield receiver_logger.get_connection_logger(extra=context)
     caplog.set_level(logging.ERROR, "receiver.connection")
-    caplog.set_level(logging.ERROR, "receiver.data_received")
+    caplog.set_level(logging.ERROR, "receiver.msg_received")
+
+
+@pytest.fixture
+def context_wrong_peer(peer) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.2', 'port': 60000,
+            'peer': '127.0.0.2:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.2', 'server': '127.0.0.1:8888',
+            'client': '127.0.0.2:60000', 'own': '127.0.0.1:8888'}
+
+
+@pytest.fixture
+async def receiver_connection_logger_wrong_peer(receiver_logger, context_wrong_peer, caplog) -> ConnectionLogger:
+    caplog.set_level(logging.DEBUG, "receiver.connection")
+    caplog.set_level(logging.DEBUG, "receiver.msg_received")
+    yield receiver_logger.get_connection_logger(extra=context_wrong_peer)
+    caplog.set_level(logging.ERROR, "receiver.connection")
+    caplog.set_level(logging.ERROR, "receiver.msg_received")
 
 
 @pytest.fixture
@@ -35,13 +100,13 @@ def sender_connection_logger(sender_logger, context_client) -> ConnectionLogger:
 async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "receiver.stats")
     caplog.set_level(logging.DEBUG, "receiver.connection")
-    caplog.set_level(logging.DEBUG, "receiver.data_received")
+    caplog.set_level(logging.DEBUG, "receiver.msg_received")
     logger = receiver_logger.get_connection_logger(extra=context)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
     await logger.wait_closed()
-    caplog.set_level(logging.ERROR, "receiver.data_received")
+    caplog.set_level(logging.ERROR, "receiver.msg_received")
     caplog.set_level(logging.ERROR, "receiver.stats")
     caplog.set_level(logging.ERROR, "receiver.connection")
 

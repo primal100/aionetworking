@@ -32,3 +32,6 @@ class JSONCodec(BaseCodec):
 class JSONObject(BaseMessageObject):
     name = 'JSON'
     codec_cls = JSONCodec
+
+    def __getattr__(self, item):
+        return self.decoded[item]

@@ -17,10 +17,10 @@ class TestConnectionLogger:
             "receiver.connection", logging.INFO, 'New TCP Server connection from 127.0.0.1:60000 to 127.0.0.1:8888')
 
     def test_03_log_received_msgs(self, connection_logger, json_object, caplog, debug_logging):
-        logging.getLogger('receiver.data_received').setLevel(logging.CRITICAL)
-        caplog.handler.setFormatter(logging.Formatter("{data.uid}", style='{'))
+        logging.getLogger('receiver.msg_received').setLevel(logging.CRITICAL)
+        caplog.handler.setFormatter(logging.Formatter("{msg_obj.uid}", style='{'))
         logging.getLogger('receiver.connection').setLevel(logging.CRITICAL)
-        logging.getLogger('receiver.data_received').setLevel(logging.DEBUG)
+        logging.getLogger('receiver.msg_received').setLevel(logging.DEBUG)
         connection_logger.on_msg_decoded(json_object)
         assert caplog.text == "1\n"
 
@@ -47,8 +47,7 @@ class TestConnectionLoggerNoStats:
                                    debug_logging):
         receiver_connection_logger.on_buffer_received(json_rpc_login_request_encoded)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
-        if isinstance(json_rpc_login_request_encoded, bytes):
-            json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
+        json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
 
     def test_02_on_msg_processed(self, receiver_connection_logger, json_object, caplog):

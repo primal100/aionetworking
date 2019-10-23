@@ -114,6 +114,7 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
 
     def _log_context(self, task: asyncio.Task):
         super().log_context()
+        self._log_task = None
 
     def log_context(self):
         self._log_task = asyncio.create_task(self.wait_context_set())

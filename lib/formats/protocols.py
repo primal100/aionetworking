@@ -23,7 +23,7 @@ class MessageObject(Protocol):
 
     @property
     @abstractmethod
-    def sender(self) -> str: ...
+    def peer(self) -> str: ...
 
     @property
     @abstractmethod
