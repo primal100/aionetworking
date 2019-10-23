@@ -27,12 +27,22 @@ class TCPServer(BaseNetworkServer):
     name = "TCP Server"
     peer_prefix = 'tcp'
 
-    ssl: SSLContext = None
+    ssl: ServerSideSSL = None
     ssl_handshake_timeout: int = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.ssl:
+            self.ssl.set_logger(self.logger)
+
+    @property
+    def ssl_context(self) -> Optional[SSLContext]:
+        if self.ssl:
+            return self.ssl.context
 
     async def _get_server(self) -> asyncio.AbstractServer:
         return await self.loop.create_server(self.protocol_factory,
-                                             host=self.host, port=self.port, ssl=self.ssl,
+                                             host=self.host, port=self.port, ssl=self.ssl_context,
                                              ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
@@ -42,15 +52,25 @@ class UnixSocketServer(BaseServer):
     peer_prefix = 'unix'
 
     path: Union[str, Path] = field(default_factory=unix_address, metadata={'pickle': True})
-    ssl: SSLContext = None
+    ssl: ServerSideSSL = None
     ssl_handshake_timeout: int = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.ssl:
+            self.ssl.set_logger(self.logger)
+
+    @property
+    def ssl_context(self) -> Optional[SSLContext]:
+        if self.ssl:
+            return self.ssl.context
 
     @property
     def listening_on(self) -> str:
         return str(self.path)
 
     async def _get_server(self) -> asyncio.AbstractServer:
-        return await self.loop.create_unix_server(self.protocol_factory, path=str(self.path), ssl=self.ssl,
+        return await self.loop.create_unix_server(self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
                                                   ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 

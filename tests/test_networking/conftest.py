@@ -8,10 +8,10 @@ from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import (TCPServerConnection, TCPClientConnection,
                                         UDPServerConnection, UDPClientConnection)
 from lib.networking.protocol_factories import (StreamServerProtocolFactory, StreamClientProtocolFactory,
-                                               DatagramServerProtocolFactory, DatagramClientProtocolFactory,
-                                               BaseProtocolFactory)
+                                               DatagramServerProtocolFactory, DatagramClientProtocolFactory)
 from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
 from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
+from lib.networking.ssl import ServerSideSSL, ClientSideSSL
 from lib.networking.transports import DatagramTransportWrapper
 from lib.compatibility_tests import AsyncMock
 
@@ -1099,3 +1099,67 @@ def sftp_peer(sftp_connection_args) -> Tuple[str, int]:
 def sftp_connection_is_stored(sftp_connection_args) -> bool:
     return sftp_connection_args[5]
 
+
+@pytest.fixture
+def current_dir() -> Path:
+    return Path(os.path.abspath(os.path.dirname(__file__)))
+
+
+@pytest.fixture
+def ssl_dir(current_dir) -> Path:
+    return current_dir / "ssl"
+
+
+@pytest.fixture
+def ssl_server_dir(ssl_dir) -> Path:
+    return ssl_dir / "server"
+
+
+@pytest.fixture
+def ssl_client_dir(ssl_dir) -> Path:
+    return ssl_dir / "client"
+
+
+@pytest.fixture
+def ssl_server_cert(ssl_server_dir) -> Path:
+    return ssl_server_dir / "certificate.pem"
+
+
+@pytest.fixture
+def ssl_server_key(ssl_server_dir) -> Path:
+    return ssl_server_dir / "privkey.pem"
+
+
+@pytest.fixture
+def ssl_client_cert(ssl_client_dir) -> Path:
+    return ssl_client_dir / "certificate.pem"
+
+
+@pytest.fixture
+def ssl_client_key(ssl_client_dir) -> Path:
+    return ssl_client_dir / "privkey.pem"
+
+
+@pytest.fixture
+def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir) -> ServerSideSSL:
+    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
+                         cafile=ssl_client_cert, capath=ssl_client_dir, cadata=ssl_client_cert.read_text())
+
+
+@pytest.fixture
+def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir) -> ClientSideSSL:
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
+                         cafile=ssl_server_cert, capath=ssl_server_dir, cadata=ssl_server_cert.read_text())
+
+
+@pytest.fixture
+def server_side_no_ssl():
+    return ServerSideSSL(ssl=False)
+
+
+@pytest.fixture(params=[
+    lazy_fixture(server_side_ssl.__name__),
+    lazy_fixture(client_side_ssl.__name__),
+])
+def ssl_object(request):
+    return request.param
