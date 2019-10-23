@@ -37,6 +37,12 @@ class TestConnectionLogger:
             json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[1] == ('receiver.raw_sent', logging.DEBUG, json_rpc_login_request_encoded)
 
+    def test_06_msg_logger(self, connection_logger, json_rpc_login_request_object, debug_logging, caplog):
+        msg_logger = connection_logger.new_msg_logger(json_rpc_login_request_object)
+        assert msg_logger.extra['msg_obj'] == json_rpc_login_request_object
+        msg_logger.debug('Hello World')
+        assert caplog.record_tuples[0] == ('receiver.msg', logging.DEBUG, 'Hello World')
+
 
 class TestConnectionLoggerNoStats:
     @pytest.mark.asyncio

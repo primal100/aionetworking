@@ -28,11 +28,11 @@ class BaseMessageObject(MessageObject, Protocol):
     encoded: bytes
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
-    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    parent_logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
     received_timestamp: datetime = field(default_factory=datetime.now, compare=False, repr=False, hash=False)
 
     def __post_init__(self):
-        pass
+        self.logger = self.parent_logger.new_msg_logger(self)
 
     @classmethod
     def swap_cls(cls, name) -> Type[MessageObjectType]:
@@ -126,7 +126,7 @@ class BaseCodec(Codec):
 
     async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         async for encoded, decoded in self.decode(encoded, **kwargs):
-            yield self.msg_obj(encoded, decoded, context=self.context, logger=self.logger, **kwargs)
+            yield self.msg_obj(encoded, decoded, context=self.context, parent_logger=self.logger, **kwargs)
 
     async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         i = 0
@@ -137,7 +137,7 @@ class BaseCodec(Codec):
         self.logger.on_buffer_decoded(i)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
-        return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, logger=self.logger, **kwargs)
+        return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, parent_logger=self.logger, **kwargs)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)

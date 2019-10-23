@@ -134,6 +134,9 @@ class ConnectionLogger(Logger):
         self._msg_received_logger = self.get_sibling('msg_received', cls=Logger)
         self._msg_sent_logger = self.get_sibling('msg_sent', cls=Logger)
 
+    def new_msg_logger(self, msg_obj: MessageObjectType):
+        return self.get_sibling("msg", cls=Logger, extra={'msg_obj': msg_obj})
+
     @property
     def connection_type(self) -> str:
         return self.extra['protocol_name']

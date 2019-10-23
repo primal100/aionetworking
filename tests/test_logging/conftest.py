@@ -18,7 +18,8 @@ def peer_filter() -> PeerFilter:
 @pytest.fixture
 def message_filter() -> MessageFilter:
     msg_received_logger = logging.getLogger('receiver.msg_received')
-    return MessageFilter(Expression.from_string("method == istr login"), [msg_received_logger])
+    msg_logger = logging.getLogger('receiver.msg')
+    return MessageFilter(Expression.from_string("method == istr login"), [msg_received_logger, msg_logger])
 
 
 @pytest.fixture()
