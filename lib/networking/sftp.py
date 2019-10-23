@@ -90,6 +90,7 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
     name = 'SFTP Server'
     conn = None
     adaptor_cls = ReceiverAdaptor
+    _log_task = None
 
     def connection_made(self, conn: Union[asyncssh.SSHServerConnection, asyncssh.SSHClientConnection]) -> None:
         self.conn = conn
@@ -113,13 +114,14 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
 
     def _log_context(self, task: asyncio.Task):
         super().log_context()
-        self._scheduler.task_done(task)
 
     def log_context(self):
-        task = self._scheduler.create_task(self.wait_context_set())
-        task.add_done_callback(self._log_context)
+        self._log_task = asyncio.create_task(self.wait_context_set())
+        self._log_task.add_done_callback(self._log_context)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
+        if self._log_task:
+            self._log_task.cancel()
         try:
             sftp_factory = self.conn.get_extra_info('sftp_factory')
             if sftp_factory:
@@ -185,6 +187,7 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
             while not name or name == self._last_file_name:
                 name = self.base_path / self.get_filename()
                 await asyncio.sleep(0.000001)
+            print(name)
             self._last_file_name = name
             return name
 

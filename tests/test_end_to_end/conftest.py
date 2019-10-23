@@ -43,6 +43,9 @@ def one_way_receiver_sender_args(request):
 @pytest.fixture(params=[
     lazy_fixture(
         (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__)),
+    lazy_fixture(
+        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__,
+         tcp_server_context.__name__, tcp_client_context.__name__)),
     pytest.param(
         lazy_fixture((udp_server_two_way_started.__name__, udp_client_two_way.__name__,
                       udp_client_two_way_connected.__name__)),

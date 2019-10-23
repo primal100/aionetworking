@@ -18,19 +18,28 @@ def tcp_client_two_way(protocol_factory_two_way_client, sock, peername) -> TCPCl
 
 
 @pytest.fixture
-async def tcp_client_one_way_connected(server_started, protocol_factory_one_way_client, sock, peername) -> TCPClient:
-    client = TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peername[0],
-                       srcport=0)
-    async with client:
-        yield client
+def tcp_client_two_way_ssl(protocol_factory_two_way_client, sock, peername, client_side_ssl) -> TCPClient:
+    client_side_ssl.check_hostname = False
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
+                     srcport=0, ssl=client_side_ssl)
 
 
 @pytest.fixture
-async def tcp_client_two_way_connected(server_started, protocol_factory_two_way_client, sock, peername) -> TCPClient:
-    client = TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
-                       srcport=0)
-    async with client:
-        yield client
+async def tcp_client_one_way_connected(tcp_client_one_way) -> TCPClient:
+    async with tcp_client_one_way:
+        yield tcp_client_one_way
+
+
+@pytest.fixture
+async def tcp_client_two_way_connected(tcp_client_two_way) -> TCPClient:
+    async with tcp_client_two_way:
+        yield tcp_client_two_way
+
+
+@pytest.fixture
+async def tcp_client_two_way_connected_ssl(tcp_client_two_way_ssl):
+    async with tcp_server_two_way_ssl:
+        yield tcp_server_two_way_ssl
 
 
 @pytest.fixture
@@ -166,6 +175,9 @@ else:
     lazy_fixture(
         (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__,
          tcp_server_context.__name__, tcp_client_context.__name__)),
+    lazy_fixture(
+        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__, tcp_client_two_way_connected_ssl.__name__,
+         tcp_server_context_ssl.__name__, tcp_client_context_ssl.__name__)),
     pytest.param(
         lazy_fixture(
             (udp_server_one_way_started.__name__, udp_client_one_way.__name__, udp_client_one_way_connected.__name__,

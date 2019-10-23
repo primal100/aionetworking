@@ -1,7 +1,9 @@
 import asyncio
+from operator import attrgetter
 import pytest
 from pathlib import Path
 
+from lib.utils import alist
 from lib.actions.echo import InvalidRequestError
 
 ###Required for skipif in fixture params###
@@ -11,20 +13,24 @@ from lib.utils import supports_pipe_or_unix_connections
 
 class TestOneWayServer:
     @pytest.mark.asyncio
-    async def test_00_send_and_send_recording(self, one_way_server_started, one_way_client, tmp_path, json_buffer,
+    async def test_00_send_and_send_recording(self, one_way_server_started, one_way_client, tmp_path, json_objects,
                                               json_decoded_multi, json_recording_data, one_way_server_context,
-                                              one_way_client_context, connections_manager):
+                                              one_way_client_context, connections_manager, json_codec):
         async with one_way_client as conn:
             conn.encode_and_send_msgs(json_decoded_multi)
             await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
             assert conn.context.keys() == one_way_client_context.keys()
             await asyncio.sleep(0.1) # Workaround for bpo-38471
+        one_way_server_started.close_all_connections()
+        await one_way_server_started.wait_num_connections(0)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
         assert recording_file_path.exists()
         expected_file = next(Path(tmp_path / 'Data/Encoded').glob('*.JSON'))
         assert expected_file.exists()
-        assert expected_file.read_bytes() == json_buffer
+        objs = await alist(json_codec.from_file(expected_file))
+        objs.sort(key=attrgetter('request_id'), reverse=False)
+        assert objs == json_objects
         expected_file.unlink()
         new_recording_path = tmp_path / 'Recordings/new.recording'
         recording_file_path.rename(new_recording_path)
@@ -35,7 +41,9 @@ class TestOneWayServer:
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
         expected_file = next(Path(tmp_path / 'Data/Encoded').glob('*.JSON'))
         assert expected_file.exists()
-        assert Path(expected_file).read_bytes() == json_buffer
+        objs = await alist(json_codec.from_file(expected_file))
+        objs.sort(key=attrgetter('request_id'), reverse=False)
+        assert objs == json_objects
 
 
 class TestTwoWayServer:

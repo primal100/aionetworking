@@ -206,8 +206,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
                 self.context['own'] = str(fd)
                 self.context['server'] = self.context['addr']
                 self.context['client'] = self.context['fd']
-            return
-        if transport.get_extra_info('pipe', None):
+        elif transport.get_extra_info('pipe', None):
             # Windows Named Pipe Transport
             addr = transport.get_extra_info('addr')
             handle = transport.get_extra_info('pipe').handle
@@ -219,15 +218,21 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             self.context['client'] = self.context['handle']
             self.context['peer'] = self.context['client'] if self.adaptor_cls.is_receiver else self.context['server']
             return
-        # INET/INET6 transport
-        peer = transport.get_extra_info('peername')
-        sockname = transport.get_extra_info('sockname', None)
-        self.context['peer'] = addr_tuple_to_str(peer)
-        self.context['sock'] = addr_tuple_to_str(sockname)
-        self.context['own'] = self.context['sock']
-        self.context['host'], self.context['port'] = peer
-        self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
-        self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
+        else:
+            # INET/INET6 transport
+            peer = transport.get_extra_info('peername')
+            sockname = transport.get_extra_info('sockname', None)
+            self.context['peer'] = addr_tuple_to_str(peer)
+            self.context['sock'] = addr_tuple_to_str(sockname)
+            self.context['own'] = self.context['sock']
+            self.context['host'], self.context['port'] = peer
+            self.context['server'] = self.context['sock'] if self.adaptor_cls.is_receiver else self.context['peer']
+            self.context['client'] = self.context['peer'] if self.adaptor_cls.is_receiver else self.context['sock']
+        cipher = transport.get_extra_info('cipher', default=None)
+        if cipher:
+            self.context['cipher'] = cipher
+            self.context['compression'] = transport.get_extra_info('compression')
+            self.context['peercert'] = transport.get_extra_info('peercert')
         return
 
 
