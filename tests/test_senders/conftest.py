@@ -18,6 +18,12 @@ def tcp_client_two_way(protocol_factory_two_way_client, sock, peername) -> TCPCl
 
 
 @pytest.fixture
+def tcp_client_two_way_ipv6(protocol_factory_two_way_client, sock_ipv6, peername_ipv6) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock_ipv6[0], port=sock_ipv6[1],
+                     srcip=peername_ipv6[0], srcport=0)
+
+
+@pytest.fixture
 def tcp_client_two_way_ssl(protocol_factory_two_way_client, sock, peername, client_side_ssl) -> TCPClient:
     client_side_ssl.check_hostname = False
     return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peername[0],
@@ -50,6 +56,11 @@ def udp_client_one_way(udp_protocol_factory_one_way_client, sock) -> UDPClient:
 @pytest.fixture
 def udp_client_two_way(udp_protocol_factory_two_way_client, sock) -> UDPClient:
     return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1])
+
+
+@pytest.fixture
+def udp_client_two_way_ipv6(udp_protocol_factory_two_way_client, sock_ipv6) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock_ipv6[0], port=sock_ipv6[1])
 
 
 @pytest.fixture
@@ -92,6 +103,13 @@ async def pipe_client_two_way_connected(server_started, protocol_factory_two_way
 def sftp_client(sftp_protocol_factory_client, sock, peername, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
     return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
                       srcip=peername[0], srcport=0, username=sftp_username_password[0],
+                      password=sftp_username_password[1])
+
+
+@pytest.fixture
+def sftp_client_ipv6(sftp_protocol_factory_client, sock_ipv6, peername_ipv6, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock_ipv6[0], port=sock_ipv6[1],
+                      srcip=peername_ipv6[0], srcport=0, username=sftp_username_password[0],
                       password=sftp_username_password[1])
 
 
@@ -207,3 +225,305 @@ else:
 ])
 def receiver_sender_args(request):
     return request.param
+
+
+@pytest.fixture
+async def protocol_factory_allowed_senders_server(echo_action, initial_server_context) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    factory = StreamServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')]
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_allowed_senders_server_wrong_senders(echo_action, initial_server_context) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    factory = StreamServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.2'), IPNetwork('::2')]
+    )
+    yield factory
+
+
+@pytest.fixture
+async def tcp_server_allowed_senders_ipv4(protocol_factory_allowed_senders_server, sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host='127.0.0.1', port=sock[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def tcp_server_allowed_senders_ipv6(protocol_factory_allowed_senders_server, sock_ipv6) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host=sock_ipv6[0], port=sock_ipv6[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def tcp_server_allowed_senders_ipv4_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host='127.0.0.1', port=sock[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def tcp_server_allowed_senders_ipv6_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host='::1', port=sock[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def udp_protocol_factory_allowed_senders_wrong_senders(echo_action) -> DatagramServerProtocolFactory:
+    factory = DatagramServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.2'), IPNetwork('::2')])
+    await factory.start()
+    yield factory
+    await factory.close()
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_ipv4(udp_protocol_factory_allowed_senders, sock) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock[0], port=sock[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_ipv6(udp_protocol_factory_allowed_senders, sock_ipv6) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_wrong_senders_ipv4(udp_protocol_factory_allowed_senders_wrong_senders, sock) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=sock[0], port=sock[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_wrong_senders_ipv6(udp_protocol_factory_allowed_senders_wrong_senders, sock_ipv6) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=sock_ipv6[0], port=sock_ipv6[1])
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+def tcp_server_started_allowed_senders(tcp_allowed_senders_ok_args) -> TCPServer:
+    return tcp_allowed_senders_ok_args[0]
+
+
+@pytest.fixture
+def tcp_client_allowed_senders(tcp_allowed_senders_ok_args) -> TCPClient:
+    return tcp_allowed_senders_ok_args[1]
+
+
+@pytest.fixture(params=[
+    lazy_fixture(
+        (tcp_server_allowed_senders_ipv4.__name__, tcp_client_two_way.__name__)),
+    lazy_fixture(
+        (tcp_server_allowed_senders_ipv6.__name__, tcp_client_two_way_ipv6.__name__)),
+])
+def tcp_allowed_senders_ok_args(request):
+    return request.param
+
+
+@pytest.fixture
+def udp_server_started_allowed_senders(udp_allowed_senders_ok_args) -> TCPServer:
+    return udp_allowed_senders_ok_args[0]
+
+
+@pytest.fixture
+def udp_client_allowed_senders(udp_allowed_senders_ok_args) -> TCPClient:
+    return udp_allowed_senders_ok_args[1]
+
+
+@pytest.fixture(params=[
+    pytest.param(
+        lazy_fixture(
+            (udp_server_allowed_senders_ipv4.__name__, udp_client_two_way.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
+    pytest.param(
+        lazy_fixture(
+            (udp_server_allowed_senders_ipv6.__name__, udp_client_two_way_ipv6.__name__)),
+        marks=pytest.mark.skipif(
+            "is_proactor()")
+    )
+])
+def udp_allowed_senders_ok_args(request):
+    return request.param
+
+
+@pytest.fixture
+def tcp_server_started_wrong_senders(tcp_allowed_senders_not_ok_args) -> TCPServer:
+    return tcp_allowed_senders_not_ok_args[0]
+
+
+@pytest.fixture
+def tcp_client_wrong_senders(tcp_allowed_senders_not_ok_args) -> TCPClient:
+    return tcp_allowed_senders_not_ok_args[1]
+
+
+@pytest.fixture(params=[
+    lazy_fixture(
+        (tcp_server_allowed_senders_ipv4_wrong_senders.__name__, tcp_client_two_way.__name__)),
+    lazy_fixture(
+        (tcp_server_allowed_senders_ipv6_wrong_senders.__name__, tcp_client_two_way_ipv6.__name__)),
+])
+def tcp_allowed_senders_not_ok_args(request):
+    return request.param
+
+
+@pytest.fixture
+def udp_server_started_wrong_senders(udp_allowed_senders_not_ok_args) -> TCPServer:
+    return udp_allowed_senders_not_ok_args[0]
+
+
+@pytest.fixture
+def udp_client_wrong_senders(udp_allowed_senders_not_ok_args) -> TCPClient:
+    return udp_allowed_senders_not_ok_args[1]
+
+
+@pytest.fixture(params=[
+    pytest.param(
+        lazy_fixture(
+            (udp_server_allowed_senders_wrong_senders_ipv4.__name__, udp_client_two_way.__name__)),
+        marks=pytest.mark.skipif(
+            "not datagram_supported()")
+    ),
+    pytest.param(
+        lazy_fixture(
+            (udp_server_allowed_senders_wrong_senders_ipv6.__name__, udp_client_two_way_ipv6.__name__)),
+        marks=pytest.mark.skipif(
+            "is_proactor()")
+    )
+])
+def udp_allowed_senders_not_ok_args(request):
+    return request.param
+
+
+@pytest.fixture
+async def sftp_protocol_factory_server_allowed_senders(buffered_file_storage_action) -> SFTPOSAuthProtocolFactory:
+    factory = SFTPOSAuthProtocolFactory(
+        action=buffered_file_storage_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')]
+    )
+    yield factory
+
+
+@pytest.fixture
+async def sftp_protocol_factory_server_not_allowed_senders(buffered_file_storage_action) -> SFTPOSAuthProtocolFactory:
+    factory = SFTPOSAuthProtocolFactory(
+        action=buffered_file_storage_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.2'), IPNetwork('::2')]
+    )
+    yield factory
+
+
+@pytest.fixture
+async def sftp_server_allowed_senders_ip4(sftp_protocol_factory_server_allowed_senders, sock, tmp_path, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host='127.0.0.1', port=sock[1],
+                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def sftp_server_allowed_senders_ipv6(sftp_protocol_factory_server_allowed_senders, sock, tmp_path, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host='::1', port=sock[1],
+                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_allowed_senders, sock, tmp_path, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=sock[0], port=sock[1],
+                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def sftp_server_not_allowed_senders_ipv6(sftp_protocol_factory_server_not_allowed_senders, sock_ipv6, tmp_path,
+                                               ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1],
+                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    await server.start()
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture(params=[
+    lazy_fixture(
+        (sftp_server_allowed_senders_ip4.__name__, sftp_client.__name__)),
+    lazy_fixture(
+        (sftp_server_allowed_senders_ipv6.__name__, sftp_client_ipv6.__name__)),
+])
+def sftp_allowed_senders_ok_args(request):
+    return request.param
+
+
+@pytest.fixture(params=[
+        lazy_fixture(
+            (sftp_server_not_allowed_senders_ip4.__name__, sftp_client.__name__)),
+        lazy_fixture(
+            (sftp_server_not_allowed_senders_ipv6.__name__, sftp_client_ipv6.__name__))
+])
+def sftp_allowed_senders_not_ok_args(request):
+    return request.param
+
+
+@pytest.fixture
+def sftp_server_started_allowed_senders(sftp_allowed_senders_ok_args) -> SFTPServer:
+    return sftp_allowed_senders_ok_args[0]
+
+
+@pytest.fixture
+def sftp_client_allowed_senders(sftp_allowed_senders_ok_args) -> SFTPClient:
+    return sftp_allowed_senders_ok_args[1]
+
+
+@pytest.fixture
+def sftp_server_started_wrong_senders(sftp_allowed_senders_not_ok_args) -> SFTPServer:
+    return sftp_allowed_senders_not_ok_args[0]
+
+
+@pytest.fixture
+def sftp_client_wrong_senders(sftp_allowed_senders_not_ok_args) -> SFTPClient:
+    return sftp_allowed_senders_not_ok_args[1]

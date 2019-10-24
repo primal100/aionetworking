@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import socket
 import sys
 
+from lib.types import IPNetwork
 from lib.networking.protocol_factories import DatagramClientProtocolFactory
 from lib.networking.types import ConnectionType
 from lib.networking.ssl import ClientSideSSL
@@ -37,7 +38,11 @@ class TCPClient(BaseNetworkClient):
         self.transport, self.conn = await self.loop.create_connection(
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context,
             local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
-        self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
+        network = IPNetwork(self.host)
+        if network.is_ipv6:
+            self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
+        else:
+            self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         return self.conn
 
 
@@ -122,7 +127,11 @@ class UDPClient(BaseNetworkClient):
         protocol_factory: DatagramClientProtocolFactory
         self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
             self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr)
-        self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
+        network = IPNetwork(self.host)
+        if network.is_ipv6:
+            self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
+        else:
+            self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         self.conn = protocol_factory.new_peer()
         await self.conn.wait_connected()
         return self.conn

@@ -172,3 +172,35 @@ class TestTwoWayClientDatagramProtocolFactory:
         data = pickle.dumps(udp_protocol_factory_two_way_client_started)
         factory = pickle.loads(data)
         assert factory == udp_protocol_factory_two_way_client_started
+
+
+class TestServerDatagramProtocolFactoryAllowedSenders:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("ip_address", ['127.0.0.1', '::1'])
+    async def test_00_allowed_senders_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server,
+                                         connections_manager, queue, echo_encoded, echo_response_encoded, ip_address):
+        protocol_factory = udp_protocol_factory_allowed_senders()
+        protocol_factory.connection_made(udp_transport_server)
+        udp_transport_server.set_protocol(protocol_factory)
+        peer = (ip_address, 60000)
+        protocol_factory.datagram_received(echo_encoded, peer)
+        await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
+        udp_transport_server.close()
+        await protocol_factory.close()
+        assert await queue.get() == (peer, echo_response_encoded)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("ip_address", ['127.0.0.2', '::2'])
+    async def test_01_allowed_senders_not_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, connections_manager,
+                                             queue, echo_encoded, echo_response_encoded, ip_address):
+        protocol_factory = udp_protocol_factory_allowed_senders()
+        protocol_factory.connection_made(udp_transport_server)
+        udp_transport_server.set_protocol(protocol_factory)
+        peer = (ip_address, 60000)
+        protocol_factory.datagram_received(echo_encoded, peer)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(queue.get(), timeout=1)
+        udp_transport_server.close()
+        await protocol_factory.close()

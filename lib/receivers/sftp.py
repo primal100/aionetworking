@@ -13,7 +13,7 @@ from pathlib import Path
 
 @dataclass
 class SFTPServer(BaseNetworkServer):
-    protocol_factory = SFTPServerProtocolFactory
+    protocol_factory: SFTPServerProtocolFactory = None
     sftp_factory = SFTPFactory
     name = 'SFTP Server'
     peer_prefix = 'sftp'

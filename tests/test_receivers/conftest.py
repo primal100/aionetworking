@@ -34,7 +34,6 @@ async def tcp_server_two_way(protocol_factory_two_way_server, sock) -> TCPServer
 
 @pytest.fixture
 async def tcp_server_two_way_ssl(protocol_factory_two_way_server, sock, server_side_ssl) -> TCPServer:
-    #server_side_ssl.check_hostname = False
     server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1], ssl=server_side_ssl)
     yield server
     if server.is_started():

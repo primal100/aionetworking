@@ -42,4 +42,5 @@ class SFTPOSAuthProtocolFactory(BaseProtocolFactory):
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
+                                   allowed_senders=self.allowed_senders, aliases=self.aliases,
                                    windows_domain=self.windows_domain, unix_group=self.unix_group)

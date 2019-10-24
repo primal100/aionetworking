@@ -1,9 +1,9 @@
 from asyncio import transports
-from typing import Tuple, Any, Union
+from typing import Tuple, Any, Union, Optional
 
 
 class DatagramTransportWrapper:
-    def __init__(self, transport: transports.DatagramTransport, peer: Tuple[str, int] = None):
+    def __init__(self, transport: transports.DatagramTransport, peer: Optional[Tuple[str, int]] = None):
         self._transport = transport
         self._peer = peer
 

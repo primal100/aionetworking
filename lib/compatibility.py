@@ -47,8 +47,12 @@ def get_current_task_name():
         return 'No Running Loop'
 
 
-def datagram_supported(loop: asyncio.AbstractEventLoop = None):
+def is_proactor(loop: asyncio.AbstractEventLoop = None):
     if not hasattr(asyncio, "ProactorEventLoop"):
         return True
     loop = loop or asyncio.get_event_loop()
-    return py38 or not isinstance(loop, asyncio.ProactorEventLoop)
+    return isinstance(loop, asyncio.ProactorEventLoop)
+
+
+def datagram_supported(loop: asyncio.AbstractEventLoop = None):
+    return py38 or not is_proactor(loop=loop)

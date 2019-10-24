@@ -3,7 +3,7 @@ import pytest
 import pickle
 from pathlib import Path
 
-from lib.networking.exceptions import MethodNotFoundError
+from lib.networking.exceptions import MethodNotFoundError, MessageFromNotAuthorizedHost
 from lib.formats.recording import get_recording_from_file
 from lib.utils import alist
 
@@ -48,6 +48,52 @@ class TestConnectionShared:
         transport.set_protocol(connection)
         connection.send_data(json_rpc_login_request_encoded)
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
+
+    @pytest.mark.asyncio
+    async def test_03_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.1') is True
+
+    @pytest.mark.asyncio
+    async def test_04_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::1') is True
+
+    @pytest.mark.asyncio
+    async def test_05_sender_valid_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.2') is False
+
+    @pytest.mark.asyncio
+    async def test_06_sender_valid_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::2') is False
+
+    @pytest.mark.asyncio
+    async def test_07_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '127.0.0.1'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = '127.0.0.1'
+        tcp_protocol_two_way_server_allowed_senders._check_peer()
+        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == 'localhost4(127.0.0.1)'
+        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == '127.0.0.1'
+
+    @pytest.mark.asyncio
+    async def test_08_check_peer_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '::1'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = '::1'
+        tcp_protocol_two_way_server_allowed_senders._check_peer()
+        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == 'localhost6(::1)'
+        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == '::1'
+
+    @pytest.mark.asyncio
+    async def test_09_check_peer_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '127.0.0.2'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = '127.0.0.2'
+        with pytest.raises(MessageFromNotAuthorizedHost):
+            tcp_protocol_two_way_server_allowed_senders._check_peer()
+
+    @pytest.mark.asyncio
+    async def test_10_check_peer_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '::2'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = '::2'
+        with pytest.raises(MessageFromNotAuthorizedHost):
+            tcp_protocol_two_way_server_allowed_senders._check_peer()
 
 
 class TestConnectionOneWayServer:
