@@ -2,6 +2,7 @@ import asyncssh
 from dataclasses import dataclass, InitVar
 from pathlib import Path
 
+from lib.types import IPNetwork
 from lib.networking.sftp import SFTPClientProtocolFactory, SFTPClientProtocol
 from .clients import BaseNetworkClient
 
@@ -33,7 +34,11 @@ class SFTPClient(BaseNetworkClient):
             self.protocol_factory, self.host, self.port, local_addr=self.local_addr, known_hosts=self.known_hosts,
             username=self.username, password=self.password, client_keys=self.client_keys, passphrase=self.passphrase,
             client_version = self.client_version)
-        self.actual_srcip, self.actual_srcport = self.sftp_conn.get_extra_info('sockname')
+        network = IPNetwork(self.host)
+        if network.is_ipv6:
+            self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.sftp_conn.get_extra_info('sockname')
+        else:
+            self.actual_srcip, self.actual_srcport = self.sftp_conn.get_extra_info('sockname')
         await self.conn.wait_context_set()
         self.sftp = await self.sftp_conn.start_sftp_client()
         await self.conn.set_sftp(self.sftp)

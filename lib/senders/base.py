@@ -43,6 +43,15 @@ class BaseSender(SenderProtocol, Protocol):
     async def close(self):
         pass
 
+    def is_started(self) -> bool:
+        return self._status.is_started()
+
+    def is_closing(self) -> bool:
+        return self._status.is_stopping_or_stopped()
+
+    async def wait_stopped(self) -> None:
+        await self._status.wait_stopped()
+
     def __post_init__(self):
         self.logger = self.logger_cls(self.logger_name)
 
@@ -78,23 +87,27 @@ class BaseClient(BaseSender, Protocol):
         await self.conn.wait_closed()
         self.transport = None
 
-    def is_started(self) -> bool:
-        return self._status.is_started()
-
     def is_closing(self) -> bool:
         return self._status.is_stopping_or_stopped() or self.transport.is_closing()
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
-        #context_cv.set({'endpoint': self.full_name})
         context_cv.set({})
         logger_cv.set(self.logger)
         await self.protocol_factory.start()
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self._open_connection()
-        await self.conn.wait_connected()
+        connection.add_connection_lost_task(self.on_connection_lost)
+        await connection.wait_connected()
         self._status.set_started()
         return connection
+
+    async def on_connection_lost(self) -> None:
+        if not self._status.is_stopping_or_stopped():
+            self.logger.info('%s connection to %s was closed on the other end', self.name, self.dst)
+            self._status.set_stopping()
+            await self.protocol_factory.close()
+            self._status.set_stopped()
 
     async def close(self) -> None:
         self._status.set_stopping()

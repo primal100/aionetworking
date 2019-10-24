@@ -178,7 +178,7 @@ class BaseFileStorage(BaseAction, Protocol):
     attr: str = 'encoded'
     mode: str = 'w'
     separator: AnyStr = ''
-    binary: InitVar[bool] = False
+    binary: InitVar[bool] = True
 
     def __post_init__(self, logger, binary):
         super().__post_init__(logger)

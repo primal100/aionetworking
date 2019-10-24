@@ -8,6 +8,7 @@ from lib.conf.context import context_cv
 from lib.formats.base import BaseMessageObject
 from lib.requesters.types import RequesterType
 from lib.conf.logging import Logger, logger_cv
+from lib.types import IPNetwork
 from .transports import DatagramTransportWrapper
 from lib.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
 
@@ -17,7 +18,7 @@ from .connections import TCPClientConnection, TCPServerConnection, UDPServerConn
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
-from typing import Optional, Text, Tuple, Type, Union
+from typing import Optional, Text, Tuple, Type, Union, Sequence, Dict
 
 
 @dataclass
@@ -31,6 +32,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     logger: Logger = Logger('receiver')
     pause_reading_on_buffer_size: int = None
+    aliases: Dict[str, str] = field(default_factory=dict)
+    allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
     _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
 
     async def start(self) -> None:
@@ -54,7 +57,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         self.logger.debug('Creating new connection')
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger)
+                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
+                                   allowed_senders=self.allowed_senders, aliases=self.aliases)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -127,8 +131,7 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:
         self.transport = transport
-        self.sock = self.transport.get_extra_info('sockname')
-        self.full_name.replace(':0', f':{self.sock[1]}')
+        self.sock = self.transport.get_extra_info('sockname')[0:2]
 
     def close_all_connections(self, exc: Optional[Exception]) -> None:
         connections = filter(self.is_owner, connections_manager)
@@ -145,17 +148,24 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
     def new_peer(self, addr: Tuple[str, int] = None) -> NetworkConnectionType:
         conn = self._context.run(self._new_connection)
         transport = DatagramTransportWrapper(self.transport, addr)
-        conn.connection_made(transport)
-        return conn
+        ok = conn.connection_made(transport)
+        if ok:
+            return conn
 
     def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
+        addr = addr[0:2]
         peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr), addr_tuple_to_str(self.sock))
         conn = connections_manager.get(peer, None)
         if conn:
             conn.data_received(data)
         else:
             conn = self.new_peer(addr)
-            conn.data_received(data)
+            if conn:
+                conn.data_received(data)
+
+    async def close(self) -> None:
+        self.close_all_connections(None)
+        await super().close()
 
 
 @dataclass

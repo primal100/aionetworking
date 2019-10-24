@@ -2,9 +2,9 @@ from collections import ChainMap
 import builtins
 import operator
 
-from lib.utils import str_to_list
+from ipaddress import IPv4Network, IPv6Network, AddressValueError
 
-from typing import Union, Callable, Iterable, Any
+from typing import Union, Callable, Iterable, Any, Sequence
 
 
 from dataclasses import dataclass
@@ -20,6 +20,39 @@ from dataclasses import dataclass
         if isinstance(value, str):
             return logging.getLogger(value)
         return value"""
+
+
+class IPNetwork:
+    def __init__(self, network: Union[str, IPv4Network, IPv6Network]):
+        if isinstance(network, IPv4Network):
+            self.ip_network = network
+            self.is_ipv6 = False
+        elif isinstance(network, IPv6Network):
+            self.ip_network = network
+            self.is_ipv6 = True
+        else:
+            try:
+                self.ip_network = IPv4Network(network)
+                self.is_ipv6 = False
+            except AddressValueError:
+                try:
+                    self.ip_network = IPv6Network(network)
+                    self.is_ipv6 = True
+                except AddressValueError:
+                    raise AddressValueError(f'{network} is not valid IPv4 or IPv6 network')
+
+    def supernet_of(self, network: Union[IPv4Network, IPv6Network]):
+        return self.ip_network.supernet_of(network)
+
+
+def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networks: Sequence[IPNetwork]):
+    if not isinstance(network, IPNetwork):
+        network = IPNetwork(network)
+    if network.is_ipv6:
+        networks = filter(lambda n: n.is_ipv6, networks)
+    else:
+        networks = filter(lambda n: not n.is_ipv6, networks)
+    return any(n.supernet_of(network.ip_network) for n in networks)
 
 
 @dataclass

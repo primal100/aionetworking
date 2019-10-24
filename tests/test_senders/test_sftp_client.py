@@ -55,3 +55,18 @@ class TestClientStartStop:
         data = pickle.dumps(sftp_client)
         new_client = pickle.loads(data)
         assert new_client == sftp_client
+
+
+class TestSFTPClientAllowedSenders:
+    @pytest.mark.asyncio
+    async def test_00_sftp_client_connect_allowed(self, sftp_server_started_allowed_senders,
+                                                  sftp_client_allowed_senders, json_rpc_login_request_encoded):
+        async with sftp_client_allowed_senders as conn:
+            conn.send(json_rpc_login_request_encoded)
+
+    @pytest.mark.asyncio
+    async def test_01_sfp_client_connect_not_allowed(self, sftp_server_started_wrong_senders, sftp_client_wrong_senders,
+                                                     json_rpc_login_request_encoded):
+        with pytest.raises((ConnectionResetError, asyncssh.misc.ConnectionLost)):
+            async with sftp_client_wrong_senders as conn:
+                conn.send(json_rpc_login_request_encoded)

@@ -817,18 +817,6 @@ def protocol_factory_two_way_server(json_rpc_action, receiver_logger, buffered_f
 
 
 @pytest.fixture
-def tcp_server_two_way(protocol_factory_two_way_server, receiver_logger, sock):
-    return TCPServer(protocol_factory=protocol_factory_two_way_server, logger=receiver_logger, host=sock[0],
-                     port=sock[1])
-
-
-@pytest.fixture
-def tcp_client_two_way(protocol_factory_two_way_client, sender_logger, sock, peername):
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, logger=sender_logger, host=sock[0],
-                     port=sock[1], srcip=peername[0], srcport=0)
-
-
-@pytest.fixture
 async def two_way_receiver_adaptor(echo_action, buffered_file_storage_pre_action_binary, context,
                                    receiver_connection_logger, queue) -> ReceiverAdaptor:
     yield ReceiverAdaptor(JSONObject, action=echo_action,
@@ -934,19 +922,6 @@ def recording_file_name(one_way_server_client_args) -> str:
 @pytest.fixture
 def asn_file_name(one_way_server_client_args) -> str:
     return one_way_server_client_args[3]
-
-
-two_way_server_client_params = [
-    (tcp_server_two_way, tcp_client_two_way),
-    pytest.param(
-        (pipe_server_two_way, pipe_client_two_way),
-        marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
-    ),
-]
-@pytest.fixture(params=two_way_server_client_params)
-def two_way_server_client_args(request) -> Tuple:
-    return request.param
 
 
 @pytest.fixture

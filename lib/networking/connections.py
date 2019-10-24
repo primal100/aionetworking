@@ -9,6 +9,7 @@ from lib.compatibility import set_task_name
 from lib.conf.context import context_cv
 from lib.conf.logging import Logger, logger_cv, connection_logger_cv
 from lib.conf.types import ConnectionLoggerType
+from lib.types import IPNetwork, supernet_of
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
 from lib.wrappers.value_waiters import StatusWaiter
 
@@ -19,8 +20,11 @@ from .protocols import (
 from .transports import TransportType, DatagramTransportWrapper
 from .types import AdaptorType, SenderAdaptorType
 
-from typing import NoReturn, Optional, Tuple, Type, Dict, Any
+from typing import NoReturn, Optional, Tuple, Type, Dict, Any, Sequence, Callable, Awaitable, List
 from lib.compatibility import Protocol
+
+
+AsyncCallable = Callable[[int], Awaitable[None]]
 
 
 @dataclass
@@ -87,25 +91,27 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self.logger.get_connection_logger(extra=self.context)
 
     def _delete_connection(self) -> None:
-         connections_manager.remove_connection(self)
+        connections_manager.remove_connection(self)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
         try:
             if self._adaptor:
                 await asyncio.wait_for(self._adaptor.close(exc), timeout=self.timeout)
         finally:
-            num = connections_manager.decrement(self)
-            self.logger.log_num_connections('closed', num)
+            if self._adaptor:
+                num = connections_manager.decrement(self)
+                self.logger.log_num_connections('closed', num)
             self._status.set_stopped()
 
     def finish_connection(self, exc: Optional[BaseException]) -> None:
-        self._adaptor.logger.info('Finishing connection')
+        if self._adaptor:
+            self._adaptor.logger.info('Finishing connection')
+            self._delete_connection()
         self._status.set_stopping()
         close_task = asyncio.create_task(self._close(exc))
         set_task_name(close_task, f"Close:{self.peer}")
-        self._delete_connection()
 
-    def close(self):
+    def close(self, immediate: bool=False):
         self.finish_connection(None)
 
     async def wait_closed(self) -> None:
@@ -127,10 +133,11 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
 @dataclass
 class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     transport: asyncio.BaseTransport = field(default=None, init=False)
-    aliases: dict = field(default_factory=dict)
+    aliases: Dict[str, str] = field(default_factory=dict)
     pause_reading_on_buffer_size: int = None
-    _unprocessed_data: int = field(default=0, init=False)
-    #allowed_senders: List[IPvAnyNetwork] = field(default_factory=tuple)
+    allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
+    connection_lost_tasks: List[AsyncCallable] = field(default_factory=list)
+    _unprocessed_data: int = field(default=0, init=False, repr=False)
 
     def _raise_message_from_not_authorized_host(self, host: str) -> NoReturn:
         msg = f"Received message from unauthorized host {host}"
@@ -138,8 +145,8 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         raise MessageFromNotAuthorizedHost(msg)
 
     def _sender_valid(self, other_ip):
-        #if self.allowed_senders:
-        #    return any(n.supernet_of(other_ip) for n in self.allowed_senders)
+        if self.allowed_senders:
+            return supernet_of(other_ip, self.allowed_senders)
         return True
 
     def _get_alias(self, host: str) -> str:
@@ -155,11 +162,11 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             alias = self._get_alias(host)
             self.context['alias'] = alias
             if alias and alias not in peer:
-                self.context['peer'] = f"{self.alias}({peer})"
+                self.context['alias'] = f"{self.context['alias']}({peer})"
         else:
             self._raise_message_from_not_authorized_host(host)
 
-    def close(self):
+    def close(self, immediate: bool = False):
         if not self.transport.is_closing():
             self.transport.close()
 
@@ -177,9 +184,17 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             self.log_context()
             self._status.set_started()
             return True
-        except MessageFromNotAuthorizedHost as exc:
-            self.finish_connection(exc)
+        except MessageFromNotAuthorizedHost:
+            self.close(immediate=True)
             return False
+
+    def add_connection_lost_task(self, async_function: AsyncCallable):
+        self.connection_lost_tasks.append(async_function)
+
+    def run_connection_lost_tasks(self) -> None:
+        if self.connection_lost_tasks:
+            connection_lost_tasks = [t() for t in self.connection_lost_tasks]
+            asyncio.create_task(asyncio.wait(connection_lost_tasks))
 
     def eof_received(self) -> bool:
         return False
@@ -220,8 +235,8 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             return
         else:
             # INET/INET6 transport
-            peer = transport.get_extra_info('peername')
-            sockname = transport.get_extra_info('sockname', None)
+            peer = transport.get_extra_info('peername')[0:2]
+            sockname = transport.get_extra_info('sockname')[0:2]
             self.context['peer'] = addr_tuple_to_str(peer)
             self.context['sock'] = addr_tuple_to_str(sockname)
             self.context['own'] = self.context['sock']
@@ -244,12 +259,16 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport = transport
         self.initialize_connection(transport)
 
-    def close(self):
+    def close(self, immediate: bool = False):
         if not self.transport.is_closing():
-            self.transport.close()
+            if immediate:
+                self.transport.abort()
+            else:
+                self.transport.close()
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.close()
+        self.run_connection_lost_tasks()
         self.finish_connection(exc)
 
     def _resume_reading(self, fut: asyncio.Future):
@@ -278,14 +297,15 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
     _peer: Tuple[str, int] = field(default=None, init=False)
     transport: DatagramTransportWrapper = field(default=None, init=False, repr=False, compare=False)
 
-    def connection_made(self, transport: DatagramTransportWrapper) -> None:
+    def connection_made(self, transport: DatagramTransportWrapper) -> bool:
         self.transport = transport
-        self.initialize_connection(transport)
+        return self.initialize_connection(transport)
 
     def send(self, msg: bytes) -> None:
         self.transport.write(msg)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
+        self.run_connection_lost_tasks()
         self.finish_connection(exc)
 
 

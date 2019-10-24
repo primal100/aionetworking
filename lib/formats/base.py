@@ -53,6 +53,10 @@ class BaseMessageObject(MessageObject, Protocol):
         return self.context['alias']
 
     @property
+    def peer_safe(self) -> str:
+        return self.context['alias'].replace('::', '.').replace(':', '.')
+
+    @property
     def full_peer(self) -> str:
         return self.context['peer']
 

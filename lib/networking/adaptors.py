@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 
-from .exceptions import MethodNotFoundError
+from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from lib.actions.protocols import ActionProtocol
-from lib.compatibility import Protocol, set_task_name
+from lib.compatibility import Protocol
 from lib.conf.logging import connection_logger_cv, ConnectionLogger
 from lib.conf.context import context_cv
 from lib.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
@@ -115,6 +115,11 @@ class SenderAdaptor(BaseAdaptorProtocol):
     def all_notifications(self) -> Generator[MessageObjectType, None, None]:
         for i in range(0, self._notification_queue.qsize()):
             yield self._notification_queue.get_nowait()
+
+    async def close(self, exc: Optional[BaseException] = None) -> None:
+        exc = exc or RemoteConnectionClosedError()
+        self._scheduler.cancel_all_futures(exc)
+        await super().close(exc)
 
     async def send_data_and_wait(self, request_id: Any, encoded: bytes) -> Any:
         return await self._scheduler.run_wait_fut(request_id, self.send_data, encoded)

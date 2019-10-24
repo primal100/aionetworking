@@ -130,11 +130,12 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
         finally:
             await super()._close(exc)
 
-    def close(self):
+    def close(self, immediate: bool = False):
         if not self.is_closing():
             self.conn.close()
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
+        self.run_connection_lost_tasks()
         self.finish_connection(exc)
 
     def send(self, msg):
@@ -188,7 +189,6 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
             while not name or name == self._last_file_name:
                 name = self.base_path / self.get_filename()
                 await asyncio.sleep(0.000001)
-            print(name)
             self._last_file_name = name
             return name
 
@@ -228,5 +228,5 @@ class SFTPClientProtocolFactory(BaseProtocolFactory):
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
                                    remove_tmp_files = self.remove_tmp_files, prefix=self.prefix, base_path=self.base_path,
-                                   remote_path=self.remote_path)
+                                   remote_path=self.remote_path, allowed_senders=self.allowed_senders, aliases=self.aliases)
 

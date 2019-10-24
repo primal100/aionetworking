@@ -10,7 +10,7 @@ from contextvars import ContextVar
 
 from .base import BaseServer, BaseNetworkServer
 from lib.networking.connections import UDPServerConnection
-from lib.networking.protocol_factories import DatagramServerProtocolFactory
+from lib.networking.protocol_factories import DatagramServerProtocolFactory, StreamServerProtocolFactory
 from lib.networking.ssl import ServerSideSSL
 from lib.utils import unix_address, pipe_address
 from lib.wrappers.value_waiters import StatusWaiter
@@ -26,6 +26,7 @@ test_cv = ContextVar('test_cv', default='default')
 class TCPServer(BaseNetworkServer):
     name = "TCP Server"
     peer_prefix = 'tcp'
+    protocol_factory: StreamServerProtocolFactory = None
 
     ssl: ServerSideSSL = None
     ssl_handshake_timeout: int = None
@@ -50,6 +51,7 @@ class TCPServer(BaseNetworkServer):
 class UnixSocketServer(BaseServer):
     name = "Unix Socket Server"
     peer_prefix = 'unix'
+    protocol_factory: StreamServerProtocolFactory = None
 
     path: Union[str, Path] = field(default_factory=unix_address, metadata={'pickle': True})
     ssl: ServerSideSSL = None
@@ -79,6 +81,7 @@ class WindowsPipeServer(BaseServer):
     name = "Windows Named Pipe Server"
     peer_prefix = 'pipe'
     path: Union[str, Path] = field(default_factory=pipe_address, metadata={'pickle': True})
+    protocol_factory: StreamServerProtocolFactory = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -174,6 +177,7 @@ class DatagramServer(asyncio.AbstractServer):
 
 @dataclass
 class UDPServer(BaseNetworkServer):
+    protocol_factory: DatagramServerProtocolFactory = None
     name = "UDP Server"
     peer_prefix = 'udp'
 

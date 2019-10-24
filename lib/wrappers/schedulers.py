@@ -3,7 +3,7 @@ import asyncio
 import contextvars
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable, List, Union, Dict
+from typing import Any, Callable, Awaitable, List, Union, Dict, Optional
 
 from lib.compatibility import set_task_name
 from .counters import Counter
@@ -93,6 +93,11 @@ class TaskScheduler:
 
     def set_exception(self, name: Any, exception: BaseException) -> None:
         self._futures[name].set_exception(exception)
+
+    def cancel_all_futures(self, exc: Optional[BaseException]):
+        for name, fut in self._futures.items():
+            if not fut.cancelled() and not fut.done():
+                fut.set_exception(exc)
 
     async def join(self) -> None:
         await self._counter.wait_for(0)

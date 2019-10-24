@@ -1,7 +1,6 @@
 from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
 import asyncssh
 import datetime
-import os
 
 from lib.conf.context import context_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
@@ -13,6 +12,7 @@ from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClie
 from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from lib.networking.ssl import ServerSideSSL, ClientSideSSL
 from lib.networking.transports import DatagramTransportWrapper
+from lib.types import IPNetwork
 from lib.compatibility_tests import AsyncMock
 
 from typing import Union
@@ -386,7 +386,10 @@ async def unix_transport_client(queue, extra_client_unix) -> asyncio.Transport:
 
 @pytest.fixture
 async def udp_transport_server(queue, extra_inet) -> MockDatagramTransport:
-    yield MockDatagramTransport(queue, extra=extra_inet)
+    transport = MockDatagramTransport(queue, extra=extra_inet)
+    yield transport
+    if not transport.is_closing():
+        transport.close()
 
 
 @pytest.fixture
@@ -410,8 +413,18 @@ def peername() -> Tuple[str, int]:
 
 
 @pytest.fixture
+def peername_ipv6() -> Tuple[str, int]:
+    return '::1', 60000
+
+
+@pytest.fixture
 def sock() -> Tuple[str, int]:
     return '127.0.0.1', 8888
+
+
+@pytest.fixture
+def sock_ipv6() -> Tuple[str, int]:
+    return '::1', 8888
 
 
 @pytest.fixture
@@ -425,11 +438,13 @@ def false() -> bool:
 
 
 @pytest.fixture
-async def protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action) -> StreamServerProtocolFactory:
+async def protocol_factory_one_way_server(buffered_file_storage_action,
+                                          buffered_file_storage_recording_action) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
-        dataformat=JSONObject)
+        dataformat=JSONObject
+    )
     yield factory
 
 
@@ -450,7 +465,8 @@ async def protocol_factory_two_way_server(echo_action, buffered_file_storage_rec
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
-        dataformat=JSONObject)
+        dataformat=JSONObject
+    )
     yield factory
 
 
@@ -505,7 +521,8 @@ async def udp_protocol_factory_one_way_server(buffered_file_storage_action, buff
     factory = DatagramServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+    )
     yield factory
 
 
@@ -972,6 +989,7 @@ async def sftp_protocol_factory_server(buffered_file_storage_action, buffered_fi
         dataformat=JSONObject)
     yield factory
 
+
 @pytest.fixture
 async def sftp_protocol_factory_server_started(sftp_protocol_factory_server,
                                                sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
@@ -1194,3 +1212,28 @@ def server_side_no_ssl():
 ])
 def ssl_object(request):
     return request.param
+
+
+@pytest.fixture
+async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_server_context) -> TCPServerConnection:
+    context_cv.set(initial_server_context)
+    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
+                               allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')],
+                               parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
+                               aliases={'127.0.0.1': 'localhost4', '::1': 'localhost6'})
+    yield conn
+    if conn.transport and not conn.transport.is_closing():
+        conn.transport.close()
+    await conn.wait_closed()
+
+
+@pytest.fixture
+async def udp_protocol_factory_allowed_senders(echo_action) -> DatagramServerProtocolFactory:
+    factory = DatagramServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')],
+        aliases={'127.0.0.1': 'localhost4', '::1': 'localhost6'})
+    await factory.start()
+    yield factory
+    await factory.close()

@@ -13,3 +13,6 @@ class ConnectionAlreadyClosedError(BaseException):
 class ProtocolException(BaseException):
     pass
 
+
+class RemoteConnectionClosedError(BaseException):
+    pass
