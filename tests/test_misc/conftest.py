@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from lib.compatibility import supports_task_name
 from lib.wrappers.counters import Counters, Counter
 from lib.wrappers.schedulers import TaskScheduler
 
@@ -24,3 +25,14 @@ async def task_scheduler() -> TaskScheduler:
     scheduler = TaskScheduler()
     yield scheduler
     await asyncio.wait_for(scheduler.close(), timeout=1)
+
+
+@pytest.fixture
+async def task() -> asyncio.Task:
+    async def coro(): ...
+    if supports_task_name():
+        task = asyncio.create_task(coro(), name="Task-99")
+    else:
+        task = asyncio.create_task(coro())
+    yield task
+    await task
