@@ -50,12 +50,12 @@ class TestConnectionShared:
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
 
     @pytest.mark.asyncio
-    async def test_03_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.1') is True
+    async def test_03_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, peer):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(peer[0]) is True
 
     @pytest.mark.asyncio
-    async def test_04_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::1') is True
+    async def test_04_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, peer_ipv6):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(peer_ipv6[0]) is True
 
     @pytest.mark.asyncio
     async def test_05_sender_valid_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
@@ -66,12 +66,12 @@ class TestConnectionShared:
         assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::2') is False
 
     @pytest.mark.asyncio
-    async def test_07_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '127.0.0.1'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = '127.0.0.1'
+    async def test_07_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, peer):
+        tcp_protocol_two_way_server_allowed_senders.context['peer'] = peer[0]
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = peer[0]
         tcp_protocol_two_way_server_allowed_senders._check_peer()
-        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == 'localhost4(127.0.0.1)'
-        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == '127.0.0.1'
+        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == f'localhost4({peer[0]})'
+        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == peer[0]
 
     @pytest.mark.asyncio
     async def test_08_check_peer_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders):
@@ -120,9 +120,9 @@ class TestConnectionOneWayServer:
         packets[1] = packets[1]._replace(timestamp=json_recording_data[1].timestamp)
         assert packets == json_recording_data
 
-    def test_01_is_child(self, one_way_server_connection, one_way_server_protocol_name):
-        assert one_way_server_connection.is_child(f"{one_way_server_protocol_name.upper()} Server 127.0.0.1:8888")
-        assert not one_way_server_connection.is_child("ABC Server 127.0.0.1:8888")
+    def test_01_is_child(self, one_way_server_connection, one_way_server_protocol_name, sock_str):
+        assert one_way_server_connection.is_child(f"{one_way_server_protocol_name.upper()} Server {sock_str}")
+        assert not one_way_server_connection.is_child(f"ABC Server {sock_str}")
 
     @pytest.mark.asyncio
     async def test_02_pickle(self, one_way_server_connection):
@@ -134,7 +134,7 @@ class TestConnectionOneWayServer:
 class TestConnectionOneWayClient:
     def test_00_is_child(self, one_way_client_connection, one_way_client_protocol_name):
         assert one_way_client_connection.is_child(f"{one_way_client_protocol_name.upper()} Client 127.0.0.1:0")
-        assert not one_way_client_connection.is_child("ABC Client 127.0.0.1:8888")
+        assert not one_way_client_connection.is_child("ABC Client 127.0.0.1:0")
 
     @pytest.mark.asyncio
     async def test_01_pickle(self, one_way_client_connection):
@@ -147,14 +147,14 @@ class TestConnectionTwoWayServer:
     @pytest.mark.asyncio
     async def test_00_on_data_received(self, tmp_path, two_way_server_connection, echo_encoded,
                                        echo_response_encoded,  timestamp, echo_recording_data, queue,
-                                       two_way_server_transport, peername):
+                                       two_way_server_transport, peer):
         two_way_server_connection.connection_made(two_way_server_transport)
         two_way_server_transport.set_protocol(two_way_server_connection)
         two_way_server_connection.data_received(echo_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
-        assert receiver == peername
+        assert receiver == peer
         assert msg == echo_response_encoded
         expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
         assert expected_file.exists()
@@ -163,16 +163,16 @@ class TestConnectionTwoWayServer:
         assert packets == echo_recording_data
 
     @pytest.mark.asyncio
-    async def test_01_on_data_received_notification(self, tmp_path, two_way_server_connection,
+    async def test_01_on_data_received_notification(self, tmp_path, two_way_server_connection, peer,
                                                     echo_notification_client_encoded, echo_notification_server_encoded,
-                                                    timestamp, echo_recording_data, queue, two_way_server_transport, peername):
+                                                    timestamp, echo_recording_data, queue, two_way_server_transport):
         two_way_server_connection.connection_made(two_way_server_transport)
         two_way_server_transport.set_protocol(two_way_server_connection)
         two_way_server_connection.data_received(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
-        assert receiver == peername
+        assert receiver == peer
         assert msg == echo_notification_server_encoded
         expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
         assert expected_file.exists()

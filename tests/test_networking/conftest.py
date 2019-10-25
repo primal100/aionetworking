@@ -86,8 +86,8 @@ def critical_logging_only(caplog):
 
 
 @pytest.fixture
-def initial_server_context() -> Dict[str, Any]:
-    return {'endpoint': 'TCP Server 127.0.0.1:8888'}
+def initial_server_context(sock_str) -> Dict[str, Any]:
+    return {'endpoint': f'TCP Server {sock_str}'}
 
 
 @pytest.fixture
@@ -96,8 +96,8 @@ def initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def udp_initial_server_context() -> Dict[str, Any]:
-    return {'endpoint': 'UDP Server 127.0.0.1:8888'}
+def udp_initial_server_context(sock_str) -> Dict[str, Any]:
+    return {'endpoint': f'UDP Server {sock_str}'}
 
 
 @pytest.fixture
@@ -106,8 +106,8 @@ def udp_initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sftp_initial_server_context() -> Dict[str, Any]:
-    return {'endpoint': 'SFTP Server 127.0.0.1:8888'}
+def sftp_initial_server_context(sock_str) -> Dict[str, Any]:
+    return {'endpoint': f'SFTP Server {sock_str}'}
 
 
 @pytest.fixture
@@ -116,17 +116,17 @@ def sftp_initial_client_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def tcp_server_context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888'}
+def tcp_server_context(sock, sock_str, peer, peer_str) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': f'TCP Server {sock_str}', 'host': peer[0], 'port': peer[1],
+            'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
+            'client': peer_str, 'own': sock_str}
 
 
 @pytest.fixture
-def tcp_client_context() -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Client', 'host': '127.0.0.1', 'port': 8888,
-            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000'}
+def tcp_client_context(sock, sock_str, peer, peer_str) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Client', 'host': sock[0], 'port': sock[1],
+            'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
+            'client': peer_str, 'own': peer_str}
 
 
 @pytest.fixture
@@ -161,24 +161,24 @@ def tcp_client_context_ssl(tcp_client_context) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def udp_server_context() -> Dict[str, Any]:
-    return {'protocol_name': 'UDP Server', 'endpoint': 'UDP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888'}
+def udp_server_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
+    return {'protocol_name': 'UDP Server', 'endpoint': f'UDP Server {sock_str}', 'host': peer[0], 'port': peer[1],
+            'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
+            'client': peer_str, 'own': sock_str}
 
 
 @pytest.fixture
-def udp_client_context() -> Dict[str, Any]:
-    return {'protocol_name': 'UDP Client', 'host': '127.0.0.1', 'port': 8888,
-            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000'}
+def udp_client_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
+    return {'protocol_name': 'UDP Client', 'host': sock[0], 'port': sock[1],
+            'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
+            'client': peer_str, 'own': peer_str}
 
 
 @pytest.fixture
-def sftp_server_context() -> Dict[str, Any]:
-    return {'protocol_name': 'SFTP Server', 'endpoint': 'SFTP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': '127.0.0.1:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888',
+def sftp_server_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
+    return {'protocol_name': 'SFTP Server', 'endpoint': f'SFTP Server {sock_str}', 'host': peer[0], 'port': peer[1],
+            'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
+            'client': peer_str, 'own': sock_str,
             'username': 'testuser', 'client_version':
             'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
@@ -191,10 +191,10 @@ def sftp_server_context() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sftp_client_context() -> dict:
-    return {'protocol_name': 'SFTP Client', 'host': '127.0.0.1', 'port': 8888,
-            'peer': '127.0.0.1:8888', 'sock': '127.0.0.1:60000', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:60000',
+def sftp_client_context(peer, peer_str, sock, sock_str) -> dict:
+    return {'protocol_name': 'SFTP Client', 'host':sock[0], 'port': sock[1],
+            'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
+            'client': peer_str, 'own': peer_str,
             'username': 'testuser',
             'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
@@ -217,12 +217,14 @@ def echo_decode_error_response_encoded(echo_exception_request_encoded) -> bytes:
 
 
 @pytest.fixture
-def echo_recording_data() -> List:
-    return [recorded_packet(sent_by_server=False, timestamp=datetime.datetime(2019, 1, 1, 1, 1), sender='127.0.0.1', data=b'{"id": 1, "method": "echo"}')]
+def echo_recording_data(peer) -> List:
+    return [recorded_packet(sent_by_server=False, timestamp=datetime.datetime(2019, 1, 1, 1, 1), sender=peer[0],
+                            data=b'{"id": 1, "method": "echo"}')]
 
 
 @pytest.fixture
-async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action, tcp_server_context) -> ReceiverAdaptor:
+async def one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action,
+                                   tcp_server_context) -> ReceiverAdaptor:
     context_cv.set(tcp_server_context)
     adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
                               preaction=buffered_file_storage_recording_action)
@@ -319,18 +321,18 @@ async def file_containing_json_recording(tmpdir, buffer_codec, json_encoded_mult
 
 
 @pytest.fixture
-def extra_inet(peername, sock) -> dict:
-    return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket()}
+def extra_inet(peer, sock) -> dict:
+    return {'peername': peer, 'sockname': sock, 'socket': MockAFInetSocket()}
 
 
 @pytest.fixture
-def extra_client_inet(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket()}
+def extra_client_inet(peer, sock) -> dict:
+    return {'peername': sock, 'sockname': peer, 'socket': MockAFInetSocket()}
 
 
 @pytest.fixture
-def extra_server_inet_sftp(peername, sock) -> dict:
-    return {'peername': peername, 'sockname': sock, 'socket': MockAFInetSocket(),
+def extra_server_inet_sftp(peer, sock) -> dict:
+    return {'peername': peer, 'sockname': sock, 'socket': MockAFInetSocket(),
             'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'send_cipher': 'chacha20-poly1305@openssh.com',
@@ -342,8 +344,8 @@ def extra_server_inet_sftp(peername, sock) -> dict:
 
 
 @pytest.fixture
-def extra_client_inet_sftp(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername, 'socket': MockAFInetSocket(), 'username': 'testuser',
+def extra_client_inet_sftp(peer, sock) -> dict:
+    return {'peername': sock, 'sockname': peer, 'socket': MockAFInetSocket(), 'username': 'testuser',
             'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
             'send_cipher': 'chacha20-poly1305@openssh.com',
@@ -355,13 +357,13 @@ def extra_client_inet_sftp(peername, sock) -> dict:
 
 
 @pytest.fixture
-def extra_unix(peername, sock) -> dict:
-    return {'peername': peername, 'sockname': sock, 'socket': MockAFUnixSocket()}
+def extra_unix(peer, sock) -> dict:
+    return {'peername': peer, 'sockname': sock, 'socket': MockAFUnixSocket()}
 
 
 @pytest.fixture
-def extra_client_unix(peername, sock) -> dict:
-    return {'peername': sock, 'sockname': peername, 'socket': MockAFUnixSocket()}
+def extra_client_unix(peer, sock) -> dict:
+    return {'peername': sock, 'sockname': peer, 'socket': MockAFUnixSocket()}
 
 
 @pytest.fixture
@@ -398,33 +400,13 @@ async def udp_transport_client(queue, extra_client_inet) -> MockDatagramTranspor
 
 
 @pytest.fixture
-async def udp_transport_wrapper_server(udp_transport_server, queue, peername) -> DatagramTransportWrapper:
-    yield DatagramTransportWrapper(udp_transport_server, peername)
+async def udp_transport_wrapper_server(udp_transport_server, queue, peer) -> DatagramTransportWrapper:
+    yield DatagramTransportWrapper(udp_transport_server, peer)
 
 
 @pytest.fixture
 async def udp_transport_wrapper_client(udp_transport_client, sock) -> DatagramTransportWrapper:
     yield DatagramTransportWrapper(udp_transport_client, sock)
-
-
-@pytest.fixture
-def peername() -> Tuple[str, int]:
-    return '127.0.0.1', 60000
-
-
-@pytest.fixture
-def peername_ipv6() -> Tuple[str, int]:
-    return '::1', 60000
-
-
-@pytest.fixture
-def sock() -> Tuple[str, int]:
-    return '127.0.0.1', 8888
-
-
-@pytest.fixture
-def sock_ipv6() -> Tuple[str, int]:
-    return '::1', 8888
 
 
 @pytest.fixture
@@ -449,11 +431,12 @@ async def protocol_factory_one_way_server(buffered_file_storage_action,
 
 
 @pytest.fixture
-async def protocol_factory_one_way_server_started(protocol_factory_one_way_server, initial_server_context) -> StreamServerProtocolFactory:
+async def protocol_factory_one_way_server_started(protocol_factory_one_way_server, initial_server_context,
+                                                  sock_str) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     await protocol_factory_one_way_server.start()
     if not protocol_factory_one_way_server.full_name:
-        protocol_factory_one_way_server.set_name('TCP Server 127.0.0.1:8888', 'tcp')
+        protocol_factory_one_way_server.set_name(f'TCP Server {sock_str}', 'tcp')
     yield protocol_factory_one_way_server
     await protocol_factory_one_way_server.close()
 
@@ -471,12 +454,12 @@ async def protocol_factory_two_way_server(echo_action, buffered_file_storage_rec
 
 
 @pytest.fixture
-async def protocol_factory_two_way_server_started(protocol_factory_two_way_server,
+async def protocol_factory_two_way_server_started(protocol_factory_two_way_server, sock_str,
                                                   initial_server_context) -> StreamServerProtocolFactory:
         context_cv.set(initial_server_context)
         await protocol_factory_two_way_server.start()
         if not protocol_factory_two_way_server.full_name:
-            protocol_factory_two_way_server.set_name('TCP Server 127.0.0.1:8888', 'tcp')
+            protocol_factory_two_way_server.set_name(f'TCP Server {sock_str}', 'tcp')
         yield protocol_factory_two_way_server
         await protocol_factory_two_way_server.close()
 
@@ -527,12 +510,12 @@ async def udp_protocol_factory_one_way_server(buffered_file_storage_action, buff
 
 
 @pytest.fixture
-async def udp_protocol_factory_one_way_server_started(udp_protocol_factory_one_way_server,
-                                              udp_initial_server_context) -> DatagramServerProtocolFactory:
+async def udp_protocol_factory_one_way_server_started(udp_protocol_factory_one_way_server, sock_str,
+                                                      udp_initial_server_context) -> DatagramServerProtocolFactory:
     context_cv.set(udp_initial_server_context)
     await udp_protocol_factory_one_way_server.start()
     if not udp_protocol_factory_one_way_server.full_name:
-        udp_protocol_factory_one_way_server.set_name('UDP Server 127.0.0.1:8888', 'udp')
+        udp_protocol_factory_one_way_server.set_name(f'UDP Server{sock_str}', 'udp')
     yield udp_protocol_factory_one_way_server
     if udp_protocol_factory_one_way_server.transport and not udp_protocol_factory_one_way_server.transport.is_closing():
         await udp_protocol_factory_one_way_server.close()
@@ -549,12 +532,12 @@ async def udp_protocol_factory_two_way_server(echo_action, buffered_file_storage
 
 
 @pytest.fixture
-async def udp_protocol_factory_two_way_server_started(udp_protocol_factory_two_way_server,
+async def udp_protocol_factory_two_way_server_started(udp_protocol_factory_two_way_server, sock_str,
                                                       udp_initial_server_context) -> DatagramServerProtocolFactory:
     context_cv.set(udp_initial_server_context)
     await udp_protocol_factory_two_way_server.start()
     if not udp_protocol_factory_two_way_server.full_name:
-        udp_protocol_factory_two_way_server.set_name('UDP Server 127.0.0.1:8888', 'udp')
+        udp_protocol_factory_two_way_server.set_name(f'UDP Server {sock_str}', 'udp')
     yield udp_protocol_factory_two_way_server
     if udp_protocol_factory_two_way_server.transport and not udp_protocol_factory_two_way_server.transport.is_closing():
         await udp_protocol_factory_two_way_server.close()
@@ -600,10 +583,10 @@ async def udp_protocol_factory_two_way_client_started(udp_protocol_factory_two_w
 
 @pytest.fixture
 async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                      initial_server_context) -> TCPServerConnection:
+                                      initial_server_context, sock_str) -> TCPServerConnection:
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
-                               parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
+                               parent_name=f"TCP Server {sock_str}", peer_prefix='tcp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -622,11 +605,11 @@ async def tcp_protocol_one_way_client(initial_client_context) -> TCPClientConnec
 
 
 @pytest.fixture
-async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recording_action,
+async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recording_action, sock_str,
                                       initial_server_context) -> TCPServerConnection:
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
-                               parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
+                               parent_name=f"TCP Server {sock_str}", peer_prefix='tcp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -647,10 +630,10 @@ async def tcp_protocol_two_way_client(echo_requester, initial_client_context) ->
 
 @pytest.fixture
 async def udp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                      udp_initial_server_context) -> UDPServerConnection:
+                                      udp_initial_server_context, sock_str) -> UDPServerConnection:
     context_cv.set(udp_initial_server_context)
     conn = UDPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
-                               parent_name="UDP Server 127.0.0.1:8888", peer_prefix='udp',
+                               parent_name=f"UDP Server {sock_str}", peer_prefix='udp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -669,11 +652,11 @@ async def udp_protocol_one_way_client(udp_initial_client_context) -> UDPClientCo
 
 
 @pytest.fixture
-async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recording_action,
+async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recording_action, sock_str,
                                       udp_initial_server_context) -> UDPServerConnection:
     context_cv.set(udp_initial_server_context)
     conn = UDPServerConnection(dataformat=JSONObject, action=echo_action,
-                               parent_name="UDP Server 127.0.0.1:8888", peer_prefix='udp',
+                               parent_name=f"UDP Server {sock_str}", peer_prefix='udp',
                                preaction=buffered_file_storage_recording_action)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -730,17 +713,17 @@ def protocol_name(connection_args):
 @pytest.fixture(params=[
     lazy_fixture((
                  protocol_factory_one_way_server_started.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__,
-                 one_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+                 one_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((protocol_factory_one_way_client_started.__name__, tcp_protocol_one_way_client.__name__,
                   tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             protocol_factory_two_way_server_started.__name__, tcp_protocol_two_way_server.__name__, tcp_transport.__name__,
-            two_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+            two_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((protocol_factory_two_way_client_started.__name__, tcp_protocol_two_way_client.__name__,
                   tcp_transport_client.__name__, two_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_one_way_server_started.__name__, udp_protocol_one_way_server.__name__,
-            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True]  +
+            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peer.__name__)) + [True]  +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_one_way_client_started.__name__, udp_protocol_one_way_client.__name__,
@@ -748,7 +731,7 @@ def protocol_name(connection_args):
         "udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_server_started.__name__, udp_protocol_two_way_server.__name__,
-            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peer.__name__)) + [True] +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_client_started.__name__, udp_protocol_two_way_client.__name__,
@@ -787,10 +770,10 @@ def two_way_server_protocol_name(two_way_server_connection_args):
 @pytest.fixture(params=[
     lazy_fixture((
             protocol_factory_two_way_server_started.__name__, tcp_protocol_two_way_server.__name__, tcp_transport.__name__,
-            two_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+            two_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_two_way_server_started.__name__, udp_protocol_two_way_server.__name__,
-            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peer.__name__)) + [True] +
     ["udp"],
 ])
 def two_way_server_connection_args(request):
@@ -853,10 +836,10 @@ def one_way_server_protocol_name(one_way_server_connection_args):
 @pytest.fixture(params=[
     lazy_fixture((
             protocol_factory_one_way_server_started.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__,
-            one_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+            one_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((
             udp_protocol_factory_one_way_server_started.__name__, udp_protocol_one_way_server.__name__,
-            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_one_way_receiver_adaptor.__name__, peer.__name__)) + [True] +
     ["udp"],
 ])
 def one_way_server_connection_args(request):
@@ -919,13 +902,13 @@ def stream_connection_is_stored(stream_connection_args):
 @pytest.fixture(params=[
     lazy_fixture((
             protocol_factory_one_way_server_started.__name__, tcp_protocol_one_way_server.__name__, tcp_transport.__name__,
-            one_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+            one_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((
             protocol_factory_one_way_client_started.__name__, tcp_protocol_one_way_client.__name__,
             tcp_transport_client.__name__, one_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
     lazy_fixture((
             protocol_factory_two_way_server_started.__name__, tcp_protocol_two_way_server.__name__, tcp_transport.__name__,
-            two_way_receiver_adaptor.__name__, peername.__name__)) + [True] + ["tcp"],
+            two_way_receiver_adaptor.__name__, peer.__name__)) + [True] + ["tcp"],
     lazy_fixture((protocol_factory_two_way_client_started.__name__, tcp_protocol_two_way_client.__name__,
                   tcp_transport_client.__name__, two_way_sender_adaptor.__name__, sock.__name__)) + [False] + ["tcp"],
 ])
@@ -961,7 +944,7 @@ def datagram_connection_is_stored(datagram_connection_args):
 @pytest.fixture(params=[
     lazy_fixture((
             udp_protocol_factory_one_way_server_started.__name__, udp_protocol_one_way_server.__name__,
-            udp_transport_server.__name__, udp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_server.__name__, udp_one_way_receiver_adaptor.__name__, peer.__name__)) + [True] +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_one_way_client_started.__name__, udp_protocol_one_way_client.__name__,
@@ -969,7 +952,7 @@ def datagram_connection_is_stored(datagram_connection_args):
         "udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_server_started.__name__, udp_protocol_two_way_server.__name__,
-            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peername.__name__)) + [True] +
+            udp_transport_wrapper_server.__name__, udp_two_way_receiver_adaptor.__name__, peer.__name__)) + [True] +
     ["udp"],
     lazy_fixture((
             udp_protocol_factory_two_way_client_started.__name__, udp_protocol_two_way_client.__name__,
@@ -991,12 +974,12 @@ async def sftp_protocol_factory_server(buffered_file_storage_action, buffered_fi
 
 
 @pytest.fixture
-async def sftp_protocol_factory_server_started(sftp_protocol_factory_server,
+async def sftp_protocol_factory_server_started(sftp_protocol_factory_server, sock_str,
                                                sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
     context_cv.set(sftp_initial_server_context)
     await sftp_protocol_factory_server.start()
     if not sftp_protocol_factory_server.full_name:
-        sftp_protocol_factory_server.set_name('SFTP Server 127.0.0.1:8888', 'sftp')
+        sftp_protocol_factory_server.set_name(f'SFTP Server {sock_str}', 'sftp')
     yield sftp_protocol_factory_server
     await sftp_protocol_factory_server.close()
 
@@ -1022,10 +1005,10 @@ async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp
 
 @pytest.fixture
 async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                 sftp_initial_server_context) -> SFTPServerOSAuthProtocol:
+                                       sftp_initial_server_context, sock_str) -> SFTPServerOSAuthProtocol:
     context_cv.set(sftp_initial_server_context)
     protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
-                               parent_name="SFTP Server 127.0.0.1:8888", peer_prefix='sftp',
+                               parent_name=f"SFTP Server {sock_str}", peer_prefix='sftp',
                                preaction=buffered_file_storage_recording_action)
     yield protocol
     if not protocol.is_closing():
@@ -1111,7 +1094,7 @@ async def sftp_one_way_sender_adaptor(sftp_client_context, queue) -> SenderAdapt
 @pytest.fixture(params=[
     lazy_fixture((
                  sftp_protocol_factory_server_started.__name__, sftp_protocol_one_way_server.__name__,
-                 sftp_conn_server.__name__, sftp_one_way_receiver_adaptor.__name__, peername.__name__)) + [True],
+                 sftp_conn_server.__name__, sftp_one_way_receiver_adaptor.__name__, peer.__name__)) + [True],
     lazy_fixture((sftp_protocol_factory_client_started.__name__, sftp_protocol_one_way_client.__name__,
                   sftp_conn_client.__name__, sftp_one_way_sender_adaptor.__name__, sock.__name__)) + [False],
 ])
@@ -1215,12 +1198,13 @@ def ssl_object(request):
 
 
 @pytest.fixture
-async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_server_context) -> TCPServerConnection:
+async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_server_context, sock, sock_ipv6,
+                                                      sock_str) -> TCPServerConnection:
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
-                               allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')],
-                               parent_name="TCP Server 127.0.0.1:8888", peer_prefix='tcp',
-                               aliases={'127.0.0.1': 'localhost4', '::1': 'localhost6'})
+                               allowed_senders=[IPNetwork(sock[0]), IPNetwork(sock_ipv6[0])],
+                               parent_name=f"TCP Server {sock_str}", peer_prefix='tcp',
+                               aliases={sock[0]: 'localhost4', sock_ipv6[0]: 'localhost6'})
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -1228,12 +1212,12 @@ async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_serve
 
 
 @pytest.fixture
-async def udp_protocol_factory_allowed_senders(echo_action) -> DatagramServerProtocolFactory:
+async def udp_protocol_factory_allowed_senders(echo_action, sock, sock_ipv6, sock_str) -> DatagramServerProtocolFactory:
     factory = DatagramServerProtocolFactory(
         action=echo_action,
         dataformat=JSONObject,
-        allowed_senders=[IPNetwork('127.0.0.1'), IPNetwork('::1')],
-        aliases={'127.0.0.1': 'localhost4', '::1': 'localhost6'})
+        allowed_senders=[IPNetwork(sock[0]), IPNetwork(sock_ipv6[0])],
+        aliases={sock[0]: 'localhost4', sock_ipv6[0]: 'localhost6'})
     await factory.start()
     yield factory
     await factory.close()

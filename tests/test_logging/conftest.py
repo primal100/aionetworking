@@ -10,9 +10,9 @@ from lib.types import Expression
 
 
 @pytest.fixture
-def peer_filter() -> PeerFilter:
+def peer_filter(peer) -> PeerFilter:
     connection_logger = logging.getLogger('receiver.connection')
-    return PeerFilter(['127.0.0.1'], [connection_logger])
+    return PeerFilter([peer[0]], [connection_logger])
 
 
 @pytest.fixture
@@ -23,19 +23,19 @@ def message_filter() -> MessageFilter:
 
 
 @pytest.fixture()
-def log_record() -> logging.LogRecord:
+def log_record(peer, sock_str, peer_str) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                             'New %s connection from %s to %s', ('TCP Server', '127.0.0.1:60000', '127.0.0.1:8888'),
-                             None, func='new_connection', sinfo=None)
-    record.alias = '127.0.0.1'
+                               'New %s connection from %s to %s', ('TCP Server', peer_str, sock_str),
+                               None, func='new_connection', sinfo=None)
+    record.alias = peer[0]
     return record
 
 
 @pytest.fixture()
-def log_record_not_included() -> logging.LogRecord:
+def log_record_not_included(peer, sock_str) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                             'New %s connection from %s to %s', ('TCP Server', '127.0.0.2:60000', '127.0.0.1:8888'),
-                             None, func='new_connection', sinfo=None)
+                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{peer[1]}', sock_str),
+                                None, func='new_connection', sinfo=None)
     record.alias = '127.0.0.2'
     return record
 
@@ -43,7 +43,7 @@ def log_record_not_included() -> logging.LogRecord:
 @pytest.fixture()
 def log_record_msg_object(json_rpc_login_request_object) -> logging.LogRecord:
     record = logging.LogRecord('receiver.msg_received', logging.DEBUG, os.path.abspath(__file__), 180,
-                             'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
+                               'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
     record.msg_obj = json_rpc_login_request_object
     return record
 
@@ -72,10 +72,10 @@ async def receiver_connection_logger(receiver_logger, context, caplog) -> Connec
 
 
 @pytest.fixture
-def context_wrong_peer(peer) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.2', 'port': 60000,
-            'peer': '127.0.0.2:60000', 'sock': '127.0.0.1:8888', 'alias': '127.0.0.2', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.2:60000', 'own': '127.0.0.1:8888'}
+def context_wrong_peer(peer, peer_str, sock_str, sock) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': f'TCP Server {sock_str}', 'host': '127.0.0.2', 'port': peer[1],
+            'peer': f'127.0.0.2:{peer[1]}', 'sock': sock_str, 'alias': '127.0.0.2', 'server': sock_str,
+            'client': f'127.0.0.2:{peer[1]}', 'own': sock_str}
 
 
 @pytest.fixture

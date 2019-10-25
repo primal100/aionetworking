@@ -1,5 +1,7 @@
 from __future__ import annotations
 import pytest
+import asyncio
+import os
 from pathlib import Path
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.recording import BufferCodec, BufferObject, recorded_packet
@@ -9,15 +11,73 @@ from typing import Dict, Any, List, NamedTuple, Tuple
 
 
 @pytest.fixture
-def peer() -> str:
-    return '127.0.0.1:60000'
+def server_port() -> int:
+    loop = asyncio.get_event_loop()
+    if os.name == 'nt':
+        if isinstance(loop, asyncio.ProactorEventLoop):
+            return 8886
+        if isinstance(loop, asyncio.SelectorEventLoop):
+            return 8887
+    if isinstance(loop, asyncio.SelectorEventLoop):
+        return 8888
+    else:
+        return 8889
 
 
 @pytest.fixture
-def context(peer) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': 'TCP Server 127.0.0.1:8888', 'host': '127.0.0.1', 'port': 60000,
-            'peer': peer, 'sock': '127.0.0.1:8888', 'alias': '127.0.0.1', 'server': '127.0.0.1:8888',
-            'client': '127.0.0.1:60000', 'own': '127.0.0.1:8888'}
+def client_port() -> int:
+    loop = asyncio.get_event_loop()
+    if os.name == 'nt':
+        if isinstance(loop, asyncio.ProactorEventLoop):
+            return 60000
+        if isinstance(loop, asyncio.SelectorEventLoop):
+            return 60001
+    if isinstance(loop, asyncio.SelectorEventLoop):
+        return 60002
+    else:
+        return 60003
+
+
+@pytest.fixture
+def sock(server_port) -> Tuple[str, int]:
+    return '127.0.0.1', server_port
+
+
+@pytest.fixture
+def sock_str(sock) -> str:
+    return f'{sock[0]}:{sock[1]}'
+
+
+@pytest.fixture
+def sock_ipv6(server_port) -> Tuple[str, int, int, int]:
+    return '::1', server_port, 0, 0
+
+
+@pytest.fixture
+def peer(client_port) -> Tuple[str, int]:
+    return '127.0.0.1', client_port
+
+
+@pytest.fixture
+def peer_str(peer) -> str:
+    return f'{peer[0]}:{peer[1]}'
+
+
+@pytest.fixture
+def peer_ipv6() -> Tuple[str, int, int, int]:
+    return '::1', 60000, 0, 0
+
+
+@pytest.fixture
+def peer_ipv6str(peer_ipv6) -> str:
+    return f'{peer_ipv6[0]}:{peer_ipv6[1]}'
+
+
+@pytest.fixture
+def context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
+    return {'protocol_name': 'TCP Server', 'endpoint': f'TCP Server {sock_str}', 'host': peer[0], 'port': peer[1],
+            'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
+            'client': peer_str, 'own': sock_str}
 
 
 @pytest.fixture
