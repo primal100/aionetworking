@@ -13,20 +13,23 @@ else:
     from cached_property import cached_property
 
 
-def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
+def supports_task_name():
+    return hasattr(asyncio.Task, 'get_name')
+
+
+def set_task_name(task: asyncio.Task, name: str, include_hierarchy: bool = True, separator: str = ':'):
     if hasattr(task, "set_name"):
         task_name = get_task_name(task)
-        name = f"{task_name}_{name}" if name else task_name
+        new_name = f"{task_name}_{name}" if name else task_name
         if include_hierarchy:
             prefix = get_current_task_name()
-            if any(prefix == text for text in ("No Running Loop", "No Task")):
+            if any(prefix == text for text in ("No Running Loop", "No Task", task_name)):
                 prefix = ''
-            prefix += task_name
-            name = f"{prefix}{separator}{name}" if prefix else name
-        task.set_name(name)
+            new_name = f"{prefix}{separator}{new_name}" if prefix else new_name
+        task.set_name(new_name)
 
 
-def get_task_name(task: asyncio.Future) -> str:
+def get_task_name(task: asyncio.Task) -> str:
     if hasattr(task, "get_name"):
         return task.get_name()
     return str(id(task))
