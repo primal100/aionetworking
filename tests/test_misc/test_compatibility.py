@@ -10,7 +10,7 @@ class TestTaskNames:
         if supports_task_name():
             assert task.get_name() == get_task_name(task) == "Task-99"
         else:
-            assert id(task) == get_task_name(task)
+            assert str(id(task)) == get_task_name(task)
 
     @pytest.mark.asyncio
     async def test_01_get_current_task_name(self):
