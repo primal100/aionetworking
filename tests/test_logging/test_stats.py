@@ -83,7 +83,7 @@ class TestStatsLogger:
         assert stats_logger.processed == 0
 
     @pytest.mark.asyncio
-    async def test_02_log_info_twice(self, stats_logger, json_rpc_login_request_encoded,
+    async def test_02_log_info_twice(self, stats_logger, json_rpc_login_request_encoded, peer_str,
                                      json_rpc_logout_request_encoded, stats_formatter, caplog):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
@@ -93,7 +93,7 @@ class TestStatsLogger:
         assert stats_logger.received == 79
         assert stats_logger.processed == 79
         stats_logger.stats('ALL')
-        assert caplog.text.startswith('127.0.0.1:60000 ALL 1 1 0.08KB 0.08KB')
+        assert caplog.text.startswith(f'{peer_str} ALL 1 1 0.08KB 0.08KB')
         caplog.clear()
         assert stats_logger.received == 0
         assert stats_logger.processed == 0
@@ -102,10 +102,10 @@ class TestStatsLogger:
         assert stats_logger.received == 47
         assert stats_logger.processed == 47
         stats_logger.periodic_log()
-        assert caplog.text.startswith('127.0.0.1:60000 INTERVAL 1 1 0.05KB 0.05KB')
+        assert caplog.text.startswith(f'{peer_str} INTERVAL 1 1 0.05KB 0.05KB')
 
     @pytest.mark.asyncio
-    async def test_03_periodic_log(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog):
+    async def test_03_periodic_log(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, peer_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
@@ -114,29 +114,29 @@ class TestStatsLogger:
         assert stats_logger.received == 79
         assert stats_logger.processed == 79
         await asyncio.sleep(0.15)
-        assert caplog.text.startswith('127.0.0.1:60000 INTERVAL 1 1 0.08KB 0.08KB')
+        assert caplog.text.startswith(f'{peer_str} INTERVAL 1 1 0.08KB 0.08KB')
         assert stats_logger.received == 0
         assert stats_logger.processed == 0
 
     @pytest.mark.asyncio
-    async def test_04_finish_all(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog):
+    async def test_04_finish_all(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, peer_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(json_rpc_login_request_encoded)
         stats_logger.on_msg_processed(json_rpc_login_request_encoded)
         stats_logger.connection_finished()
-        assert caplog.text.startswith('127.0.0.1:60000 ALL 1 1 0.08KB 0.08KB')
+        assert caplog.text.startswith(f'{peer_str} ALL 1 1 0.08KB 0.08KB')
 
     @pytest.mark.asyncio
-    async def test_05_interval_end(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog):
+    async def test_05_interval_end(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, peer_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
         stats_logger.on_buffer_received(json_rpc_login_request_encoded)
         await asyncio.sleep(0.15)
-        assert caplog.text.startswith('127.0.0.1:60000 INTERVAL 1 0 0.08KB 0.00KB')
+        assert caplog.text.startswith(f'{peer_str} INTERVAL 1 0 0.08KB 0.00KB')
         caplog.clear()
         stats_logger.on_msg_processed(json_rpc_login_request_encoded)
         stats_logger.connection_finished()
-        assert caplog.text.startswith('127.0.0.1:60000 END 0 1 0.00KB 0.08KB')
+        assert caplog.text.startswith(f'{peer_str} END 0 1 0.00KB 0.08KB')

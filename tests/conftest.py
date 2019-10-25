@@ -5,13 +5,12 @@ from dataclasses import dataclass
 import asyncio
 import collections
 import pytest
-import binascii
 import logging
 import os
 import shutil
 from pathlib import Path
 
-from lib.actions.file_storage import FileStorage, BufferedFileStorage, ManagedFile
+from lib.actions.file_storage import FileStorage, BufferedFileStorage
 from lib.conf.logging import ConnectionLoggerStats
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.contrib.pickle import PickleCodec, PickleObject
@@ -28,8 +27,8 @@ from lib.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPSer
 from lib.senders.base import BaseClient
 from lib.senders.clients import TCPClient, pipe_client
 from lib.utils import set_loop_policy
-from lib.wrappers.counters import Counters, Counter
-from lib.wrappers.schedulers import TaskScheduler
+
+
 
 from tests.mock import MockDatagramTransport
 
@@ -656,11 +655,6 @@ def json_rpc_invalid_params_response() -> dict:
     return {'jsonrpc': "2.0", 'id': 0, 'error': {"code": -32600, "message": "Invalid Request"}}
 
 
-@pytest.fixture
-async def task_scheduler() -> TaskScheduler:
-    scheduler = TaskScheduler()
-    yield scheduler
-    await asyncio.wait_for(scheduler.close(), timeout=1)
 
 
 @pytest.fixture
@@ -678,19 +672,7 @@ def peer_str() -> str:
     return '127.0.0.1:60000'
 
 
-@pytest.fixture
-async def counter() -> Counter:
-    yield Counter()
 
-
-@pytest.fixture
-async def counter_with_max() -> Counter:
-    yield Counter(max=5, max_increments=5)
-
-
-@pytest.fixture
-async def counters() -> Counters:
-    yield Counters()
 
 
 @pytest.fixture

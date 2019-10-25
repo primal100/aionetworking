@@ -94,7 +94,7 @@ def two_way_client(two_way_receiver_sender_args):
 
 
 @pytest.fixture
-def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, initial_server_context,
+def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, initial_server_context, sock_str,
                                               receiver_logger) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     factory = StreamServerProtocolFactory(
@@ -102,14 +102,14 @@ def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, init
         dataformat=JSONObject,
         logger=receiver_logger)
     if not factory.full_name:
-        factory.set_name('TCP Server 127.0.0.1:8888', 'tcp')
+        factory.set_name(f'TCP Server {sock_str}', 'tcp')
     yield factory
 
 
 @pytest.fixture
 async def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
     server = TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
-                       port=8888)
+                       port=sock[1])
     await server.start()
     yield server
     if server.is_started():

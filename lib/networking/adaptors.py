@@ -117,8 +117,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
             yield self._notification_queue.get_nowait()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
-        exc = exc or RemoteConnectionClosedError()
-        self._scheduler.cancel_all_futures(exc)
+        self._scheduler.cancel_all_futures(RemoteConnectionClosedError)
         await super().close(exc)
 
     async def send_data_and_wait(self, request_id: Any, encoded: bytes) -> Any:
