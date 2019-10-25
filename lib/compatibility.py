@@ -17,7 +17,7 @@ def supports_task_name():
     return hasattr(asyncio.Task, 'get_name')
 
 
-def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = True, separator: str = ':'):
+def set_task_name(task: asyncio.Task, name: str, include_hierarchy: bool = True, separator: str = ':'):
     if hasattr(task, "set_name"):
         task_name = get_task_name(task)
         new_name = f"{task_name}_{name}" if name else task_name
@@ -29,7 +29,7 @@ def set_task_name(task: asyncio.Future, name: str, include_hierarchy: bool = Tru
         task.set_name(new_name)
 
 
-def get_task_name(task: asyncio.Future) -> str:
+def get_task_name(task: asyncio.Task) -> str:
     if hasattr(task, "get_name"):
         return task.get_name()
     return str(id(task))
