@@ -1,0 +1,5 @@
+!PipeClient
+path: !PipeAddr
+protocol_factory: !StreamClientProtocolFactory
+                  dataformat: !JSON
+                  requester: !EchoRequester

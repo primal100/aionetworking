@@ -1,0 +1,7 @@
+!UDPClient
+host: 127.0.0.1
+port: 0
+quiet: False
+protocol_factory: !DatagramClientProtocolFactory
+                  dataformat: !JSON
+                  requester: !EchoRequester

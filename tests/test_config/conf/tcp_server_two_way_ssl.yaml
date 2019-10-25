@@ -1,0 +1,22 @@
+!TCPServer
+host: 127.0.0.1
+port: !Port
+quiet: False
+ssl: !ServerSideSSL
+     ssl: True
+     cert: !SSLDir server/certificate.pem
+     key: !SSLDir server/privkey.pem
+     cafile: !SSLDir client/certificate.pem
+     capath: !SSLDir client
+     cert_required: True
+     check_hostname: True
+ssl_handshake_timeout: 60
+protocol_factory: !StreamServerProtocolFactory
+                  action: !EchoAction
+                  preaction: !BufferedFileStorage
+                             base_path: !TmpDir Recordings
+                             path: "{msg.peer_safe}.recording"
+                             buffering: 0
+                             close_file_after_inactivity: 2
+                  dataformat: !JSON
+                  pause_reading_on_buffer_size: null

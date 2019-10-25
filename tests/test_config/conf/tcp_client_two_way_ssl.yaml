@@ -1,0 +1,17 @@
+!TCPClient
+host: 127.0.0.1
+port: !Port
+srcip: 127.0.0.1
+ssl: !ClientSideSSL
+     ssl: True
+     cert: !SSLDir client/certificate.pem
+     key: !SSLDir client/privkey.pem
+     cafile: !SSLDir server/certificate.pem
+     capath: !SSLDir server
+     cert_required: True
+     check_hostname: True
+ssl_handshake_timeout: 60
+protocol_factory: !StreamClientProtocolFactory
+                  dataformat: !JSON
+                  requester: !EchoRequester
+

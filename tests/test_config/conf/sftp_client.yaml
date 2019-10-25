@@ -1,0 +1,9 @@
+!SFTPClient
+host: 127.0.0.1
+port: !Port
+srcip: 127.0.0.1
+username: testuser
+password: abcd1234@
+protocol_factory: !SFTPClientProtocolFactory
+                  base_path: !TmpDir sftp_sent
+                  dataformat: !JSON

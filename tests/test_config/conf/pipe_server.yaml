@@ -1,0 +1,12 @@
+!PipeServer
+path: !PipeAddr
+protocol_factory: !StreamServerProtocolFactory
+                  action: !EchoAction
+                          timeout: 5
+                  preaction: !BufferedFileStorage
+                             base_path: !TmpDir Recordings
+                             path: "{msg.peer_safe}.recording"
+                             buffering: 0
+                             close_file_after_inactivity: 2
+                  dataformat: !JSON
+                  pause_reading_on_buffer_size: null

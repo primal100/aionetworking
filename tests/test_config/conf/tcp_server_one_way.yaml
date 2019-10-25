@@ -1,0 +1,17 @@
+!TCPServer
+host: 127.0.0.1
+port: !Port
+quiet: False
+protocol_factory: !StreamServerProtocolFactory
+                  action: !BufferedFileStorage
+                           base_path: !TmpDir Data
+                           path: "Encoded/{msg.peer_safe}_{msg.name}.{msg.name}"
+                           buffering: 0
+                           close_file_after_inactivity: 2
+                  preaction: !BufferedFileStorage
+                             base_path: !TmpDir Recordings
+                             path: "{msg.peer_safe}.recording"
+                             buffering: 0
+                             close_file_after_inactivity: 2
+                  dataformat: !JSON
+                  pause_reading_on_buffer_size: null

@@ -25,7 +25,7 @@ class SFTPFactory(asyncssh.SFTPServer):
     remove_tmp_files = True
     base_upload_dir: Path = settings.TEMPDIR / "sftp_received"
 
-    def __init__(self, conn, base_upload_dir: Path = settings.HOME.joinpath('sftp')):
+    def __init__(self, conn, base_upload_dir: Path = settings.APP_HOME.joinpath('sftp')):
         self._scheduler = TaskScheduler()
         self._conn = conn
         self._conn.set_extra_info(sftp_factory=self)
