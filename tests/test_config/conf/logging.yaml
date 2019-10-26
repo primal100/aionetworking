@@ -1,0 +1,161 @@
+version: 1
+disable_existing_loggers: true
+
+formatters:
+    standard:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    connection:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %{peer}s - %(taskname)s- %(message)s"
+    stats_sender:
+        format: "{msg} {start} {end} {msgs.sent} {sent.kb:.2f}KB {send_rate.kb:.2f}KB/s {msgs.send_rate:.2f}/s {msgs.send_interval}/s {interval}/s"
+        style: '{'
+    stats_received:
+        format: "{msg} {start} {end} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {interval}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB",
+        style: '{'
+    raw:
+        format: "%(peer)s %(message)s"
+    msg:
+        format: "{peer} {msg_obj.request_id}"
+        style: '{'
+
+filters:
+    peer:
+        (): lib.conf.log_filters.PeerFilter
+        peers: [127.0.0.1]
+
+handlers:
+    console:
+        class: logging.StreamHandler
+        level: ERROR
+        formatter: standard
+        stream: ext://sys.stdout
+
+    file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: standard
+        filename: !Path "{logs}/aionetworking.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+    connection_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: connection
+        filename: !Path "{logs}/aionetworking.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+    stats_receiver_file_handler:
+        class: logging.handlers.TimedRotatingFileHandler
+        level: INFO
+        formatter: stats_received
+        filename: !Path "{stats}/{node}.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 20
+        when: D
+        interval: 1
+
+    stats_sender_file_handler:
+        class: logging.handlers.TimedRotatingFileHandler
+        level: INFO
+        formatter: stats_sender
+        filename: !Path "{stats}/{name}_{host}_{port}.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 20
+        when: D
+        interval: 1
+
+    raw_received_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: raw
+        filters: [peer]
+        filename: !Path "{logs}/raw/{node}_received.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+    raw_sent_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: raw
+        filters: [peer]
+        filename: !Path "{logs}/raw/{name}_{host}_{port}_sent.log"
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+    msg_received_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter:  msg
+        filename: !Path "{logs}/summaries/{node}_received.log"
+        filters: [peer]
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+    msg_sent_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter:  msg
+        filename: !Path "{logs}/summaries/{name}_{host}_{port}_sent.log"
+        filters: [peer]
+        maxBytes: 10485760 # 10MB
+        backupCount: 5
+
+root:
+    level: ERROR
+    handlers: [console, file_handler]
+    propagate: yes
+
+
+loggers:
+
+    receiver:
+        level: INFO
+        handlers: [console, file_handler]
+        propagate: no
+
+    sender:
+        level: INFO
+        handlers: [console, file_handler]
+        propagate: no
+
+    receiver.connection:
+        level: INFO
+        handlers: [console, connection_file_handler]
+        propagate: no
+
+    sender.connection:
+        level: INFO
+        handlers: [console, connection_file_handler]
+        propagate: no
+
+    receiver.stats:
+        level: INFO
+        handlers: [console, stats_receiver_file_handler]
+        propagate: no
+
+    sender.stats:
+        level: INFO
+        handlers: [console, stats_stats_file_handler]
+        propagate: no
+
+    receiver.raw_received:
+        level: DEBUG
+        handlers: [console, raw_received_file_handler]
+        propagate: no
+
+    sender.raw_sent:
+        level: DEBUG
+        handlers: [console, raw_sent_file_handler]
+        propagate: no
+
+    receiver.msg_received:
+        level: DEBUG
+        handlers: [console, msg_received_file_handler]
+        propagate: no
+
+    sender.msg_sent:
+        level: DEBUG
+        handlers: [console, msg_sent_file_handler]
+        propagate: no

@@ -1,10 +1,14 @@
 !PipeServer
 path: !PipeAddr
+logger: !ReceiverLogger
+    stats_interval: 0
+    stats_fixed_start_time: true
+    datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !StreamServerProtocolFactory
                   action: !EchoAction
                           timeout: 5
                   preaction: !BufferedFileStorage
-                             base_path: !TmpDir Recordings
+                             base_path: !Path "{temp}/Recordings"
                              path: "{msg.peer_safe}.recording"
                              buffering: 0
                              close_file_after_inactivity: 2

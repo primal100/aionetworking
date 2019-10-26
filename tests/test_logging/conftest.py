@@ -58,7 +58,7 @@ def log_record_msg_object_not_included(json_rpc_logout_request_object) -> loggin
 
 @pytest.fixture
 async def receiver_logger() -> Logger:
-    logger = Logger(logger_name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
+    logger = Logger(name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
     yield logger
 
 

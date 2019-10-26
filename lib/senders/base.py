@@ -9,19 +9,18 @@ from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from lib.compatibility import Protocol
 from lib.conf.context import context_cv
-from lib.conf.logging import Logger, logger_cv
+from lib.conf.logging import Logger, logger_cv, get_logger_sender
 from lib.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from lib.wrappers.value_waiters import StatusWaiter
 from .protocols import SenderProtocol
 
-from typing import Type, Optional
+from typing import Optional
 
 
 @dataclass
 class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
-    logger_cls: Type[Logger] = Logger
-    logger_name = 'sender'
+    logger: Logger = field(default_factory=get_logger_sender)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
@@ -52,9 +51,6 @@ class BaseSender(SenderProtocol, Protocol):
     async def wait_stopped(self) -> None:
         await self._status.wait_stopped()
 
-    def __post_init__(self):
-        self.logger = self.logger_cls(self.logger_name)
-
 
 @dataclass
 class BaseClient(BaseSender, Protocol):
@@ -67,7 +63,6 @@ class BaseClient(BaseSender, Protocol):
     timeout: int = 5
 
     def __post_init__(self):
-        super().__post_init__()
         self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 

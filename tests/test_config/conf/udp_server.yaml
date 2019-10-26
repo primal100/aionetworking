@@ -2,11 +2,15 @@
 host: 127.0.0.1
 port: !Port
 quiet: False
+logger: !ReceiverLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !DatagramServerProtocolFactory
                   action: !EchoAction
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   allowed_senders: !IPNetwork [127.0.0.1, "::1"]
-                  aliases: !!map
-                           127.0.0.1: localhost4
-                           '::1': localhost6
+                  aliases:
+                      127.0.0.1: localhost4
+                      ::1: localhost6

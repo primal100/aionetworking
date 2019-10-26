@@ -2,6 +2,10 @@
 host: 127.0.0.1
 port: 0
 quiet: False
+logger: !SenderLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !DatagramClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester

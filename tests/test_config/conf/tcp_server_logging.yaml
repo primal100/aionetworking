@@ -6,17 +6,12 @@ logger: !ReceiverLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
-ssl: !ServerSideSSL
-     ssl: True
-     cert: !Path "{ssl}/server/certificate.pem"
-     key: !Path "{ssl}/server/privkey.pem"
-     cafile: !Path "{ssl}/client/certificate.pem"
-     capath: !Path "{ssl}/client"
-     cert_required: True
-     check_hostname: True
-ssl_handshake_timeout: 60
 protocol_factory: !StreamServerProtocolFactory
-                  action: !EchoAction
+                  action: !BufferedFileStorage
+                           base_path: !Path "{data}"
+                           path: "Encoded/{msg.peer_safe}_{msg.name}.{msg.name}"
+                           buffering: 0
+                           close_file_after_inactivity: 2
                   preaction: !BufferedFileStorage
                              base_path: !Path "{temp}/recordings"
                              path: "{msg.peer_safe}.recording"
@@ -24,3 +19,5 @@ protocol_factory: !StreamServerProtocolFactory
                              close_file_after_inactivity: 2
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
+---
+log_config_file: !Path "{conf}/logging.yaml"

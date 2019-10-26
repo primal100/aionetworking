@@ -2,14 +2,18 @@
 host: 127.0.0.1
 port: !Port
 quiet: False
+logger: !ReceiverLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !StreamServerProtocolFactory
                   action: !BufferedFileStorage
-                           base_path: !TmpDir Data
+                           base_path: !Path "{data}"
                            path: "Encoded/{msg.peer_safe}_{msg.name}.{msg.name}"
                            buffering: 0
                            close_file_after_inactivity: 2
                   preaction: !BufferedFileStorage
-                             base_path: !TmpDir Recordings
+                             base_path: !Path "{temp}/recordings"
                              path: "{msg.peer_safe}.recording"
                              buffering: 0
                              close_file_after_inactivity: 2

@@ -4,6 +4,10 @@ port: !Port
 srcip: 127.0.0.1
 username: testuser
 password: abcd1234@
+logger: !SenderLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !SFTPClientProtocolFactory
-                  base_path: !TmpDir sftp_sent
+                  base_path: !Path "{temp}/sftp_sent"
                   dataformat: !JSON

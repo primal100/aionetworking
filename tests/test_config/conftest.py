@@ -1,15 +1,9 @@
 import pytest
 import os
 from pathlib import Path
-from lib.types import load_base_path
-from lib.yaml_constructors import load_all_tags
+from lib.conf.yaml_config import load_all_tags, load_paths
 import yaml
 from tests.test_senders.conftest import *
-
-
-@pytest.fixture
-def conf_dir() -> Path:
-    return Path(os.path.abspath(os.path.dirname(__file__))) / "conf"
 
 
 @pytest.fixture
@@ -103,18 +97,39 @@ def sftp_client_yaml_config_stream(sftp_client_yaml_config_path):
 
 
 @pytest.fixture
-def load_all_yaml_tags():
+def current_dir() -> Path:
+    return Path(os.path.abspath(os.path.dirname(__file__)))
+
+
+@pytest.fixture
+def load_all_yaml_tags(tmpdir, current_dir):
     load_all_tags()
+    load_paths(app_home=current_dir, volatile_home=tmpdir, tmp_dir=tmpdir)
 
 
 @pytest.fixture
-def load_tmp_dir_tag(tmpdir):
-    load_base_path("!TmpDir", Path(tmpdir))
+def conf_dir(current_dir) -> Path:
+    return current_dir / "conf"
 
 
 @pytest.fixture
-def load_ssl_dir_tag(ssl_dir):
-    load_base_path("!SSLDir", Path(ssl_dir))
+def stats_dir(current_dir) -> Path:
+    return current_dir / "stats"
+
+
+@pytest.fixture
+def data_dir(current_dir) -> Path:
+    return current_dir / "data"
+
+
+@pytest.fixture
+def load_conf_dir_tag(conf_dir):
+    load_base_path("!conf", Path(conf_dir))
+
+
+@pytest.fixture
+def logs_dir(tmpdir) -> Path:
+    return tmpdir / "logs"
 
 
 @pytest.fixture
@@ -173,3 +188,13 @@ def config_file(config_files_args):
 @pytest.fixture
 def expected_object(config_files_args):
     return config_files_args[1]
+
+
+@pytest.fixture
+def server_with_logging_yaml_config_path(conf_dir):
+    return conf_dir / "tcp_server_logging.yaml"
+
+
+@pytest.fixture
+def server_with_logging_yaml_config_stream(server_with_logging_yaml_config_path):
+    return open(server_with_logging_yaml_config_path, 'r')

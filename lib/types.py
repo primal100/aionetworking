@@ -175,34 +175,3 @@ class DirectoryPathNewOK(Path):
             raise errors.PathNotADirectoryError(path=value)
         return value
 """
-
-
-def path_constructor(loader, node) -> Optional[Path]:
-    value = loader.construct_scalar(node)
-    if value:
-        path = Path(value)
-        path.mkdir(exist_ok=True, parents=True)
-        return path
-    return None
-
-
-def load_path(Loader=yaml.SafeLoader):
-    yaml.add_constructor('!Path', path_constructor, Loader=Loader)
-
-
-def base_path_constructor(base_path: Path, loader, node) -> Path:
-    value = loader.construct_scalar(node)
-    return Path(base_path / value)
-
-
-def load_base_path(tag_name: str, base_path: Path, Loader=yaml.SafeLoader):
-    yaml.add_constructor(tag_name, partial(base_path_constructor, base_path), Loader=Loader)
-
-
-def ip_network_constructor(loader, node) -> Sequence[IPNetwork]:
-    values = loader.construct_sequence(node)
-    return [IPNetwork(v) for v in values]
-
-
-def load_ip_network(Loader=yaml.SafeLoader):
-    yaml.add_constructor('!IPNetwork', ip_network_constructor, Loader=Loader)
