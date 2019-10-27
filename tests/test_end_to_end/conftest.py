@@ -42,19 +42,16 @@ def one_way_receiver_sender_args(request):
 
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__)),
+        (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__)),
     lazy_fixture(
-        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__,
-         tcp_server_context.__name__, tcp_client_context.__name__)),
+        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__)),
     pytest.param(
-        lazy_fixture((udp_server_two_way_started.__name__, udp_client_two_way.__name__,
-                      udp_client_two_way_connected.__name__)),
+        lazy_fixture((udp_server_two_way_started.__name__, udp_client_two_way.__name__)),
         marks=pytest.mark.skipif(
             "not datagram_supported()")
     ),
     pytest.param(
-        lazy_fixture((pipe_server_two_way_started.__name__, pipe_client_two_way.__name__,
-                      pipe_client_two_way_connected.__name__)),
+        lazy_fixture((pipe_server_two_way_started.__name__, pipe_client_two_way.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     )
@@ -91,27 +88,4 @@ def two_way_server_started(two_way_receiver_sender_args):
 @pytest.fixture
 def two_way_client(two_way_receiver_sender_args):
     return two_way_receiver_sender_args[1]
-
-
-@pytest.fixture
-def protocol_factory_one_way_server_benchmark(buffered_file_storage_action, initial_server_context, sock_str,
-                                              receiver_logger) -> StreamServerProtocolFactory:
-    context_cv.set(initial_server_context)
-    factory = StreamServerProtocolFactory(
-        action=buffered_file_storage_action,
-        dataformat=JSONObject,
-        logger=receiver_logger)
-    if not factory.full_name:
-        factory.set_name(f'TCP Server {sock_str}', 'tcp')
-    yield factory
-
-
-@pytest.fixture
-async def tcp_server_one_way_benchmark(protocol_factory_one_way_server_benchmark, receiver_logger, sock):
-    server = TCPServer(protocol_factory=protocol_factory_one_way_server_benchmark, host=sock[0],
-                       port=sock[1])
-    await server.start()
-    yield server
-    if server.is_started():
-        await server.close()
 

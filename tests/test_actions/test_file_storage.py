@@ -68,7 +68,7 @@ class TestJsonBufferedFileStorage:
 
     @pytest.mark.asyncio
     async def test_01_pre_action(self, tmp_path, buffered_file_storage_recording_action, buffer_objects,
-                                 json_recording_data, buffer_codec, timestamp):
+                                 json_recording_data, buffer_codec):
 
         await buffered_file_storage_recording_action.do_one(buffer_objects[0])
         await buffered_file_storage_recording_action.do_one(buffer_objects[1])
@@ -77,12 +77,12 @@ class TestJsonBufferedFileStorage:
         packets = await alist(get_recording_from_file(expected_file))
         assert packets == json_recording_data
 
-    def test_02_action_pickle(self, buffered_file_storage_action_binary):
-        data = pickle.dumps(buffered_file_storage_action_binary)
+    def test_02_action_pickle(self, buffered_file_storage_recording_action):
+        data = pickle.dumps(buffered_file_storage_recording_action)
         action = pickle.loads(data)
-        assert action == buffered_file_storage_action_binary
+        assert action == buffered_file_storage_recording_action
 
-    def test_03_pre_action_pickle(self, buffered_file_storage_pre_action_binary):
-        data = pickle.dumps(buffered_file_storage_pre_action_binary)
+    def test_03_pre_action_pickle(self, buffered_file_storage_recording_action):
+        data = pickle.dumps(buffered_file_storage_recording_action)
         action = pickle.loads(data)
-        assert action == buffered_file_storage_pre_action_binary
+        assert action == buffered_file_storage_recording_action

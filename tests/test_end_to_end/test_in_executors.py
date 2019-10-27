@@ -33,7 +33,7 @@ class TestOneWaySenderInExecutors:
     @pytest.mark.asyncio
     async def test_01_send_in_other_process(self, one_way_server_started, one_way_client,
                                             json_rpc_login_request_encoded, tmp_path):
-        num = 20
+        num = 10
         msgs = [json_rpc_login_request_encoded for _ in range(0, num)]
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await asyncio.get_event_loop().run_in_executor(executor, one_way_client.open_send_msgs, msgs, 0.00025, 2)
