@@ -1,4 +1,5 @@
-from logging import Filter, Logger, LogRecord
+from __future__ import annotations
+from logging import Filter, LogRecord
 
 from dataclasses import dataclass
 from lib.types import Expression

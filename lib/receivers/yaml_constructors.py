@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .servers import TCPServer, UDPServer, pipe_server
 import yaml
 

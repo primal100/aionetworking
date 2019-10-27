@@ -27,11 +27,6 @@ class BaseAction(Protocol):
 
     timeout: int = 5
 
-    @classmethod
-    def swap_cls(cls, name: str) -> Type[ActionType]:
-        from lib.definitions import ACTIONS
-        return ACTIONS[name]
-
     def __post_init__(self, logger) -> None:
         self.logger = logger.get_child(name='actions')
 

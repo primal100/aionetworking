@@ -1,3 +1,4 @@
+from __future__ import annotations
 import yaml
 from .ssl import ServerSideSSL, ClientSideSSL
 from .protocol_factories import (StreamServerProtocolFactory, DatagramServerProtocolFactory,

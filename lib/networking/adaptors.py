@@ -71,7 +71,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     async def _run_preaction(self, buffer: bytes, timestamp: datetime = None) -> None:
         self.logger.info('Running preaction')
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
-        await self.preaction.do_one(buffer_obj)
+        if not self.preaction.filter(buffer_obj):
+            await self.preaction.do_one(buffer_obj)
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future:
         self.logger.on_buffer_received(buffer)

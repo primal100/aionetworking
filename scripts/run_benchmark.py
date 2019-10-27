@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import annotations
 import aiofile
 import aiofiles
 import asyncio
