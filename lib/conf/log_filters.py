@@ -7,22 +7,7 @@ from typing import Sequence
 
 
 @dataclass
-class BaseFilter(Filter):
-
-    loggers: Sequence[Logger]
-
-    def __init__(self, loggers: Sequence[Logger] = (), *args,  **kwargs):
-        super().__init__(*args, **kwargs)
-        self.loggers = loggers
-        self.__post_init__()
-
-    def __post_init__(self):
-        for logger in self.loggers:
-            logger.addFilter(self)
-
-
-@dataclass
-class PeerFilter(BaseFilter):
+class PeerFilter(Filter):
     peers: Sequence[str]
 
     def __init__(self, peers: Sequence[str], *args, **kwargs):
@@ -37,7 +22,7 @@ class PeerFilter(BaseFilter):
 
 
 @dataclass
-class MessageFilter(BaseFilter):
+class MessageFilter(Filter):
 
     expr: Expression
 

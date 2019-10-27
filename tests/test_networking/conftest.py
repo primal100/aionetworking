@@ -2,6 +2,7 @@ from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
 import asyncssh
 import datetime
 
+import logging
 from lib.conf.context import context_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import (TCPServerConnection, TCPClientConnection,
@@ -20,7 +21,6 @@ from typing import Union
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn
 
 from tests.test_actions.conftest import *   ###Required for tests
-from tests.test_logging.conftest import *
 from tests.test_requesters.conftest import *
 
 from unittest.mock import Mock

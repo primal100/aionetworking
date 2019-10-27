@@ -60,8 +60,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         return self.codec.from_decoded(decoded)
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None:
-        self.logger.on_sending_decoded_msg(msg_decoded)
         msg_obj = self._encode_msg(msg_decoded)
+        self.logger.on_sending_decoded_msg(msg_obj)
         self.send_data(msg_obj.encoded)
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None:

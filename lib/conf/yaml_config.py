@@ -1,5 +1,6 @@
 import yaml
-from pathlib import Path
+import os
+
 from logging.config import dictConfig
 from lib.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action
 from lib.conf.yaml_constructors import load_logger, load_receiver_logger, load_sender_logger
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Union, Dict
 
 
-def get_default_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, Path] = None,
+def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, Path] = None,
                tmp_dir: Union[str, Path] = TEMPDIR) -> Dict[str, Path]:
     volatile_home = volatile_home or app_home
     return {'temp': tmp_dir,
@@ -71,19 +72,18 @@ def load_all_tags():
 def configure_logging(path: Path):
     with path.open('rt') as f:
         config = yaml.safe_load(f.read())
-        configured = False
-        while not configured:
-            try:
-                dictConfig(config)
-                configured = True
-            except FileNotFoundError as e:
-                Path(e.filename).parent.mkdir(parents=True, exist_ok=True)
+        for handler in config['handlers'].values():
+            filename = handler.get('filename')
+            if filename:
+                filename.parent.mkdir(parents=True, exist_ok=True)
+        dictConfig(config)
 
 
-def node_from_config(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = None) -> Union[ReceiverType, SenderType]:
-    paths = paths or get_default_paths()
+def node_from_config(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = None) -> \
+        Union[ReceiverType, SenderType]:
+    paths = paths or get_paths()
     load_path(paths)
-    configs = yaml.safe_load_all(path)
+    configs = list(yaml.safe_load_all(path))
     node = configs[0]
     if len(configs) > 1:
         misc_config = configs[1]
@@ -95,5 +95,6 @@ def node_from_config(path: Union[str, Path], paths: Dict[str, Union[str, Path]] 
         paths['name'] = node.name.replace(' ', '_')
         paths['host'] = node.host
         paths['port'] = node.port
+        paths['pid'] = str(os.getpid())
         configure_logging(log_config_file)
     return node
