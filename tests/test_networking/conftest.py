@@ -72,7 +72,7 @@ def patch_os_auth_failure():
 @pytest.fixture
 def patch_os_call_args(sftp_username_password):
     if os.name == 'posix':
-        return sftp_username_password
+        return sftp_username_password[0], sftp_username_password[1], 'sftplogin'
     elif os.name == 'nt':
         import pywintypes
         import win32con

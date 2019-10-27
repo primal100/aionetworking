@@ -11,7 +11,7 @@ from typing import Dict, Any
 @dataclass
 class SFTPServerOSAuthProtocol(SFTPServerProtocol):
     windows_domain: str = '.'
-    unix_group: str = ''
+    pam_service: str = 'sftplogin'
 
     def password_auth_supported(self) -> bool:
         return True
@@ -20,7 +20,7 @@ class SFTPServerOSAuthProtocol(SFTPServerProtocol):
         self.logger.info('Attempting SFTP %s login for user %s', authentication_type, password)
         authorized = await asyncio.get_event_loop().run_in_executor(None,
                                                                     partial(authenticate,
-                                                                            group=self.unix_group,
+                                                                            pam_service=self.pam_service,
                                                                             domain=self.windows_domain),
                                                                     username, password)
         if authorized:
@@ -35,10 +35,10 @@ class SFTPOSAuthProtocolFactory(BaseProtocolFactory):
     peer_prefix = 'sftp'
     connection_cls = SFTPServerOSAuthProtocol
     windows_domain: str = '.'
-    unix_group: str = ''
+    pam_service: str = 'sftplogin'
 
     def _additional_connection_kwargs(self) -> Dict[str, Any]:
         return {
-            'unix_group': self.unix_group,
+            'pam_service': self.pam_service,
             'windows_domain': self.windows_domain
         }
