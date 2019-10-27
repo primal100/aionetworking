@@ -8,7 +8,7 @@ protocol_factory: !StreamServerProtocolFactory
                   action: !EchoAction
                           timeout: 5
                   preaction: !BufferedFileStorage
-                             base_path: !Path "{temp}/Recordings"
+                             base_path: !Path "{temp}/recordings"
                              path: "{msg.peer_safe}.recording"
                              buffering: 0
                              close_file_after_inactivity: 2

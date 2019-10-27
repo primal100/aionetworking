@@ -25,9 +25,9 @@ class TestOneWaySenderInExecutors:
         one_way_server_started.close_all_connections()
         await one_way_server_started.wait_num_connections(0)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
-        recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
+        recording_file_path = next(tmp_path.glob('recordings/*.recording'))
         assert recording_file_path.exists()
-        expected_file = next(Path(tmp_path / 'Data/Encoded').glob('*.JSON'))
+        expected_file = next(Path(tmp_path / 'data/Encoded').glob('*.JSON'))
         assert expected_file.exists()
         assert len(expected_file.read_bytes()) == len(json_rpc_login_request_encoded) * num
 
@@ -42,9 +42,9 @@ class TestOneWaySenderInExecutors:
         one_way_server_started.close_all_connections()
         await one_way_server_started.wait_num_connections(0)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
-        recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
+        recording_file_path = next(tmp_path.glob('recordings/*.recording'))
         assert recording_file_path.exists()
-        expected_file = next(Path(tmp_path / 'Data/Encoded').glob('*.JSON'))
+        expected_file = next(Path(tmp_path / 'data/Encoded').glob('*.JSON'))
         assert expected_file.exists()
         assert len(expected_file.read_bytes()) == len(json_rpc_login_request_encoded) * num
 
@@ -60,7 +60,7 @@ class TestTwoWaySenderInExecutors:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             await asyncio.get_event_loop().run_in_executor(executor, two_way_client.open_send_msgs,
                                                            msgs, None, 0, None, True)
-        recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
+        recording_file_path = next(tmp_path.glob('recordings/*.recording'))
         assert recording_file_path.exists()
 
     @pytest.mark.asyncio
@@ -70,5 +70,5 @@ class TestTwoWaySenderInExecutors:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await asyncio.get_event_loop().run_in_executor(executor, two_way_client.open_send_msgs, msgs, 0.00025, 2,
                                                            None, True)
-        recording_file_path = next(tmp_path.glob('Recordings/*.recording'))
+        recording_file_path = next(tmp_path.glob('recordings/*.recording'))
         assert recording_file_path.exists()

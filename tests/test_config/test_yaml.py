@@ -5,6 +5,8 @@ from lib.conf.yaml_config import node_from_config
 class TestYamlConfig:
     def test_00_yaml_config_node(self, config_file, expected_object, all_paths, load_all_yaml_tags, reset_logging):
         node = node_from_config(config_file, paths=all_paths)
+        assert node.protocol_factory.action == expected_object.protocol_factory.action
+        assert node.protocol_factory == expected_object.protocol_factory
         assert node == expected_object
 
     def test_01_yaml_config_node_with_logging(self, config_file_logging, expected_object_logging, all_paths,
