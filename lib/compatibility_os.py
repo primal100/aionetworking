@@ -4,15 +4,11 @@ import os
 
 if os.name == 'posix':
     import pamela
-    import grp
     authentication_type = 'PAM'
 
-    def authenticate(username: str, password: str, group: str =None, **kwargs) -> bool:
-        if group:
-            if username not in grp.getgrnam(group).gr_mem:
-                return False
+    def authenticate(username: str, password: str, pam_service: str = 'sftplogin', **kwargs) -> bool:
         try:
-            pamela.authenticate(username, password)
+            pamela.authenticate(username, password, pam_service)
             return True
         except pamela.PAMError:
             return False
