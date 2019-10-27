@@ -34,11 +34,6 @@ class BaseMessageObject(MessageObject, Protocol):
         self.logger = self.parent_logger.new_msg_logger(self)
 
     @classmethod
-    def swap_cls(cls, name) -> Type[MessageObjectType]:
-        from lib import definitions
-        return definitions.DATA_FORMATS[name]
-
-    @classmethod
     def _get_codec_kwargs(cls) -> Dict:
         return {}
 

@@ -35,13 +35,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get)
+    codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
     send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
-        self.codec: BaseCodec = self.dataformat.get_codec()
+        self.codec: BaseCodec = self.dataformat.get_codec(**self.codec_config)
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 

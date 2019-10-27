@@ -18,7 +18,7 @@ from .connections import TCPClientConnection, TCPServerConnection, UDPServerConn
 from .protocols import ProtocolFactoryProtocol
 from .types import ProtocolFactoryType,  NetworkConnectionType
 
-from typing import Optional, Text, Tuple, Type, Union, Sequence, Dict
+from typing import Optional, Text, Tuple, Type, Union, Sequence, Dict, Any
 
 
 @dataclass
@@ -34,6 +34,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     pause_reading_on_buffer_size: int = None
     aliases: Dict[str, str] = field(default_factory=dict)
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
+    codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
 
     async def start(self) -> None:
@@ -52,13 +53,17 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     def __call__(self) -> NetworkConnectionType:
         return self._context.run(self._new_connection)
 
+    def _additional_connection_kwargs(self) -> Dict[str, Any]:
+        return {}
+
     def _new_connection(self) -> NetworkConnectionType:
         context_cv.set(context_cv.get().copy())
         self.logger.debug('Creating new connection')
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
-                                   allowed_senders=self.allowed_senders, aliases=self.aliases)
+                                   allowed_senders=self.allowed_senders, aliases=self.aliases,
+                                   codec_config=self.codec_config, **self._additional_connection_kwargs())
 
     def __getstate__(self):
         return dataclass_getstate(self)

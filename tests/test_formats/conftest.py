@@ -2,12 +2,13 @@ from __future__ import annotations
 import pytest
 import asyncio
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from lib.formats.contrib.json import JSONObject, JSONCodec
 from lib.formats.recording import BufferCodec, BufferObject, recorded_packet
 from lib.formats.types import MessageObjectType
 
-from typing import Dict, Any, List, NamedTuple, Tuple
+from typing import Dict, Any, List, NamedTuple, Tuple, Type
 
 
 @pytest.fixture
@@ -171,3 +172,21 @@ def json_encoded_multi(json_rpc_login_request_encoded, json_rpc_logout_request_e
         json_rpc_logout_request_encoded
     ]
 
+
+@dataclass
+class JSONCodecWithKwargs(JSONCodec):
+    test_param: str = None
+
+
+class JSONObjectWithCodecKwargs(JSONObject):
+    codec_cls = JSONCodecWithKwargs
+
+
+@pytest.fixture
+def json_codec_with_kwargs() -> JSONCodecWithKwargs:
+    return JSONCodecWithKwargs(JSONObjectWithCodecKwargs, test_param='abc')
+
+
+@pytest.fixture
+def json_object_with_codec_kwargs() -> Type[JSONObjectWithCodecKwargs]:
+    return JSONObjectWithCodecKwargs

@@ -1227,3 +1227,16 @@ async def udp_protocol_factory_allowed_senders(echo_action, sock, sock_ipv6, soc
     await factory.start()
     yield factory
     await factory.close()
+
+
+@pytest.fixture
+async def protocol_factory_one_way_server_codec_kwargs(buffered_file_storage_action) -> StreamServerProtocolFactory:
+    factory = StreamServerProtocolFactory(
+        action=buffered_file_storage_action,
+        dataformat=JSONObjectWithCodecKwargs,
+        codec_config={'test_param': 'abc'}
+    )
+    await factory.start()
+    yield factory
+    await factory.close()
+

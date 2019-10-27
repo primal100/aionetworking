@@ -28,6 +28,19 @@ class TestStreamProtocolFactories:
         assert factory == stream_protocol_factory
         await stream_protocol_factory.close()
 
+    @pytest.mark.asyncio
+    async def test_02_protocol_factory_custom_codec_config(self, protocol_factory_one_way_server_codec_kwargs,
+                                                           tcp_transport, json_codec_with_kwargs):
+        new_connection = protocol_factory_one_way_server_codec_kwargs()
+        assert new_connection.codec_config == {'test_param': 'abc'}
+        new_connection.connection_made(tcp_transport)
+        tcp_transport.set_protocol(new_connection)
+        adaptor = new_connection._adaptor
+        assert adaptor.codec_config == {'test_param': 'abc'}
+        assert adaptor.codec.msg_obj == json_codec_with_kwargs.msg_obj
+        assert adaptor.codec.test_param == json_codec_with_kwargs.test_param
+        tcp_transport.close()
+
 
 class TestOneWayServerDatagramProtocolFactory:
 
