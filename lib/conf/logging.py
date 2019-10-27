@@ -51,20 +51,20 @@ class BaseLogger(logging.LoggerAdapter, ABC):
 
 @dataclass
 class Logger(BaseLogger):
-    logger_name: str
+    name: str
     datefmt: str = '%Y-%m-%d %H:%M:%S.%f'
     extra: dict = None
-    stats_interval: Union[float, int] = 0
+    stats_interval: Union[float, int] = 60
     stats_fixed_start_time: bool = True
     _is_closing: bool = field(default=False, init=False)
 
-    def __init__(self, logger_name: str, datefmt: str = '%Y-%m-%d %H:%M:%S.%f', extra: Dict = None,
+    def __init__(self, name: str, datefmt: str = '%Y-%m-%d %H:%M:%S.%f', extra: Dict = None,
                  stats_interval: Optional[Union[int, float]] = 0, stats_fixed_start_time: bool = True):
-        self.logger_name = logger_name
+        self.logger_name = name
         self.datefmt = datefmt
         self.stats_interval = stats_interval
         self.stats_fixed_start_time = stats_fixed_start_time
-        logger = logging.getLogger(logger_name)
+        logger = logging.getLogger(name)
         super().__init__(logger, extra or {})
 
     def __getstate__(self):
@@ -92,7 +92,7 @@ class Logger(BaseLogger):
         return ConnectionLogger
 
     def _get_child_logger(self, name):
-        child_name = f"{self.name}.{name}"
+        child_name = f"{self.logger_name}.{name}"
         return logging.getLogger(child_name)
 
     def get_connection_logger(self, name: str = 'connection', **kwargs) -> Any:
@@ -416,6 +416,14 @@ class ConnectionLoggerStats(ConnectionLogger):
         await self._stats_logger.wait_closed()
 
 
+def get_logger_receiver() -> Logger:
+    return Logger('receiver')
+
+
+def get_logger_sender() -> Logger:
+    return Logger('sender')
+
+
 def get_connection_logger_receiver() -> ConnectionLoggerType:
     return ConnectionLogger('receiver.connection')
 
@@ -424,7 +432,7 @@ def get_connection_logger_sender() -> ConnectionLoggerType:
     return ConnectionLogger('sender.connection')
 
 
-logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=Logger('receiver'))
+logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=get_logger_receiver())
 connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
                                                                                         default=ConnectionLogger(
                                                                                             'receiver.connection',

@@ -1,5 +1,7 @@
+from __future__ import annotations
 from collections import ChainMap
 import builtins
+from dataclasses import dataclass
 import operator
 
 from ipaddress import IPv4Network, IPv6Network, AddressValueError
@@ -7,19 +9,6 @@ from ipaddress import IPv4Network, IPv6Network, AddressValueError
 from typing import Union, Callable, Iterable, Any, Sequence
 
 
-from dataclasses import dataclass
-
-
-"""class Logger(logging.Logger):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, value: Union[str, logging.Logger]) -> logging.Logger:
-        if isinstance(value, str):
-            return logging.getLogger(value)
-        return value"""
 
 
 class IPNetwork:
@@ -40,6 +29,9 @@ class IPNetwork:
                     self.is_ipv6 = True
                 except AddressValueError:
                     raise AddressValueError(f'{network} is not valid IPv4 or IPv6 network')
+
+    def __eq__(self, other):
+        return self.ip_network == other.ip_network
 
     def supernet_of(self, network: Union[IPv4Network, IPv6Network]):
         return self.ip_network.supernet_of(network)
@@ -137,35 +129,3 @@ class Expression:
                 value = value.lower()
             return self.op(value, self.value.lower())
         return self.op(value, self.value)
-
-
-"""
-class FilePathNewOK(Path):
-    @classmethod
-    def __get_validators__(cls) -> 'CallableGenerator':
-        yield path_validator
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, value: Path) -> Path:
-        if not value.exists():
-            value.parent.mkdir(exists_ok=True, parents=True)
-        if not value.is_file():
-            raise errors.PathNotAFileError(path=value)
-        return value
-
-
-class DirectoryPathNewOK(Path):
-    @classmethod
-    def __get_validators__(cls) -> 'CallableGenerator':
-        yield path_validator
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, value: Path) -> Path:
-        if not value.exists():
-            value.parent.mkdir(exists_ok=True, parents=True)
-        if not value.is_dir():
-            raise errors.PathNotADirectoryError(path=value)
-        return value
-"""

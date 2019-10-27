@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path

@@ -1,0 +1,21 @@
+!TCPClient
+host: 127.0.0.1
+port: !Port
+srcip: 127.0.0.1
+logger: !SenderLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
+ssl: !ClientSideSSL
+     ssl: True
+     cert: !Path "{ssl}/client/certificate.pem"
+     key: !Path "{ssl}/client/privkey.pem"
+     cafile: !Path "{ssl}/server/certificate.pem"
+     capath: !Path "{ssl}/server"
+     cert_required: True
+     check_hostname: True
+ssl_handshake_timeout: 60
+protocol_factory: !StreamClientProtocolFactory
+                  dataformat: !JSON
+                  requester: !EchoRequester
+

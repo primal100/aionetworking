@@ -1,0 +1,9 @@
+!PipeClient
+path: !PipeAddr
+logger: !SenderLogger
+    stats_interval: 0
+    stats_fixed_start_time: true
+    datefmt: '%Y-%m-%d %H:%M:%S.%f'
+protocol_factory: !StreamClientProtocolFactory
+                  dataformat: !JSON
+                  requester: !EchoRequester

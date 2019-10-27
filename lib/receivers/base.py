@@ -5,22 +5,20 @@ from dataclasses import dataclass, field
 
 from .exceptions import ServerException
 from lib.conf.context import context_cv
-from lib.conf.logging import Logger, logger_cv
+from lib.conf.logging import Logger, logger_cv, get_logger_receiver
 from lib.wrappers.value_waiters import StatusWaiter
 from lib.networking.types import ProtocolFactoryType
 from lib.utils import dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import ReceiverProtocol
 
 from lib.compatibility import Protocol
-from typing import Type
 
 
 @dataclass
 class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
     quiet: bool = False
-    logger_cls: Type[Logger] = Logger
-    logger_name: str = 'receiver'
+    logger: Logger = field(default_factory=get_logger_receiver)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
@@ -37,9 +35,6 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     async def serve_in_loop(self) -> None:
         await self.start()
 
-    def __post_init__(self) -> None:
-        self.logger = self.logger_cls(self.logger_name)
-
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
@@ -50,7 +45,6 @@ class BaseServer(BaseReceiver, Protocol):
     server: asyncio.AbstractServer = field(default=None, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
         self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self.full_name, self.peer_prefix)
 

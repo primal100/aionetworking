@@ -2,6 +2,7 @@ from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
 import asyncssh
 import datetime
 
+import logging
 from lib.conf.context import context_cv
 from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from lib.networking.connections import (TCPServerConnection, TCPClientConnection,
@@ -20,7 +21,6 @@ from typing import Union
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn
 
 from tests.test_actions.conftest import *   ###Required for tests
-from tests.test_logging.conftest import *
 from tests.test_requesters.conftest import *
 
 from unittest.mock import Mock
@@ -1175,13 +1175,19 @@ def ssl_client_key(ssl_client_dir) -> Path:
 @pytest.fixture
 def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir) -> ServerSideSSL:
     return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
-                         cafile=ssl_client_cert, capath=ssl_client_dir, cadata=ssl_client_cert.read_text())
+                         cafile=ssl_client_cert, capath=ssl_client_dir)
 
 
 @pytest.fixture
 def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir) -> ClientSideSSL:
     return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
                          cafile=ssl_server_cert, capath=ssl_server_dir, cadata=ssl_server_cert.read_text())
+
+
+@pytest.fixture
+def client_side_ssl_no_cadata(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir) -> ClientSideSSL:
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
+                         cafile=ssl_server_cert, capath=ssl_server_dir)
 
 
 @pytest.fixture

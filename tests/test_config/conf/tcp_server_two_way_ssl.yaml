@@ -1,0 +1,26 @@
+!TCPServer
+host: 127.0.0.1
+port: !Port
+quiet: False
+logger: !ReceiverLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
+ssl: !ServerSideSSL
+     ssl: True
+     cert: !Path "{ssl}/server/certificate.pem"
+     key: !Path "{ssl}/server/privkey.pem"
+     cafile: !Path "{ssl}/client/certificate.pem"
+     capath: !Path "{ssl}/client"
+     cert_required: True
+     check_hostname: True
+ssl_handshake_timeout: 60
+protocol_factory: !StreamServerProtocolFactory
+                  action: !EchoAction
+                  preaction: !BufferedFileStorage
+                             base_path: !Path "{temp}/recordings"
+                             path: "{msg.peer_safe}.recording"
+                             buffering: 0
+                             close_file_after_inactivity: 2
+                  dataformat: !JSON
+                  pause_reading_on_buffer_size: null

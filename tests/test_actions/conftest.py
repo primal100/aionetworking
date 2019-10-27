@@ -19,14 +19,14 @@ async def managed_file(tmp_path) -> ManagedFile:
 
 @pytest.fixture
 async def file_storage_action(tmp_path) -> FileStorage:
-    action = FileStorage(base_path=tmp_path / 'Data', binary=True,
-                         path='Encoded/{msg.name}/{msg.peer}_{msg.uid}.{msg.name}')
+    action = FileStorage(base_path=tmp_path / 'data', binary=True,
+                         path='Encoded/{msg.name}/{msg.peer_safe}_{msg.uid}.{msg.name}')
     yield action
 
 
 @pytest.fixture
 async def buffered_file_storage_action(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=Path(tmp_path / 'Data'), binary=True, close_file_after_inactivity=2,
+    action = BufferedFileStorage(base_path=Path(tmp_path / 'data'), binary=True, close_file_after_inactivity=2,
                                  path='Encoded/{msg.peer_safe}_{msg.name}.{msg.name}', buffering=0)
     yield action
     if not action.is_closing():
@@ -35,8 +35,8 @@ async def buffered_file_storage_action(tmp_path) -> BufferedFileStorage:
 
 @pytest.fixture
 async def buffered_file_storage_recording_action(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=Path(tmp_path / 'Recordings'), binary=True, close_file_after_inactivity=2,
-                                 path='{msg.peer}.recording', buffering=0)
+    action = BufferedFileStorage(base_path=Path(tmp_path / 'recordings'), binary=True, close_file_after_inactivity=2,
+                                 path='{msg.peer_safe}.recording', buffering=0)
     yield action
     if not action.is_closing():
         await action.close()

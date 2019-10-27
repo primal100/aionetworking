@@ -20,7 +20,7 @@ class TestTwoWayReceiverAdaptor:
         await two_way_receiver_adaptor.close()
         assert task.done()
         assert msg == echo_response_encoded
-        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist(get_recording_from_file(expected_file))
         assert packets == echo_recording_data

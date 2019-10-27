@@ -108,11 +108,11 @@ class TestConnectionOneWayServer:
         one_way_server_connection.data_received(json_rpc_logout_request_encoded)
         one_way_server_connection.close()
         await asyncio.wait_for(one_way_server_connection.wait_closed(), timeout=1)
-        expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
+        expected_file = Path(tmp_path/'data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects
-        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist((get_recording_from_file(expected_file)))
         assert (packets[1].timestamp - packets[0].timestamp).total_seconds() > 1
@@ -156,7 +156,7 @@ class TestConnectionTwoWayServer:
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peer
         assert msg == echo_response_encoded
-        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist((get_recording_from_file(expected_file)))
         packets[0] = packets[0]._replace(timestamp=echo_recording_data[0].timestamp)
@@ -174,7 +174,7 @@ class TestConnectionTwoWayServer:
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
         assert receiver == peer
         assert msg == echo_notification_server_encoded
-        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist((get_recording_from_file(expected_file)))
         assert len(packets) == 1

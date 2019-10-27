@@ -55,7 +55,7 @@ class TestOneWayServerDatagramProtocolFactory:
         await asyncio.wait_for(protocol_factory.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0
-        expected_file = Path(tmp_path / 'Data/Encoded/127.0.0.1_JSON.JSON')
+        expected_file = Path(tmp_path / 'data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         msgs = await alist(json_codec.from_file(expected_file))
         assert msgs == json_objects

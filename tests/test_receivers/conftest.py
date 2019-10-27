@@ -1,7 +1,7 @@
-import asyncssh
 from lib.receivers.base import BaseServer
 from lib.receivers.sftp import SFTPServer
 from lib.receivers.servers import TCPServer, UDPServer, pipe_server
+from scripts.generate_ssh_host_key import generate_key_in_path
 
 from tests.test_networking.conftest import *
 from lib.utils import pipe_address_by_os
@@ -34,7 +34,8 @@ async def tcp_server_two_way(protocol_factory_two_way_server, sock) -> TCPServer
 
 @pytest.fixture
 async def tcp_server_two_way_ssl(protocol_factory_two_way_server, sock, server_side_ssl) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1], ssl=server_side_ssl)
+    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1], ssl=server_side_ssl,
+                       ssl_handshake_timeout=60)
     yield server
     if server.is_started():
         await server.close()
@@ -159,8 +160,7 @@ async def pipe_server_two_way_started(pipe_server_two_way) -> BaseServer:
 @pytest.fixture
 async def ssh_host_key(tmp_path) -> Path:
     private_path = Path(tmp_path) / 'skey'
-    skey = asyncssh.generate_private_key('ssh-rsa')
-    skey.write_private_key(str(private_path))
+    generate_key_in_path(private_path)
     yield private_path
 
 

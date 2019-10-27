@@ -31,6 +31,13 @@ def tcp_client_two_way_ssl(protocol_factory_two_way_client, sock, peer, client_s
 
 
 @pytest.fixture
+def tcp_client_two_way_ssl_no_cadata(protocol_factory_two_way_client, sock, peer, client_side_ssl_no_cadata) -> TCPClient:
+    client_side_ssl.check_hostname = False
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peer[0],
+                     srcport=0, ssl=client_side_ssl_no_cadata, ssl_handshake_timeout=60)
+
+
+@pytest.fixture
 async def tcp_client_one_way_connected(tcp_client_one_way) -> TCPClient:
     async with tcp_client_one_way:
         yield tcp_client_one_way
@@ -298,20 +305,28 @@ async def udp_protocol_factory_allowed_senders_wrong_senders(echo_action) -> Dat
 
 @pytest.fixture
 async def udp_server_allowed_senders_ipv4(udp_protocol_factory_allowed_senders, sock) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock[0], port=sock[1])
-    await server.start()
-    yield server
-    if server.is_started():
-        await server.close()
+    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock[0], port=sock[1])
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_ipv4_started(udp_server_allowed_senders_ipv4) -> UDPServer:
+    await udp_server_allowed_senders_ipv4.start()
+    yield udp_server_allowed_senders_ipv4
+    if udp_server_allowed_senders_ipv4.is_started():
+        await udp_server_allowed_senders_ipv4.close()
 
 
 @pytest.fixture
 async def udp_server_allowed_senders_ipv6(udp_protocol_factory_allowed_senders, sock_ipv6) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1])
-    await server.start()
-    yield server
-    if server.is_started():
-        await server.close()
+    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1])
+
+
+@pytest.fixture
+async def udp_server_allowed_senders_ipv6_started(udp_server_allowed_senders_ipv6) -> UDPServer:
+    await udp_server_allowed_senders_ipv6.start()
+    yield udp_server_allowed_senders_ipv6
+    if udp_server_allowed_senders_ipv6.is_started():
+        await udp_server_allowed_senders_ipv6.close()
 
 
 @pytest.fixture
@@ -365,13 +380,13 @@ def udp_client_allowed_senders(udp_allowed_senders_ok_args) -> TCPClient:
 @pytest.fixture(params=[
     pytest.param(
         lazy_fixture(
-            (udp_server_allowed_senders_ipv4.__name__, udp_client_two_way.__name__)),
+            (udp_server_allowed_senders_ipv4_started.__name__, udp_client_two_way.__name__)),
         marks=pytest.mark.skipif(
             "not datagram_supported()")
     ),
     pytest.param(
         lazy_fixture(
-            (udp_server_allowed_senders_ipv6.__name__, udp_client_two_way_ipv6.__name__)),
+            (udp_server_allowed_senders_ipv6_started.__name__, udp_client_two_way_ipv6.__name__)),
         marks=pytest.mark.skipif(
             "is_proactor()")
     )
@@ -469,7 +484,8 @@ async def sftp_server_allowed_senders_ipv6(sftp_protocol_factory_server_allowed_
 
 
 @pytest.fixture
-async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_allowed_senders, sock, tmp_path, ssh_host_key) -> SFTPServer:
+async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_allowed_senders, sock, tmp_path,
+                                              ssh_host_key) -> SFTPServer:
     server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=sock[0], port=sock[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()

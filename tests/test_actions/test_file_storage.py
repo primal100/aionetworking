@@ -14,11 +14,11 @@ class TestJsonFileStorage:
     async def test_00_do_one(self, tmp_path, file_storage_action, json_objects, json_rpc_login_request_encoded,
                              json_codec):
         await asyncio.wait([file_storage_action.do_one(obj) for obj in json_objects])
-        expected_file = Path(tmp_path/'Data/Encoded/JSON/127.0.0.1_1.JSON')
+        expected_file = Path(tmp_path/'data/Encoded/JSON/127.0.0.1_1.JSON')
         assert expected_file.exists()
         item = await json_codec.one_from_file(expected_file)
         assert item == json_objects[0]
-        expected_file = Path(tmp_path/'Data/Encoded/JSON/127.0.0.1_2.JSON')
+        expected_file = Path(tmp_path/'data/Encoded/JSON/127.0.0.1_2.JSON')
         assert expected_file.exists()
         item = await json_codec.one_from_file(expected_file)
         assert item == json_objects[1]
@@ -61,7 +61,7 @@ class TestJsonBufferedFileStorage:
     @pytest.mark.asyncio
     async def test_00_do_one(self, tmp_path, buffered_file_storage_action, json_objects, json_buffer, json_codec):
         await asyncio.wait([buffered_file_storage_action.do_one(obj) for obj in json_objects])
-        expected_file = Path(tmp_path/'Data/Encoded/127.0.0.1_JSON.JSON')
+        expected_file = Path(tmp_path/'data/Encoded/127.0.0.1_JSON.JSON')
         assert expected_file.exists()
         items = await alist(json_codec.from_file(expected_file))
         assert sorted(items, key=str) == sorted(json_objects, key=str)
@@ -72,7 +72,7 @@ class TestJsonBufferedFileStorage:
 
         await buffered_file_storage_recording_action.do_one(buffer_objects[0])
         await buffered_file_storage_recording_action.do_one(buffer_objects[1])
-        expected_file = Path(tmp_path / 'Recordings/127.0.0.1.recording')
+        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
         packets = await alist(get_recording_from_file(expected_file))
         assert packets == json_recording_data
