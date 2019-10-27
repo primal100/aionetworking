@@ -3,6 +3,7 @@ from abc import abstractmethod
 import warnings
 
 from aionetworking.types.formats import MessageObjectType
+from aionetworking.types.logging import LoggerType
 
 from typing import AsyncGenerator, Any, TypeVar
 from aionetworking.compatibility import Protocol
@@ -38,3 +39,6 @@ class ActionProtocol(Protocol):
 
     @abstractmethod
     async def close(self) -> None: ...
+
+    @abstractmethod
+    def set_logger(self, logger: LoggerType) -> None: ...

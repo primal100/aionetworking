@@ -1,6 +1,6 @@
-from aionetworking.receivers.base import BaseServer
+from aionetworking import TCPServer, UDPServer, pipe_server
+from aionetworking.receivers import BaseServer
 from aionetworking.receivers.sftp import SFTPServer
-from aionetworking.receivers.servers import TCPServer, UDPServer, pipe_server
 from aionetworking.utils import pipe_address_by_os
 from scripts.generate_ssh_host_key import generate_key_in_path
 

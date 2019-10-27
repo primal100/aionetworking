@@ -4,10 +4,11 @@ from dataclasses import dataclass, field
 import contextvars
 
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.conf.context import context_cv
+from aionetworking.context import context_cv
 from aionetworking.formats.base import BaseMessageObject
 from aionetworking.types.requesters import RequesterType
-from aionetworking.conf.logging import Logger, logger_cv
+from aionetworking.logging.loggers import logger_cv, get_logger_receiver
+from aionetworking.types.logging import LoggerType
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str, IPNetwork
 from .transports import DatagramTransportWrapper
 
@@ -29,7 +30,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     preaction: ActionProtocol = None
     requester: RequesterType = None
     dataformat: Type[BaseMessageObject] = None
-    logger: Logger = Logger('receiver')
+    logger: LoggerType = field(default_factory=get_logger_receiver)
     pause_reading_on_buffer_size: int = None
     aliases: Dict[str, str] = field(default_factory=dict)
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
@@ -70,8 +71,12 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     def __setstate__(self, state):
         dataclass_setstate(self, state)
 
-    def set_logger(self, logger: Logger) -> None:
+    def set_logger(self, logger: LoggerType) -> None:
         self.logger = logger
+        if self.action:
+            self.action.set_logger(logger)
+        if self.action:
+            self.action.set_logger(logger)
 
     def set_name(self, full_name: str, peer_prefix: str) -> None:
         self.full_name = full_name

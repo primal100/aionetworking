@@ -7,8 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from aionetworking.compatibility import Protocol
-from aionetworking.conf.context import context_cv
-from aionetworking.conf.logging import Logger, logger_cv, get_logger_sender
+from aionetworking.context import context_cv
+from aionetworking.logging.loggers import logger_cv, get_logger_sender
+from aionetworking.types.logging import LoggerType
 from aionetworking.types.networking import ProtocolFactoryType, ConnectionType
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from aionetworking.futures.value_waiters import StatusWaiter
@@ -20,7 +21,7 @@ from typing import Optional
 @dataclass
 class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
-    logger: Logger = field(default_factory=get_logger_sender)
+    logger: LoggerType = field(default_factory=get_logger_sender)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property

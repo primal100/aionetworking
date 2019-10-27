@@ -7,7 +7,7 @@ from pathlib import Path
 
 from aionetworking.types.actions import ActionType
 from aionetworking.types.requesters import RequesterType
-from aionetworking.conf.logging import Logger
+from aionetworking.types.logging import LoggerType
 from aionetworking.types.formats import MessageObjectType
 from aionetworking.utils import inherit_on_type_checking_only
 
@@ -26,7 +26,7 @@ class ProtocolFactoryProtocol(Protocol):
     def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
 
     @abstractmethod
-    def set_logger(self, logger: Logger): ...
+    def set_logger(self, logger: LoggerType): ...
 
     @abstractmethod
     def set_name(self, name: str, peer_prefix: str): ...

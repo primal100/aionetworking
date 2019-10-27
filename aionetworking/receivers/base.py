@@ -4,8 +4,9 @@ import asyncio
 from dataclasses import dataclass, field
 
 from .exceptions import ServerException
-from aionetworking.conf.context import context_cv
-from aionetworking.conf.logging import Logger, logger_cv, get_logger_receiver
+from aionetworking.context import context_cv
+from aionetworking.logging.loggers import logger_cv, get_logger_receiver
+from aionetworking.types.logging import LoggerType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.networking import ProtocolFactoryType
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_loop
@@ -18,7 +19,7 @@ from aionetworking.compatibility import Protocol
 class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
     quiet: bool = False
-    logger: Logger = field(default_factory=get_logger_receiver)
+    logger: LoggerType = field(default_factory=get_logger_receiver)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property

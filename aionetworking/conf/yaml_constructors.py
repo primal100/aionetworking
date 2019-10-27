@@ -4,7 +4,7 @@ from pathlib import Path
 
 from functools import partial
 from aionetworking.utils import IPNetwork
-from .logging import Logger
+from aionetworking.logging import Logger
 
 from typing import Optional, Dict, Union, Sequence
 

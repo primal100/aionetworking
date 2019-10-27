@@ -4,8 +4,8 @@ import asyncio
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from aionetworking.formats.contrib.json import JSONObject, JSONCodec
-from aionetworking.formats.recording import BufferCodec, BufferObject, recorded_packet
+from aionetworking import JSONObject, JSONCodec
+from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
 from aionetworking.types.formats import MessageObjectType
 
 from typing import Dict, Any, List, NamedTuple, Tuple, Type

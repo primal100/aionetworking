@@ -3,7 +3,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 
 from aionetworking.compatibility import Protocol
-from aionetworking.conf.logging import Logger, get_connection_logger_sender
+from aionetworking.logging.loggers import Logger, get_connection_logger_sender
 
 
 @dataclass

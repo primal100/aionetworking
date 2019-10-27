@@ -8,12 +8,11 @@ from dataclasses import dataclass, field
 from aionetworking.compatibility import get_current_task_name
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
 from aionetworking.utils import log_exception, SystemInfo, supports_system_info
-from aionetworking.conf.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
+from aionetworking.logging.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from aionetworking.futures.schedulers import TaskScheduler
 
 from typing import Type, Optional, Dict, Generator, Any, Union
 from aionetworking.types.formats import MessageObjectType
-from aionetworking.types.conf import ConnectionLoggerType
 
 
 class BaseLogger(logging.LoggerAdapter, ABC):
@@ -422,11 +421,11 @@ def get_logger_sender() -> Logger:
     return Logger('sender')
 
 
-def get_connection_logger_receiver() -> ConnectionLoggerType:
+def get_connection_logger_receiver() -> ConnectionLogger:
     return ConnectionLogger('receiver.connection')
 
 
-def get_connection_logger_sender() -> ConnectionLoggerType:
+def get_connection_logger_sender() -> ConnectionLogger:
     return ConnectionLogger('sender.connection')
 
 

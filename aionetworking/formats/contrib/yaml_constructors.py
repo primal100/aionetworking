@@ -12,7 +12,7 @@ def load_json(Loader=yaml.SafeLoader):
     yaml.add_constructor('!JSON', json_object_constructor, Loader=Loader)
 
 
-def pickle_object_constructor(loader, node) -> Type[JSONObject]:
+def pickle_object_constructor(loader, node) -> Type[PickleObject]:
     return PickleObject
 
 

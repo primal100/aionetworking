@@ -6,9 +6,9 @@ from pathlib import Path
 from pprint import pformat
 
 from aionetworking import settings
-from aionetworking.conf.context import context_cv
-from aionetworking.conf.logging import connection_logger_cv
-from aionetworking.types.conf import ConnectionLoggerType
+from aionetworking.context import context_cv
+from aionetworking.logging.loggers import connection_logger_cv
+from aionetworking.types.logging import ConnectionLoggerType
 from aionetworking.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec

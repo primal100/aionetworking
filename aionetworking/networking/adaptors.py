@@ -8,9 +8,9 @@ from functools import partial
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
 from aionetworking.compatibility import Protocol
-from aionetworking.conf.logging import connection_logger_cv, ConnectionLogger
-from aionetworking.conf.context import context_cv
-from aionetworking.formats.base import MessageObjectType, BaseCodec, BaseMessageObject
+from aionetworking.logging.loggers import connection_logger_cv, ConnectionLogger
+from aionetworking.context import context_cv
+from aionetworking.types.formats import MessageObjectType, CodecType
 from aionetworking.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from aionetworking.requesters.protocols import RequesterProtocol
 from aionetworking.futures.schedulers import TaskScheduler
@@ -30,7 +30,7 @@ msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 @dataclass
 class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
-    dataformat: Type[BaseMessageObject]
+    dataformat: Type[MessageObjectType]
     bufferformat: Type[BufferObject] = BufferObject
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
@@ -42,7 +42,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
-        self.codec: BaseCodec = self.dataformat.get_codec(**self.codec_config)
+        self.codec: CodecType = self.dataformat.get_codec(**self.codec_config)
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 

@@ -5,11 +5,12 @@ from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 
 from .base import BaseAction
-from aionetworking.conf.logging import Logger, logger_cv
+from aionetworking.logging.loggers import logger_cv
 from aionetworking import settings
 from aionetworking.compatibility import set_task_name, Protocol
-from aionetworking.conf.utils_logging import p
+from aionetworking.logging.utils_logging import p
 from aionetworking.futures.value_waiters import StatusWaiter
+from aionetworking.types.logging import LoggerType
 
 from typing import ClassVar, AnyStr
 from aionetworking.types.formats import MessageObjectType
@@ -22,7 +23,7 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
-    logger: Logger = field(default_factory=logger_cv.get)
+    logger: LoggerType = field(default_factory=logger_cv.get)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: ManagedFile = field(default=None)
     _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
@@ -180,8 +181,7 @@ class BaseFileStorage(BaseAction, Protocol):
     separator: AnyStr = ''
     binary: InitVar[bool] = True
 
-    def __post_init__(self, logger, binary):
-        super().__post_init__(logger)
+    def __post_init__(self, binary):
         if binary and 'b' not in self.mode:
             self.mode += 'b'
             if isinstance(self.separator, str):

@@ -1,8 +1,9 @@
 import yaml
 
-from aionetworking.conf.log_filters import PeerFilter, MessageFilter
-from aionetworking.conf.logging import Logger, ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
-from aionetworking.conf.yaml_config import load_all_tags, get_paths
+from aionetworking import Logger
+from aionetworking.logging import PeerFilter, MessageFilter
+from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
+from aionetworking.conf import load_all_tags, get_paths
 from aionetworking.utils import Expression
 from tests.conftest import get_fixture
 from tests.test_senders.conftest import *

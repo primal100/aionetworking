@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths
-from aionetworking.conf.logging import Logger, logger_cv
+from aionetworking.logging.loggers import logger_cv
+from aionetworking.types.logging import LoggerType
 from aionetworking.compatibility import Protocol
 
 from pathlib import Path
@@ -12,7 +13,7 @@ from dataclasses import dataclass, field
 @dataclass
 class BaseSSLContext(Protocol):
     purpose = None
-    logger: Logger = field(default_factory=logger_cv.get)
+    logger: LoggerType = field(default_factory=logger_cv.get)
     ssl: bool = False
     cert: Path = None
     key: Path = None
@@ -23,7 +24,7 @@ class BaseSSLContext(Protocol):
     cert_required: bool = False
     check_hostname: bool = False
 
-    def set_logger(self, logger: Logger) -> None:
+    def set_logger(self, logger: LoggerType) -> None:
         self.logger = logger
 
     @property
