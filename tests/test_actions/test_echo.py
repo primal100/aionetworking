@@ -1,7 +1,7 @@
 import pytest
 import json
-from lib.actions.echo import InvalidRequestError
-from lib.utils import aone
+from aionetworking.actions.echo import InvalidRequestError
+from aionetworking.utils import aone
 
 
 class TestEcho:

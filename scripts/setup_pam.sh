@@ -1,4 +1,9 @@
 #!/bin/bash
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
 if [ $# -eq 0 ]; then
     echo "Provide username which will be given shadow access to run this application"
     exit 1

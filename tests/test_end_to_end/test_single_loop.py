@@ -3,12 +3,11 @@ from operator import attrgetter
 import pytest
 from pathlib import Path
 
-from lib.utils import alist
-from lib.actions.echo import InvalidRequestError
+from aionetworking.utils import alist
+from aionetworking.actions.echo import InvalidRequestError
 
 ###Required for skipif in fixture params###
-from lib.compatibility import datagram_supported
-from lib.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
 
 
 class TestOneWayServer:

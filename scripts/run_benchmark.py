@@ -7,15 +7,15 @@ import concurrent.futures
 import argparse
 import logging
 from pathlib import Path
-from lib import settings
-from lib.actions.echo import EchoAction
-from lib.actions.file_storage import BufferedFileStorage
-from lib.formats.contrib.json import JSONObject
-from lib.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory
-from lib.receivers.servers import TCPServer
-from lib.requesters.echo import EchoRequester
-from lib.senders.clients import TCPClient
-from lib.utils import set_loop_policy
+from aionetworking import settings
+from aionetworking.actions.echo import EchoAction
+from aionetworking.actions.file_storage import BufferedFileStorage
+from aionetworking.formats.contrib.json import JSONObject
+from aionetworking.networking.protocol_factories import StreamServerProtocolFactory, StreamClientProtocolFactory
+from aionetworking.receivers.servers import TCPServer
+from aionetworking.requesters.echo import EchoRequester
+from aionetworking.senders.clients import TCPClient
+from aionetworking.utils import set_loop_policy
 from tempfile import mkdtemp
 
 

@@ -1,9 +1,11 @@
-import pytest
-import os
-from pathlib import Path
-import logging
-from lib.conf.yaml_config import load_all_tags, get_paths
 import yaml
+
+from aionetworking import Logger
+from aionetworking.logging import PeerFilter, MessageFilter
+from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
+from aionetworking.conf import load_all_tags, get_paths
+from aionetworking.utils import Expression
+from tests.conftest import get_fixture
 from tests.test_senders.conftest import *
 
 
@@ -230,17 +232,6 @@ def config_file_logging(config_files_with_logging_args):
 @pytest.fixture
 def expected_object_logging(config_files_with_logging_args):
     return config_files_with_logging_args[1]
-
-
-import pytest
-import logging
-import os
-from tests.conftest import get_fixture
-from tests.test_formats.conftest import *
-
-from lib.conf.logging import Logger, ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
-from lib.conf.log_filters import PeerFilter, MessageFilter
-from lib.types import Expression
 
 
 @pytest.fixture

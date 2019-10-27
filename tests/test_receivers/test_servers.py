@@ -2,12 +2,11 @@ import asyncio
 import pytest
 import pickle
 
-from lib.receivers.exceptions import ServerException
-from lib.utils import time_coro
+from aionetworking.receivers.exceptions import ServerException
+from aionetworking.utils import time_coro
 
 ###Required for skipif in fixture params###
-from lib.compatibility import datagram_supported
-from lib.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
 
 
 class TestServerStartStop:

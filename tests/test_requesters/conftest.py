@@ -1,5 +1,5 @@
 from tests.test_actions.conftest import *
-from lib.requesters.echo import EchoRequester
+from aionetworking.requesters import EchoRequester
 import pytest
 
 

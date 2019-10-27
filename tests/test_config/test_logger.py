@@ -2,7 +2,7 @@ import logging
 import pytest
 import pickle
 
-from lib.compatibility import get_current_task_name, py38, set_current_task_name
+from aionetworking.compatibility import get_current_task_name, py38, set_current_task_name
 
 
 class TestLogger:

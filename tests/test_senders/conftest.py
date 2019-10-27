@@ -1,8 +1,9 @@
 import socket
 from tests.test_receivers.conftest import *
 
-from lib.senders.clients import BaseNetworkClient, TCPClient, UDPClient, pipe_client
-from lib.senders.sftp import SFTPClient
+from aionetworking import TCPClient, UDPClient, pipe_client
+from aionetworking.senders import BaseNetworkClient
+from aionetworking.senders.sftp import SFTPClient
 
 
 @pytest.fixture

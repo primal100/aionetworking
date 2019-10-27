@@ -1,10 +1,11 @@
-from lib.receivers.base import BaseServer
-from lib.receivers.sftp import SFTPServer
-from lib.receivers.servers import TCPServer, UDPServer, pipe_server
+from aionetworking import TCPServer, UDPServer, pipe_server
+from aionetworking.receivers import BaseServer
+from aionetworking.receivers.sftp import SFTPServer
+from aionetworking.utils import pipe_address_by_os
 from scripts.generate_ssh_host_key import generate_key_in_path
 
 from tests.test_networking.conftest import *
-from lib.utils import pipe_address_by_os
+
 from pytest_lazyfixture import lazy_fixture
 
 

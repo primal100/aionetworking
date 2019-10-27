@@ -1,8 +1,8 @@
 import pytest
 import asyncio
-from lib.formats.contrib.json import JSONObject
-from lib.formats.recording import get_recording
-from lib.utils import alist
+from aionetworking.formats.contrib.json import JSONObject
+from aionetworking.formats.recording import get_recording
+from aionetworking.utils import alist
 
 
 class TestJsonCodec:

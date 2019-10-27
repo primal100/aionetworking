@@ -7,30 +7,25 @@ import collections
 import pytest
 import logging
 import os
-import shutil
 from pathlib import Path
 
-from lib.actions.file_storage import FileStorage, BufferedFileStorage
-from lib.conf.logging import ConnectionLoggerStats
-from lib.formats.contrib.json import JSONObject, JSONCodec
-from lib.formats.contrib.pickle import PickleCodec, PickleObject
-from lib.formats.contrib.types import JSONObjectType
-from lib.formats.recording import BufferObject
-from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
-from lib.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
+from aionetworking.actions import FileStorage, BufferedFileStorage
+from aionetworking.logging import ConnectionLoggerStats
+from aionetworking.formats.contrib import JSONObject, JSONCodec
+from aionetworking.formats.contrib import PickleCodec, PickleObject
+from aionetworking.types.formats import JSONObjectType
+from aionetworking.formats import BufferObject
+from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
+from aionetworking.networking import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
 
-from lib.networking.types import SimpleNetworkConnectionType
-from lib.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
-from lib.networking.connections_manager import ConnectionsManager
-from lib.receivers.base import BaseServer
-from lib.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
-from lib.senders.base import BaseClient
-from lib.senders.clients import TCPClient, pipe_client
-from lib.utils import set_loop_policy
-
-
-
-from tests.mock import MockDatagramTransport
+from aionetworking.types.networking import SimpleNetworkConnectionType
+from aionetworking.networking.protocol_factories import StreamServerProtocolFactory
+from aionetworking.networking.connections_manager import ConnectionsManager
+from aionetworking.receivers.base import BaseServer
+from aionetworking.receivers.servers import pipe_server
+from aionetworking.senders.base import BaseClient
+from aionetworking.senders.clients import pipe_client
+from aionetworking.utils import set_loop_policy
 
 from typing import Dict, Any, List, Tuple, Union, Callable, Optional, Type
 
@@ -208,16 +203,6 @@ def sender_connection_logger_stats(sender_connection_logger, context_client, cap
 @pytest.fixture
 def pickle_codec(context, receiver_connection_logger) -> PickleCodec:
     return PickleCodec(PickleObject, context=context, logger=receiver_connection_logger)
-
-
-@pytest.fixture
-def data_dir():
-    from lib.settings import TEST_DATA_DIR
-    if TEST_DATA_DIR.exists():
-        shutil.rmtree(TEST_DATA_DIR)
-    TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    yield TEST_DATA_DIR
-    shutil.rmtree(TEST_DATA_DIR)
 
 
 @pytest.fixture
@@ -743,35 +728,6 @@ def buffer_json_2(json_encoded_multi) -> str:
 
 
 @pytest.fixture
-def asn1_recording() -> bytes:
-    return b"\x00\x00\x00\x00\x00\x01\t\x00\x00\x00127.0.0.1\xf0\x00\x00\x00bGH\x04\x00\x00\x00\x01k\x1e(\x1c\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x11`\x0f\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x14\x02l\x1f\xa1\x1d\x02\x01\xff\x02\x01-0\x15\x80\x07\x91\x14\x97Bu3\xf3\x81\x01\x00\x82\x07\x91\x14\x97yy\x08\xf0e\x81\xa4H\x04\x84\x00\x01\xffI\x04\xa5\x05\x00\x01k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x0e\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00lj\xa2h\x02\x01\x010c\x02\x018\xa3^\xa1\\0Z\x04\x10K\x9da\x91\x10u6e\x8c\xfeY\x88\x0c\xd2\xac'\x04\x10K\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8\x04\x10\x8cC\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x04\x10C\xa2T P\x12\x04g\xf33\xc0\x0fB\xd8K\x8c\x04\x10\xa2U\x1a\x05\x8c\xdb\x00\x00K\x8dy\xf7\xca\xffP\x12\x00\x00\x00\x80?\x01\t\x00\x00\x00127.0.0.1V\x00\x00\x00e\x16H\x04\xa5\x05\x00\x01I\x04\x84\x00\x01\xffl\x08\xa1\x06\x02\x01\x02\x02\x018d<I\x04W\x18\x00\x00k*((\x06\x07\x00\x11\x86\x05\x01\x01\x01\xa0\x1da\x1b\x80\x02\x07\x80\xa1\t\x06\x07\x04\x00\x00\x01\x00\x05\x03\xa2\x03\x02\x01\x00\xa3\x05\xa1\x03\x02\x01\x00l\x08\xa3\x06\x02\x01\x01\x02\x01\x0b"
-
-
-@pytest.fixture
-def file_containing_asn1_recording(tmpdir, asn1_recording) -> Path:
-    p = Path(tmpdir.mkdir("recording").join("asn1.recording"))
-    p.write_bytes(asn1_recording)
-    return p
-
-
-@pytest.fixture
-def asn1_recording_data(buffer_asn1_1, buffer_asn1_2) -> List[Dict]:
-    return [{
-        'sent_by_server': False,
-        'seconds': 0.0,
-        'peer': "127.0.0.1",
-        'data': buffer_asn1_1
-    },
-    {
-        'sent_by_server': False,
-        'seconds': 1.0,
-        'peer': "127.0.0.1",
-        'data': buffer_asn1_2
-    }
-    ]
-
-
-@pytest.fixture
 def json_recording() -> bytes:
     return b'\x00\x00\x00\x00\x00\x00\t\x00\x00\x00127.0.0.1O\x00\x00\x00{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}\x00\x00\x00\x80?\x00\t\x00\x00\x00127.0.0.1/\x00\x00\x00{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
@@ -999,7 +955,7 @@ async def two_way_client_connected(two_way_client_sender, two_way_server_started
 
 @pytest.fixture
 async def connections_manager() -> ConnectionsManager:
-    from lib.networking.connections_manager import connections_manager
+    from aionetworking.networking.connections_manager import connections_manager
     yield connections_manager
     connections_manager.clear()
 
