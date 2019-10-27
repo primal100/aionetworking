@@ -1,6 +1,6 @@
 import asyncio
 from aionetworking.actions.base import BaseAction
-from aionetworking.formats.types import MessageObjectType
+from aionetworking.types.formats import MessageObjectType
 from dataclasses import dataclass, field
 from aionetworking.factories import queue_defaultdict
 

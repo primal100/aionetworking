@@ -7,7 +7,7 @@ from pathlib import Path
 from aionetworking.compatibility import Protocol
 
 from typing import AsyncGenerator, Any, Dict, Sequence
-from .types import CodecType, MessageObjectType
+from aionetworking.types.formats import CodecType, MessageObjectType
 
 
 class MessageObject(Protocol):

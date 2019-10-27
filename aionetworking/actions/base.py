@@ -4,8 +4,8 @@ import warnings
 
 from aionetworking.compatibility import Protocol
 from aionetworking.conf.logging import Logger
-from aionetworking.conf.types import LoggerType
-from aionetworking.formats.types import MessageObjectType
+from aionetworking.types.conf import LoggerType
+from aionetworking.types.formats import MessageObjectType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
 

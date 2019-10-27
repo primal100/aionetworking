@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from aionetworking.compatibility import Protocol
-from aionetworking.networking.types import ConnectionType
+from aionetworking.types.networking import ConnectionType
 
 
 class SenderProtocol(Protocol):

@@ -6,8 +6,7 @@ from aionetworking.receivers.exceptions import ServerException
 from aionetworking.utils import time_coro
 
 ###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported
-from aionetworking.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
 
 
 class TestServerStartStop:

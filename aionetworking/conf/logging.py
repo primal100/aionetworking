@@ -12,8 +12,8 @@ from aionetworking.conf.utils_logging import LoggingDatetime, LoggingTimeDelta, 
 from aionetworking.futures.schedulers import TaskScheduler
 
 from typing import Type, Optional, Dict, Generator, Any, Union
-from aionetworking.formats.types import MessageObjectType
-from .types import ConnectionLoggerType
+from aionetworking.types.formats import MessageObjectType
+from aionetworking.types.conf import ConnectionLoggerType
 
 
 class BaseLogger(logging.LoggerAdapter, ABC):

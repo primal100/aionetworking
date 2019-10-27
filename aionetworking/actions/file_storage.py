@@ -12,7 +12,7 @@ from aionetworking.conf.utils_logging import p
 from aionetworking.futures.value_waiters import StatusWaiter
 
 from typing import ClassVar, AnyStr
-from aionetworking.formats.types import MessageObjectType
+from aionetworking.types.formats import MessageObjectType
 
 
 @dataclass

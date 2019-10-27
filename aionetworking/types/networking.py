@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from .protocols import (ProtocolFactoryProtocol, ConnectionProtocol, NetworkConnectionProtocol,
-                            UDPConnectionProtocol, AdaptorProtocol, SenderAdaptorProtocol,
-                            SimpleNetworkConnectionProtocol)
+    from aionetworking.networking.protocols import (ProtocolFactoryProtocol, ConnectionProtocol, NetworkConnectionProtocol,
+                                                    UDPConnectionProtocol, AdaptorProtocol, SenderAdaptorProtocol,
+                                                    SimpleNetworkConnectionProtocol)
 
 
 ProtocolFactoryType = TypeVar('ProtocolFactoryType', bound='ProtocolFactoryProtocol')

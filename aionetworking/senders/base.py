@@ -9,7 +9,7 @@ from typing import Tuple, Sequence, AnyStr
 from aionetworking.compatibility import Protocol
 from aionetworking.conf.context import context_cv
 from aionetworking.conf.logging import Logger, logger_cv, get_logger_sender
-from aionetworking.networking.types import ProtocolFactoryType, ConnectionType
+from aionetworking.types.networking import ProtocolFactoryType, ConnectionType
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from aionetworking.futures.value_waiters import StatusWaiter
 from .protocols import SenderProtocol

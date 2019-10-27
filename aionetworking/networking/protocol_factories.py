@@ -6,17 +6,16 @@ import contextvars
 from aionetworking.actions.protocols import ActionProtocol
 from aionetworking.conf.context import context_cv
 from aionetworking.formats.base import BaseMessageObject
-from aionetworking.requesters.types import RequesterType
+from aionetworking.types.requesters import RequesterType
 from aionetworking.conf.logging import Logger, logger_cv
-from aionetworking.types import IPNetwork
-from aionetworking.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str
+from aionetworking.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str, IPNetwork
 from .transports import DatagramTransportWrapper
 
 
 from .connections_manager import connections_manager
 from .connections import TCPClientConnection, TCPServerConnection, UDPServerConnection, UDPClientConnection
 from .protocols import ProtocolFactoryProtocol
-from .types import ProtocolFactoryType,  NetworkConnectionType
+from aionetworking.types.networking import ProtocolFactoryType,  NetworkConnectionType
 
 from typing import Optional, Text, Tuple, Type, Union, Sequence, Dict, Any
 

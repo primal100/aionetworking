@@ -7,7 +7,7 @@ from .exceptions import ServerException
 from aionetworking.conf.context import context_cv
 from aionetworking.conf.logging import Logger, logger_cv, get_logger_receiver
 from aionetworking.futures.value_waiters import StatusWaiter
-from aionetworking.networking.types import ProtocolFactoryType
+from aionetworking.types.networking import ProtocolFactoryType
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_loop
 from .protocols import ReceiverProtocol
 

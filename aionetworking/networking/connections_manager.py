@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any
 
 
-from aionetworking.networking.types import SimpleNetworkConnectionType
+from aionetworking.types.networking import SimpleNetworkConnectionType
 from aionetworking.futures.counters import Counters
 
 

@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 
 from functools import partial
-from aionetworking.types import IPNetwork
+from aionetworking.utils import IPNetwork
 from .logging import Logger
 
 from typing import Optional, Dict, Union, Sequence

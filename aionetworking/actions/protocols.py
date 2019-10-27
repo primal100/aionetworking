@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod
 import warnings
 
-from aionetworking.formats.types import MessageObjectType
+from aionetworking.types.formats import MessageObjectType
 
 from typing import AsyncGenerator, Any, TypeVar
 from aionetworking.compatibility import Protocol

@@ -8,9 +8,8 @@ from .exceptions import MessageFromNotAuthorizedHost
 from aionetworking.compatibility import set_task_name
 from aionetworking.conf.context import context_cv
 from aionetworking.conf.logging import Logger, logger_cv, connection_logger_cv
-from aionetworking.conf.types import ConnectionLoggerType
-from aionetworking.types import IPNetwork, supernet_of
-from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate
+from aionetworking.types.conf import ConnectionLoggerType
+from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, IPNetwork, supernet_of
 from aionetworking.futures.value_waiters import StatusWaiter
 
 from .connections_manager import connections_manager
@@ -18,7 +17,7 @@ from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocols import (
     ConnectionDataclassProtocol, AdaptorProtocolGetattr, UDPConnectionMixinProtocol, SenderAdaptorGetattr)
 from .transports import TransportType, DatagramTransportWrapper
-from .types import AdaptorType, SenderAdaptorType
+from aionetworking.types.networking import AdaptorType, SenderAdaptorType
 
 from typing import NoReturn, Optional, Tuple, Type, Dict, Any, Sequence, Callable, Awaitable, List
 from aionetworking.compatibility import Protocol

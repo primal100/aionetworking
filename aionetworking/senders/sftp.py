@@ -2,7 +2,7 @@ import asyncssh
 from dataclasses import dataclass, InitVar
 from pathlib import Path
 
-from aionetworking.types import IPNetwork
+from aionetworking.utils import IPNetwork
 from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPClientProtocol
 from .clients import BaseNetworkClient
 

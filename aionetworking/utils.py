@@ -1,8 +1,12 @@
 from __future__ import annotations
 import asyncio
 from aiofiles.os import wrap
+from collections import ChainMap
+from ipaddress import AddressValueError
+import builtins
 import datetime
 import io
+import operator
 import os
 import struct
 import re
@@ -12,12 +16,12 @@ import itertools
 import sys
 import socket
 import tempfile
-from dataclasses import fields, MISSING
+from dataclasses import dataclass, fields, MISSING
 from functools import wraps
 
 from .compatibility import Protocol
 from pathlib import Path
-from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator
+from typing import Sequence, Callable, List, AnyStr, Tuple, Union, Iterator, AsyncGenerator, Any, TYPE_CHECKING, Generator, Iterable
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 try:
@@ -104,12 +108,12 @@ def inherit_on_type_checking_only(arg):
 
 
 ###Iterators###
-def has_items(generator: Iterator) -> bool:
+"""def has_items(generator: Iterator) -> bool:
     try:
         next(generator)
         return True
     except StopIteration:
-        return False
+        return False"""
 
 
 ###Async Generators###
@@ -125,12 +129,6 @@ async def anext(generator: AsyncGenerator) -> Any:
 
 async def alist(generator: AsyncGenerator) -> List[Any]:
     return [i async for i in generator]
-
-
-###Networking###
-
-def supernet_of(self, other: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]) -> bool:
-    return any(n.supernet_of(other) for n in self.data)
 
 
 ###Asyncio###
@@ -173,10 +171,6 @@ def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) 
             set_proactor_loop_policy_windows()
 
 
-def supports_pipe_or_unix_connections() -> bool:
-    return hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe')
-
-
 ###Logging###
 
 def log_exception(ex: BaseException) -> Sequence[str]:
@@ -186,7 +180,7 @@ def log_exception(ex: BaseException) -> Sequence[str]:
 
 ###Datetime utils###
 
-def timestamp_to_utc_string(dt) -> str:
+"""def timestamp_to_utc_string(dt) -> str:
     return datetime.datetime.strftime(dt, '%Y%m%d%H%M%S')
 
 
@@ -202,7 +196,7 @@ def datetime_to_human_readable(dt: datetime.datetime, strf: str='%Y-%m-%d %H:%M:
 
 
 def current_date() -> str:
-    return datetime.datetime.now().strftime("%Y%m%d")
+    return datetime.datetime.now().strftime("%Y%m%d")"""
 
 
 ###Multiprocessing###
@@ -240,7 +234,7 @@ def pipe_address_by_os() -> Path:
 
 ###Binary###
 
-def pack_variable_len_string(content: bytes) -> bytes:
+"""def pack_variable_len_string(content: bytes) -> bytes:
     return struct.pack("I", len(content)) + content
 
 
@@ -335,11 +329,11 @@ def unpack_recorded_packets(content: bytes) -> Sequence[Tuple[int, AnyStr, bytes
 #Text
 def camel_case_to_title(string: str) -> str:
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1 \2', string)
-    return re.sub('([a-z0-9])([A-Z])', r'\1 \2', s1).title()
+    return re.sub('([a-z0-9])([A-Z])', r'\1 \2', s1).title()"""
 
 
 #Text formatting
-class Color:
+"""class Color:
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
     DARKCYAN = '\033[36m'
@@ -357,11 +351,11 @@ def bold(text: str) -> str:
 
 
 def underline(text: str) -> str:
-    return Color.UNDERLINE + text + Color.END
+    return Color.UNDERLINE + text + Color.END"""
 
 
 ###Testing###
-async def run_and_wait(method, *args, interval: int=7, **kwargs):
+"""async def run_and_wait(method, *args, interval: int=7, **kwargs):
     await method(*args, **kwargs)
     await asyncio.sleep(interval)
 
@@ -376,7 +370,7 @@ async def run_wait_close_multiple(method, message_manager, sender, msgs: [Sequen
     for message in msgs:
         await run_and_wait(method, sender, message, interval=interval, **kwargs)
     await asyncio.sleep(final_interval)
-    await message_manager.stop()
+    await message_manager.stop()"""
 
 
 def addr_tuple_to_str(addr: Sequence):
@@ -386,29 +380,6 @@ def addr_tuple_to_str(addr: Sequence):
 def addr_str_to_tuple(addr: AnyStr):
     addr, port = addr.split(':')
     return addr, int(port)
-
-
-###ASN.1 PyCrate###
-def adapt_asn_domain(domain: Sequence) -> str:
-    return '.'.join([str(x) for x in domain])
-
-
-def asn_timestamp_to_utc_string(timestamp: Sequence) -> str:
-    return ''.join(timestamp)
-
-
-def asn_timestamp_to_datetime(timestamp: Sequence) -> datetime.datetime:
-    year = int(timestamp[0] or 0)
-    month = int(timestamp[1] or 0)
-    day = int(timestamp[2] or 0)
-    hour = int(timestamp[3] or 0)
-    minute = int(timestamp[4] or 0)
-    second = int(timestamp[5] or 0)
-    if timestamp[6] is None:
-        microsecond = 0
-    else:
-        microsecond = int(timestamp[6].ljust(6, '0'))
-    return datetime.datetime(year, month, day, hour, minute, second, microsecond)
 
 
 def dataclass_getstate(self):
@@ -450,3 +421,123 @@ class SystemInfo:
             return psutil.Process(os.getpid()).cpu_percent()
         except NameError:
             return "Unknown"
+
+
+class IPNetwork:
+    def __init__(self, network: Union[str, IPv4Network, IPv6Network]):
+        if isinstance(network, IPv4Network):
+            self.ip_network = network
+            self.is_ipv6 = False
+        elif isinstance(network, IPv6Network):
+            self.ip_network = network
+            self.is_ipv6 = True
+        else:
+            try:
+                self.ip_network = IPv4Network(network)
+                self.is_ipv6 = False
+            except AddressValueError:
+                try:
+                    self.ip_network = IPv6Network(network)
+                    self.is_ipv6 = True
+                except AddressValueError:
+                    raise AddressValueError(f'{network} is not valid IPv4 or IPv6 network')
+
+    def __eq__(self, other):
+        return self.ip_network == other.ip_network
+
+    def supernet_of(self, network: Union[IPv4Network, IPv6Network]):
+        return self.ip_network.supernet_of(network)
+
+
+def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networks: Sequence[IPNetwork]):
+    if not isinstance(network, IPNetwork):
+        network = IPNetwork(network)
+    if network.is_ipv6:
+        networks = filter(lambda n: n.is_ipv6, networks)
+    else:
+        networks = filter(lambda n: not n.is_ipv6, networks)
+    return any(n.supernet_of(network.ip_network) for n in networks)
+
+
+@dataclass
+class CallableFromString(Callable):
+    _strings_to_callables = {}
+    callable: Callable
+
+    def __post_init__(self):
+        self.callable = self.adapt_callable(self.callable)
+
+    def __call__(self, *args, **kwargs):
+        return self.callable(*args, **kwargs)
+
+    def adapt_callable(self, v: Union[str, Callable]):
+        if isinstance(v, str):
+            try:
+                return self._strings_to_callables[v]
+            except KeyError:
+                raise TypeError(f"{v} not found")
+        if v not in self._strings_to_callables.values():
+            name = self.__class__.__name__
+            raise TypeError(f"{v} not a valid {name}")
+        return v
+
+
+class Builtin(CallableFromString):
+    _strings_to_callables = ChainMap(builtins.__dict__, {'istr': str})
+
+
+def in_(a, b) -> bool:
+    return a in b
+
+
+class Operator(CallableFromString):
+    _strings_to_callables = {
+        '=': operator.eq,
+        '==': operator.eq,
+        'eq': operator.eq,
+        '<': operator.lt,
+        'lt': operator.lt,
+        '<=': operator.le,
+        'lte': operator.le,
+        '!<': operator.ne,
+        'ne': operator.ne,
+        '>': operator.gt,
+        'gt': operator.gt,
+        '>=': operator.ge,
+        'ge': operator.ge,
+        'in': in_,
+        'contains': operator.contains
+    }
+
+
+@dataclass
+class Expression:
+    attr: str
+    op: Operator
+    value_type: Builtin
+    value: Any
+    case_sensitive: bool = True
+
+    @classmethod
+    def from_string(cls, string: str):
+        attr, op, value_type, value = string.split()
+        if op.startswith('i'):
+            case_sensitive = True
+            op = op.split('i')[1]
+        else:
+            case_sensitive = False
+        op = Operator(op)
+        return cls(attr, op, value_type, value, case_sensitive=case_sensitive)
+
+    def __call__(self, obj: Any) -> bool:
+        if not self.attr or self.attr == 'self':
+            value = obj
+        else:
+            value = getattr(obj, self.attr)
+        if self.case_sensitive:
+            if isinstance(value, Iterable):
+                value = [v.lower() for v in value]
+            else:
+                value = value.lower()
+            return self.op(value, self.value.lower())
+        return self.op(value, self.value)

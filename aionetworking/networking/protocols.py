@@ -5,13 +5,13 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from aionetworking.actions.types import ActionType
-from aionetworking.requesters.types import RequesterType
+from aionetworking.types.actions import ActionType
+from aionetworking.types.requesters import RequesterType
 from aionetworking.conf.logging import Logger
-from aionetworking.formats.types import MessageObjectType
+from aionetworking.types.formats import MessageObjectType
 from aionetworking.utils import inherit_on_type_checking_only
 
-from .types import AdaptorType
+from aionetworking.types.networking import AdaptorType
 
 from aionetworking.compatibility import Protocol
 from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union, Dict, Tuple, Type

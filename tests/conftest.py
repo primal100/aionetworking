@@ -7,30 +7,25 @@ import collections
 import pytest
 import logging
 import os
-import shutil
 from pathlib import Path
 
 from aionetworking.actions.file_storage import FileStorage, BufferedFileStorage
 from aionetworking.conf.logging import ConnectionLoggerStats
 from aionetworking.formats.contrib.json import JSONObject, JSONCodec
 from aionetworking.formats.contrib.pickle import PickleCodec, PickleObject
-from aionetworking.formats.contrib.types import JSONObjectType
+from aionetworking.types.formats import JSONObjectType
 from aionetworking.formats.recording import BufferObject
 from aionetworking.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
 
-from aionetworking.networking.types import SimpleNetworkConnectionType
-from aionetworking.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
+from aionetworking.types.networking import SimpleNetworkConnectionType
+from aionetworking.networking.protocol_factories import StreamServerProtocolFactory
 from aionetworking.networking.connections_manager import ConnectionsManager
 from aionetworking.receivers.base import BaseServer
-from aionetworking.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
+from aionetworking.receivers.servers import pipe_server
 from aionetworking.senders.base import BaseClient
-from aionetworking.senders.clients import TCPClient, pipe_client
+from aionetworking.senders.clients import pipe_client
 from aionetworking.utils import set_loop_policy
-
-
-
-from tests.mock import MockDatagramTransport
 
 from typing import Dict, Any, List, Tuple, Union, Callable, Optional, Type
 

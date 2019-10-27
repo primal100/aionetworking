@@ -7,13 +7,14 @@ from pprint import pformat
 
 from aionetworking import settings
 from aionetworking.conf.context import context_cv
-from aionetworking.conf.logging import ConnectionLogger, connection_logger_cv
+from aionetworking.conf.logging import connection_logger_cv
+from aionetworking.types.conf import ConnectionLoggerType
 from aionetworking.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
 from typing import AsyncGenerator, Any, Dict, Sequence, Type
 from aionetworking.compatibility import Protocol
-from .types import MessageObjectType, CodecType
+from aionetworking.types.formats import MessageObjectType, CodecType
 
 
 @dataclass
@@ -26,7 +27,7 @@ class BaseMessageObject(MessageObject, Protocol):
     encoded: bytes
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
-    parent_logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
     received_timestamp: datetime = field(default_factory=datetime.now, compare=False, repr=False, hash=False)
 
     def __post_init__(self):
@@ -107,7 +108,7 @@ class BaseCodec(Codec):
 
     msg_obj: Type[MessageObjectType]
     context: Dict[str, Any] = field(default_factory=context_cv.get)
-    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
 
     def __post_init__(self):
         pass

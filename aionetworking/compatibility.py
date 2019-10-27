@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import sys
+import socket
 
 
 py38 = sys.version_info >= (3, 8)
@@ -60,3 +61,7 @@ def is_proactor(loop: asyncio.AbstractEventLoop = None):
 
 def datagram_supported(loop: asyncio.AbstractEventLoop = None):
     return py38 or not is_proactor(loop=loop)
+
+
+def supports_pipe_or_unix_connections() -> bool:
+    return hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe')

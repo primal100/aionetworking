@@ -6,14 +6,14 @@ import logging
 from aionetworking.conf.context import context_cv
 from aionetworking.networking.adaptors import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking.connections import (TCPServerConnection, TCPClientConnection,
-                                        UDPServerConnection, UDPClientConnection)
+                                                  UDPServerConnection, UDPClientConnection)
 from aionetworking.networking.protocol_factories import (StreamServerProtocolFactory, StreamClientProtocolFactory,
-                                               DatagramServerProtocolFactory, DatagramClientProtocolFactory)
+                                                         DatagramServerProtocolFactory, DatagramClientProtocolFactory)
 from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
 from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from aionetworking.networking.ssl import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
-from aionetworking.types import IPNetwork
+from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
 
 from typing import Union

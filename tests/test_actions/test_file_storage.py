@@ -4,7 +4,7 @@ import pickle
 from pathlib import Path
 
 from aionetworking.actions.file_storage import ManagedFile
-from aionetworking.formats.recording import get_recording_from_file
+from aionetworking.formats import get_recording_from_file
 from aionetworking.utils import alist
 
 

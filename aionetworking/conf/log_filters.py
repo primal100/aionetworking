@@ -2,7 +2,7 @@ from __future__ import annotations
 from logging import Filter, LogRecord
 
 from dataclasses import dataclass
-from aionetworking.types import Expression
+from aionetworking.utils import Expression
 
 from typing import Sequence
 

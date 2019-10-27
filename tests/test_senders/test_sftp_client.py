@@ -7,10 +7,7 @@ from aionetworking.utils import pipe_address_by_os
 from aionetworking.receivers.exceptions import ServerException
 
 ###Required for skipif in fixture params###
-from aionetworking.utils import pipe_address_by_os
-from aionetworking.compatibility import datagram_supported
-from aionetworking.utils import pipe_address_by_os
-from aionetworking.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
 
 
 class TestClientStartStop:

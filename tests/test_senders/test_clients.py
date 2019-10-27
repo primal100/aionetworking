@@ -5,8 +5,7 @@ import pytest
 from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
 ###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported, is_proactor
-from aionetworking.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, is_proactor, supports_pipe_or_unix_connections
 
 
 class TestClientStartStop:

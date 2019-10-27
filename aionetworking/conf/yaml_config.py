@@ -9,10 +9,10 @@ from aionetworking.formats.contrib.yaml_constructors import load_json, load_pick
 from aionetworking.networking.yaml_constructors import (load_server_side_ssl, load_client_side_ssl,
                                               load_stream_server_protocol_factory, load_datagram_server_protocol_factory,
                                               load_stream_client_protocol_factory, load_datagram_client_protocol_factory)
-from aionetworking.receivers.types import ReceiverType
+from aionetworking.types.receivers import ReceiverType
 from aionetworking.receivers.yaml_constructors import load_tcp_server, load_udp_server, load_pipe_server
 from aionetworking.requesters.yaml_constructors import load_echo_requester
-from aionetworking.senders.types import SenderType
+from aionetworking.types.senders import SenderType
 from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_client, load_pipe_client
 from .yaml_constructors import load_ip_network, load_path
 from aionetworking.settings import APP_HOME, TEMPDIR

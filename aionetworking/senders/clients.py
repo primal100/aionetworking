@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 import socket
 import sys
 
-from aionetworking.types import IPNetwork
+from aionetworking.utils import IPNetwork
 from aionetworking.networking.protocol_factories import DatagramClientProtocolFactory
-from aionetworking.networking.types import ConnectionType
+from aionetworking.types.networking import ConnectionType
 from aionetworking.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
 
