@@ -10,23 +10,23 @@ import os
 import shutil
 from pathlib import Path
 
-from lib.actions.file_storage import FileStorage, BufferedFileStorage
-from lib.conf.logging import ConnectionLoggerStats
-from lib.formats.contrib.json import JSONObject, JSONCodec
-from lib.formats.contrib.pickle import PickleCodec, PickleObject
-from lib.formats.contrib.types import JSONObjectType
-from lib.formats.recording import BufferObject
-from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
-from lib.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
+from aionetworking.actions.file_storage import FileStorage, BufferedFileStorage
+from aionetworking.conf.logging import ConnectionLoggerStats
+from aionetworking.formats.contrib.json import JSONObject, JSONCodec
+from aionetworking.formats.contrib.pickle import PickleCodec, PickleObject
+from aionetworking.formats.contrib.types import JSONObjectType
+from aionetworking.formats.recording import BufferObject
+from aionetworking.networking.adaptors import ReceiverAdaptor, SenderAdaptor
+from aionetworking.networking.connections import BaseConnectionProtocol, TCPServerConnection, TCPClientConnection
 
-from lib.networking.types import SimpleNetworkConnectionType
-from lib.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
-from lib.networking.connections_manager import ConnectionsManager
-from lib.receivers.base import BaseServer
-from lib.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
-from lib.senders.base import BaseClient
-from lib.senders.clients import TCPClient, pipe_client
-from lib.utils import set_loop_policy
+from aionetworking.networking.types import SimpleNetworkConnectionType
+from aionetworking.networking.protocol_factories import StreamClientProtocolFactory, StreamServerProtocolFactory
+from aionetworking.networking.connections_manager import ConnectionsManager
+from aionetworking.receivers.base import BaseServer
+from aionetworking.receivers.servers import TCPServer, pipe_server, DatagramServer, UDPServer
+from aionetworking.senders.base import BaseClient
+from aionetworking.senders.clients import TCPClient, pipe_client
+from aionetworking.utils import set_loop_policy
 
 
 
@@ -208,16 +208,6 @@ def sender_connection_logger_stats(sender_connection_logger, context_client, cap
 @pytest.fixture
 def pickle_codec(context, receiver_connection_logger) -> PickleCodec:
     return PickleCodec(PickleObject, context=context, logger=receiver_connection_logger)
-
-
-@pytest.fixture
-def data_dir():
-    from lib.settings import TEST_DATA_DIR
-    if TEST_DATA_DIR.exists():
-        shutil.rmtree(TEST_DATA_DIR)
-    TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    yield TEST_DATA_DIR
-    shutil.rmtree(TEST_DATA_DIR)
 
 
 @pytest.fixture
@@ -999,7 +989,7 @@ async def two_way_client_connected(two_way_client_sender, two_way_server_started
 
 @pytest.fixture
 async def connections_manager() -> ConnectionsManager:
-    from lib.networking.connections_manager import connections_manager
+    from aionetworking.networking.connections_manager import connections_manager
     yield connections_manager
     connections_manager.clear()
 

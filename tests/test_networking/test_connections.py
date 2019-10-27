@@ -3,9 +3,9 @@ import pytest
 import pickle
 from pathlib import Path
 
-from lib.networking.exceptions import MethodNotFoundError, MessageFromNotAuthorizedHost
-from lib.formats.recording import get_recording_from_file
-from lib.utils import alist
+from aionetworking.networking.exceptions import MethodNotFoundError, MessageFromNotAuthorizedHost
+from aionetworking.formats.recording import get_recording_from_file
+from aionetworking.utils import alist
 
 
 class TestConnectionShared:

@@ -3,9 +3,9 @@ import asyncio
 
 from pathlib import Path
 
-from lib.formats.recording import get_recording_from_file
-from lib.networking.exceptions import MethodNotFoundError
-from lib.utils import alist
+from aionetworking.formats.recording import get_recording_from_file
+from aionetworking.networking.exceptions import MethodNotFoundError
+from aionetworking.utils import alist
 
 
 class TestTwoWayReceiverAdaptor:

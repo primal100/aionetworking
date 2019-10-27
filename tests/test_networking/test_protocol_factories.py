@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import pickle
 from pathlib import Path
-from lib.utils import addr_tuple_to_str, alist
+from aionetworking.utils import alist
 
 
 class TestStreamProtocolFactories:

@@ -3,9 +3,9 @@ import asyncio
 import pickle
 from pathlib import Path
 
-from lib.actions.file_storage import ManagedFile
-from lib.formats.recording import get_recording_from_file
-from lib.utils import alist
+from aionetworking.actions.file_storage import ManagedFile
+from aionetworking.formats.recording import get_recording_from_file
+from aionetworking.utils import alist
 
 
 class TestJsonFileStorage:

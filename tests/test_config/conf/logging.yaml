@@ -23,7 +23,7 @@ formatters:
 
 filters:
     peer:
-        (): lib.conf.log_filters.PeerFilter
+        (): aionetworking.conf.log_filters.PeerFilter
         peers: [127.0.0.1]
 
 handlers:

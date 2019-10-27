@@ -1,8 +1,8 @@
 import pytest
 import asyncio
-from lib.compatibility import supports_task_name
-from lib.wrappers.counters import Counters, Counter
-from lib.wrappers.schedulers import TaskScheduler
+from aionetworking.compatibility import supports_task_name
+from aionetworking.futures.counters import Counters, Counter
+from aionetworking.futures.schedulers import TaskScheduler
 
 
 @pytest.fixture

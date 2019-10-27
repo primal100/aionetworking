@@ -1,7 +1,8 @@
-from lib.compatibility import supports_task_name, get_task_name, get_current_task_name, set_task_name, \
-    set_current_task_name
 import pytest
 import asyncio
+
+from aionetworking.compatibility import (supports_task_name, get_task_name, get_current_task_name, set_task_name,
+    set_current_task_name)
 
 
 class TestTaskNames:

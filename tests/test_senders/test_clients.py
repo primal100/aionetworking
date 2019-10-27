@@ -2,11 +2,11 @@ import asyncio
 import pickle
 import pytest
 
-from lib.networking.exceptions import RemoteConnectionClosedError
+from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
 ###Required for skipif in fixture params###
-from lib.compatibility import datagram_supported, is_proactor
-from lib.utils import supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, is_proactor
+from aionetworking.utils import supports_pipe_or_unix_connections
 
 
 class TestClientStartStop:

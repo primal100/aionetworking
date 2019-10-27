@@ -3,18 +3,18 @@ import asyncssh
 import datetime
 
 import logging
-from lib.conf.context import context_cv
-from lib.networking.adaptors import ReceiverAdaptor, SenderAdaptor
-from lib.networking.connections import (TCPServerConnection, TCPClientConnection,
+from aionetworking.conf.context import context_cv
+from aionetworking.networking.adaptors import ReceiverAdaptor, SenderAdaptor
+from aionetworking.networking.connections import (TCPServerConnection, TCPClientConnection,
                                         UDPServerConnection, UDPClientConnection)
-from lib.networking.protocol_factories import (StreamServerProtocolFactory, StreamClientProtocolFactory,
+from aionetworking.networking.protocol_factories import (StreamServerProtocolFactory, StreamClientProtocolFactory,
                                                DatagramServerProtocolFactory, DatagramClientProtocolFactory)
-from lib.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
-from lib.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
-from lib.networking.ssl import ServerSideSSL, ClientSideSSL
-from lib.networking.transports import DatagramTransportWrapper
-from lib.types import IPNetwork
-from lib.compatibility_tests import AsyncMock
+from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
+from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
+from aionetworking.networking.ssl import ServerSideSSL, ClientSideSSL
+from aionetworking.networking.transports import DatagramTransportWrapper
+from aionetworking.types import IPNetwork
+from aionetworking.compatibility_tests import AsyncMock
 
 from typing import Union
 

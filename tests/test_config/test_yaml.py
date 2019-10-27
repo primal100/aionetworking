@@ -1,5 +1,5 @@
 import logging
-from lib.conf.yaml_config import node_from_config
+from aionetworking.conf.yaml_config import node_from_config
 
 
 class TestYamlConfig:
