@@ -13,7 +13,7 @@ from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_l
 from .protocols import ReceiverProtocol
 
 from aionetworking.compatibility import Protocol
-
+from typing import Optional
 
 @dataclass
 class BaseReceiver(ReceiverProtocol, Protocol):
@@ -135,6 +135,9 @@ class BaseServer(BaseReceiver, Protocol):
 class BaseNetworkServer(BaseServer, Protocol):
     host: str = '0.0.0.0'
     port: int = 4000
+    reuse_address: Optional[bool] = None
+    reuse_port: Optional[bool] = None
+    backlog: int = 100
 
     @property
     def listening_on(self) -> str:

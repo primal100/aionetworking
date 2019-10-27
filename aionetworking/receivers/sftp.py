@@ -39,7 +39,8 @@ class SFTPServer(BaseNetworkServer):
         return kwargs
 
     async def _get_server(self) -> asyncio.AbstractServer:
-        return await asyncssh.create_server(self.protocol_factory, self.host, self.port,
+        return await asyncssh.create_server(self.protocol_factory, self.host, self.port, backlog=self.backlog,
+                                            reuse_address=self.reuse_address, reuse_port=self.reuse_port,
                                             sftp_factory=partial(self.sftp_factory, base_upload_dir=self.base_upload_dir),
                                             **self.sftp_kwargs)
 
