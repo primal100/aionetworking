@@ -28,8 +28,8 @@ class TCPServer(BaseNetworkServer):
     peer_prefix = 'tcp'
     protocol_factory: StreamServerProtocolFactory = None
 
-    ssl: ServerSideSSL = None
-    ssl_handshake_timeout: int = None
+    ssl: Optional[ServerSideSSL] = None
+    ssl_handshake_timeout: Optional[int] = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -42,8 +42,9 @@ class TCPServer(BaseNetworkServer):
             return self.ssl.context
 
     async def _get_server(self) -> asyncio.AbstractServer:
-        return await self.loop.create_server(self.protocol_factory,
-                                             host=self.host, port=self.port, ssl=self.ssl_context,
+        return await self.loop.create_server(self.protocol_factory, host=self.host, port=self.port,
+                                             ssl=self.ssl_context, reuse_address=self.reuse_address,
+                                             reuse_port=self.reuse_port, backlog=self.backlog,
                                              ssl_handshake_timeout=self.ssl_handshake_timeout)
 
 
@@ -52,10 +53,11 @@ class UnixSocketServer(BaseServer):
     name = "Unix Socket Server"
     peer_prefix = 'unix'
     protocol_factory: StreamServerProtocolFactory = None
+    backlog: int = 100
 
     path: Union[str, Path] = field(default_factory=unix_address, metadata={'pickle': True})
-    ssl: ServerSideSSL = None
-    ssl_handshake_timeout: int = None
+    ssl: Optional[ServerSideSSL] = None
+    ssl_handshake_timeout: Optional[int] = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -73,7 +75,7 @@ class UnixSocketServer(BaseServer):
 
     async def _get_server(self) -> asyncio.AbstractServer:
         return await self.loop.create_unix_server(self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
-                                                  ssl_handshake_timeout=self.ssl_handshake_timeout)
+                                                  ssl_handshake_timeout=self.ssl_handshake_timeout, backlog=self.backlog)
 
 
 @dataclass
@@ -118,7 +120,7 @@ def pipe_server(path: Union[str, Path] = None, **kwargs):
 class DatagramServer(asyncio.AbstractServer):
 
     def __init__(self, protocol_factory: DatagramServerProtocolFactory, host: str, port: int,
-                 family: int = 0, proto: int = 0, flags: int = 0, sock = None, start_serving: bool=True,
+                 family: int = 0, proto: int = 0, flags: int = 0, sock = None, start_serving: bool = True,
                  reuse_address: bool = None, reuse_port: bool = None, allow_broadcast: bool = None, loop = None):
         self._loop = loop or asyncio.get_event_loop()
         self._sock = sock
@@ -180,9 +182,11 @@ class UDPServer(BaseNetworkServer):
     protocol_factory: DatagramServerProtocolFactory = None
     name = "UDP Server"
     peer_prefix = 'udp'
+    allow_broadcast: Optional[bool] = False
 
     async def _get_server(self) -> DatagramServer:
         server = DatagramServer(
-            self.protocol_factory, self.host, self.port, loop=self.loop)
+            self.protocol_factory, self.host, self.port, loop=self.loop, allow_broadcast=self.allow_broadcast,
+            reuse_address=self.reuse_address, reuse_port=self.reuse_port)
         await server.wait_started()
         return server

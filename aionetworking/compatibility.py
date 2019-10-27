@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import socket
+from typing import Optional, Any, Dict
 
 
 py38 = sys.version_info >= (3, 8)
@@ -65,3 +66,9 @@ def datagram_supported(loop: asyncio.AbstractEventLoop = None):
 
 def supports_pipe_or_unix_connections() -> bool:
     return hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe')
+
+
+def get_client_kwargs(happy_eyeballs_delay: Optional[float] = None, interleave: Optional[int] = None) -> Dict[str, Any]:
+    if py38:
+        return {'happy_eyeballs_delay': happy_eyeballs_delay, 'interleave': interleave}
+    return {}

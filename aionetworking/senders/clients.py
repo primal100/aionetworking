@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import socket
 import sys
 
+from aionetworking.compatibility import get_client_kwargs
 from aionetworking.utils import IPNetwork
 from aionetworking.networking.protocol_factories import DatagramClientProtocolFactory
 from aionetworking.types.networking import ConnectionType
@@ -20,9 +21,12 @@ class TCPClient(BaseNetworkClient):
     name = "TCP Client"
     peer_prefix = 'tcp'
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
+    server_hostname: Optional[str] = None
+    happy_eyeballs_delay: Optional[float] = None
+    interleave: Optional[int] = None
 
-    ssl: ClientSideSSL = None
-    ssl_handshake_timeout: int = None
+    ssl: Optional[ClientSideSSL] = None
+    ssl_handshake_timeout: Optional[int] = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -35,9 +39,10 @@ class TCPClient(BaseNetworkClient):
             return self.ssl.context
 
     async def _open_connection(self) -> ConnectionType:
+        extra_kwargs = get_client_kwargs(self.happy_eyeballs_delay, self.interleave)
         self.transport, self.conn = await self.loop.create_connection(
-            self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context,
-            local_addr=self.local_addr, ssl_handshake_timeout=self.ssl_handshake_timeout)
+            self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context, local_addr=self.local_addr,
+            ssl_handshake_timeout=self.ssl_handshake_timeout, server_hostname=self.server_hostname, **extra_kwargs)
         network = IPNetwork(self.host)
         if network.is_ipv6:
             self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
@@ -52,9 +57,10 @@ class UnixSocketClient(BaseClient):
     peer_prefix = 'unix'
     path: Union[str, Path] = None
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
+    server_hostname: Optional[str] = None
 
-    ssl: ClientSideSSL = None
-    ssl_handshake_timeout: int = None
+    ssl: Optional[ClientSideSSL] = None
+    ssl_handshake_timeout: Optional[int] = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -80,7 +86,7 @@ class UnixSocketClient(BaseClient):
     async def _open_connection(self) -> ConnectionType:
         self.transport, self.conn = await self.loop.create_unix_connection(
             self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
-            ssl_handshake_timeout=self.ssl_handshake_timeout)
+            ssl_handshake_timeout=self.ssl_handshake_timeout, server_hostname=self.server_hostname)
         return self.conn
 
 
@@ -122,11 +128,15 @@ class UDPClient(BaseNetworkClient):
     name = "UDP Client"
     peer_prefix = 'udp'
     transport: asyncio.DatagramTransport = field(init=False, compare=False, default=None)
+    reuse_address: Optional[bool] = None
+    reuse_port: Optional[bool] = None
+    allow_broadcast: Optional[bool] = None
 
     async def _open_connection(self) -> ConnectionType:
         protocol_factory: DatagramClientProtocolFactory
         self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
-            self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr)
+            self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr,
+            reuse_address=self.reuse_address, reuse_port=self.reuse_port, allow_broadcast=self.allow_broadcast)
         network = IPNetwork(self.host)
         if network.is_ipv6:
             self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
