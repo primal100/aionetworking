@@ -1,6 +1,4 @@
 import datetime
-from lib.conf.context import context_cv
-
 import asyncssh
 import aiofiles.os
 import asyncio
@@ -15,7 +13,7 @@ from .protocol_factories import BaseProtocolFactory
 from .connections import NetworkConnectionProtocol
 from lib.utils import aremove
 
-from typing import Optional, AnyStr, Union
+from typing import Optional, AnyStr, Union, Dict, Any
 from pathlib import Path
 
 
@@ -221,12 +219,11 @@ class SFTPClientProtocolFactory(BaseProtocolFactory):
     base_path: Path = settings.TEMPDIR / "sftp_sent"
     remote_path: str = '/'
 
-    def _new_connection(self) -> SFTPClientProtocol:
-        context_cv.set(context_cv.get().copy())
-        self.logger.debug('Creating new connection')
-        return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
-                                   preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
-                                   pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
-                                   remove_tmp_files = self.remove_tmp_files, prefix=self.prefix, base_path=self.base_path,
-                                   remote_path=self.remote_path, allowed_senders=self.allowed_senders, aliases=self.aliases)
+    def _additional_connection_kwargs(self) -> Dict[str, Any]:
+        return {
+            'remove_tmp_files': self.remove_tmp_files,
+            'base_path': self.base_path,
+            'remote_path': self.remote_path
+        }
+
 

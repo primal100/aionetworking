@@ -53,6 +53,10 @@ class TestJsonObject:
     def test_02_filter(self, json_object):
         assert json_object.filter() is False
 
+    def test_03_json_object_with_codec_kwargs(self, json_object_with_codec_kwargs, json_codec_with_kwargs):
+        codec = json_object_with_codec_kwargs.get_codec(test_param='abc')
+        assert codec == json_codec_with_kwargs
+
 
 class TestBufferObject:
     @pytest.mark.asyncio

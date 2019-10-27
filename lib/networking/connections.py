@@ -33,6 +33,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get, metadata={'pickle': True})
+    codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     logger: Logger = field(default_factory=logger_cv.get, metadata={'pickle': True})
 
     def __post_init__(self):
@@ -71,7 +72,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             'context': self.context,
             'dataformat': self.dataformat,
             'preaction': self.preaction,
-            'send': self.send
+            'send': self.send,
+            'codec_config': self.codec_config
         }
         if self.adaptor_cls.is_receiver:
             self._adaptor = self._get_receiver_adaptor(**kwargs)
