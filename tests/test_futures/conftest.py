@@ -3,6 +3,23 @@ import asyncio
 from aionetworking.compatibility import supports_task_name
 from aionetworking import Counters, Counter, TaskScheduler
 
+from typing import Callable, Union
+
+
+@pytest.fixture
+async def future():
+    yield asyncio.Future()
+
+
+@pytest.fixture
+def wait_get_double_coro() -> Callable:
+    async def wait_get_double(delay: Union[int, float], num: int):
+        await asyncio.sleep(delay)
+        if num > 4:
+            raise ValueError()
+        return num * 2
+    return wait_get_double
+
 
 @pytest.fixture
 async def counter() -> Counter:

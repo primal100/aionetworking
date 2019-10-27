@@ -1,20 +1,22 @@
 from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
 import asyncssh
-import datetime
 
 import logging
 from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory, \
                            DatagramClientProtocolFactory)
 from aionetworking import context_cv
 from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
+from aionetworking.networking import ConnectionsManager
 from aionetworking.networking import (TCPServerConnection, TCPClientConnection,
                                       UDPServerConnection, UDPClientConnection)
 from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
 from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from aionetworking.networking import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
+from aionetworking.types.networking import SimpleNetworkConnectionType
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
+import datetime
 
 from typing import Union
 
@@ -408,14 +410,14 @@ async def udp_transport_wrapper_client(udp_transport_client, sock) -> DatagramTr
     yield DatagramTransportWrapper(udp_transport_client, sock)
 
 
-@pytest.fixture
+"""@pytest.fixture
 def true() -> bool:
     return True
 
 
 @pytest.fixture
 def false() -> bool:
-    return False
+    return False"""
 
 
 @pytest.fixture
@@ -1239,3 +1241,37 @@ async def protocol_factory_one_way_server_codec_kwargs(buffered_file_storage_act
     yield factory
     await factory.close()
 
+
+@pytest.fixture
+async def queue() -> asyncio.Queue:
+    yield asyncio.Queue()
+
+
+@pytest.fixture
+async def connections_manager() -> ConnectionsManager:
+    from aionetworking.networking.connections_manager import connections_manager
+    yield connections_manager
+    connections_manager.clear()
+
+
+@dataclass
+class SimpleNetworkConnection:
+    peer: str
+    parent_name: str
+    queue: asyncio.Queue
+
+    async def wait_all_messages_processed(self) -> None: ...
+
+    def encode_and_send_msg(self, msg_decoded: Any) -> None:
+        self.queue.put_nowait(msg_decoded)
+
+
+@pytest.fixture
+def simple_network_connections(queue, peer_str) -> List[SimpleNetworkConnectionType]:
+    return [SimpleNetworkConnection(peer_str, "TCP Server 127.0.0.1:8888", queue),
+            SimpleNetworkConnection('127.0.0.1:4444', "TCP Server 127.0.0.1:8888", queue)]
+
+
+@pytest.fixture
+def simple_network_connection(simple_network_connections) -> SimpleNetworkConnectionType:
+    return simple_network_connections[0]

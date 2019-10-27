@@ -19,7 +19,7 @@ class TestLogger:
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(not py38, reason="Task names only valid from python 3.8")
-    async def test_02_process_taskname(self, receiver_logger, context):
+    async def test_02_process_taskname(self, receiver_logger, tcp_server_context):
         set_current_task_name("TestTask", include_hierarchy=False)
         msg, kwargs = receiver_logger.process("Hello World", {})
         assert msg, kwargs == ('Hello World', {'extra': {'taskname': "TestTask"}})
@@ -50,12 +50,12 @@ class TestLogger:
         assert caplog.record_tuples[0] == (
             'receiver', logging.DEBUG, 'Connection closed. There are now 4 active connections.')
 
-    def test_07_get_connection_logger(self, receiver_logger, receiver_connection_logger, context):
-        conn_logger = receiver_logger.get_connection_logger(extra=context)
+    def test_07_get_connection_logger(self, receiver_logger, receiver_connection_logger, tcp_server_context):
+        conn_logger = receiver_logger.get_connection_logger(extra=tcp_server_context)
         assert conn_logger == receiver_connection_logger
 
-    def test_08_get_connection_logger(self, sender_logger, sender_connection_logger, context_client):
-        conn_logger = sender_logger.get_connection_logger(extra=context_client)
+    def test_08_get_connection_logger(self, sender_logger, sender_connection_logger, tcp_client_context):
+        conn_logger = sender_logger.get_connection_logger(extra=tcp_client_context)
         assert conn_logger == sender_connection_logger
 
     def test_09_pickle(self, receiver_logger):

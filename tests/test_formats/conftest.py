@@ -3,6 +3,7 @@ import pytest
 import asyncio
 import os
 from dataclasses import dataclass
+import datetime
 from pathlib import Path
 from aionetworking import JSONObject, JSONCodec
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
@@ -37,6 +38,11 @@ def client_port() -> int:
         return 60002
     else:
         return 60003
+
+
+@pytest.fixture
+def timestamp() -> datetime.datetime:
+    return datetime.datetime(2019, 1, 1, 1, 1)
 
 
 @pytest.fixture
@@ -87,17 +93,32 @@ def json_codec(context) -> JSONCodec:
 
 
 @pytest.fixture
+def user1() -> List[str, str]:
+    return ['user1', 'password']
+
+
+@pytest.fixture
 def json_rpc_login_request(user1) -> Dict[str, Any]:
     return {'jsonrpc': "2.0", 'id': 1, 'method': 'login', 'params': user1}
 
 
 @pytest.fixture
-def json_rpc_login_request_encoded(user1) -> bytes:
+def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestamp) -> JSONObject:
+    return json_codec.from_decoded(json_rpc_logout_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp) -> JSONObject:
+    return json_codec.from_decoded(json_rpc_login_request, received_timestamp=timestamp)
+
+
+@pytest.fixture
+def json_rpc_login_request_encoded() -> bytes:
     return b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}'
 
 
 @pytest.fixture
-def json_rpc_logout_request(user1) -> Dict[str, Any]:
+def json_rpc_logout_request() -> Dict[str, Any]:
     return {'jsonrpc': "2.0", 'id': 2, 'method': 'logout'}
 
 

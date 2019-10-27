@@ -39,24 +39,6 @@ def tcp_client_two_way_ssl_no_cadata(protocol_factory_two_way_client, sock, peer
 
 
 @pytest.fixture
-async def tcp_client_one_way_connected(tcp_client_one_way) -> TCPClient:
-    async with tcp_client_one_way:
-        yield tcp_client_one_way
-
-
-@pytest.fixture
-async def tcp_client_two_way_connected(tcp_client_two_way) -> TCPClient:
-    async with tcp_client_two_way:
-        yield tcp_client_two_way
-
-
-@pytest.fixture
-async def tcp_client_two_way_connected_ssl(tcp_client_two_way_ssl):
-    async with tcp_server_two_way_ssl:
-        yield tcp_server_two_way_ssl
-
-
-@pytest.fixture
 def udp_client_one_way(udp_protocol_factory_one_way_client, sock) -> UDPClient:
     return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1])
 
@@ -72,39 +54,15 @@ def udp_client_two_way_ipv6(udp_protocol_factory_two_way_client, sock_ipv6) -> U
 
 
 @pytest.fixture
-async def udp_client_one_way_connected(server_started, udp_client_one_way) -> UDPClient:
-    async with udp_client_one_way:
-        yield udp_client_one_way
-
-
-@pytest.fixture
-async def udp_client_two_way_connected(server_started, udp_client_two_way) -> UDPClient:
-    async with udp_client_two_way:
-        yield client
-
-
-@pytest.fixture
 def pipe_client_one_way(protocol_factory_one_way_client, pipe_path):
     return pipe_client(protocol_factory=protocol_factory_one_way_client, path=pipe_path)
 
-
-@pytest.fixture
-async def pipe_client_one_way_connected(protocol_factory_one_way_client, pipe_path):
-    client = pipe_client(protocol_factory=protocol_factory_one_way_client, path=pipe_path)
-    async with client:
-        yield client
 
 
 @pytest.fixture
 def pipe_client_two_way(protocol_factory_two_way_client, pipe_path):
     return pipe_client(protocol_factory=protocol_factory_two_way_client, path=pipe_path)
 
-
-@pytest.fixture
-async def pipe_client_two_way_connected(server_started, protocol_factory_two_way_client, pipe_path):
-    client = pipe_client(protocol_factory=protocol_factory_two_way_client, path=pipe_path)
-    async with client:
-        yield client
 
 
 @pytest.fixture
@@ -136,12 +94,6 @@ def sftp_client_wrong_password(sftp_protocol_factory_client, sock, peer, sftp_us
 
 
 @pytest.fixture
-async def sftp_client_connected(server_started, sftp_client_one_way) -> SFTPClient:
-    async with sftp_client_one_way:
-        yield sftp_client_one_way
-
-
-@pytest.fixture
 def server_started(receiver_sender_args):
     return receiver_sender_args[0]
 
@@ -152,18 +104,13 @@ def client(receiver_sender_args) -> BaseNetworkClient:
 
 
 @pytest.fixture
-def client_connected(receiver_sender_args) -> BaseNetworkClient:
+def server_context(receiver_sender_args) -> dict:
     return receiver_sender_args[2]
 
 
 @pytest.fixture
-def server_context(receiver_sender_args) -> dict:
-    return receiver_sender_args[3]
-
-
-@pytest.fixture
 def client_context(receiver_sender_args) -> dict:
-    return receiver_sender_args[4]
+    return receiver_sender_args[3]
 
 
 if hasattr(socket, 'AF_UNIX'):
@@ -196,37 +143,37 @@ else:
 
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__, tcp_client_one_way_connected.__name__,
+        (tcp_server_one_way_started.__name__, tcp_client_one_way.__name__,
          tcp_server_context.__name__, tcp_client_context.__name__)),
     lazy_fixture(
-        (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__, tcp_client_two_way_connected.__name__,
+        (tcp_server_two_way_started.__name__, tcp_client_two_way.__name__,
          tcp_server_context.__name__, tcp_client_context.__name__)),
     lazy_fixture(
-        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__, tcp_client_two_way_connected_ssl.__name__,
+        (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__,
          tcp_server_context_ssl.__name__, tcp_client_context_ssl.__name__)),
     pytest.param(
         lazy_fixture(
-            (udp_server_one_way_started.__name__, udp_client_one_way.__name__, udp_client_one_way_connected.__name__,
+            (udp_server_one_way_started.__name__, udp_client_one_way.__name__,
              udp_server_context.__name__, udp_client_context.__name__)),
         marks=pytest.mark.skipif(
             "not datagram_supported()")
     ),
     pytest.param(
         lazy_fixture(
-            (udp_server_two_way_started.__name__, udp_client_two_way.__name__, udp_client_two_way_connected.__name__,
+            (udp_server_two_way_started.__name__, udp_client_two_way.__name__,
              udp_server_context.__name__, udp_client_context.__name__)),
         marks=pytest.mark.skipif(
             "not datagram_supported()")
     ),
     pytest.param(
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
-                      pipe_client_one_way_connected.__name__, context_pipe_server.__name__, context_pipe_client.__name__)),
+                      context_pipe_server.__name__, context_pipe_client.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     ),
     pytest.param(
         lazy_fixture((pipe_server_two_way_started.__name__, pipe_client_two_way.__name__,
-                      pipe_client_two_way_connected.__name__, context_pipe_server.__name__, context_pipe_client.__name__)),
+                      context_pipe_server.__name__, context_pipe_client.__name__)),
         marks=pytest.mark.skipif(
             "not supports_pipe_or_unix_connections()")
     )

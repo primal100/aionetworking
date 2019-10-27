@@ -285,11 +285,11 @@ async def receiver_logger() -> Logger:
 
 
 @pytest.fixture
-async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
+async def receiver_connection_logger(receiver_logger, tcp_server_context, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
     caplog.set_level(logging.ERROR, "receiver.stats")
-    yield receiver_logger.get_connection_logger(extra=context)
+    yield receiver_logger.get_connection_logger(extra=tcp_server_context)
     caplog.set_level(logging.ERROR, "receiver.connection")
     caplog.set_level(logging.ERROR, "receiver.msg_received")
 
@@ -316,16 +316,16 @@ def sender_logger() -> Logger:
 
 
 @pytest.fixture
-def sender_connection_logger(sender_logger, context_client) -> ConnectionLogger:
-    return sender_logger.get_connection_logger(extra=context_client)
+def sender_connection_logger(sender_logger, tcp_client_context) -> ConnectionLogger:
+    return sender_logger.get_connection_logger(extra=tcp_client_context)
 
 
 @pytest.fixture
-async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
+async def receiver_connection_logger_stats(receiver_logger, tcp_server_context, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "receiver.stats")
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
-    logger = receiver_logger.get_connection_logger(extra=context)
+    logger = receiver_logger.get_connection_logger(extra=tcp_server_context)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
@@ -350,9 +350,9 @@ def zero_division_exception() -> BaseException:
         return e
 
 
-@pytest.fixture(params=[receiver_connection_logger, receiver_connection_logger_stats])
+@pytest.fixture(params=[receiver_connection_logger.__name__, receiver_connection_logger_stats.__name__])
 def _connection_logger(request):
-    return get_fixture(request)
+    return lazy_fixture(request.param)
 
 
 @pytest.fixture
