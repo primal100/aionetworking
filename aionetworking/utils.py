@@ -45,6 +45,7 @@ async def time_coro(coro):
     return time.time() - start_time
 
 
+"""
 async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool = False, cleanup: Callable = None,
                     cleanup_args=(), num_items: int = None, num_bytes: int = None, ignore_first: bool = True, **kwargs):
     times = []
@@ -77,7 +78,7 @@ async def benchmark(async_func: Callable, *args, num_times: int = 5, quiet: bool
                 times = '\t'.join(times)
                 print(f"{async_func.__name__}\t{num_bytes}\t{num_items}\t{times}")
 
-
+"""
 ###Dataclasses###
 
 def dataclass_getstate(self):

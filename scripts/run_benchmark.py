@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from __future__ import annotations
-import aiofile
+try:
+    import aiofile
+except ImportError:
+    aiofile = None
 import aiofiles
 import asyncio
 import concurrent.futures
@@ -288,7 +291,8 @@ if __name__ == '__main__':
                         help='two-way server')
     args, kw = parser.parse_known_args()
     setup_logging(args.loglevel, args.senderloglevel, args.asyncio_debug, args.twoway)
-    settings.FILE_OPENER = aiofile.AIOFile if args.aioh else aiofiles.open
+    if aiofile:
+        settings.FILE_OPENER = aiofile.AIOFile if args.aioh else aiofiles.open
     set_loop_policy(linux_loop_type=args.loop, windows_loop_type=args.loop)
     params = (args.clients, args.num, args.slow_duration, args.asyncio_debug, args.pause_on_size, args.times, args.timeout)
     if args.twoway:
