@@ -174,15 +174,19 @@ def udp_client_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
             'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
             'client': peer_str, 'own': peer_str}
 
+@pytest.fixture
+def asyncssh_version():
+    return asyncssh.__version__
+
 
 @pytest.fixture
-def sftp_server_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
+def sftp_server_context(peer, peer_str, sock, sock_str, asyncssh_version) -> Dict[str, Any]:
     return {'protocol_name': 'SFTP Server', 'endpoint': f'SFTP Server {sock_str}', 'host': peer[0], 'port': peer[1],
             'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
             'client': peer_str, 'own': sock_str,
             'username': 'testuser', 'client_version':
-            'SSH-2.0-AsyncSSH_1.18.0',
-            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            f'SSH-2.0-AsyncSSH_{asyncssh_version}',
+            'server_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
             'send_compression': 'zlib@openssh.com',
@@ -192,13 +196,13 @@ def sftp_server_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sftp_client_context(peer, peer_str, sock, sock_str) -> dict:
+def sftp_client_context(peer, peer_str, sock, sock_str, asyncssh_version) -> dict:
     return {'protocol_name': 'SFTP Client', 'host':sock[0], 'port': sock[1],
             'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
             'client': peer_str, 'own': peer_str,
             'username': 'testuser',
-            'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
-            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'client_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
+            'server_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
             'send_compression': 'zlib@openssh.com',
@@ -332,10 +336,10 @@ def extra_client_inet(peer, sock) -> dict:
 
 
 @pytest.fixture
-def extra_server_inet_sftp(peer, sock) -> dict:
+def extra_server_inet_sftp(peer, sock, asyncssh_version) -> dict:
     return {'peername': peer, 'sockname': sock, 'socket': MockAFInetSocket(),
-            'username': 'testuser', 'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
-            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'username': 'testuser', 'client_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
+            'server_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
             'send_compression': 'zlib@openssh.com',
@@ -345,10 +349,10 @@ def extra_server_inet_sftp(peer, sock) -> dict:
 
 
 @pytest.fixture
-def extra_client_inet_sftp(peer, sock) -> dict:
+def extra_client_inet_sftp(peer, sock, asyncssh_version) -> dict:
     return {'peername': sock, 'sockname': peer, 'socket': MockAFInetSocket(), 'username': 'testuser',
-            'client_version': 'SSH-2.0-AsyncSSH_1.18.0',
-            'server_version': 'SSH-2.0-AsyncSSH_1.18.0',
+            'client_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
+            'server_version': f'SSH-2.0-AsyncSSH_{asyncssh_version}',
             'send_cipher': 'chacha20-poly1305@openssh.com',
             'send_mac': 'chacha20-poly1305@openssh.com',
             'send_compression': 'zlib@openssh.com',
@@ -1060,7 +1064,7 @@ def sftp_one_way_conn_client(extra_client_inet_sftp, sftp_protocol_one_way_clien
 
 @pytest.fixture
 async def sftp_factory_client(sftp_one_way_conn_client) -> SFTPFactory:
-    sftp_factory = asyncssh.SFTPClient(asyncio.get_event_loop(), None, None, None)
+    sftp_factory = asyncssh.SFTPClient(None, None, None)
     sftp_factory.realpath = AsyncMock(return_value='/')
     sftp_factory.put = AsyncMock()
     yield sftp_factory
