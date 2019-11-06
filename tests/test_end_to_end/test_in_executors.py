@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 ###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections_in_other_process
 
 
 class TestOneWaySenderInExecutors:
