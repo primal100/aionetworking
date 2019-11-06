@@ -1,7 +1,7 @@
-psutil>=5.6.3
-asyncssh>=2.0.0
-aiofile>=1.5.2
+psutil>=5.6.4
+asyncssh>=2.0.1
 pyyaml>=5.1.2
 uvloop>=0.13.0;os_name=='posix'
 pamela>=1.0.0;os_name=='posix'
-pywin32>=225;os_name=='nt'
+#cryptography   #required for asyncssh, for windows, install with Pycharm
+#pywin32=>225;os_name='nt'  #Install with Pycharm in venv, or globally

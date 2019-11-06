@@ -3,7 +3,8 @@ import yaml
 import os
 
 from logging.config import dictConfig
-from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action
+from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action, \
+    load_empty_action
 from aionetworking.conf.yaml_constructors import load_logger, load_receiver_logger, load_sender_logger
 from aionetworking.formats.contrib.yaml_constructors import load_json, load_pickle
 from aionetworking.networking.yaml_constructors import (load_server_side_ssl, load_client_side_ssl,
@@ -20,7 +21,7 @@ from .yaml_constructors import load_ip_network, load_path
 from aionetworking.settings import APP_HOME, TEMPDIR
 
 from pathlib import Path
-from typing import Union, Dict
+from typing import Union, Dict, TextIO
 
 
 def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, Path] = None,
@@ -31,6 +32,7 @@ def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, P
             'conf': app_home / 'conf',
             'data': volatile_home / 'data',
             'logs': volatile_home / 'logs',
+            'misc': volatile_home / 'misc',
             'stats': volatile_home / 'stats',
             'ssl': app_home / 'ssl'}
 
@@ -55,6 +57,7 @@ def load_minimal_tags() -> None:
     load_pickle()
     load_ip_network()
     load_echo_action()
+    load_empty_action()
     load_buffered_file_storage()
     load_file_storage()
     load_echo_requester()
@@ -82,7 +85,13 @@ def configure_logging(path: Path):
         dictConfig(config)
 
 
-def node_from_config(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = None) -> \
+def node_from_file(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = None) -> \
+        Union[ReceiverType, SenderType]:
+    stream = open(path, 'r')
+    return node_from_config(stream, paths=paths)
+
+
+def node_from_config(path: TextIO, paths: Dict[str, Union[str, Path]] = None) -> \
         Union[ReceiverType, SenderType]:
     paths = paths or get_paths()
     load_path(paths)

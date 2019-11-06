@@ -58,11 +58,9 @@ def pipe_client_one_way(protocol_factory_one_way_client, pipe_path):
     return pipe_client(protocol_factory=protocol_factory_one_way_client, path=pipe_path)
 
 
-
 @pytest.fixture
 def pipe_client_two_way(protocol_factory_two_way_client, pipe_path):
     return pipe_client(protocol_factory=protocol_factory_two_way_client, path=pipe_path)
-
 
 
 @pytest.fixture

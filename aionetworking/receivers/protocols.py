@@ -15,6 +15,9 @@ class ReceiverProtocol(Protocol):
     async def start(self): ...
 
     @abstractmethod
+    async def serve_forever(self) -> None: ...
+    
+    @abstractmethod
     async def close(self): ...
 
     @abstractmethod
