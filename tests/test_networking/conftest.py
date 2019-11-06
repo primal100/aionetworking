@@ -174,6 +174,7 @@ def udp_client_context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
             'peer': sock_str, 'sock': peer_str, 'alias': sock[0], 'server': sock_str,
             'client': peer_str, 'own': peer_str}
 
+
 @pytest.fixture
 def asyncssh_version():
     return asyncssh.__version__
@@ -412,16 +413,6 @@ async def udp_transport_wrapper_server(udp_transport_server, queue, peer) -> Dat
 @pytest.fixture
 async def udp_transport_wrapper_client(udp_transport_client, sock) -> DatagramTransportWrapper:
     yield DatagramTransportWrapper(udp_transport_client, sock)
-
-
-"""@pytest.fixture
-def true() -> bool:
-    return True
-
-
-@pytest.fixture
-def false() -> bool:
-    return False"""
 
 
 @pytest.fixture

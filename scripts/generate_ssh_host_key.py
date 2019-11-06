@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 from __future__ import annotations
 from pathlib import Path
-import asyncssh
-from typing import Union
-
-
-def generate_key_in_path(path: Union[Path, str], alg_name='ssh-rsa'):
-    skey = asyncssh.generate_private_key(alg_name)
-    skey.write_private_key(str(path))
+from aionetworking.receivers.sftp import generate_key_in_path
 
 
 if __name__ == '__main__':

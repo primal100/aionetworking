@@ -47,7 +47,8 @@ class BaseAction(Protocol):
     def is_closing(self) -> None:
         return self._status.is_stopping_or_stopped()
 
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        self._status.is_stopped()
 
     def on_decode_error(self, data: bytes, exc: BaseException) -> Any:
         pass
@@ -57,3 +58,6 @@ class BaseAction(Protocol):
 
     async def do_one(self, msg: MessageObjectType) -> Any: ...
 
+
+@dataclass
+class EmptyAction(BaseAction): ...

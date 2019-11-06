@@ -177,13 +177,11 @@ class BaseFileStorage(BaseAction, Protocol):
     base_path: Path = field(default_factory=default_data_dir, metadata={'pickle': True})
     path: str = ''
     attr: str = 'encoded'
-    mode: str = 'w'
+    mode: str = 'wb'
     separator: AnyStr = ''
-    binary: InitVar[bool] = True
 
-    def __post_init__(self, binary):
-        if binary and 'b' not in self.mode:
-            self.mode += 'b'
+    def __post_init__(self):
+        if 'b' in self.mode:
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
         self._status.is_started()
@@ -229,7 +227,7 @@ class FileStorage(BaseFileStorage):
 @dataclass
 class BufferedFileStorage(BaseFileStorage):
     name = 'Buffered File Storage'
-    mode: str = 'a'
+    mode: str = 'ab'
     _qsize: int = 0
 
     close_file_after_inactivity: int = 10

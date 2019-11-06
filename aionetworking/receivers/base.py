@@ -80,6 +80,17 @@ class BaseServer(BaseReceiver, Protocol):
             self._print_listening_message()
         self._status.set_started()
 
+    async def serve_forever(self) -> None:
+        if not self._status.is_starting_or_started():
+            await self.start()
+        try:
+            await self.server.serve_forever()
+        except asyncio.CancelledError:
+            try:
+                await self.close()
+            finally:
+                raise
+
     async def close(self) -> None:
         if self._status.is_stopping_or_stopped():
             raise ServerException(f"{self.name} running on {self.listening_on} already stopping or stopped")
@@ -110,6 +121,9 @@ class BaseServer(BaseReceiver, Protocol):
 
     def is_closing(self) -> bool:
         return self._status.is_stopping_or_stopped()
+
+    def is_closed(self) -> bool:
+        return self._status.is_stopped()
 
     async def wait_started(self):
         await self._status.wait_started()

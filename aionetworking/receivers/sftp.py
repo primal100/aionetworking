@@ -7,7 +7,7 @@ from aionetworking import settings
 from aionetworking.networking.sftp import SFTPServerProtocolFactory, SFTPFactory
 from .base import BaseNetworkServer
 
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from pathlib import Path
 
 
@@ -45,4 +45,6 @@ class SFTPServer(BaseNetworkServer):
                                             **self.sftp_kwargs)
 
 
-
+def generate_key_in_path(path: Union[Path, str], alg_name='ssh-rsa'):
+    skey = asyncssh.generate_private_key(alg_name)
+    skey.write_private_key(str(path))
