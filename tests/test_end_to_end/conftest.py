@@ -30,7 +30,7 @@ def echo_exception_response_object(echo_exception_response_encoded, echo_excepti
         lazy_fixture((pipe_server_one_way_started.__name__, pipe_client_one_way.__name__,
                       context_pipe_server.__name__, context_pipe_client.__name__)),
         marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
+            "not supports_pipe_or_unix_connections_in_other_process()")
     ),
     lazy_fixture(
         (sftp_server_started.__name__, sftp_client.__name__, sftp_server_context.__name__,
@@ -53,7 +53,7 @@ def one_way_receiver_sender_args(request):
     pytest.param(
         lazy_fixture((pipe_server_two_way_started.__name__, pipe_client_two_way.__name__)),
         marks=pytest.mark.skipif(
-            "not supports_pipe_or_unix_connections()")
+            "not supports_pipe_or_unix_connections_in_other_process()")
     )
 ])
 def two_way_receiver_sender_args(request):

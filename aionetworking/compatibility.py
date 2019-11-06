@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import os
 import sys
 import socket
 from typing import Optional, Any, Dict
@@ -55,7 +56,7 @@ def get_current_task_name():
 
 def is_proactor(loop: asyncio.AbstractEventLoop = None):
     if not hasattr(asyncio, "ProactorEventLoop"):
-        return True
+        return False
     loop = loop or asyncio.get_event_loop()
     return isinstance(loop, asyncio.ProactorEventLoop)
 
@@ -68,7 +69,23 @@ def supports_pipe_or_unix_connections() -> bool:
     return hasattr(socket, 'AF_UNIX') or hasattr(asyncio.get_event_loop(), 'start_serving_pipe')
 
 
+def supports_pipe_or_unix_connections_in_other_process() -> bool:
+    if not supports_pipe_or_unix_connections():
+        return False
+    if not py38 and os.name == 'nt':
+        return False
+    return True
+
+
+def is_selector():
+    return type(asyncio.get_event_loop()) == asyncio.SelectorEventLoop
+
+
+def is_builtin_loop():
+    return is_selector() or is_proactor()
+
+
 def get_client_kwargs(happy_eyeballs_delay: Optional[float] = None, interleave: Optional[int] = None) -> Dict[str, Any]:
-    if py38:
+    if py38 and is_builtin_loop():
         return {'happy_eyeballs_delay': happy_eyeballs_delay, 'interleave': interleave}
     return {}
