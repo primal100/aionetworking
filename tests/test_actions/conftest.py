@@ -24,7 +24,7 @@ async def file_storage_action(tmp_path) -> FileStorage:
 
 @pytest.fixture
 async def buffered_file_storage_action(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=tmp_path, close_file_after_inactivity=2,
+    action = BufferedFileStorage(base_path=tmp_path / 'data', close_file_after_inactivity=2,
                                  path='Encoded/{msg.peer_safe}_{msg.name}.{msg.name}', buffering=0)
     yield action
     if not action.is_closing():
