@@ -1,4 +1,8 @@
 import logging
+import pytest
+import asyncio
+import signal
+import os
 from aionetworking.conf.yaml_config import node_from_config
 
 
@@ -45,3 +49,106 @@ class TestYamlConfig:
         for logger in loggers:
             assert logger.propagate is False
             assert len(logger.handlers) == 2
+
+
+class TestSignalServerManager:
+    @pytest.mark.asyncio
+    async def test_00_start_close(self, signal_server_manager):
+        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        await asyncio.wait_for(signal_server_manager.wait_server_started(), timeout=2)
+        signal_server_manager.close()
+        await asyncio.wait_for(task, timeout=1)
+        await asyncio.wait_for(signal_server_manager.wait_server_stopped(), timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_01_check_reload_no_change(self, signal_server_manager_started):
+        current_server_id = id(signal_server_manager_started.server)
+        signal_server_manager_started.check_reload()
+        await asyncio.sleep(1)
+        assert signal_server_manager_started.server_is_started()
+        assert id(signal_server_manager_started.server) == current_server_id
+
+    @staticmethod
+    def modify_config_file(tmp_config_file):
+        with open(str(tmp_config_file), "rt") as f:
+            data = f.read()
+            data = data.replace('127.0.0.1', '127.0.0.2')
+        with open(str(tmp_config_file), 'wt') as f:
+            f.write(data)
+
+    @pytest.mark.asyncio
+    async def test_02_check_reload_with_change(self, signal_server_manager_started, tmp_config_file):
+        current_server_id = id(signal_server_manager_started.server)
+        assert signal_server_manager_started.server.host == '127.0.0.1'
+        self.modify_config_file(tmp_config_file)
+        signal_server_manager_started.check_reload()
+        await asyncio.wait_for(signal_server_manager_started.wait_server_stopped(), timeout=1)
+        await asyncio.wait_for(signal_server_manager_started.wait_server_started(), timeout=2)
+        assert signal_server_manager_started.server.host == '127.0.0.2'
+        assert id(signal_server_manager_started.server) != current_server_id
+
+    @pytest.mark.asyncio
+    async def test_03_check_reload_file_deleted(self, signal_server_manager, tmp_config_file):
+        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        await signal_server_manager.wait_server_started()
+        tmp_config_file.unlink()
+        signal_server_manager.check_reload()
+        assert signal_server_manager._stop_event.is_set()
+        assert not signal_server_manager._restart_event.is_set()
+        await asyncio.wait_for(signal_server_manager.wait_server_stopped(), timeout=2)
+        await asyncio.wait_for(task, timeout=1)
+
+    @staticmethod
+    async def send_signal(server_manager, signal):
+        await server_manager.wait_server_started()
+        os.kill(os.getpid(), signal)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
+        pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
+    ])
+    async def test_04_close_signal(self, signal_server_manager, signal_num):
+        task = asyncio.create_task(self.send_signal(signal_server_manager, signal_num))
+        await signal_server_manager.serve_until_stopped()
+        await task
+        await asyncio.wait_for(signal_server_manager.server.wait_stopped(), timeout=10)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
+    ])
+    async def test_05_reload_no_change_on_signal(self, signal_server_manager_started, signal_num):
+        current_server_id = id(signal_server_manager_started.server)
+        await self.send_signal(signal_server_manager_started, signal_num)
+        await asyncio.sleep(1)
+        assert signal_server_manager_started.server_is_started()
+        assert id(signal_server_manager_started.server) == current_server_id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
+    ])
+    async def test_06_reload_change_on_signal(self, signal_server_manager_started, signal_num, tmp_config_file):
+        current_server_id = id(signal_server_manager_started.server)
+        assert signal_server_manager_started.server.host == '127.0.0.1'
+        self.modify_config_file(tmp_config_file)
+        await self.send_signal(signal_server_manager_started, signal_num)
+        await asyncio.wait_for(signal_server_manager_started.wait_server_stopped(), timeout=1)
+        await asyncio.wait_for(signal_server_manager_started.wait_server_started(), timeout=2)
+        assert signal_server_manager_started.server.host == '127.0.0.2'
+        assert id(signal_server_manager_started.server) != current_server_id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
+    ])
+    async def test_07_reload_no_file_signal(self, signal_server_manager, signal_num, tmp_config_file):
+        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        await signal_server_manager.wait_server_started()
+        tmp_config_file.unlink()
+        await self.send_signal(signal_server_manager, signal_num)
+        await signal_server_manager._stop_event.wait()
+        assert not signal_server_manager._restart_event.is_set()
+        await asyncio.wait_for(signal_server_manager.wait_server_stopped(), timeout=2)
+        await asyncio.wait_for(task, timeout=1)

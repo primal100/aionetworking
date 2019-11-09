@@ -51,19 +51,6 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         await stop_event.wait()
         await self.close()
 
-    async def serve_until_keyboard_interrupt(self) -> None:
-        try:
-            await self.serve_forever()
-        except KeyboardInterrupt:
-            pass
-        await self.close()
-
-    async def run_until_interrupt(self) -> None:
-        if os.name == 'posix':
-            await self.serve_until_close_signal()
-        else:
-            await self.serve_until_keyboard_interrupt()
-
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):

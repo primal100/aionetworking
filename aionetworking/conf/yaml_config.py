@@ -9,7 +9,7 @@ from logging.config import dictConfig
 from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action, \
     load_empty_action
 from aionetworking.compatibility_os import loop_on_close_signal, loop_on_user1_signal, send_stopping, send_status, \
-    send_ready, send_reloading, send_to_journal
+    send_ready, send_reloading
 from aionetworking.conf.yaml_constructors import load_logger, load_receiver_logger, load_sender_logger
 from aionetworking.formats.contrib.yaml_constructors import load_json, load_pickle
 from aionetworking.networking.yaml_constructors import (load_server_side_ssl, load_client_side_ssl,
@@ -132,23 +132,26 @@ def client_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[
 
 
 @dataclass
-class UnixSignalServerManager:
+class SignalServerManager:
     conf_path: Union[Path, str]
-    _last_modified_time: float = field(init=False)
+    server: ReceiverType = field(init=False)
+    _last_modified_time: float = field(init=False, default=None)
+    paths: Dict[str, Union[str, Path]] = None
 
     def __post_init__(self):
         self._last_modified_time = self.modified_time
         self._stop_event = asyncio.Event()
         self._restart_event = asyncio.Event()
         self._restart_event.set()
-        loop_on_close_signal(self.stop)
+        self.server = server_from_config_file(self.conf_path, self.paths)
+        loop_on_close_signal(self.close)
         loop_on_user1_signal(self.check_reload)
 
     @property
     def modified_time(self) -> float:
         return os.stat(self.conf_path).st_mtime
 
-    def stop(self) -> None:
+    def close(self) -> None:
         send_stopping()
         send_status('Stopping server')
         self._stop_event.set()
@@ -166,18 +169,30 @@ class UnixSignalServerManager:
         else:
             self._stop_event.set()
 
-    async def _run_server_until_signal(self, server: ReceiverType) -> None:
-        await server.start()
+    def server_is_started(self):
+        return self.server.is_started
+
+    async def wait_server_stopped(self):
+        await self.server.wait_stopped()
+
+    async def wait_server_started(self):
+        await self.server.wait_started()
+
+    async def _run_server_until_signal(self) -> None:
+        await self.server.start()
         sys.stdout.flush()
-        msgs = '.'.join(list(server.listening_on_msgs))
+        msgs = '.'.join(list(self.server.listening_on_msgs))
         send_status(msgs)
         send_ready()
-        await asyncio.wait([self._stop_event.wait(), self._restart_event.wait()],
-                           return_when=asyncio.FIRST_COMPLETED)
-        await server.close()
+        done, pending = await asyncio.wait([self._stop_event.wait(), self._restart_event.wait()],
+                                           return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        await self.server.close()
 
-    async def serve_until_stopped(self, paths: Dict[str, Union[str, Path]] = None) -> None:
+    async def serve_until_stopped(self) -> None:
         while self._restart_event.is_set():
             self._restart_event.clear()
-            server = server_from_config_file(self.conf_path, paths)
-            await self._run_server_until_signal(server)
+            await self._run_server_until_signal()
+            if self._restart_event.is_set():
+                self.server = server_from_config_file(self.conf_path, self.paths)

@@ -1,1 +1,2 @@
-systemd-python
+#sudo apt install libsystemd-dev
+systemd-python;sys_platform=='linux'

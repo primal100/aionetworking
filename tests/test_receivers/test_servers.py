@@ -1,9 +1,10 @@
 import asyncio
 import pytest
 import pickle
+import signal
+import os
 
 from aionetworking.receivers.exceptions import ServerException
-from aionetworking.utils import time_coro
 
 ###Required for skipif in fixture params###
 from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
@@ -97,7 +98,20 @@ class TestServerStartStop:
         await asyncio.wait_for(task, timeout=2)
 
     @pytest.mark.asyncio
-    async def test_09_pickle_server(self, server_receiver):
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
+        pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
+    ])
+    async def test_09_serve_until_close_signal(self, server_quiet, signal_num):
+        assert not server_quiet.is_started()
+        task = asyncio.create_task(server_quiet.serve_until_close_signal())
+        await asyncio.wait_for(server_quiet.wait_started(), timeout=2)
+        os.kill(os.getpid(), signal_num)
+        await asyncio.wait_for(task, timeout=2)
+        assert server_quiet.is_closed()
+
+    @pytest.mark.asyncio
+    async def test_10_pickle_server(self, server_receiver):
         data = pickle.dumps(server_receiver)
         server = pickle.loads(data)
         assert server == server_receiver

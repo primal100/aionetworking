@@ -1,9 +1,10 @@
 import yaml
+import shutil
 
 from aionetworking import Logger
 from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
-from aionetworking.conf import load_all_tags, get_paths
+from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
 from aionetworking.utils import Expression
 from tests.conftest import get_fixture
 from tests.test_senders.conftest import *
@@ -17,7 +18,7 @@ def reset_logging():
 
 
 @pytest.fixture
-def tcp_server_one_way_yaml_config_path(conf_dir):
+def tcp_server_one_way_yaml_config_path(conf_dir) -> Path:
     return conf_dir / "tcp_server_one_way.yaml"
 
 
@@ -379,3 +380,29 @@ def stats_formatter() -> logging.Formatter:
     return logging.Formatter(
         "{peer} {msg} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB",
         style="{")
+
+
+@pytest.fixture
+def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags, server_port_load) -> Path:
+    path = tmp_path / tcp_server_one_way_yaml_config_path.name
+    shutil.copy(tcp_server_one_way_yaml_config_path, path)
+    return path
+
+
+@pytest.fixture
+async def signal_server_manager(tmp_config_file) -> SignalServerManager:
+    server_manager = SignalServerManager(tmp_config_file)
+    yield server_manager
+    server_manager.close()
+
+
+@pytest.fixture
+async def signal_server_manager_started(tmp_config_file) -> SignalServerManager:
+    server_manager = SignalServerManager(tmp_config_file)
+    task = asyncio.create_task(server_manager.serve_until_stopped())
+    await server_manager.wait_server_started()
+    yield server_manager
+    server_manager.close()
+    await server_manager.wait_server_stopped()
+    await task
+
