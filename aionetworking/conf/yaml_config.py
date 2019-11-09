@@ -1,10 +1,15 @@
 from __future__ import annotations
+import asyncio
 import yaml
 import os
+from dataclasses import dataclass, field
+import sys
 
 from logging.config import dictConfig
 from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action, \
     load_empty_action
+from aionetworking.compatibility_os import loop_on_close_signal, loop_on_user1_signal, send_stopping, send_status, \
+    send_ready, send_reloading, send_to_journal
 from aionetworking.conf.yaml_constructors import load_logger, load_receiver_logger, load_sender_logger
 from aionetworking.formats.contrib.yaml_constructors import load_json, load_pickle
 from aionetworking.networking.yaml_constructors import (load_server_side_ssl, load_client_side_ssl,
@@ -20,6 +25,7 @@ from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_cl
 from .yaml_constructors import load_ip_network, load_path
 from aionetworking.settings import APP_HOME, TEMPDIR
 
+import time
 from pathlib import Path
 from typing import Union, Dict, TextIO
 
@@ -91,11 +97,11 @@ def node_from_file(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = 
     return node_from_config(stream, paths=paths)
 
 
-def node_from_config(path: TextIO, paths: Dict[str, Union[str, Path]] = None) -> \
+def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None) -> \
         Union[ReceiverType, SenderType]:
     paths = paths or get_paths()
     load_path(paths)
-    configs = list(yaml.safe_load_all(path))
+    configs = list(yaml.safe_load_all(conf))
     node = configs[0]
     if len(configs) > 1:
         misc_config = configs[1]
@@ -110,3 +116,68 @@ def node_from_config(path: TextIO, paths: Dict[str, Union[str, Path]] = None) ->
         paths['pid'] = str(os.getpid())
         configure_logging(log_config_file)
     return node
+
+
+def node_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[str, Path]] = None) -> Union[ReceiverType, SenderType]:
+    f = open(str(conf_path), 'r')
+    return node_from_config(f, paths=paths)
+
+
+def server_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[str, Path]] = None) -> ReceiverType:
+    return node_from_config_file(conf_path, paths=paths)
+
+
+def client_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[str, Path]] = None) -> SenderType:
+    return node_from_config_file(conf_path, paths=paths)
+
+
+@dataclass
+class UnixSignalServerManager:
+    conf_path: Union[Path, str]
+    _last_modified_time: float = field(init=False)
+
+    def __post_init__(self):
+        self._last_modified_time = self.modified_time
+        self._stop_event = asyncio.Event()
+        self._restart_event = asyncio.Event()
+        self._restart_event.set()
+        loop_on_close_signal(self.stop)
+        loop_on_user1_signal(self.check_reload)
+
+    @property
+    def modified_time(self) -> float:
+        return os.stat(self.conf_path).st_mtime
+
+    def stop(self) -> None:
+        send_stopping()
+        send_status('Stopping server')
+        self._stop_event.set()
+
+    def check_reload(self) -> None:
+        if os.path.exists(self.conf_path):
+            last_modified = self.modified_time
+            if last_modified > self._last_modified_time:
+                send_reloading()
+                self._last_modified_time = last_modified
+                send_status('Restarting server')
+                self._restart_event.set()
+            else:
+                send_ready()
+        else:
+            self._stop_event.set()
+
+    async def _run_server_until_signal(self, server: ReceiverType) -> None:
+        await server.start()
+        sys.stdout.flush()
+        msgs = '.'.join(list(server.listening_on_msgs))
+        send_status(msgs)
+        send_ready()
+        await asyncio.wait([self._stop_event.wait(), self._restart_event.wait()],
+                           return_when=asyncio.FIRST_COMPLETED)
+        await server.close()
+
+    async def serve_until_stopped(self, paths: Dict[str, Union[str, Path]] = None) -> None:
+        while self._restart_event.is_set():
+            self._restart_event.clear()
+            server = server_from_config_file(self.conf_path, paths)
+            await self._run_server_until_signal(server)

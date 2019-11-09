@@ -1,9 +1,12 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .exceptions import ServerException
+from aionetworking.compatibility_os import loop_on_close_signal, send_to_journal
 from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, get_logger_receiver
 from aionetworking.types.logging import LoggerType
@@ -13,7 +16,8 @@ from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_l
 from .protocols import ReceiverProtocol
 
 from aionetworking.compatibility import Protocol
-from typing import Optional
+from typing import Optional, Generator
+
 
 @dataclass
 class BaseReceiver(ReceiverProtocol, Protocol):
@@ -36,6 +40,30 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     async def serve_in_loop(self) -> None:
         await self.start()
 
+    @property
+    def listening_on_msgs(self) -> Generator[str, None, None]:
+        yield from ()
+
+    async def serve_until_close_signal(self) -> None:
+        stop_event = asyncio.Event()
+        loop_on_close_signal(stop_event.set)
+        await self.start()
+        await stop_event.wait()
+        await self.close()
+
+    async def serve_until_keyboard_interrupt(self) -> None:
+        try:
+            await self.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        await self.close()
+
+    async def run_until_interrupt(self) -> None:
+        if os.name == 'posix':
+            await self.serve_until_close_signal()
+        else:
+            await self.serve_until_keyboard_interrupt()
+
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
@@ -57,7 +85,8 @@ class BaseServer(BaseReceiver, Protocol):
     def full_name(self):
         return f"{self.name} {self.listening_on}"
 
-    def _print_listening_message(self) -> None:
+    @property
+    def listening_on_msgs(self) -> Generator[str, None, None]:
         sockets = self.server.sockets
         for sock in sockets:
             sock_name = sock.getsockname()
@@ -65,7 +94,11 @@ class BaseServer(BaseReceiver, Protocol):
                 listening_on = ':'.join([str(v) for v in sock_name])
             else:
                 listening_on = sock_name
-            print(f"Serving {self.name} on {listening_on}")
+            yield f"Serving {self.name} on {listening_on}"
+
+    def _print_listening_message(self) -> None:
+        for msg in self.listening_on_msgs:
+            print(msg)
 
     async def start(self) -> None:
         if self._status.is_starting_or_started():
