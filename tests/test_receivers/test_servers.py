@@ -3,11 +3,21 @@ import pytest
 import pickle
 import signal
 import os
+from unittest.mock import call
 
 from aionetworking.receivers.exceptions import ServerException
 
 ###Required for skipif in fixture params###
 from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
+
+
+ready_call = call('READY=1')
+stopping_call = call('STOPPING=1')
+reloading_call = call('RELOADING=1')
+
+
+def status_call(msg):
+    return call(f'STATUS={msg}')
 
 
 class TestServerStartStop:
@@ -102,13 +112,18 @@ class TestServerStartStop:
         pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
-    async def test_09_serve_until_close_signal(self, server_quiet, signal_num):
+    async def test_09_serve_until_close_signal(self, server_quiet, signal_num, patch_systemd, server_port):
         assert not server_quiet.is_started()
         task = asyncio.create_task(server_quiet.serve_until_close_signal())
         await asyncio.wait_for(server_quiet.wait_started(), timeout=2)
+        status = next(server_quiet.listening_on_msgs)
         os.kill(os.getpid(), signal_num)
         await asyncio.wait_for(task, timeout=2)
         assert server_quiet.is_closed()
+        if patch_systemd:
+            daemon, journal = patch_systemd
+            daemon.notify.assert_has_calls([status_call(status), ready_call, stopping_call])
+            assert daemon.notify.call_count == 3
 
     @pytest.mark.asyncio
     async def test_10_pickle_server(self, server_receiver):

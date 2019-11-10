@@ -1,18 +1,17 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
-import os
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .exceptions import ServerException
-from aionetworking.compatibility_os import loop_on_close_signal, send_to_journal
+from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status
 from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, get_logger_receiver
 from aionetworking.types.logging import LoggerType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.networking import ProtocolFactoryType
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_loop
+import sys
 from .protocols import ReceiverProtocol
 
 from aionetworking.compatibility import Protocol
@@ -44,11 +43,26 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     def listening_on_msgs(self) -> Generator[str, None, None]:
         yield from ()
 
-    async def serve_until_close_signal(self) -> None:
-        stop_event = asyncio.Event()
+    def send_status(self):
+        msgs = ','.join(list(self.listening_on_msgs))
+        if msgs:
+            send_status(msgs)
+
+    async def serve_until_close_signal(self, stop_event: asyncio.Event = None,
+                                       restart_event: asyncio.Event = None) -> None:
+        stop_event = stop_event or asyncio.Event()
+        restart_event = restart_event or asyncio.Event()
         loop_on_close_signal(stop_event.set)
         await self.start()
-        await stop_event.wait()
+        sys.stdout.flush()
+        self.send_status()
+        send_ready()
+        done, pending = await asyncio.wait([stop_event.wait(), restart_event.wait()],
+                                           return_when=asyncio.FIRST_COMPLETED)
+        if stop_event.is_set():
+            send_stopping()
+        for task in pending:
+            task.cancel()
         await self.close()
 
 

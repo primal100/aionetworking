@@ -2,7 +2,7 @@ from __future__ import annotations
 import signal
 import asyncio
 import os
-from typing import Callable, Optional
+from typing import Callable
 try:
      from systemd import daemon
      from systemd import journal
@@ -17,23 +17,24 @@ try:
          daemon.notify(f'STATUS={status}')
 
      def send_stopping():
-         daemon.notify(f'STOPPING=1')
+         daemon.notify('STOPPING=1')
 
      def send_reloading():
-        daemon.notify(f'RELOADING=1')
+        daemon.notify('RELOADING=1')
 except ImportError:
     def send_to_journal(*args, **kwargs): ...
 
-    def send_ready(): ...
+    def send_ready():
+        pass
 
+    def send_status(status: str):
+        pass
 
-    def send_status(status: str): ...
+    def send_stopping():
+        pass
 
-
-    def send_stopping(): ...
-
-
-    def send_reloading(): ...
+    def send_reloading():
+        pass
 
 
 def loop_on_user1_signal(callback: Callable):

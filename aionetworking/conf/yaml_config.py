@@ -143,7 +143,7 @@ class SignalServerManager:
         self._stop_event = asyncio.Event()
         self._restart_event = asyncio.Event()
         self._restart_event.set()
-        self.server = server_from_config_file(self.conf_path, self.paths)
+        self.server = self.get_server()
         loop_on_close_signal(self.close)
         loop_on_user1_signal(self.check_reload)
 
@@ -152,8 +152,6 @@ class SignalServerManager:
         return os.stat(self.conf_path).st_mtime
 
     def close(self) -> None:
-        send_stopping()
-        send_status('Stopping server')
         self._stop_event.set()
 
     def check_reload(self) -> None:
@@ -178,21 +176,12 @@ class SignalServerManager:
     async def wait_server_started(self):
         await self.server.wait_started()
 
-    async def _run_server_until_signal(self) -> None:
-        await self.server.start()
-        sys.stdout.flush()
-        msgs = '.'.join(list(self.server.listening_on_msgs))
-        send_status(msgs)
-        send_ready()
-        done, pending = await asyncio.wait([self._stop_event.wait(), self._restart_event.wait()],
-                                           return_when=asyncio.FIRST_COMPLETED)
-        for task in pending:
-            task.cancel()
-        await self.server.close()
+    def get_server(self) -> ReceiverType:
+        return server_from_config_file(self.conf_path, self.paths)
 
     async def serve_until_stopped(self) -> None:
         while self._restart_event.is_set():
             self._restart_event.clear()
-            await self._run_server_until_signal()
+            await self.server.serve_until_close_signal(stop_event=self._stop_event, restart_event=self._restart_event)
             if self._restart_event.is_set():
-                self.server = server_from_config_file(self.conf_path, self.paths)
+                self.server = self.get_server()
