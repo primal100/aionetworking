@@ -22,15 +22,16 @@ from aionetworking.requesters.yaml_constructors import load_echo_requester
 from aionetworking.types.senders import SenderType
 from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_client, load_pipe_client
 from .yaml_constructors import load_ip_network, load_path, load_default_ports
-from aionetworking.settings import APP_HOME, TEMPDIR
+from aionetworking import settings
 
-import time
 from pathlib import Path
 from typing import Union, Dict, TextIO
 
 
-def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, Path] = None,
-               tmp_dir: Union[str, Path] = TEMPDIR) -> Dict[str, Path]:
+def get_paths(app_home: Union[str, Path] = None, volatile_home: Union[str, Path] = None,
+              tmp_dir: Union[str, Path] = None) -> Dict[str, Path]:
+    app_home = app_home or settings.APP_HOME
+    tmp_dir = tmp_dir or settings.TEMPDIR
     volatile_home = volatile_home or app_home
     return {'temp': tmp_dir,
             'home': app_home,
