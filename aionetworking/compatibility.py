@@ -81,8 +81,12 @@ def is_selector():
     return type(asyncio.get_event_loop()) == asyncio.SelectorEventLoop
 
 
-def is_builtin_loop():
+def is_builtin_loop() -> bool:
     return is_selector() or is_proactor()
+
+
+def supports_keyboard_interrupt() -> bool:
+    return os.name != 'nt' or (py38 and is_proactor())
 
 
 def get_client_kwargs(happy_eyeballs_delay: Optional[float] = None, interleave: Optional[int] = None) -> Dict[str, Any]:
