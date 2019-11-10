@@ -1,12 +1,28 @@
 from __future__ import annotations
 import yaml
+import asyncio
+import os
 from pathlib import Path
 
 from functools import partial
+from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.utils import IPNetwork
 from aionetworking.logging import Logger
 
 from typing import Optional, Dict, Union, Sequence
+
+
+def port_constructor(loader, node, default_port) -> int:
+    if node.value:
+        value = loader.construct_yaml_int(node)
+        if value:
+            return value
+    return default_port()
+
+
+def load_default_ports():
+    yaml.add_constructor('!Port', partial(port_constructor, default_server_port()), Loader=yaml.SafeLoader)
+    yaml.add_constructor('!ClientPort', partial(port_constructor, default_client_port()), Loader=yaml.SafeLoader)
 
 
 def path_constructor(paths, loader, node) -> Optional[Path]:
