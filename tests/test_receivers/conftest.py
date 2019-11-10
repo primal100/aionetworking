@@ -7,6 +7,7 @@ from scripts.generate_ssh_host_key import generate_key_in_path
 from tests.test_networking.conftest import *
 
 from pytest_lazyfixture import lazy_fixture
+from typing import Optional
 
 
 @pytest.fixture
@@ -260,3 +261,15 @@ def server_args(request) -> Tuple:
     ])
 def receiver_args(request):
     return request.param
+
+
+@pytest.fixture
+def patch_systemd(monkeypatch) -> Optional[Tuple]:
+    try:
+        from systemd import daemon
+        from systemd import journal
+        monkeypatch.setattr(daemon, 'notify', Mock())
+        monkeypatch.setattr(journal, 'send', Mock())
+        return daemon, journal
+    except ImportError:
+        return None

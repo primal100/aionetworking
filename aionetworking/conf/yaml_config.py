@@ -152,8 +152,6 @@ class SignalServerManager:
         return os.stat(self.conf_path).st_mtime
 
     def close(self) -> None:
-        send_stopping()
-        send_status('Stopping server')
         self._stop_event.set()
 
     def check_reload(self) -> None:
@@ -164,7 +162,6 @@ class SignalServerManager:
                 self._last_modified_time = last_modified
                 send_status('Restarting server')
                 self._restart_event.set()
-                self._stop_event.set()
             else:
                 send_ready()
         else:
@@ -185,7 +182,6 @@ class SignalServerManager:
     async def serve_until_stopped(self) -> None:
         while self._restart_event.is_set():
             self._restart_event.clear()
-            self._stop_event.clear()
-            await self.server.serve_until_close_signal(stop_event=self._stop_event)
+            await self.server.serve_until_close_signal(stop_event=self._stop_event, restart_event=self._restart_event)
             if self._restart_event.is_set():
                 self.server = self.get_server()

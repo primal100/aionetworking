@@ -1,3 +1,4 @@
+from __future__ import annotations
 import yaml
 import shutil
 
@@ -6,8 +7,10 @@ from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
 from aionetworking.utils import Expression
+from unittest.mock import Mock
 from tests.conftest import get_fixture
 from tests.test_senders.conftest import *
+from typing import Optional
 
 
 @pytest.fixture
@@ -405,4 +408,3 @@ async def signal_server_manager_started(tmp_config_file) -> SignalServerManager:
     server_manager.close()
     await server_manager.wait_server_stopped()
     await task
-

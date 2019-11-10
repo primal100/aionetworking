@@ -48,15 +48,21 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         if msgs:
             send_status(msgs)
 
-    async def serve_until_close_signal(self, stop_event: asyncio.Event = None) -> None:
+    async def serve_until_close_signal(self, stop_event: asyncio.Event = None,
+                                       restart_event: asyncio.Event = None) -> None:
         stop_event = stop_event or asyncio.Event()
+        restart_event = restart_event or asyncio.Event()
         loop_on_close_signal(stop_event.set)
         await self.start()
         sys.stdout.flush()
         self.send_status()
         send_ready()
-        await stop_event.wait()
-        send_stopping()
+        done, pending = await asyncio.wait([stop_event.wait(), restart_event.wait()],
+                                           return_when=asyncio.FIRST_COMPLETED)
+        if stop_event.is_set():
+            send_stopping()
+        for task in pending:
+            task.cancel()
         await self.close()
 
 
