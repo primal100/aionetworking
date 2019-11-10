@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
+import asyncio
 from aionetworking.compatibility import Protocol
 
 
@@ -13,6 +14,10 @@ class ReceiverProtocol(Protocol):
 
     @abstractmethod
     async def start(self): ...
+
+    @abstractmethod
+    async def serve_until_close_signal(self, stop_event: asyncio.Event = None,
+                                       restart_event: asyncio.Event = None, notify_pid: int = None) -> None: ...
 
     @abstractmethod
     async def serve_forever(self) -> None: ...

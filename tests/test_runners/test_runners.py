@@ -3,10 +3,9 @@ import pytest
 import signal
 import time
 import socket
-import asyncio
 import os
 from aionetworking.compatibility import supports_keyboard_interrupt, py38
-from threading import Thread
+from threading import Thread, Event
 
 
 def port_is_open(host, port) -> bool:
@@ -47,13 +46,15 @@ def modify_config_file(tmp_config_file, old_host, new_host):
         f.write(data)
 
 
-def assert_reload_ok(signal, host, port, tmp_config_file):
-    time.sleep(1)
+def assert_reload_ok(signal_num, host, port, tmp_config_file, event):
+    print('waiting signal')
+    event.wait()
+    event.clear()
     new_host = '127.0.0.2'
     assert not port_is_open(new_host, port)
     modify_config_file(tmp_config_file, host, new_host)
-    raise_signal(signal, host, port)
-    time.sleep(1)
+    raise_signal(signal_num, host, port)
+    event.wait()
     assert not port_is_open(host, port)
     raise_signal(signal.SIGTERM, new_host, port)
 
@@ -62,7 +63,13 @@ def assert_reload_ok(signal, host, port, tmp_config_file):
     pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
 ])
 def test_signal_runner_reload(tmp_config_file, all_paths, server_port_load, signal_num, new_event_loop):
-    thread = Thread(target=assert_reload_ok, args=(signal_num, '127.0.0.1', server_port_load, tmp_config_file))
+    event = Event()
+    thread = Thread(target=assert_reload_ok, args=(signal_num, '127.0.0.1', server_port_load, tmp_config_file, event))
     thread.start()
-    run_server_default_tags(tmp_config_file, paths=all_paths)
+
+    def event_set(signum, frame):
+        event.set()
+
+    signal.signal(signal.SIGUSR2, event_set)
+    run_server_default_tags(tmp_config_file, paths=all_paths, notify_pid=os.getpid())
     thread.join(timeout=1)

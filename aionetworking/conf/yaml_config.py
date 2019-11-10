@@ -135,6 +135,7 @@ def client_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[
 class SignalServerManager:
     conf_path: Union[Path, str]
     server: ReceiverType = field(init=False)
+    notify_pid: int = None
     _last_modified_time: float = field(init=False, default=None)
     paths: Dict[str, Union[str, Path]] = None
 
@@ -182,6 +183,7 @@ class SignalServerManager:
     async def serve_until_stopped(self) -> None:
         while self._restart_event.is_set():
             self._restart_event.clear()
-            await self.server.serve_until_close_signal(stop_event=self._stop_event, restart_event=self._restart_event)
+            await self.server.serve_until_close_signal(stop_event=self._stop_event, restart_event=self._restart_event,
+                                                       notify_pid=self.notify_pid)
             if self._restart_event.is_set():
                 self.server = self.get_server()
