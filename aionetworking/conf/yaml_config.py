@@ -43,7 +43,7 @@ def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, P
 
 
 def load_minimal_tags() -> None:
-    load_default_ports
+    load_default_ports()
     load_logger()
     load_receiver_logger()
     load_sender_logger()
