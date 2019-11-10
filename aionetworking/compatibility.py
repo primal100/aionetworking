@@ -103,11 +103,12 @@ def default_server_port() -> int:
         if isinstance(loop, asyncio.ProactorEventLoop):
             return base_port + 10
         if isinstance(loop, asyncio.SelectorEventLoop):
-            return base_port + 15
+            return base_port + 11
+        return base_port + 12
     if isinstance(loop, asyncio.SelectorEventLoop):
         return base_port
     else:
-        return base_port + 5
+        return base_port + 1
 
 
 def default_client_port() -> int:
@@ -117,8 +118,9 @@ def default_client_port() -> int:
         if isinstance(loop, asyncio.ProactorEventLoop):
             return base_port + 100
         if isinstance(loop, asyncio.SelectorEventLoop):
-            return base_port + 150
+            return base_port + 110
+        return base_port + 120
     if isinstance(loop, asyncio.SelectorEventLoop):
         return base_port
     else:
-        return base_port + 50
+        return base_port + 10
