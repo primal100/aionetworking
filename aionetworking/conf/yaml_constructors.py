@@ -12,12 +12,12 @@ from aionetworking.logging import Logger
 from typing import Optional, Dict, Union, Sequence
 
 
-def port_constructor(loader, node, default_port) -> int:
+def port_constructor(default_port, loader, node) -> int:
     if node.value:
         value = loader.construct_yaml_int(node)
         if value:
             return value
-    return default_port()
+    return default_port
 
 
 def load_default_ports():
