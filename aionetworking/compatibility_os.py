@@ -58,6 +58,11 @@ def loop_remove_signals():
         loop.remove_signal_handler(signal.SIGUSR1)
 
 
+def send_notify_start_signal(pid: int):
+    if os.name == 'posix':
+        os.kill(pid, signal.SIGUSR2)
+
+
 if os.name == 'posix':
     import pamela
     authentication_type = 'PAM'

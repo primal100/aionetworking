@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from .exceptions import ServerException
-from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status
+from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status, send_notify_start_signal
 from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, get_logger_receiver
 from aionetworking.types.logging import LoggerType
@@ -49,7 +49,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
             send_status(msgs)
 
     async def serve_until_close_signal(self, stop_event: asyncio.Event = None,
-                                       restart_event: asyncio.Event = None) -> None:
+                                       restart_event: asyncio.Event = None, notify_pid: int = None) -> None:
         stop_event = stop_event or asyncio.Event()
         restart_event = restart_event or asyncio.Event()
         loop_on_close_signal(stop_event.set)
@@ -57,6 +57,8 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         sys.stdout.flush()
         self.send_status()
         send_ready()
+        if notify_pid:
+            send_notify_start_signal(notify_pid)
         done, pending = await asyncio.wait([stop_event.wait(), restart_event.wait()],
                                            return_when=asyncio.FIRST_COMPLETED)
         if stop_event.is_set():
