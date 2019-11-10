@@ -94,19 +94,6 @@ def new_event_loop():
 
 
 @pytest.fixture
-def server_port_load(sock):
-    def port_constructor(loader, node) -> int:
-        if node.value:
-            value = loader.construct_yaml_int(node)
-            if value:
-                return value
-        return sock[1]
-
-    yaml.add_constructor('!Port', port_constructor, Loader=yaml.SafeLoader)
-    return sock[1]
-
-
-@pytest.fixture
 def server_pipe_address_load(pipe_path):
     def pipe_address_constructor(loader, node) -> Path:
         if node.value:
@@ -143,7 +130,7 @@ def config_files_args(request):
 
 
 @pytest.fixture
-def config_file(config_files_args, server_port_load):
+def config_file(config_files_args):
     return config_files_args[0]
 
 
@@ -173,7 +160,7 @@ def tcp_server_misc_yaml_config_path(conf_dir):
 
 
 @pytest.fixture
-def tcp_server_misc_yaml_config_stream(tcp_server_misc_yaml_config_path, server_port_load):
+def tcp_server_misc_yaml_config_stream(tcp_server_misc_yaml_config_path):
     return open(tcp_server_misc_yaml_config_path, 'r')
 
 
@@ -183,7 +170,7 @@ def tcp_client_misc_yaml_config_path(conf_dir):
 
 
 @pytest.fixture
-def tcp_client_misc_yaml_config_stream(tcp_client_misc_yaml_config_path, server_port_load):
+def tcp_client_misc_yaml_config_stream(tcp_client_misc_yaml_config_path):
     return open(tcp_client_misc_yaml_config_path, 'r')
 
 
@@ -355,7 +342,7 @@ def stats_formatter() -> logging.Formatter:
 
 
 @pytest.fixture
-def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags, server_port_load) -> Path:
+def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags) -> Path:
     path = tmp_path / tcp_server_one_way_yaml_config_path.name
     shutil.copy(tcp_server_one_way_yaml_config_path, path)
     return path
