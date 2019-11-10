@@ -3,7 +3,6 @@ import asyncio
 import yaml
 import os
 from dataclasses import dataclass, field
-import sys
 
 from logging.config import dictConfig
 from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action, \
@@ -22,7 +21,7 @@ from aionetworking.receivers.yaml_constructors import load_tcp_server, load_udp_
 from aionetworking.requesters.yaml_constructors import load_echo_requester
 from aionetworking.types.senders import SenderType
 from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_client, load_pipe_client
-from .yaml_constructors import load_ip_network, load_path
+from .yaml_constructors import load_ip_network, load_path, load_default_ports
 from aionetworking.settings import APP_HOME, TEMPDIR
 
 import time
@@ -44,6 +43,7 @@ def get_paths(app_home: Union[str, Path] = APP_HOME, volatile_home: Union[str, P
 
 
 def load_minimal_tags() -> None:
+    load_default_ports
     load_logger()
     load_receiver_logger()
     load_sender_logger()

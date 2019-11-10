@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import datetime
 from pathlib import Path
 from aionetworking import JSONObject, JSONCodec
+from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
 from aionetworking.types.formats import MessageObjectType
 
@@ -14,30 +15,12 @@ from typing import Dict, Any, List, NamedTuple, Tuple, Type
 
 @pytest.fixture
 def server_port() -> int:
-    loop = asyncio.get_event_loop()
-    if os.name == 'nt':
-        if isinstance(loop, asyncio.ProactorEventLoop):
-            return 8886
-        if isinstance(loop, asyncio.SelectorEventLoop):
-            return 8887
-    if isinstance(loop, asyncio.SelectorEventLoop):
-        return 8888
-    else:
-        return 8889
+    return default_server_port()
 
 
 @pytest.fixture
 def client_port() -> int:
-    loop = asyncio.get_event_loop()
-    if os.name == 'nt':
-        if isinstance(loop, asyncio.ProactorEventLoop):
-            return 60000
-        if isinstance(loop, asyncio.SelectorEventLoop):
-            return 60001
-    if isinstance(loop, asyncio.SelectorEventLoop):
-        return 60002
-    else:
-        return 60003
+    return default_client_port()
 
 
 @pytest.fixture

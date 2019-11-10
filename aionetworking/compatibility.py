@@ -6,6 +6,7 @@ import socket
 from typing import Optional, Any, Dict
 
 
+py39 = sys.version_info >= (3, 9)
 py38 = sys.version_info >= (3, 8)
 
 
@@ -93,3 +94,31 @@ def get_client_kwargs(happy_eyeballs_delay: Optional[float] = None, interleave: 
     if py38 and is_builtin_loop():
         return {'happy_eyeballs_delay': happy_eyeballs_delay, 'interleave': interleave}
     return {}
+
+
+def default_server_port() -> int:
+    loop = asyncio.get_event_loop()
+    base_port = 3900 if py39 else 3800 if py38 else 3700
+    if os.name == 'nt':
+        if isinstance(loop, asyncio.ProactorEventLoop):
+            return base_port + 10
+        if isinstance(loop, asyncio.SelectorEventLoop):
+            return base_port + 15
+    if isinstance(loop, asyncio.SelectorEventLoop):
+        return base_port
+    else:
+        return base_port + 5
+
+
+def default_client_port() -> int:
+    loop = asyncio.get_event_loop()
+    base_port = 39000 if py39 else 38000 if py38 else 37000
+    if os.name == 'nt':
+        if isinstance(loop, asyncio.ProactorEventLoop):
+            return base_port + 100
+        if isinstance(loop, asyncio.SelectorEventLoop):
+            return base_port + 150
+    if isinstance(loop, asyncio.SelectorEventLoop):
+        return base_port
+    else:
+        return base_port + 50
