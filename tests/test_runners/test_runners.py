@@ -2,25 +2,15 @@ from aionetworking.runners import run_server_default_tags
 import pytest
 import signal
 import time
-import socket
 import os
 from aionetworking.compatibility import supports_keyboard_interrupt, py38
+from aionetworking.utils import is_listening_on
 from threading import Thread, Event
-
-
-def port_is_open(host, port) -> bool:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect((host, port))
-        s.shutdown(socket.SHUT_RDWR)
-        return True
-    except:
-        return False
 
 
 def raise_signal(signal_num, host, port):
     time.sleep(1)
-    assert port_is_open(host, port)
+    assert is_listening_on((host, port))
     if py38:
         signal.raise_signal(signal_num)
     else:
@@ -50,11 +40,11 @@ def assert_reload_ok(signal_num, host, port, tmp_config_file, event):
     event.wait()
     event.clear()
     new_host = '127.0.0.2'
-    assert not port_is_open(new_host, port)
+    assert not is_listening_on((new_host, port))
     modify_config_file(tmp_config_file, host, new_host)
     raise_signal(signal_num, host, port)
     event.wait()
-    assert not port_is_open(host, port)
+    assert not is_listening_on((host, port))
     raise_signal(signal.SIGTERM, new_host, port)
 
 
