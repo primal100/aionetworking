@@ -22,7 +22,7 @@ def status_call(msg):
 
 class TestServerStartStop:
     @pytest.mark.asyncio
-    async def test_00_server_start(self, server_receiver, capsys):
+    async def test_00_server_start(self, server_receiver, capsys, sock):
         assert not server_receiver.is_started()
         task = asyncio.create_task(server_receiver.start())
         await asyncio.wait_for(server_receiver.wait_started(), timeout=2)

@@ -13,6 +13,7 @@ import itertools
 import sys
 import socket
 import tempfile
+from aionetworking.compatibility_os import is_wsl
 from dataclasses import dataclass, fields, MISSING
 from functools import wraps
 
@@ -266,6 +267,17 @@ def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networ
 
 
 ###System###
+
+
+def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
+    if psutil and not is_wsl():
+        connections = psutil.net_connections(kind=kind)
+        return any(conn.laddr == addr for conn in connections)
+    else:
+        import subprocess
+        process = subprocess.run(f'nc -z {addr[0]} {addr[1]}'.split())
+        return process.returncode == 0
+
 
 class SystemInfo:
     @property

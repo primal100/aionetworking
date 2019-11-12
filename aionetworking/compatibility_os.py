@@ -2,6 +2,7 @@ from __future__ import annotations
 import signal
 import asyncio
 import os
+import platform
 from typing import Callable
 try:
      from systemd import daemon
@@ -61,6 +62,10 @@ def loop_remove_signals():
 def send_notify_start_signal(pid: int):
     if os.name == 'posix':
         os.kill(pid, signal.SIGUSR2)
+
+
+def is_wsl() -> bool:
+    return os.name == 'posix' and 'microsoft' in platform.uname().release.lower()
 
 
 if os.name == 'posix':
