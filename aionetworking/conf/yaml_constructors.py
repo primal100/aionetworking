@@ -1,7 +1,5 @@
 from __future__ import annotations
 import yaml
-import asyncio
-import os
 from pathlib import Path
 
 from functools import partial
@@ -12,17 +10,17 @@ from aionetworking.logging import Logger
 from typing import Optional, Dict, Union, Sequence
 
 
-def port_constructor(default_port, loader, node) -> int:
+def port_constructor(default_port_func, loader, node) -> int:
     if node.value:
         value = loader.construct_yaml_int(node)
         if value:
             return value
-    return default_port
+    return default_port_func()
 
 
 def load_default_ports():
-    yaml.add_constructor('!Port', partial(port_constructor, default_server_port()), Loader=yaml.SafeLoader)
-    yaml.add_constructor('!ClientPort', partial(port_constructor, default_client_port()), Loader=yaml.SafeLoader)
+    yaml.add_constructor('!Port', partial(port_constructor, default_server_port), Loader=yaml.SafeLoader)
+    yaml.add_constructor('!ClientPort', partial(port_constructor, default_client_port), Loader=yaml.SafeLoader)
 
 
 def path_constructor(paths, loader, node) -> Optional[Path]:
