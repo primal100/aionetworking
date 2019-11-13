@@ -4,13 +4,13 @@ import signal
 import time
 import os
 from aionetworking.compatibility import supports_keyboard_interrupt, py38
-from aionetworking.utils import is_listening_on
+from aionetworking.utils import wait_listening_on_sync, is_listening_on
 from threading import Thread, Event
 
 
 def raise_signal(signal_num, host, port):
     time.sleep(1)
-    assert is_listening_on((host, port))
+    wait_listening_on_sync((host, port))
     if py38:
         signal.raise_signal(signal_num)
     else:

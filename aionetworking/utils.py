@@ -272,11 +272,29 @@ def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networ
 def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
     if psutil and not is_wsl():
         connections = psutil.net_connections(kind=kind)
-        return any(conn.laddr == addr and conn.status == 'LISTEN' for conn in connections)
+        return any(
+            conn.laddr == addr and any(status == conn.status for status in (psutil.CONN_LISTEN, psutil.CONN_NONE)) for
+            conn in connections)
     else:
         import subprocess
         process = subprocess.run(f'nc -z {addr[0]} {addr[1]}'.split())
         return process.returncode == 0
+
+
+def wait_listening_on_sync(addr: Tuple[str, int], kind: str = 'inet', timeout: int = 3):
+    i = 0
+    interval = 0.5
+    while not is_listening_on(addr, kind=kind) and i < timeout:
+        time.sleep(interval)
+        i += interval
+
+
+async def wait_listening_on_async(addr: Tuple[str, int], kind: str = 'inet', timeout: int = 100):
+    i = 0
+    interval = 0.5
+    while not is_listening_on(addr, kind=kind) and i < timeout:
+        await asyncio.sleep(interval)
+        i += interval
 
 
 class SystemInfo:
