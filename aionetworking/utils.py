@@ -284,17 +284,18 @@ def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
 def wait_listening_on_sync(addr: Tuple[str, int], kind: str = 'inet', timeout: int = 3):
     i = 0
     interval = 0.5
-    while not is_listening_on(addr, kind=kind) and i < timeout:
+    while not is_listening_on(addr, kind=kind):
         time.sleep(interval)
-        i += interval
+        if timeout:
+            i += interval
+            if i >= timeout:
+                raise TimeoutError(f'Waited for {timeout} seconds for listener on {addr}')
 
 
-async def wait_listening_on_async(addr: Tuple[str, int], kind: str = 'inet', timeout: int = 100):
-    i = 0
+async def wait_listening_on_async(addr: Tuple[str, int], kind: str = 'inet'):
     interval = 0.5
-    while not is_listening_on(addr, kind=kind) and i < timeout:
+    while not is_listening_on(addr, kind=kind):
         await asyncio.sleep(interval)
-        i += interval
 
 
 class SystemInfo:
