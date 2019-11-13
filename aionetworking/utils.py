@@ -272,7 +272,7 @@ def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networ
 def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
     if psutil and not is_wsl():
         connections = psutil.net_connections(kind=kind)
-        return any(conn.laddr == addr for conn in connections)
+        return any(conn.laddr == addr and conn.status == 'LISTEN' for conn in connections)
     else:
         import subprocess
         process = subprocess.run(f'nc -z {addr[0]} {addr[1]}'.split())

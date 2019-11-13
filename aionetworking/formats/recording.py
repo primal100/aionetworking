@@ -11,6 +11,7 @@ recorded_packet = namedtuple("recorded_packet", ["sent_by_server", "timestamp", 
 
 @dataclass
 class BufferCodec(PickleCodec):
+    log_msgs = False
 
     async def decode(self, encoded: bytes, **kwargs) -> recorded_packet:
         async for encoded, decoded in super().decode(encoded, **kwargs):

@@ -46,6 +46,7 @@ def assert_reload_ok(signal_num, host, port, tmp_config_file, event):
     event.wait()
     assert not is_listening_on((host, port))
     raise_signal(signal.SIGTERM, new_host, port)
+    modify_config_file(tmp_config_file, host, new_host)
 
 
 @pytest.mark.parametrize('signal_num', [

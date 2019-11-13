@@ -105,6 +105,7 @@ class BaseCodec(Codec):
     read_mode = 'rb'
     write_mode = 'wb'
     append_mode = 'ab'
+    log_msgs = True
 
     msg_obj: Type[MessageObjectType]
     context: Dict[str, Any] = field(default_factory=context_cv.get)
@@ -129,7 +130,8 @@ class BaseCodec(Codec):
     async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         i = 0
         async for msg in self._from_buffer(encoded, **kwargs):
-            self.logger.on_msg_decoded(msg)
+            if self.log_msgs:
+                self.logger.on_msg_decoded(msg)
             yield msg
             i += 1
         self.logger.on_buffer_decoded(i)

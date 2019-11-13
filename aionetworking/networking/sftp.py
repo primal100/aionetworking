@@ -34,9 +34,12 @@ class SFTPFactory(asyncssh.SFTPServer):
         else:
             super().__init__(self._conn)
 
-    @cached_property
+    @property
     def sftp_connection(self):
-        return self._conn.get_extra_info('sftp_connection')
+        conn = self._conn.get_extra_info('sftp_connection')
+        if not conn:
+            conn = self._conn.get_extra_info('connection').get_extra_info('sftp_connection')
+        return conn
 
     async def _handle_data(self, name: str, data: AnyStr):
         self.sftp_connection.data_received(data)
