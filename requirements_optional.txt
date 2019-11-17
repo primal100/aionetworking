@@ -4,4 +4,4 @@ pyyaml>=5.1.2
 uvloop>=0.14.0;os_name=='posix'
 pamela>=1.0.0;os_name=='posix'
 #cryptography   #required for asyncssh, for windows, install with Pycharm
-#pywin32=>226;os_name='nt'  #Install with Pycharm in venv, also install globally
+#pywin32=>227;os_name='nt'  #Install with Pycharm in venv, also install globally

@@ -166,17 +166,25 @@ def set_uvloop_policy_linux() -> None:
     uvloop.install()
 
 
+class InvalidLoopNameException(BaseException):
+    pass
+
+
 def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) -> None:
     if os.name == 'posix':
         if linux_loop_type == 'selector':
             set_selector_loop_policy_linux()
         elif linux_loop_type == 'uvloop':
             set_uvloop_policy_linux()
+        else:
+            raise InvalidLoopNameException(f'{linux_loop_type} is not a valid loop name. Choose either selector or uvloop')
     elif os.name == 'nt':
         if windows_loop_type == 'selector':
             set_selector_loop_policy_windows()
         elif windows_loop_type == 'proactor':
             set_proactor_loop_policy_windows()
+        else:
+            raise InvalidLoopNameException(f'{linux_loop_type} is not a valid loop name. Choose either proactor or selector')
 
 
 ###Logging###

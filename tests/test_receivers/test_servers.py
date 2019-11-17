@@ -25,7 +25,7 @@ class TestServerStartStop:
     async def test_00_server_start(self, server_receiver, capsys, sock):
         assert not server_receiver.is_started()
         task = asyncio.create_task(server_receiver.start())
-        await asyncio.wait_for(server_receiver.wait_started(), timeout=2)
+        await asyncio.wait_for(server_receiver.wait_started(), timeout=5)
         assert server_receiver.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
