@@ -1,5 +1,6 @@
 from pytest_lazyfixture import lazy_fixture, is_lazy_fixture
 import asyncssh
+import os
 
 import logging
 from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory, \
