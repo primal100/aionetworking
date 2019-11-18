@@ -32,6 +32,8 @@ msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     dataformat: Type[MessageObjectType]
     bufferformat: Type[BufferObject] = BufferObject
+    codec: CodecType = None
+    buffer_codec: BufferCodec = None
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
     context: Dict[str, Any] = field(default_factory=context_cv.get)
@@ -42,8 +44,6 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     def __post_init__(self) -> None:
         context_cv.set(self.context)
-        self.codec: CodecType = self.dataformat.get_codec(**self.codec_config)
-        self.buffer_codec: BufferCodec = self.bufferformat.get_codec()
         self.logger.new_connection()
 
     def on_msg_sent(self, msg_encoded: bytes, task: Optional[asyncio.Future]):
@@ -57,7 +57,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         else:
             self.on_msg_sent(msg_encoded, None)
 
+    def _set_codecs(self, buffer: Optional[bytes]):
+        context_cv.set(self.context)
+        self.codec = self.dataformat.get_codec(buffer, **self.codec_config)
+        self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer)
+
     def _encode_msg(self, decoded: Any) -> MessageObjectType:
+        if not self.codec:
+            self._set_codecs(decoded)
         return self.codec.from_decoded(decoded)
 
     def encode_and_send_msg(self, msg_decoded: Any) -> None:
@@ -76,6 +83,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             await self.preaction.do_one(buffer_obj)
 
     def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future:
+        if not self.codec:
+            self._set_codecs(buffer)
         self.logger.on_buffer_received(buffer)
         timestamp = timestamp or datetime.now()
         if self.preaction:
@@ -172,7 +181,6 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     action: ActionProtocol = None
 
     def __post_init__(self) -> None:
-        self._loop_id = id(asyncio.get_event_loop())
         super().__post_init__()
         if self.action.supports_notifications:
             self._notifications_task = self._scheduler.task_with_callback(self._send_notifications(), name='Notifications')

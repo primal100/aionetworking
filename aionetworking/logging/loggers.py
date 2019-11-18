@@ -204,7 +204,7 @@ class ConnectionLogger(Logger):
         self.debug('Filtered msg %s', msg.uid)
 
     def on_msg_failed(self, msg: MessageObjectType, exc: BaseException) -> None:
-        self.error('Failed to process msg %s', msg.uid)
+        self.error('Failed to process msg %s', getattr(msg, 'uid', None))
         self.manage_error(exc)
 
     def connection_finished(self, exc: Optional[BaseException] = None) -> None:
