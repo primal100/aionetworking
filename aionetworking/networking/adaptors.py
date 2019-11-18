@@ -230,7 +230,8 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     tasks.append(asyncio.create_task(self._process_msg(msg_obj)))
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.wait(tasks)
+            if tasks:
+                await asyncio.wait(tasks)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
         return len(buffer)
