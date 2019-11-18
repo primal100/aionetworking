@@ -38,8 +38,8 @@ class TestJsonCodec:
 
 
 class TestJsonObject:
-    def test_00_get_codec(self, json_codec, context):
-        codec = JSONObject.get_codec(context=context)
+    def test_00_get_codec(self, json_buffer, json_codec, context):
+        codec = JSONObject.get_codec(json_buffer, context=context)
         assert codec == json_codec
 
     def test_01_properties(self, json_object, timestamp, peer_str, peer):
@@ -53,8 +53,8 @@ class TestJsonObject:
     def test_02_filter(self, json_object):
         assert json_object.filter() is False
 
-    def test_03_json_object_with_codec_kwargs(self, json_object_with_codec_kwargs, json_codec_with_kwargs):
-        codec = json_object_with_codec_kwargs.get_codec(test_param='abc')
+    def test_03_json_object_with_codec_kwargs(self, json_buffer, json_object_with_codec_kwargs, json_codec_with_kwargs):
+        codec = json_object_with_codec_kwargs.get_codec(json_buffer, test_param='abc')
         assert codec == json_codec_with_kwargs
 
 

@@ -12,7 +12,7 @@ from aionetworking.types.logging import ConnectionLoggerType
 from aionetworking.utils import aone, dataclass_getstate, dataclass_setstate
 
 from .protocols import MessageObject, Codec
-from typing import AsyncGenerator, Any, Dict, Sequence, Type
+from typing import AsyncGenerator, Any, Dict, Sequence, Type, Optional
 from aionetworking.compatibility import Protocol
 from aionetworking.types.formats import MessageObjectType, CodecType
 
@@ -38,7 +38,7 @@ class BaseMessageObject(MessageObject, Protocol):
         return {}
 
     @classmethod
-    def get_codec(cls, **kwargs) -> CodecType:
+    def get_codec(cls, first_buffer_received: Optional[bytes], **kwargs) -> CodecType:
         kwargs.update(cls._get_codec_kwargs())
         return cls.codec_cls(cls, **kwargs)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from aionetworking.compatibility import Protocol
 
-from typing import AsyncGenerator, Any, Dict, Sequence
+from typing import AsyncGenerator, Any, Dict, Sequence, Optional
 from aionetworking.types.formats import CodecType, MessageObjectType
 
 
@@ -19,7 +19,7 @@ class MessageObject(Protocol):
 
     @classmethod
     @abstractmethod
-    def get_codec(cls, **kwargs) -> CodecType: ...
+    def get_codec(cls, first_buffer_received: Optional[bytes], **kwargs) -> CodecType: ...
 
     @property
     @abstractmethod
