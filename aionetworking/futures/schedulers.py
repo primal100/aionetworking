@@ -110,20 +110,20 @@ class TaskScheduler:
             return delay
 
     @staticmethod
-    async def _call_coro_periodic(delay: Union[int, float], async_callback: Callable,
+    async def _call_coro_periodic(interval: Union[int, float], async_callback: Callable,
                              *args, start_time_interval: Union[int, float] = 0, **kwargs):
         await asyncio.sleep(start_time_interval)
         while True:
             coro = async_callback(*args, **kwargs)
             await coro
-            await asyncio.sleep(delay)
+            await asyncio.sleep(interval)
 
-    def call_coro_periodic(self, delay: Union[int, float], async_callback: Callable, *args,
+    def call_coro_periodic(self, interval: Union[int, float], async_callback: Callable, *args,
                            fixed_start_time: bool = False, immediate: bool = False, task_name: str = None,
                            **kwargs) -> None:
-        start_time_interval = self.get_start_interval(fixed_start_time, immediate, delay)
+        start_time_interval = self.get_start_interval(fixed_start_time, immediate, interval)
         task = asyncio.create_task(
-            self._call_coro_periodic(delay, async_callback, start_time_interval=start_time_interval, *args, **kwargs))
+            self._call_coro_periodic(interval, async_callback, start_time_interval=start_time_interval, *args, **kwargs))
         set_task_name(task, task_name)
         self._periodic_tasks.append(task)
 
@@ -131,5 +131,5 @@ class TaskScheduler:
     async def _call_cb(callback: Callable, *args, **kwargs):
         return callback(*args, **kwargs)
 
-    def call_cb_periodic(self, delay: Union[int, float], cb: Callable, *args, task_name: str = None, **kwargs):
-        self.call_coro_periodic(delay, self._call_cb, cb, *args, task_name=task_name, **kwargs)
+    def call_cb_periodic(self, interval: Union[int, float], cb: Callable, *args, task_name: str = None, **kwargs):
+        self.call_coro_periodic(interval, self._call_cb, cb, *args, task_name=task_name, **kwargs)

@@ -2,7 +2,7 @@ from abc import abstractmethod
 import asyncio
 import contextvars
 from dataclasses import dataclass, field
-from datetime import datetime
+import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
@@ -76,17 +76,17 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         for decoded_msg in decoded_msgs:
             self.encode_and_send_msg(decoded_msg)
 
-    async def _run_preaction(self, buffer: bytes, timestamp: datetime = None) -> None:
+    async def _run_preaction(self, buffer: bytes, timestamp: datetime.datetime = None) -> None:
         self.logger.info('Running preaction')
         buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
         if not self.preaction.filter(buffer_obj):
             await self.preaction.do_one(buffer_obj)
 
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future:
+    def on_data_received(self, buffer: bytes, timestamp: datetime.datetime = None) -> asyncio.Future:
+        timestamp = timestamp or datetime.datetime.now()
         if not self.codec:
             self._set_codecs(buffer)
         self.logger.on_buffer_received(buffer)
-        timestamp = timestamp or datetime.now()
         if self.preaction:
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")

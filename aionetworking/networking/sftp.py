@@ -201,6 +201,7 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
         await self.sftp.put(file_path, remotepath=self.remote_path)
         if self.remove_tmp_files:
             await aremove(file_path)
+        self.last_msg = datetime.datetime.now()
 
     def send(self, data: bytes) -> asyncio.Future:
         task = self._scheduler.task_with_callback(self._put_data(data))
