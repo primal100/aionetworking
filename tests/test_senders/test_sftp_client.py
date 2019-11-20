@@ -70,3 +70,25 @@ class TestSFTPClientAllowedSenders:
         with pytest.raises((ConnectionResetError, asyncssh.misc.ConnectionLost)):
             async with sftp_client_wrong_senders as conn:
                 conn.send(json_rpc_login_request_encoded)
+
+
+class TestClientConnectionsExpire:
+    @pytest.mark.asyncio
+    async def test_00_connections_expire(self, sftp_server_for_expire_connections,
+                                                sftp_client_for_expire_connections):
+        async with sftp_client_for_expire_connections as conn:
+            await asyncio.sleep(0.2)
+            assert not conn.is_closing()
+            await asyncio.sleep(1)
+            assert conn.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_01_connections_expire_after_msg_received(self, sftp_server_for_expire_connections, sftp_client_for_expire_connections,
+                                                            json_rpc_login_request_encoded):
+        async with sftp_client_for_expire_connections as conn:
+            await asyncio.sleep(0.5)
+            conn.send_data(json_rpc_login_request_encoded)
+            await asyncio.sleep(0.8)
+            assert not conn.is_closing()
+            await asyncio.sleep(0.6)
+            assert conn.is_closing()

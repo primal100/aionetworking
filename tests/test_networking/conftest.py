@@ -439,6 +439,51 @@ async def protocol_factory_one_way_server_started(protocol_factory_one_way_serve
 
 
 @pytest.fixture
+async def protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
+    factory = StreamServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_client_connections_expire(echo_requester) -> StreamServerProtocolFactory:
+    factory = StreamClientProtocolFactory(
+        requester=echo_requester,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_server_connections_expire_started(protocol_factory_server_connections_expire,
+                                                             initial_server_context,
+                                                             sock_str) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    await protocol_factory_server_connections_expire.start()
+    if not protocol_factory_server_connections_expire.full_name:
+        protocol_factory_server_connections_expire.set_name(f'TCP Server {sock_str}', 'tcp')
+    yield protocol_factory_server_connections_expire
+    await protocol_factory_server_connections_expire.close()
+
+
+@pytest.fixture
+async def protocol_factory_one_way_server_started(protocol_factory_one_way_server, initial_server_context,
+                                                  sock_str) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    await protocol_factory_one_way_server.start()
+    if not protocol_factory_one_way_server.full_name:
+        protocol_factory_one_way_server.set_name(f'TCP Server {sock_str}', 'tcp')
+    yield protocol_factory_one_way_server
+    await protocol_factory_one_way_server.close()
+
+
+@pytest.fixture
 async def protocol_factory_two_way_server(echo_action, buffered_file_storage_recording_action,
                                           initial_server_context) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
@@ -516,6 +561,29 @@ async def udp_protocol_factory_one_way_server_started(udp_protocol_factory_one_w
     yield udp_protocol_factory_one_way_server
     if udp_protocol_factory_one_way_server.transport and not udp_protocol_factory_one_way_server.transport.is_closing():
         await udp_protocol_factory_one_way_server.close()
+
+
+@pytest.fixture
+async def udp_protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
+    factory = DatagramServerProtocolFactory(
+        action=echo_action,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def udp_protocol_factory_server_connections_expire_started(udp_protocol_factory_server_connections_expire,
+                                                                 initial_server_context,
+                                                                 sock_str) -> DatagramServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    await udp_protocol_factory_server_connections_expire.start()
+    if not udp_protocol_factory_server_connections_expire.full_name:
+        udp_protocol_factory_server_connections_expire.set_name(f'UDP Server {sock_str}', 'udp')
+    yield udp_protocol_factory_server_connections_expire
+    await udp_protocol_factory_server_connections_expire.close()
 
 
 @pytest.fixture
@@ -961,8 +1029,8 @@ def datagram_connection_args(request):
 
 
 @pytest.fixture
-async def sftp_protocol_factory_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                               ) -> SFTPOSAuthProtocolFactory:
+async def sftp_protocol_factory_server(buffered_file_storage_action,
+                                       buffered_file_storage_recording_action) -> SFTPOSAuthProtocolFactory:
     factory = SFTPOSAuthProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
@@ -979,6 +1047,38 @@ async def sftp_protocol_factory_server_started(sftp_protocol_factory_server, soc
         sftp_protocol_factory_server.set_name(f'SFTP Server {sock_str}', 'sftp')
     yield sftp_protocol_factory_server
     await sftp_protocol_factory_server.close()
+
+
+@pytest.fixture
+async def sftp_protocol_factory_server_expired_connections(buffered_file_storage_action) -> SFTPOSAuthProtocolFactory:
+    factory = SFTPOSAuthProtocolFactory(
+        action=buffered_file_storage_action,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def sftp_protocol_factory_client_expired_connections() -> SFTPClientProtocolFactory:
+    factory = SFTPClientProtocolFactory(
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def sftp_protocol_factory_server_expired_connections_started(sftp_protocol_factory_server_expired_connections,
+                                                                   sock_str, sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
+    context_cv.set(sftp_initial_server_context)
+    await sftp_protocol_factory_server_expired_connections.start()
+    if not sftp_protocol_factory_server_expired_connections.full_name:
+        sftp_protocol_factory_server_expired_connections.set_name(f'SFTP Server {sock_str}', 'sftp')
+    yield sftp_protocol_factory_server_expired_connections
+    await sftp_protocol_factory_server_expired_connections.close()
 
 
 @pytest.fixture
@@ -1017,7 +1117,7 @@ async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_fi
 async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
     context_cv.set(sftp_initial_client_context)
     protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
-                              base_path=Path(tmpdir) / 'sftp_sent')
+                                  base_path=Path(tmpdir) / 'sftp_sent')
     yield protocol
     if not protocol.is_closing():
         protocol.close()
@@ -1029,6 +1129,11 @@ def sftp_conn_server(request, extra_server_inet_sftp, sftp_protocol) -> MockSFTP
     if is_lazy_fixture(sftp_protocol):
         sftp_protocol = request.getfixturevalue(sftp_protocol.name)
     yield MockSFTPConn(sftp_protocol, extra=extra_server_inet_sftp)
+
+
+@pytest.fixture
+def server_sftp_conn(extra_server_inet_sftp, sftp_protocol_one_way_server) -> MockSFTPConn:
+    yield MockSFTPConn(sftp_protocol_one_way_server, extra=extra_server_inet_sftp)
 
 
 @pytest.fixture

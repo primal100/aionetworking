@@ -1,11 +1,13 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+import datetime
 import contextvars
 
 from aionetworking.actions.protocols import ActionProtocol
 from aionetworking.context import context_cv
 from aionetworking.formats.base import BaseMessageObject
+from aionetworking.futures import TaskScheduler
 from aionetworking.types.requesters import RequesterType
 from aionetworking.logging.loggers import logger_cv, get_logger_receiver
 from aionetworking.types.logging import LoggerType
@@ -32,9 +34,12 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     logger: LoggerType = field(default_factory=get_logger_receiver)
     pause_reading_on_buffer_size: int = None
+    expire_connections_after_inactive_minutes: Union[int, float] = 0
+    expire_connections_check_interval_minutes: Union[int, float] = 1
     aliases: Dict[str, str] = field(default_factory=dict)
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
+    scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False)
     _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
 
     async def start(self) -> None:
@@ -49,6 +54,10 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.requester.start())
         if coros:
             await asyncio.wait(coros)
+        if self.expire_connections_after_inactive_minutes:
+            self.scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
+                                            self.check_expired_connections,
+                                            task_name=f'Check expired connections for {self.full_name}')
 
     def __call__(self) -> NetworkConnectionType:
         return self._context.run(self._new_connection)
@@ -108,13 +117,22 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         if coros:
             await asyncio.wait(coros)
 
+    @staticmethod
+    def close_connection(conn: NetworkConnectionType, exc: Optional[Exception]):
+        conn.close()
+
     def close_all_connections(self, exc: Optional[Exception]) -> None:
-        connections = filter(self.is_owner, connections_manager)
-        for conn in list(connections):
-            conn.close()
+        for conn in filter(self.is_owner, list(connections_manager)):
+            self.close_connection(conn, exc)
+
+    def check_expired_connections(self):
+        now = datetime.datetime.now()
+        for conn in filter(self.is_owner, list(connections_manager)):
+            if (now - conn.last_msg).total_seconds() >= (self.expire_connections_after_inactive_minutes * 60):
+                self.close_connection(conn, None)
 
     async def close(self) -> None:
-        await self.wait_num_connected(0)
+        await asyncio.wait([self.scheduler.close(), self.wait_num_connected(0)])
         await self.close_actions()
         connections_manager.clear_server(self.full_name)
 
@@ -142,10 +160,9 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
         self.transport = transport
         self.sock = self.transport.get_extra_info('sockname')[0:2]
 
-    def close_all_connections(self, exc: Optional[Exception]) -> None:
-        connections = filter(self.is_owner, connections_manager)
-        for conn in list(connections):
-            conn.connection_lost(exc)
+    @staticmethod
+    def close_connection(conn: NetworkConnectionType, exc: Optional[Exception]):
+        conn.connection_lost(exc)
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         self.logger.manage_error(exc)

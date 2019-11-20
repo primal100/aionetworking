@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from abc import abstractmethod
-from datetime import datetime
+import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from aionetworking.types.formats import MessageObjectType
 from aionetworking.utils import inherit_on_type_checking_only
 
 from aionetworking.types.networking import AdaptorType
+from .transports import TransportType
 
 from aionetworking.compatibility import Protocol
 from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union, Dict, Tuple, Type
@@ -88,6 +89,7 @@ class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
     dataformat: Type[MessageObjectType] = None
     context: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     peer_prefix: str = ''
+    last_msg: datetime.datetime = field(default=None, init=False, compare=False, hash=False)
     timeout: Union[int, float] = 1000
 
     adaptor_cls: Type[AdaptorType] = field(default=None, init=False)
@@ -131,7 +133,7 @@ class BaseAdaptorProtocol(Protocol):
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
 
     @abstractmethod
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> asyncio.Future: ...
+    def on_data_received(self, buffer: bytes, timestamp: datetime.datetime = None) -> asyncio.Future: ...
 
 
 class AdaptorProtocol(BaseAdaptorProtocol, Protocol):
@@ -149,7 +151,7 @@ class AdaptorProtocolGetattr(BaseAdaptorProtocol, Protocol):
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None: ...
 
-    def on_data_received(self, buffer: bytes, timestamp: datetime = None) -> None: ...
+    def on_data_received(self, buffer: bytes, timestamp: datetime.datetime = None) -> asyncio.Future: ...
 
 
 class SenderAdaptorMixinProtocol(Protocol):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
+import datetime
 import socket
 
 from .exceptions import MessageFromNotAuthorizedHost
@@ -128,7 +129,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self._status.is_started()
 
     def data_received(self, data: bytes) -> None:
-        self._adaptor.on_data_received(data)
+        self.last_msg = datetime.datetime.now()
+        self._adaptor.on_data_received(data, timestamp=self.last_msg)
 
 
 @dataclass
@@ -181,6 +183,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         try:
             if self.context.get('host'):
                 self._check_peer()
+            self.last_msg = datetime.datetime.now()
             self._start_adaptor()
             self.log_context()
             self._status.set_started()
@@ -251,6 +254,10 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             self.context['peercert'] = transport.get_extra_info('peercert')
         return
 
+    def send(self, msg: bytes) -> None:
+        self.transport.write(msg)
+        self.last_msg = datetime.datetime.now()
+
 
 @dataclass
 class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
@@ -281,16 +288,14 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
                     self._adaptor.logger.info('Reading resumed')
 
     def data_received(self, data: bytes) -> None:
+        self.last_msg = datetime.datetime.now()
         self._unprocessed_data += len(data)
         if self.pause_reading_on_buffer_size is not None:
             if self.pause_reading_on_buffer_size <= len(data):
                 self.transport.pause_reading()
                 self.logger.info('Reading Paused')
-        task = self._adaptor.on_data_received(data)
+        task = self._adaptor.on_data_received(data, timestamp=self.last_msg)
         task.add_done_callback(self._resume_reading)
-
-    def send(self, msg: bytes) -> None:
-        self.transport.write(msg)
 
 
 @dataclass
@@ -301,9 +306,6 @@ class BaseUDPConnection(NetworkConnectionProtocol, UDPConnectionMixinProtocol):
     def connection_made(self, transport: DatagramTransportWrapper) -> bool:
         self.transport = transport
         return self.initialize_connection(transport)
-
-    def send(self, msg: bytes) -> None:
-        self.transport.write(msg)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
         self.run_connection_lost_tasks()

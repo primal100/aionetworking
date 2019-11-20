@@ -5,7 +5,7 @@ from .base import BaseRequester
 @dataclass
 class EchoRequester(BaseRequester):
     methods = ('echo', 'make_exception')
-    notification_methods = ('subscribe',)
+    notification_methods = ('subscribe', 'simple')
     last_id = 0
 
     def _make_request(self, method: str, request_id: bool):
@@ -18,6 +18,9 @@ class EchoRequester(BaseRequester):
 
     def echo(self):
         return self._make_request('echo', True)
+
+    def simple(self):
+        return self._make_request('simple', True)
 
     def make_exception(self):
         return self._make_request('echo_typo', True)

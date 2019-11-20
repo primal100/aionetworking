@@ -66,3 +66,35 @@ class TestClientAllowedSenders:
         async with udp_client_wrong_senders as conn:
             with pytest.raises(asyncio.TimeoutError):
                 await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
+
+
+class TestConnectionsExpire:
+    @pytest.mark.asyncio
+    async def test_00_connections_expire(self, server_expire_connections, client_expire_connections):
+        async with client_expire_connections as conn:
+            await asyncio.sleep(0.2)
+            assert not conn.transport.is_closing()
+            await asyncio.sleep(1)
+            assert conn.transport.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_01_connections_expire_after_msg_received(self, server_expire_connections,
+                                                                   client_expire_connections, echo_encoded):
+        async with client_expire_connections as conn:
+            await asyncio.sleep(0.5)
+            conn.simple()
+            await asyncio.sleep(0.8)
+            assert not conn.transport.is_closing()
+            await asyncio.sleep(0.4)
+            assert conn.transport.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_02_connections_expire_after_msg_sent(self, server_expire_connections,
+                                                               client_expire_connections):
+        async with client_expire_connections as conn:
+            await asyncio.sleep(0.5)
+            await conn.echo()
+            await asyncio.sleep(0.8)
+            assert not conn.transport.is_closing()
+            await asyncio.sleep(0.4)
+            assert conn.transport.is_closing()
