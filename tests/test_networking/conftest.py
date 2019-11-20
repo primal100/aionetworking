@@ -439,9 +439,20 @@ async def protocol_factory_one_way_server_started(protocol_factory_one_way_serve
 
 
 @pytest.fixture
-async def protocol_factory_server_connections_expire(buffered_file_storage_action) -> StreamServerProtocolFactory:
+async def protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
-        action=buffered_file_storage_action,
+        action=echo_action,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_client_connections_expire(echo_requester) -> StreamServerProtocolFactory:
+    factory = StreamClientProtocolFactory(
+        requester=echo_requester,
         dataformat=JSONObject,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
@@ -553,9 +564,9 @@ async def udp_protocol_factory_one_way_server_started(udp_protocol_factory_one_w
 
 
 @pytest.fixture
-async def udp_protocol_factory_server_connections_expire(buffered_file_storage_action) -> StreamServerProtocolFactory:
+async def udp_protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
     factory = DatagramServerProtocolFactory(
-        action=buffered_file_storage_action,
+        action=echo_action,
         dataformat=JSONObject,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
@@ -1042,6 +1053,16 @@ async def sftp_protocol_factory_server_started(sftp_protocol_factory_server, soc
 async def sftp_protocol_factory_server_expired_connections(buffered_file_storage_action) -> SFTPOSAuthProtocolFactory:
     factory = SFTPOSAuthProtocolFactory(
         action=buffered_file_storage_action,
+        dataformat=JSONObject,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60
+    )
+    yield factory
+
+
+@pytest.fixture
+async def sftp_protocol_factory_client_expired_connections() -> SFTPClientProtocolFactory:
+    factory = SFTPClientProtocolFactory(
         dataformat=JSONObject,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60

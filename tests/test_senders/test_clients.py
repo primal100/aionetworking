@@ -68,9 +68,9 @@ class TestClientAllowedSenders:
                 await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
 
 
-class TestClientConnectionsExpire:
+class TestConnectionsExpire:
     @pytest.mark.asyncio
-    async def test_00_client_connections_expire(self, server_expire_connections, client_expire_connections):
+    async def test_00_connections_expire(self, server_expire_connections, client_expire_connections):
         async with client_expire_connections as conn:
             await asyncio.sleep(0.2)
             assert not conn.transport.is_closing()
@@ -78,11 +78,22 @@ class TestClientConnectionsExpire:
             assert conn.transport.is_closing()
 
     @pytest.mark.asyncio
-    async def test_01_client_connections_expire_after_msg_received(self, server_expire_connections, client_expire_connections,
-                                                                   json_rpc_login_request_encoded):
+    async def test_01_connections_expire_after_msg_received(self, server_expire_connections,
+                                                                   client_expire_connections, echo_encoded):
         async with client_expire_connections as conn:
             await asyncio.sleep(0.5)
-            conn.send_data(json_rpc_login_request_encoded)
+            conn.simple()
+            await asyncio.sleep(0.8)
+            assert not conn.transport.is_closing()
+            await asyncio.sleep(0.4)
+            assert conn.transport.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_02_connections_expire_after_msg_sent(self, server_expire_connections,
+                                                               client_expire_connections):
+        async with client_expire_connections as conn:
+            await asyncio.sleep(0.5)
+            await conn.echo()
             await asyncio.sleep(0.8)
             assert not conn.transport.is_closing()
             await asyncio.sleep(0.4)

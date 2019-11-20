@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import pytest
 import pickle
 from pathlib import Path
@@ -44,18 +45,24 @@ class TestStreamProtocolFactories:
 
     @pytest.mark.asyncio
     async def test_03_protocol_factory_connections_expire(self, protocol_factory_server_connections_expire_started,
-                                                          tcp_transport, json_rpc_login_request_encoded):
+                                                          tcp_transport, echo_encoded, echo_response):
         new_connection = protocol_factory_server_connections_expire_started()
         new_connection.connection_made(tcp_transport)
         tcp_transport.set_protocol(new_connection)
         connection_time = new_connection.last_msg
-        await asyncio.sleep(0.0001)
-        new_connection.data_received(json_rpc_login_request_encoded)
-        assert new_connection.last_msg > connection_time
+        assert isinstance(connection_time, datetime.datetime)
+        await asyncio.sleep(0.1)
+        new_connection.data_received(echo_encoded)
+        data_received_time = new_connection.last_msg
+        assert data_received_time > connection_time
         assert not new_connection.is_closing()
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
         assert not new_connection.is_closing()
-        await asyncio.sleep(0.9)
+        new_connection.send_data(echo_response)
+        assert new_connection.last_msg > data_received_time
+        await asyncio.sleep(0.5)
+        assert not new_connection.is_closing()
+        await asyncio.sleep(0.8)
         assert new_connection.is_closing()
         await protocol_factory_server_connections_expire_started.wait_all_closed()
 
@@ -99,19 +106,25 @@ class TestOneWayServerDatagramProtocolFactory:
 
     @pytest.mark.asyncio
     async def test_02_protocol_factory_connections_expire(self, udp_protocol_factory_server_connections_expire_started,
-                                                          udp_transport_server, json_rpc_login_request_encoded, peer,
+                                                          udp_transport_server, echo_encoded, echo_response, peer,
                                                           connections_manager, sock_str, peer_str):
         protocol_factory = udp_protocol_factory_server_connections_expire_started()
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        protocol_factory.datagram_received(json_rpc_login_request_encoded, peer)
+        protocol_factory.datagram_received(echo_encoded, peer)
         await asyncio.wait_for(udp_protocol_factory_server_connections_expire_started.wait_num_connected(1), timeout=1)
         full_peername = f"udp_{sock_str}_{peer_str}"
         new_connection = connections_manager.get(full_peername)
+        msg_received_time = new_connection.last_msg
+        assert isinstance(msg_received_time, datetime.datetime)
         assert not new_connection.is_closing()
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
         assert not new_connection.is_closing()
-        await asyncio.sleep(0.9)
+        new_connection.send_data(echo_response)
+        assert new_connection.last_msg > msg_received_time
+        await asyncio.sleep(0.5)
+        assert not new_connection.is_closing()
+        await asyncio.sleep(0.8)
         assert new_connection.is_closing()
         await udp_protocol_factory_server_connections_expire_started.wait_all_closed()
 

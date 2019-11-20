@@ -500,29 +500,66 @@ async def tcp_server_connections_expire(protocol_factory_server_connections_expi
         await server.close()
 
 
+@pytest.fixture
+async def tcp_client_connections_expire(protocol_factory_client_connections_expire, sock, peer) -> TCPServer:
+    yield TCPClient(protocol_factory=protocol_factory_client_connections_expire, host=sock[0], port=sock[1],
+                    srcip=peer[0], srcport=0)
+
+
 @pytest.fixture(params=[
     lazy_fixture(
-        (tcp_server_connections_expire.__name__, tcp_client_one_way.__name__)),
+        (tcp_server_connections_expire.__name__, tcp_client_two_way.__name__)),
+    lazy_fixture(
+        (tcp_server_two_way_started.__name__, tcp_client_connections_expire.__name__))
 ])
-def connections_expire_args(request):
+def tcp_connections_expire_args(request):
     return request.param
 
 
 @pytest.fixture
-def server_expire_connections(connections_expire_args) -> BaseServer:
-    return connections_expire_args[0]
+def server_expire_connections(tcp_connections_expire_args) -> BaseServer:
+    return tcp_connections_expire_args[0]
 
 
 @pytest.fixture
-def client_expire_connections(connections_expire_args) -> BaseServer:
-    return connections_expire_args[1]
+def client_expire_connections(tcp_connections_expire_args) -> BaseServer:
+    return tcp_connections_expire_args[1]
 
 
 @pytest.fixture
-async def sftp_server_expire_connections(sftp_protocol_factory_server_expired_connections, sock, tmp_path, ssh_host_key) -> SFTPServer:
+async def sftp_server_expire_connections(sftp_protocol_factory_server_expired_connections, sock, tmp_path,
+                                         ssh_host_key) -> SFTPServer:
     server = SFTPServer(protocol_factory=sftp_protocol_factory_server_expired_connections, host=sock[0], port=sock[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
     if server.is_started():
         await server.close()
+
+
+@pytest.fixture
+async def sftp_client_expire_connections(sftp_protocol_factory_client_expired_connections, sock, peer,
+                                         sftp_username_password) -> SFTPServer:
+    yield SFTPClient(protocol_factory=sftp_protocol_factory_client_expired_connections, host=sock[0], port=sock[1],
+                     srcip=peer[0], srcport=0, username=sftp_username_password[0],
+                     password=sftp_username_password[1])
+
+
+@pytest.fixture(params=[
+    lazy_fixture(
+        (sftp_server_expire_connections.__name__, sftp_client.__name__)),
+    lazy_fixture(
+        (sftp_server_started.__name__, sftp_client_expire_connections.__name__))
+])
+def sftp_connections_expire_args(request):
+    return request.param
+
+
+@pytest.fixture
+def sftp_server_for_expire_connections(sftp_connections_expire_args) -> BaseServer:
+    return sftp_connections_expire_args[0]
+
+
+@pytest.fixture
+def sftp_client_for_expire_connections(sftp_connections_expire_args) -> BaseServer:
+    return sftp_connections_expire_args[1]
