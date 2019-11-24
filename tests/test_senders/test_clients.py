@@ -74,12 +74,12 @@ class TestConnectionsExpire:
         async with client_expire_connections as conn:
             await asyncio.sleep(0.2)
             assert not conn.transport.is_closing()
-            await asyncio.sleep(1)
+            await asyncio.sleep(1.2)
             assert conn.transport.is_closing()
 
     @pytest.mark.asyncio
     async def test_01_connections_expire_after_msg_received(self, server_expire_connections,
-                                                                   client_expire_connections, echo_encoded):
+                                                            client_expire_connections, echo_encoded):
         async with client_expire_connections as conn:
             await asyncio.sleep(0.5)
             conn.simple()
@@ -90,7 +90,7 @@ class TestConnectionsExpire:
 
     @pytest.mark.asyncio
     async def test_02_connections_expire_after_msg_sent(self, server_expire_connections,
-                                                               client_expire_connections):
+                                                        client_expire_connections):
         async with client_expire_connections as conn:
             await asyncio.sleep(0.5)
             await conn.echo()
