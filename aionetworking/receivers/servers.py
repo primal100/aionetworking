@@ -257,7 +257,8 @@ class UDPServer(BaseNetworkServer):
     protocol_factory: DatagramServerProtocolFactory = None
     name = "UDP Server"
     peer_prefix = 'udp'
-    allow_broadcast: Optional[bool] = False
+    reuse_address: Optional[bool] = False  # Fix for Python bpo-37228
+    allow_broadcast: Optional[bool] = None
 
     async def _get_server(self) -> DatagramServer:
         server = DatagramServer(
