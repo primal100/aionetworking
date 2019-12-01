@@ -92,3 +92,10 @@ elif os.name == 'nt':
             return True
         except pywintypes.error:
             return False
+
+
+def windows_and_is_administrator() -> bool:
+    if not os.name == 'nt':
+        return False
+    from win32com.shell import shell
+    return shell.IsUserAnAdmin()
