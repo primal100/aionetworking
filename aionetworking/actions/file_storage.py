@@ -48,8 +48,7 @@ class ManagedFile:
             files = [f for f in cls._open_files.values() if f.is_in(base_path)]
         else:
             files = [f for f in cls._open_files.values()]
-        if files:
-            await asyncio.wait([f.close() for f in files])
+        await asyncio.gather(*[f.close() for f in files])
 
     @classmethod
     def num_files(cls):

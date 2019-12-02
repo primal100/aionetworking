@@ -48,7 +48,7 @@ class BaseAction(Protocol):
         return self._status.is_stopping_or_stopped()
 
     async def close(self) -> None:
-        self._status.is_stopped()
+        self._status.set_stopped()
 
     def on_decode_error(self, data: bytes, exc: BaseException) -> Any:
         pass

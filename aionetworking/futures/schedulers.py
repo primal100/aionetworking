@@ -83,8 +83,7 @@ class TaskScheduler:
     async def close(self):
         self.close_nowait()
         await self.join()
-        if self._periodic_tasks:
-            await asyncio.wait(self._periodic_tasks)
+        await asyncio.gather(*self._periodic_tasks, return_exceptions=True)
         self._periodic_tasks.clear()
 
     def close_nowait(self):
