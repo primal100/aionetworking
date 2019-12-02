@@ -52,8 +52,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.preaction.start())
         if self.requester:
             coros.append(self.requester.start())
-        if coros:
-            await asyncio.wait(coros)
+        await asyncio.gather(*coros)
         if self.expire_connections_after_inactive_minutes:
             self.scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
                                             self.check_expired_connections,
@@ -100,8 +99,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     async def wait_num_connected(self, num: int) -> None:
         await connections_manager.wait_num_connections(self.full_name, num)
 
-    async def wait_all_messages_processed(self) -> None:
-        await connections_manager.wait_all_messages_processed(self.full_name)
+    #async def wait_all_messages_processed(self) -> None:
+    #    await connections_manager.wait_all_messages_processed(self.full_name)
 
     async def wait_all_closed(self) -> None:
         await connections_manager.wait_num_connections(self.full_name, 0)
@@ -114,8 +113,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.preaction.close())
         if self.requester:
             coros.append(self.requester.close())
-        if coros:
-            await asyncio.wait(coros)
+        await asyncio.gather(*coros)
 
     @staticmethod
     def close_connection(conn: NetworkConnectionType, exc: Optional[Exception]):
@@ -132,7 +130,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                 self.close_connection(conn, None)
 
     async def close(self) -> None:
-        await asyncio.wait([self.scheduler.close(), self.wait_num_connected(0)])
+        await asyncio.gather(self.scheduler.close(), self.wait_num_connected(0))
         await self.close_actions()
         connections_manager.clear_server(self.full_name)
 
