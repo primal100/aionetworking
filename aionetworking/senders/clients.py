@@ -128,7 +128,6 @@ class UDPClient(BaseNetworkClient):
     name = "UDP Client"
     peer_prefix = 'udp'
     transport: asyncio.DatagramTransport = field(init=False, compare=False, default=None)
-    reuse_address: Optional[bool] = None
     reuse_port: Optional[bool] = None
     allow_broadcast: Optional[bool] = None
 
@@ -136,7 +135,7 @@ class UDPClient(BaseNetworkClient):
         protocol_factory: DatagramClientProtocolFactory
         self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
             self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr,
-            reuse_address=self.reuse_address, reuse_port=self.reuse_port, allow_broadcast=self.allow_broadcast)
+            reuse_port=self.reuse_port, allow_broadcast=self.allow_broadcast)
         network = IPNetwork(self.host)
         if network.is_ipv6:
             self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')

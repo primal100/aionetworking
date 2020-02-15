@@ -107,7 +107,6 @@ class BaseServer(BaseReceiver, Protocol):
         if self._status.is_starting_or_started():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self._status.set_starting()
-        context_cv.set({'endpoint': self.full_name})
         logger_cv.set(self.logger)
         await self.protocol_factory.start()
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
@@ -185,7 +184,6 @@ class BaseServer(BaseReceiver, Protocol):
 class BaseNetworkServer(BaseServer, Protocol):
     host: str = '0.0.0.0'
     port: int = 4000
-    reuse_address: Optional[bool] = None
     reuse_port: Optional[bool] = None
     backlog: int = 100
 

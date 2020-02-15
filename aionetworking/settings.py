@@ -8,6 +8,7 @@ import sys
 
 APP_NAME = 'AIONetworking'
 FILE_OPENER = aiofiles.open
+APP_CONFIG = {}
 
 
 def __getattr__(name):

@@ -41,7 +41,9 @@ class TestOneWaySenderInExecutors:
         one_way_server_started.close_all_connections()
         await one_way_server_started.wait_num_connections(0)
         await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
-        recording_file_path = next(tmp_path.glob('recordings/*.recording'))
+        glob_path = 'recordings/*.recording'
+        assert len(list(tmp_path.glob(glob_path))) > 0
+        recording_file_path = next(tmp_path.glob(glob_path))
         assert recording_file_path.exists()
         expected_file = next(Path(tmp_path / 'data/Encoded').glob('*.JSON'))
         assert expected_file.exists()

@@ -56,9 +56,9 @@ class TestConnectionServer:
         packets[1] = packets[1]._replace(timestamp=json_recording_data[1].timestamp)
         assert packets == json_recording_data
 
-    def test_01_is_child(self, sftp_protocol_one_way_server, sock_str):
-        assert sftp_protocol_one_way_server.is_child(f"SFTP Server {sock_str}")
-        assert not sftp_protocol_one_way_server.is_child(f"ABC Server {sock_str}")
+    def test_01_is_child(self, sftp_protocol_one_way_server, server_sock_str):
+        assert sftp_protocol_one_way_server.is_child(f"SFTP Server {server_sock_str}")
+        assert not sftp_protocol_one_way_server.is_child(f"ABC Server {server_sock_str}")
 
     @pytest.mark.asyncio
     async def test_02_pickle(self, sftp_protocol_one_way_server):

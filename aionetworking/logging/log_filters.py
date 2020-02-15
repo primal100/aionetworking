@@ -16,9 +16,10 @@ class PeerFilter(Filter):
         super().__init__(*args, **kwargs)
 
     def filter(self, record: LogRecord) -> bool:
-        peer = getattr(record, 'alias', None)
-        if peer:
-            return peer in self.peers
+        address = getattr(record, 'address', None)
+        host = getattr(record, 'host', None)
+        if address or host:
+            return any(s in self.peers for s in (address, host))
         return True
 
 

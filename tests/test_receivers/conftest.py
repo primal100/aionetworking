@@ -11,33 +11,36 @@ from typing import Optional
 
 
 @pytest.fixture
-async def pipe_path() -> Path:
-    path = pipe_address_by_os()
+async def pipe_path(server_port) -> Path:
+    if os.name == 'linux':
+        path = Path(f'/tmp/test_{server_port}')
+    else:
+        path = pipe_address_by_os()
     yield path
     if path.exists():
         path.unlink()
 
 
 @pytest.fixture
-async def tcp_server_one_way(protocol_factory_one_way_server, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_one_way_server, host=sock[0], port=sock[1])
+async def tcp_server_one_way(protocol_factory_one_way_server, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_one_way_server, host=server_sock[0], port=server_sock[1])
     yield server
     if server.is_started():
         await server.close()
 
 
 @pytest.fixture
-async def tcp_server_two_way(protocol_factory_two_way_server, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1])
+async def tcp_server_two_way(protocol_factory_two_way_server, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=server_sock[0], port=server_sock[1])
     yield server
     if server.is_started():
         await server.close()
 
 
 @pytest.fixture
-async def tcp_server_two_way_ssl(protocol_factory_two_way_server, sock, server_side_ssl) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=sock[0], port=sock[1], ssl=server_side_ssl,
-                       ssl_handshake_timeout=60)
+async def tcp_server_two_way_ssl(protocol_factory_two_way_server, server_sock, server_side_ssl) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_two_way_server, host=server_sock[0], port=server_sock[1],
+                       ssl=server_side_ssl, ssl_handshake_timeout=60)
     yield server
     if server.is_started():
         await server.close()
@@ -80,16 +83,16 @@ async def tcp_server_two_way_ssl_started(tcp_server_two_way_ssl) -> TCPServer:
 
 
 @pytest.fixture
-async def udp_server_one_way(udp_protocol_factory_one_way_server, sock) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_one_way_server, host=sock[0], port=sock[1])
+async def udp_server_one_way(udp_protocol_factory_one_way_server, server_sock) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_one_way_server, host=server_sock[0], port=server_sock[1])
     yield server
     if server.is_started():
         await server.close()
 
 
 @pytest.fixture
-async def udp_server_two_way(udp_protocol_factory_two_way_server, sock) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_two_way_server, host=sock[0], port=sock[1])
+async def udp_server_two_way(udp_protocol_factory_two_way_server, server_sock) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_two_way_server, host=server_sock[0], port=server_sock[1])
     yield server
     if server.is_started():
         await server.close()
@@ -167,8 +170,8 @@ async def ssh_host_key(tmp_path) -> Path:
 
 
 @pytest.fixture
-async def sftp_server(sftp_protocol_factory_server, sock, ssh_host_key, tmp_path) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server, host=sock[0], port=sock[1],
+async def sftp_server(sftp_protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server, host=server_sock[0], port=server_sock[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     yield server
     if server.is_started():

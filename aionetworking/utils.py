@@ -231,6 +231,14 @@ def pipe_address_by_os() -> Path:
 
 ###Networking###
 
+def hostname_or_ip(host: str):
+    try:
+        return socket.gethostbyaddr(host)[0]
+    except socket.herror:
+        return host
+
+
+
 def addr_tuple_to_str(addr: Sequence):
     return ':'.join(str(a) for a in addr)
 
@@ -241,39 +249,48 @@ def addr_str_to_tuple(addr: AnyStr):
 
 
 class IPNetwork:
+    ip_network: Union[IPv4Network, IPv6Network] = None
+    hostname: str = None
+    is_ipv6: bool = False
+
     def __init__(self, network: Union[str, IPv4Network, IPv6Network]):
         if isinstance(network, IPv4Network):
             self.ip_network = network
-            self.is_ipv6 = False
         elif isinstance(network, IPv6Network):
             self.ip_network = network
             self.is_ipv6 = True
         else:
             try:
                 self.ip_network = IPv4Network(network)
-                self.is_ipv6 = False
             except AddressValueError:
                 try:
                     self.ip_network = IPv6Network(network)
                     self.is_ipv6 = True
                 except AddressValueError:
-                    raise AddressValueError(f'{network} is not valid IPv4 or IPv6 network')
+                    if network:
+                        self.hostname = network
+                    else:
+                        AddressValueError('IP Address, Network Or Hostname must be given')
 
     def __eq__(self, other):
-        return self.ip_network == other.ip_network
+        if self.ip_network:
+            return self.ip_network == other.ip_network
+        return self.hostname == other.hostname
 
-    def supernet_of(self, network: Union[IPv4Network, IPv6Network]):
-        return self.ip_network.supernet_of(network)
+    def supernet_of(self, network: Union[IPv4Network, IPv6Network], hostname: str):
+        if self.ip_network:
+            return self.ip_network.supernet_of(network)
+        return hostname == self.hostname
 
 
-def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], networks: Sequence[IPNetwork]):
+def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], hostname: str, networks: Sequence[IPNetwork]):
     if not isinstance(network, IPNetwork):
         network = IPNetwork(network)
     if network.is_ipv6:
         networks = filter(lambda n: n.is_ipv6, networks)
     else:
         networks = filter(lambda n: not n.is_ipv6, networks)
-    return any(n.supernet_of(network.ip_network) for n in networks)
+    return any(n.supernet_of(network.ip_network, hostname) for n in networks)
 
 
 ###System###

@@ -9,7 +9,7 @@ protocol_factory: !StreamServerProtocolFactory
                           timeout: 5
                   preaction: !BufferedFileStorage
                              base_path: !Path "{temp}/recordings"
-                             path: "{msg.peer_safe}.recording"
+                             path: "{msg.address}.recording"
                              buffering: 0
                              close_file_after_inactivity: 2
                   dataformat: !JSON

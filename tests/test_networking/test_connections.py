@@ -50,50 +50,64 @@ class TestConnectionShared:
         assert queue.get_nowait() == (peer_data, json_rpc_login_request_encoded)
 
     @pytest.mark.asyncio
-    async def test_03_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, peer):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(peer[0]) is True
+    async def test_03_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(client_sock[0], client_sock[0]) is True
 
     @pytest.mark.asyncio
-    async def test_04_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, peer_ipv6):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(peer_ipv6[0]) is True
+    async def test_04_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock_ipv6):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(client_sock_ipv6[0], client_sock_ipv6[0]) is True
 
     @pytest.mark.asyncio
-    async def test_05_sender_valid_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.2') is False
+    async def test_05_sender_valid_hostname_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname, client_hostname):
+        assert tcp_protocol_two_way_server_allowed_senders_hostname._sender_valid('10.10.10.10', client_hostname) is True
 
     @pytest.mark.asyncio
-    async def test_06_sender_valid_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::2') is False
+    async def test_06_sender_valid_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.2', 'abcd') is False
 
     @pytest.mark.asyncio
-    async def test_07_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, peer):
-        tcp_protocol_two_way_server_allowed_senders.context['peer'] = peer[0]
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = peer[0]
+    async def test_07_sender_valid_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::2', 'abcd') is False
+
+    @pytest.mark.asyncio
+    async def test_08_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock):
+        tcp_protocol_two_way_server_allowed_senders.context['address'] = client_sock[0]
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
         tcp_protocol_two_way_server_allowed_senders._check_peer()
-        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == f'localhost4({peer[0]})'
-        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == peer[0]
 
     @pytest.mark.asyncio
-    async def test_08_check_peer_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '::1'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = '::1'
+    async def test_09_check_peer_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock_ipv6):
+        tcp_protocol_two_way_server_allowed_senders.context['address'] = client_sock_ipv6[0]
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
         tcp_protocol_two_way_server_allowed_senders._check_peer()
-        assert tcp_protocol_two_way_server_allowed_senders.context['alias'] == 'localhost6(::1)'
-        assert tcp_protocol_two_way_server_allowed_senders.context['peer'] == '::1'
 
     @pytest.mark.asyncio
-    async def test_09_check_peer_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '127.0.0.2'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = '127.0.0.2'
+    async def test_10_check_peer_hostname_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname, client_hostname):
+        tcp_protocol_two_way_server_allowed_senders_hostname.context['address'] = '10.10.10.10'
+        tcp_protocol_two_way_server_allowed_senders_hostname.context['host'] = client_hostname
+        tcp_protocol_two_way_server_allowed_senders_hostname._check_peer()
+
+    @pytest.mark.asyncio
+    async def test_11_check_peer_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['address'] = '127.0.0.2'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
         with pytest.raises(MessageFromNotAuthorizedHost):
             tcp_protocol_two_way_server_allowed_senders._check_peer()
 
     @pytest.mark.asyncio
-    async def test_10_check_peer_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['peer'] = '::2'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = '::2'
+    async def test_12_check_peer_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
+        tcp_protocol_two_way_server_allowed_senders.context['address'] = '::2'
+        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
         with pytest.raises(MessageFromNotAuthorizedHost):
             tcp_protocol_two_way_server_allowed_senders._check_peer()
+
+    @pytest.mark.asyncio
+    async def test_13_check_peer_hostname_not_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname):
+        tcp_protocol_two_way_server_allowed_senders_hostname.context['peer'] = '10.10.10.10:11111'
+        tcp_protocol_two_way_server_allowed_senders_hostname.context['address'] = '10.10.10.10'
+        tcp_protocol_two_way_server_allowed_senders_hostname.context['host'] = 'abcd'
+        with pytest.raises(MessageFromNotAuthorizedHost):
+            tcp_protocol_two_way_server_allowed_senders_hostname._check_peer()
 
 
 class TestConnectionOneWayServer:
@@ -120,9 +134,9 @@ class TestConnectionOneWayServer:
         packets[1] = packets[1]._replace(timestamp=json_recording_data[1].timestamp)
         assert packets == json_recording_data
 
-    def test_01_is_child(self, one_way_server_connection, one_way_server_protocol_name, sock_str):
-        assert one_way_server_connection.is_child(f"{one_way_server_protocol_name.upper()} Server {sock_str}")
-        assert not one_way_server_connection.is_child(f"ABC Server {sock_str}")
+    def test_01_is_child(self, one_way_server_connection, one_way_server_protocol_name, server_sock_str):
+        assert one_way_server_connection.is_child(f"{one_way_server_protocol_name.upper()} Server {server_sock_str}")
+        assert not one_way_server_connection.is_child(f"ABC Server {server_sock_str}")
 
     @pytest.mark.asyncio
     async def test_02_pickle(self, one_way_server_connection):
@@ -147,14 +161,14 @@ class TestConnectionTwoWayServer:
     @pytest.mark.asyncio
     async def test_00_on_data_received(self, tmp_path, two_way_server_connection, echo_encoded,
                                        echo_response_encoded,  timestamp, echo_recording_data, queue,
-                                       two_way_server_transport, peer):
+                                       two_way_server_transport, client_sock):
         two_way_server_connection.connection_made(two_way_server_transport)
         two_way_server_transport.set_protocol(two_way_server_connection)
         two_way_server_connection.data_received(echo_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
-        assert receiver == peer
+        assert receiver == client_sock
         assert msg == echo_response_encoded
         expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()
@@ -163,7 +177,7 @@ class TestConnectionTwoWayServer:
         assert packets == echo_recording_data
 
     @pytest.mark.asyncio
-    async def test_01_on_data_received_notification(self, tmp_path, two_way_server_connection, peer,
+    async def test_01_on_data_received_notification(self, tmp_path, two_way_server_connection, client_sock,
                                                     echo_notification_client_encoded, echo_notification_server_encoded,
                                                     timestamp, echo_recording_data, queue, two_way_server_transport):
         two_way_server_connection.connection_made(two_way_server_transport)
@@ -172,7 +186,7 @@ class TestConnectionTwoWayServer:
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         two_way_server_connection.close()
         await asyncio.wait_for(two_way_server_connection.wait_closed(), timeout=1)
-        assert receiver == peer
+        assert receiver == client_sock
         assert msg == echo_notification_server_encoded
         expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
         assert expected_file.exists()

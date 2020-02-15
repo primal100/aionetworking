@@ -31,7 +31,8 @@ class TestStreamProtocolFactories:
 
     @pytest.mark.asyncio
     async def test_02_protocol_factory_custom_codec_config(self, protocol_factory_one_way_server_codec_kwargs,
-                                                           tcp_transport, json_codec_with_kwargs, json_rpc_login_request_encoded):
+                                                           tcp_transport, json_codec_with_kwargs,
+                                                           json_rpc_login_request_encoded):
         new_connection = protocol_factory_one_way_server_codec_kwargs()
         assert new_connection.codec_config == {'test_param': 'abc'}
         new_connection.connection_made(tcp_transport)
@@ -70,23 +71,24 @@ class TestStreamProtocolFactories:
 class TestOneWayServerDatagramProtocolFactory:
 
     @pytest.mark.asyncio
-    async def test_00_connection_lifecycle(self, udp_protocol_factory_one_way_server_started,
+    async def test_00_connection_lifecycle(self, udp_protocol_factory_one_way_server_started, tmp_path,
                                            udp_protocol_one_way_server, json_rpc_logout_request_encoded,
-                                           udp_transport_server, peer, sock, json_rpc_login_request_encoded,
-                                           connections_manager, tmp_path, json_codec, json_objects, peer_str, sock_str):
+                                           udp_transport_server, client_sock, server_sock,
+                                           json_rpc_login_request_encoded, connections_manager, json_codec,
+                                           json_objects, client_sock_str, server_sock_str):
         protocol_factory = udp_protocol_factory_one_way_server_started()
         assert protocol_factory == udp_protocol_factory_one_way_server_started
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        protocol_factory.datagram_received(json_rpc_login_request_encoded, peer)
+        protocol_factory.datagram_received(json_rpc_login_request_encoded, client_sock)
         assert connections_manager.total == 1
         await asyncio.wait_for(udp_protocol_factory_one_way_server_started.wait_num_connected(1), timeout=1)
-        full_peername = f"udp_{sock_str}_{peer_str}"
+        full_peername = f"udp_{server_sock_str}_{client_sock_str}"
         new_connection = connections_manager.get(full_peername)
         assert new_connection.is_connected()
         assert udp_protocol_factory_one_way_server_started.logger == new_connection.logger
         assert udp_protocol_factory_one_way_server_started.is_owner(new_connection)
-        protocol_factory.datagram_received(json_rpc_logout_request_encoded, peer)
+        protocol_factory.datagram_received(json_rpc_logout_request_encoded, client_sock)
         assert connections_manager.total == 1
         assert id(connections_manager.get(full_peername)) == id(new_connection)
         udp_transport_server.close()
@@ -106,14 +108,14 @@ class TestOneWayServerDatagramProtocolFactory:
 
     @pytest.mark.asyncio
     async def test_02_protocol_factory_connections_expire(self, udp_protocol_factory_server_connections_expire_started,
-                                                          udp_transport_server, echo_encoded, echo_response, peer,
-                                                          connections_manager, sock_str, peer_str):
+                                                          udp_transport_server, echo_encoded, echo_response, client_sock,
+                                                          connections_manager, server_sock_str, client_sock_str):
         protocol_factory = udp_protocol_factory_server_connections_expire_started()
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        protocol_factory.datagram_received(echo_encoded, peer)
+        protocol_factory.datagram_received(echo_encoded, client_sock)
         await asyncio.wait_for(udp_protocol_factory_server_connections_expire_started.wait_num_connected(1), timeout=1)
-        full_peername = f"udp_{sock_str}_{peer_str}"
+        full_peername = f"udp_{server_sock_str}_{client_sock_str}"
         new_connection = connections_manager.get(full_peername)
         msg_received_time = new_connection.last_msg
         assert isinstance(msg_received_time, datetime.datetime)
@@ -133,20 +135,20 @@ class TestOneWayClientDatagramProtocolFactory:
 
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, udp_protocol_factory_one_way_client_started, udp_protocol_one_way_client,
-                                           json_rpc_login_request_encoded, udp_transport_client, peer, peer_str, sock_str,
-                                           sock, connections_manager, queue):
+                                           json_rpc_login_request_encoded, udp_transport_client, client_sock,
+                                           client_sock_str, server_sock_str, server_sock, connections_manager, queue):
         protocol_factory = udp_protocol_factory_one_way_client_started()
         assert protocol_factory == udp_protocol_factory_one_way_client_started
         protocol_factory.connection_made(udp_transport_client)
         udp_transport_client.set_protocol(protocol_factory)
         conn = protocol_factory.new_peer()
         assert connections_manager.total == 1
-        full_peername = f"udp_{peer_str}_{sock_str}"
+        full_peername = f"udp_{client_sock_str}_{server_sock_str}"
         new_connection = connections_manager.get(full_peername)
         assert new_connection.is_connected()
         conn.send(json_rpc_login_request_encoded)
         msg = await queue.get()
-        assert msg == (sock, json_rpc_login_request_encoded)
+        assert msg == (server_sock, json_rpc_login_request_encoded)
         assert udp_protocol_factory_one_way_client_started.logger == new_connection.logger
         assert udp_protocol_factory_one_way_client_started.is_owner(new_connection)
         udp_transport_client.close()
@@ -165,26 +167,26 @@ class TestTwoWayServerDatagramProtocolFactory:
 
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, udp_protocol_factory_two_way_server_started,
-                                           udp_protocol_two_way_server, sock, peer_str, sock_str,
-                                           echo_encoded, udp_transport_server, echo_response_encoded, peer,
+                                           udp_protocol_two_way_server, server_sock, client_sock_str, server_sock_str,
+                                           echo_encoded, udp_transport_server, echo_response_encoded, client_sock,
                                            connections_manager, queue):
         protocol_factory = udp_protocol_factory_two_way_server_started()
         assert protocol_factory == udp_protocol_factory_two_way_server_started
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        protocol_factory.datagram_received(echo_encoded, peer)
+        protocol_factory.datagram_received(echo_encoded, client_sock)
         assert connections_manager.total == 1
         await asyncio.wait_for(udp_protocol_factory_two_way_server_started.wait_num_connected(1), timeout=1)
-        full_peername = f"udp_{sock_str}_{peer_str}"
+        full_peername = f"udp_{server_sock_str}_{client_sock_str}"
         new_connection = connections_manager.get(full_peername)
         assert new_connection.is_connected()
         assert udp_protocol_factory_two_way_server_started.logger == new_connection.logger
         assert udp_protocol_factory_two_way_server_started.is_owner(new_connection)
         msg = await queue.get()
-        assert msg == (peer, echo_response_encoded)
-        protocol_factory.datagram_received(echo_encoded, peer)
+        assert msg == (client_sock, echo_response_encoded)
+        protocol_factory.datagram_received(echo_encoded, client_sock)
         msg = await queue.get()
-        assert msg == (peer, echo_response_encoded)
+        assert msg == (client_sock, echo_response_encoded)
         assert connections_manager.total == 1
         assert id(connections_manager.get(full_peername)) == id(new_connection)
         udp_transport_server.close()
@@ -203,8 +205,8 @@ class TestTwoWayClientDatagramProtocolFactory:
 
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, udp_protocol_factory_two_way_client_started, udp_protocol_two_way_client,
-                                           echo_response_encoded, udp_transport_client, echo_encoded, sock, peer,
-                                           connections_manager, queue, echo_response_object, peer_str, sock_str):
+                                           echo_response_encoded, udp_transport_client, echo_encoded, server_sock, client_sock,
+                                           connections_manager, queue, echo_response_object, client_sock_str, server_sock_str):
         protocol_factory = udp_protocol_factory_two_way_client_started()
         assert protocol_factory == udp_protocol_factory_two_way_client_started
         protocol_factory.connection_made(udp_transport_client)
@@ -213,12 +215,12 @@ class TestTwoWayClientDatagramProtocolFactory:
         assert connections_manager.total == 1
         task = asyncio.create_task(conn.echo())
         msg = await queue.get()
-        assert msg == (sock, echo_encoded)
-        protocol_factory.datagram_received(echo_response_encoded, sock)
+        assert msg == (server_sock, echo_encoded)
+        protocol_factory.datagram_received(echo_response_encoded, server_sock)
         response = await asyncio.wait_for(task, timeout=1)
         assert response == echo_response_object
         assert connections_manager.total == 1
-        full_peername = f"udp_{peer_str}_{sock_str}"
+        full_peername = f"udp_{client_sock_str}_{server_sock_str}"
         new_connection = connections_manager.get(full_peername)
         assert new_connection.is_connected()
         assert udp_protocol_factory_two_way_client_started.logger == new_connection.logger
@@ -239,12 +241,12 @@ class TestTwoWayClientDatagramProtocolFactory:
 class TestServerDatagramProtocolFactoryAllowedSenders:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ip_address", ['127.0.0.1', '::1'])
-    async def test_00_allowed_senders_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, peer,
+    async def test_00_allowed_senders_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, client_sock,
                                          connections_manager, queue, echo_encoded, echo_response_encoded, ip_address):
         protocol_factory = udp_protocol_factory_allowed_senders()
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        peer = (ip_address, peer[1])
+        peer = (ip_address, client_sock[1])
         protocol_factory.datagram_received(echo_encoded, peer)
         await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
         udp_transport_server.close()
@@ -254,11 +256,11 @@ class TestServerDatagramProtocolFactoryAllowedSenders:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ip_address", ['127.0.0.2', '::2'])
     async def test_01_allowed_senders_not_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, connections_manager,
-                                             queue, echo_encoded, echo_response_encoded, ip_address, peer):
+                                             queue, echo_encoded, echo_response_encoded, ip_address, client_sock):
         protocol_factory = udp_protocol_factory_allowed_senders()
         protocol_factory.connection_made(udp_transport_server)
         udp_transport_server.set_protocol(protocol_factory)
-        peer = (ip_address, peer[1])
+        peer = (ip_address, client_sock[1])
         protocol_factory.datagram_received(echo_encoded, peer)
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
