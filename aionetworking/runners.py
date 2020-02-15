@@ -19,7 +19,8 @@ async def run_forever(conf, paths: Dict[str, Union[str, Path]] = None, timeout: 
 def run_server(conf_file, paths: Dict[str, Union[str, Path]] = None, asyncio_debug: bool = False,
                notify_pid: int = None, timeout: int = None):
     if os.name == 'posix':
-        asyncio.run(run_until_signal(conf_file, paths=paths, notify_pid=notify_pid, timeout=timeout), debug=asyncio_debug)
+        asyncio.run(run_until_signal(conf_file, paths=paths, notify_pid=notify_pid, timeout=timeout),
+                    debug=asyncio_debug)
     else:
         try:
             asyncio.run(run_forever(conf_file, paths=paths, timeout=timeout), debug=asyncio_debug)

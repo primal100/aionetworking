@@ -6,9 +6,16 @@ from pathlib import Path
 from aionetworking import JSONObject, JSONCodec
 from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
+from aionetworking.utils import hostname_or_ip
 from aionetworking.types.formats import MessageObjectType
+from aionetworking.types.networking import AFINETContext
 
 from typing import Dict, Any, List, NamedTuple, Tuple, Type
+
+
+@pytest.fixture
+def timestamp() -> datetime.datetime:
+    return datetime.datetime(2019, 1, 1, 1, 1)
 
 
 @pytest.fixture
@@ -22,50 +29,58 @@ def client_port() -> int:
 
 
 @pytest.fixture
-def timestamp() -> datetime.datetime:
-    return datetime.datetime(2019, 1, 1, 1, 1)
-
-
-@pytest.fixture
-def sock(server_port) -> Tuple[str, int]:
+def server_sock(server_port) -> Tuple[str, int]:
     return '127.0.0.1', server_port
 
 
 @pytest.fixture
-def sock_str(sock) -> str:
-    return f'{sock[0]}:{sock[1]}'
-
-
-@pytest.fixture
-def sock_ipv6(server_port) -> Tuple[str, int, int, int]:
-    return '::1', server_port, 0, 0
-
-
-@pytest.fixture
-def peer(client_port) -> Tuple[str, int]:
+def client_sock(client_port) -> Tuple[str, int]:
     return '127.0.0.1', client_port
 
 
 @pytest.fixture
-def peer_str(peer) -> str:
-    return f'{peer[0]}:{peer[1]}'
+def server_sock_str(server_sock) -> str:
+    return f'{server_sock[0]}:{server_sock[1]}'
 
 
 @pytest.fixture
-def peer_ipv6() -> Tuple[str, int, int, int]:
+def server_hostname(server_sock) -> str:
+    return hostname_or_ip(server_sock[0])
+
+
+@pytest.fixture
+def client_hostname(client_sock) -> str:
+    return hostname_or_ip(client_sock[0])
+
+
+@pytest.fixture
+def client_sock_str(client_sock) -> str:
+    return f'{client_sock[0]}:{client_sock[1]}'
+
+
+@pytest.fixture
+def server_sock_ipv6(server_port) -> Tuple[str, int, int, int]:
+    return '::1', server_port, 0, 0
+
+
+@pytest.fixture
+def client_sock_ipv6() -> Tuple[str, int, int, int]:
     return '::1', 60000, 0, 0
 
 
 @pytest.fixture
-def peer_ipv6str(peer_ipv6) -> str:
-    return f'{peer_ipv6[0]}:{peer_ipv6[1]}'
+def client_sock_ipv6str(client_sock_ipv6) -> str:
+    return f'{client_sock_ipv6[0]}:{client_sock_ipv6[1]}'
 
 
 @pytest.fixture
-def context(peer, peer_str, sock, sock_str) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': f'TCP Server {sock_str}', 'host': peer[0], 'port': peer[1],
-            'peer': peer_str, 'sock': sock_str, 'alias': peer[0], 'server': sock_str,
-            'client': peer_str, 'own': sock_str}
+def context(client_sock, client_sock_str, client_hostname, server_sock, server_sock_str) -> AFINETContext:
+    context: AFINETContext = {
+        'protocol_name': 'TCP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
+        'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str, 'client': client_sock_str,
+        'own': server_sock_str, 'address': client_sock[0]
+    }
+    return context
 
 
 @pytest.fixture

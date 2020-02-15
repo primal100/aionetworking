@@ -11,10 +11,10 @@ class TestConnectionLogger:
         assert kwargs['extra']['taskname'] == "No Running Loop"
         assert msg, kwargs == ("Hello World", {'extra': tcp_server_context})
 
-    def test_02_new_connection(self, connection_logger, caplog, peer_str, sock_str):
+    def test_02_new_connection(self, connection_logger, caplog, client_sock_str, server_sock_str):
         connection_logger.new_connection()
         assert caplog.record_tuples[0] == (
-            "receiver.connection", logging.INFO, f'New TCP Server connection from {peer_str} to {sock_str}')
+            "receiver.connection", logging.INFO, f'New TCP Server connection from {client_sock_str} to {server_sock_str}')
 
     def test_03_log_received_msgs(self, connection_logger, json_object, caplog, debug_logging):
         logging.getLogger('receiver.msg_received').setLevel(logging.CRITICAL)
@@ -64,19 +64,20 @@ class TestConnectionLoggerNoStats:
         receiver_connection_logger.on_msg_sent(json_rpc_logout_request_encoded)
         assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
 
-    def test_04_connection_finished_no_error(self, receiver_connection_logger, caplog, peer_str, sock_str):
+    def test_04_connection_finished_no_error(self, receiver_connection_logger, caplog, client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished()
         assert caplog.record_tuples == [('receiver.connection', logging.INFO,
-                                         f'TCP Server connection from {peer_str} to {sock_str} has been closed')]
+                                         f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')]
 
-    def test_05_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog, peer_str, sock_str):
+    def test_05_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog,
+                                               client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished(zero_division_exception)
         log = caplog.record_tuples[0]
         assert log[0] == 'receiver.connection'
         assert log[1] == logging.ERROR
         assert 'ZeroDivisionError: division by zero' in log[2]
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
-                                           f'TCP Server connection from {peer_str} to {sock_str} has been closed')
+                                           f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
 
 
 class TestConnectionLoggerStats:
@@ -105,20 +106,21 @@ class TestConnectionLoggerStats:
         assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
         assert receiver_connection_logger_stats._stats_logger.msgs.sent == 1
 
-    def test_04_connection_finished_no_error(self, receiver_connection_logger_stats, caplog, peer_str, sock_str):
+    def test_04_connection_finished_no_error(self, receiver_connection_logger_stats, caplog, client_sock_str, server_sock_str):
         receiver_connection_logger_stats.connection_finished()
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO,
-                                           f'TCP Server connection from {peer_str} to {sock_str} has been closed')
+                                           f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
         assert caplog.record_tuples[1] == ('receiver.stats', logging.INFO, 'ALL')
 
-    def test_05_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog, peer_str, sock_str):
+    def test_05_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog,
+                                               client_sock_str, server_sock_str):
         receiver_connection_logger_stats.connection_finished(zero_division_exception)
         log = caplog.record_tuples[0]
         assert log[0] == 'receiver.connection'
         assert log[1] == logging.ERROR
         assert 'ZeroDivisionError: division by zero' in log[2]
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
-                                           f'TCP Server connection from {peer_str} to {sock_str} has been closed')
+                                           f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
         assert caplog.record_tuples[2] == ('receiver.stats', logging.INFO, 'ALL')
 
 

@@ -23,7 +23,9 @@ class TestClientStartStop:
             assert sftp_client.sftp_conn
             await asyncio.wait_for(conn.wait_context_set(), timeout=1)
             sftp_client_context['client'] = conn.context['client']
-            sftp_client_context['sock'] = conn.context['sock']
+            sftp_client_context['server'] = conn.context['server']
+            sftp_client_context['address'] = conn.context['address']
+            sftp_client_context['host'] = conn.context['host']
             sftp_client_context['own'] = conn.context['own']
             assert conn.context == sftp_client_context
             server_peer = conn.get_peername("sftp", conn.context['client'], conn.context['server'])
@@ -31,6 +33,7 @@ class TestClientStartStop:
             sftp_server_context['client'] = server_conn.context['client']
             sftp_server_context['peer'] = server_conn.context['peer']
             sftp_server_context['port'] = sftp_client.actual_srcport
+            sftp_server_context['alias'] = f'{sftp_client_context["host"]}({server_conn.context["peer"]})'
             assert server_conn.context == sftp_server_context
         assert sftp_client.is_closing()
 

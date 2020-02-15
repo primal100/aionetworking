@@ -17,14 +17,14 @@ class SFTPServerOSAuthProtocol(SFTPServerProtocol):
         return True
 
     async def validate_password(self, username: str, password: str) -> bool:
-        self.logger.info('Attempting SFTP %s login for user %s', authentication_type, password)
+        self.logger.info('Attempting SFTP %s login for user %s', authentication_type.lower(), username)
         authorized = await asyncio.get_event_loop().run_in_executor(None,
                                                                     partial(authenticate,
                                                                             pam_service=self.pam_service,
                                                                             domain=self.windows_domain),
                                                                     username, password)
         if authorized:
-            self.logger.info('SFTP User % successfully logged in', username)
+            self.logger.info('SFTP User %s successfully logged in', username)
         else:
             self.logger.error('SFTP Login failed for user %s', username)
         return authorized

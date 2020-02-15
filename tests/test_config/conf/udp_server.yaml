@@ -11,6 +11,4 @@ protocol_factory: !DatagramServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   allowed_senders: !IPNetwork [127.0.0.1, "::1"]
-                  aliases:
-                      127.0.0.1: localhost4
-                      ::1: localhost6
+

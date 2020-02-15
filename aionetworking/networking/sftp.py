@@ -96,21 +96,24 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
     def connection_made(self, conn: Union[asyncssh.SSHServerConnection, asyncssh.SSHClientConnection]) -> None:
         self.conn = conn
         extra_context = {
-            'username': SFTPItem(self.conn, 'username'),
-            'client_version': SFTPItem(self.conn, 'client_version'),
-            'server_version': SFTPItem(self.conn, 'server_version'),
-            'send_cipher': SFTPItem(self.conn, 'send_cipher'),
-            'send_mac': SFTPItem(self.conn, 'send_mac'),
-            'send_compression': SFTPItem(self.conn, 'send_compression'),
-            'recv_cipher': SFTPItem(self.conn, 'recv_cipher'),
-            'recv_mac': SFTPItem(self.conn, 'recv_mac'),
-            'recv_compression': SFTPItem(self.conn, 'recv_compression'),
+            'username': SFTPItem(self.conn, 'username')
         }
+        self.logger.debug(f"""
+            'client_version': {SFTPItem(self.conn, 'client_version')},
+            'server_version': {SFTPItem(self.conn, 'server_version')},
+            'send_cipher': {SFTPItem(self.conn, 'send_cipher')},
+            'send_mac': {SFTPItem(self.conn, 'send_mac')},
+            'send_compression': {SFTPItem(self.conn, 'send_compression')},
+            'recv_cipher': {SFTPItem(self.conn, 'recv_cipher')},
+            'recv_mac': {SFTPItem(self.conn, 'recv_mac')},
+            'recv_compression': {SFTPItem(self.conn, 'recv_compression')},
+        """
+        )
         self.initialize_connection(conn, **extra_context)
         self.conn.set_extra_info(sftp_connection=self)
 
     async def wait_context_set(self) -> None:
-        while not self.context['send_cipher'] or not self.context['username']:
+        while not self.context.get('username'):
             await asyncio.sleep(0.000001)
 
     def _log_context(self, task: asyncio.Task):

@@ -106,8 +106,8 @@ def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None) ->
     node = configs[0]
     if len(configs) > 1:
         misc_config = configs[1]
-        log_config_file = misc_config['log_config_file']
-        node_name = misc_config.get('node_name')
+        log_config_file = misc_config.pop('log_config_file')
+        node_name = misc_config.pop('node_name', None)  #3.8 assignment expression
         if not node_name:
             node_name = node.full_name.replace(' ', '_')
         paths['node'] = node_name
@@ -116,6 +116,7 @@ def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None) ->
         paths['port'] = node.port
         paths['pid'] = str(os.getpid())
         configure_logging(log_config_file)
+        settings.APP_CONFIG.update(misc_config)
     return node
 
 

@@ -24,12 +24,12 @@ class TestLogger:
         msg, kwargs = receiver_logger.process("Hello World", {})
         assert msg, kwargs == ('Hello World', {'extra': {'taskname': "TestTask"}})
 
-    def test_03_update_extra(self, receiver_logger, sock_str):
-        receiver_logger.update_extra(endpoint=f'TCP Server {sock_str}')
-        assert receiver_logger.extra == {'endpoint': f'TCP Server {sock_str}'}
+    def test_03_update_extra(self, receiver_logger, server_sock_str):
+        receiver_logger.update_extra(endpoint=f'TCP Server {server_sock_str}')
+        assert receiver_logger.extra == {'endpoint': f'TCP Server {server_sock_str}'}
         msg, kwargs = receiver_logger.process('Hello World', {})
         assert msg, kwargs == (
-        'Hello World', {'extra': {'taskname': 'No Running Loop', 'endpoint': f'TCP Server {sock_str}'}})
+        'Hello World', {'extra': {'taskname': 'No Running Loop', 'endpoint': f'TCP Server {server_sock_str}'}})
 
     def test_04_manage_error(self, receiver_logger, caplog, zero_division_exception) -> None:
         receiver_logger.manage_error(zero_division_exception)

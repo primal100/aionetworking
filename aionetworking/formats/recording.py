@@ -19,7 +19,7 @@ class BufferCodec(PickleCodec):
 
     def encode(self, decoded: bytes, received_timestamp=None, **kwargs) -> bytes:
         if self.context:
-            sender = self.context['alias']
+            sender = self.context.get('address')
         else:
             sender = None
         packet_data = (

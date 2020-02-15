@@ -12,10 +12,10 @@ class TestEcho:
         assert response == echo_response
 
     @pytest.mark.asyncio
-    async def test_01_do_notification(self, echo_action, echo_notification_request_object, echo_notification, peer_str):
+    async def test_01_do_notification(self, echo_action, echo_notification_request_object, echo_notification, client_sock_str):
         response = await echo_action.do_one(echo_notification_request_object)
         assert response is None
-        notification = await aone(echo_action.get_notifications(peer_str))
+        notification = await aone(echo_action.get_notifications(client_sock_str))
         assert notification == echo_notification
 
     @pytest.mark.asyncio

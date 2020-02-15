@@ -6,6 +6,7 @@ from aionetworking import Logger
 from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
+from aionetworking.types.networking import AFINETContext
 from aionetworking.utils import Expression
 from tests.test_senders.conftest import *
 import asyncio
@@ -192,8 +193,8 @@ def expected_object_logging(config_files_with_logging_args):
 
 
 @pytest.fixture
-def peer_filter(peer) -> PeerFilter:
-    return PeerFilter([peer[0]])
+def peer_filter(client_sock) -> PeerFilter:
+    return PeerFilter([client_sock[0]])
 
 
 @pytest.fixture
@@ -202,20 +203,22 @@ def message_filter() -> MessageFilter:
 
 
 @pytest.fixture()
-def log_record(peer, sock_str, peer_str) -> logging.LogRecord:
+def log_record(client_sock_str, server_sock_str) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                               'New %s connection from %s to %s', ('TCP Server', peer_str, sock_str),
+                               'New %s connection from %s to %s', ('TCP Server', client_sock_str, server_sock_str),
                                None, func='new_connection', sinfo=None)
-    record.alias = peer[0]
+    record.hostname = 'localhost'
+    record.host = '127.0.0.1'
     return record
 
 
 @pytest.fixture()
-def log_record_not_included(peer, sock_str) -> logging.LogRecord:
+def log_record_not_included(client_sock, server_sock_str) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{peer[1]}', sock_str),
+                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{client_sock[1]}', server_sock_str),
                                 None, func='new_connection', sinfo=None)
-    record.alias = '127.0.0.2'
+    record.hostname = 'localhost2'
+    record.host = '127.0.0.2'
     return record
 
 
@@ -252,10 +255,15 @@ async def receiver_connection_logger(receiver_logger, tcp_server_context, caplog
 
 
 @pytest.fixture
-def context_wrong_peer(peer, peer_str, sock_str, sock) -> Dict[str, Any]:
-    return {'protocol_name': 'TCP Server', 'endpoint': f'TCP Server {sock_str}', 'host': '127.0.0.2', 'port': peer[1],
-            'peer': f'127.0.0.2:{peer[1]}', 'sock': sock_str, 'alias': '127.0.0.2', 'server': sock_str,
-            'client': f'127.0.0.2:{peer[1]}', 'own': sock_str}
+def context_wrong_peer(client_sock, client_sock_str, client_hostname, server_sock, server_sock_str) -> AFINETContext:
+    client_sock = ('127.0.0.2', client_sock[1])
+    client_sock_str = f'127.0.0.2:{client_sock[1]}'
+    context: AFINETContext = {
+        'protocol_name': 'TCP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
+        'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str, 'client': client_sock_str,
+        'own': server_sock_str, 'address': client_sock[0]
+    }
+    return context
 
 
 @pytest.fixture

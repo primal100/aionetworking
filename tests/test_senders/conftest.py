@@ -5,52 +5,54 @@ from aionetworking import TCPClient, UDPClient, pipe_client
 from aionetworking.senders import BaseNetworkClient
 from aionetworking.senders.sftp import SFTPClient
 
+from aionetworking.types.networking import AFUNIXContext, NamedPipeContext
+
 
 @pytest.fixture
-def tcp_client_one_way(protocol_factory_one_way_client, sock, peer) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=sock[0], port=sock[1], srcip=peer[0],
+def tcp_client_one_way(protocol_factory_one_way_client, server_sock, client_sock) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_one_way_client, host=server_sock[0], port=server_sock[1], srcip=client_sock[0],
                      srcport=0)
 
 
 @pytest.fixture
-def tcp_client_two_way(protocol_factory_two_way_client, sock, peer) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peer[0],
+def tcp_client_two_way(protocol_factory_two_way_client, server_sock, client_sock) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1], srcip=client_sock[0],
                      srcport=0)
 
 
 @pytest.fixture
-def tcp_client_two_way_ipv6(protocol_factory_two_way_client, sock_ipv6, peer_ipv6) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock_ipv6[0], port=sock_ipv6[1],
-                     srcip=peer_ipv6[0], srcport=0)
+def tcp_client_two_way_ipv6(protocol_factory_two_way_client, server_sock_ipv6, client_sock_ipv6) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock_ipv6[0], port=server_sock_ipv6[1],
+                     srcip=client_sock_ipv6[0], srcport=0)
 
 
 @pytest.fixture
-def tcp_client_two_way_ssl(protocol_factory_two_way_client, sock, peer, client_side_ssl) -> TCPClient:
+def tcp_client_two_way_ssl(protocol_factory_two_way_client, server_sock, client_sock, client_side_ssl) -> TCPClient:
     client_side_ssl.check_hostname = False
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peer[0],
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1], srcip=client_sock[0],
                      srcport=0, ssl=client_side_ssl)
 
 
 @pytest.fixture
-def tcp_client_two_way_ssl_no_cadata(protocol_factory_two_way_client, sock, peer, client_side_ssl_no_cadata) -> TCPClient:
+def tcp_client_two_way_ssl_no_cadata(protocol_factory_two_way_client, server_sock, client_sock, client_side_ssl_no_cadata) -> TCPClient:
     client_side_ssl.check_hostname = False
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=sock[0], port=sock[1], srcip=peer[0],
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1], srcip=client_sock[0],
                      srcport=0, ssl=client_side_ssl_no_cadata, ssl_handshake_timeout=60)
 
 
 @pytest.fixture
-def udp_client_one_way(udp_protocol_factory_one_way_client, sock) -> UDPClient:
-    return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=sock[0], port=sock[1])
+def udp_client_one_way(udp_protocol_factory_one_way_client, server_sock) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_one_way_client, host=server_sock[0], port=server_sock[1])
 
 
 @pytest.fixture
-def udp_client_two_way(udp_protocol_factory_two_way_client, sock) -> UDPClient:
-    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock[0], port=sock[1])
+def udp_client_two_way(udp_protocol_factory_two_way_client, server_sock) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1])
 
 
 @pytest.fixture
-def udp_client_two_way_ipv6(udp_protocol_factory_two_way_client, sock_ipv6) -> UDPClient:
-    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=sock_ipv6[0], port=sock_ipv6[1])
+def udp_client_two_way_ipv6(udp_protocol_factory_two_way_client, server_sock_ipv6) -> UDPClient:
+    return UDPClient(protocol_factory=udp_protocol_factory_two_way_client, host=server_sock_ipv6[0], port=server_sock_ipv6[1])
 
 
 @pytest.fixture
@@ -64,30 +66,30 @@ def pipe_client_two_way(protocol_factory_two_way_client, pipe_path):
 
 
 @pytest.fixture
-def sftp_client(sftp_protocol_factory_client, sock, peer, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
-                      srcip=peer[0], srcport=0, username=sftp_username_password[0],
+def sftp_client(sftp_protocol_factory_client, server_sock, client_sock, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=server_sock[0], port=server_sock[1],
+                      srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
                       password=sftp_username_password[1])
 
 
 @pytest.fixture
-def sftp_client_ipv6(sftp_protocol_factory_client, sock_ipv6, peer_ipv6, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock_ipv6[0], port=sock_ipv6[1],
-                      srcip=peer_ipv6[0], srcport=0, username=sftp_username_password[0],
+def sftp_client_ipv6(sftp_protocol_factory_client, server_sock_ipv6, client_sock_ipv6, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=server_sock_ipv6[0], port=server_sock_ipv6[1],
+                      srcip=client_sock_ipv6[0], srcport=0, username=sftp_username_password[0],
                       password=sftp_username_password[1])
 
 
 @pytest.fixture
-def sftp_client_exact_port(sftp_protocol_factory_client, sock, peer, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
-                      srcip=peer[0], srcport=peer[1], username=sftp_username_password[0],
+def sftp_client_exact_port(sftp_protocol_factory_client, server_sock, client_sock, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=server_sock[0], port=server_sock[1],
+                      srcip=client_sock[0], srcport=client_sock[1], username=sftp_username_password[0],
                       password=sftp_username_password[1])
 
 
 @pytest.fixture
-def sftp_client_wrong_password(sftp_protocol_factory_client, sock, peer, sftp_username_password, patch_os_auth_failure) -> SFTPClient:
-    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=sock[0], port=sock[1],
-                      srcip=peer[0], srcport=0, username=sftp_username_password[0],
+def sftp_client_wrong_password(sftp_protocol_factory_client, server_sock, client_sock, sftp_username_password, patch_os_auth_failure) -> SFTPClient:
+    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=server_sock[0], port=server_sock[1],
+                      srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
                       password='abcdefgh')
 
 
@@ -113,30 +115,36 @@ def client_context(receiver_sender_args) -> dict:
 
 if hasattr(socket, 'AF_UNIX'):
     @pytest.fixture
-    def context_pipe_server() -> Dict[str, Any]:
-        return {'protocol_name': 'TCP Server', 'endpoint': 'Unix Server /tmp/test', 'sock': '/tmp/test',
-                'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'server': '/tmp/test', 'client': '/tmp/test.1',
-                'fd': 1, 'own': '/tmp/test'}
-
+    def context_pipe_server(pipe_path) -> AFUNIXContext:
+        context: AFUNIXContext = {
+            'protocol_name': 'Unix Server', 'address': pipe_path.name, 'peer': '1', 'own': str(pipe_path),
+            'alias': '/tmp/test.1', 'server': str(pipe_path), 'client': '1', 'fd': 1,
+        }
+        return context
 
     @pytest.fixture
-    def context_pipe_client() -> Dict[str, Any]:
-        return {'protocol_name': 'TCP Client', 'fd': 1, 'addr': '/tmp/test', 'own': '1',
-                'peer': '/tmp/test.1', 'alias': '/tmp/test.1', 'server': '/tmp/test', 'client': '/tmp/test.1',
-                }
+    def context_pipe_client(pipe_path) -> AFUNIXContext:
+        context: AFUNIXContext = {
+            'protocol_name': 'Unix Client', 'address': pipe_path.name, 'peer': str(pipe_path), 'own': '1',
+            'alias': f'{pipe_path}.1', 'server': str(pipe_path), 'client': '1', 'fd': 1
+        }
+        return context
 else:
     @pytest.fixture
-    def context_pipe_server(pipe_path) -> Dict[str, Any]:
-        return {'protocol_name': 'TCP Server', 'endpoint': f'Windows Pipe Server {pipe_path}',
-                'peer': '12345', 'alias': 12345, 'server':pipe_path, 'client': '12345',
-                'handle': 12345, 'own': pipe_path}
-
+    def context_pipe_server(pipe_path) -> NamedPipeContext:
+        context: NamedPipeContext = {
+            'protocol_name': 'Pipe Server', 'address': pipe_path.name, 'peer': '12345',  'own': str(pipe_path),
+            'alias': f'{pipe_path}.12345', 'server': str(pipe_path), 'client': '12345', 'handle': 12345,
+        }
+        return context
 
     @pytest.fixture
-    def context_pipe_client(pipe_path) -> Dict[str, Any]:
-        return {'protocol_name': 'TCP Client', 'addr': str(pipe_path),
-                'peer': f'{pipe_path}.12345', 'alias': 12346, 'server':str(pipe_path), 'client': '12345',
-                'handle': 12346, 'own': '12345'}
+    def context_pipe_client(pipe_path) -> NamedPipeContext:
+        context: NamedPipeContext = {
+            'protocol_name': 'Pipe Client', 'address': str(pipe_path), 'peer': '12345', 'own': '12345',
+            'alias': f'{pipe_path}.12346', 'server':str(pipe_path), 'client': '12345', 'handle': 12346
+        }
+        return context
 
 
 @pytest.fixture(params=[
@@ -148,7 +156,7 @@ else:
          tcp_server_context.__name__, tcp_client_context.__name__)),
     lazy_fixture(
         (tcp_server_two_way_ssl_started.__name__, tcp_client_two_way_ssl.__name__,
-         tcp_server_context_ssl.__name__, tcp_client_context_ssl.__name__)),
+         tcp_server_context.__name__, tcp_client_context.__name__)),
     pytest.param(
         lazy_fixture(
             (udp_server_one_way_started.__name__, udp_client_one_way.__name__,
@@ -181,12 +189,12 @@ def receiver_sender_args(request):
 
 
 @pytest.fixture
-async def protocol_factory_allowed_senders_server(echo_action, initial_server_context, peer, peer_ipv6) -> StreamServerProtocolFactory:
+async def protocol_factory_allowed_senders_server(echo_action, initial_server_context, client_sock, client_sock_ipv6) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     factory = StreamServerProtocolFactory(
         action=echo_action,
         dataformat=JSONObject,
-        allowed_senders=[IPNetwork(peer[0]), IPNetwork(peer_ipv6[0])]
+        allowed_senders=[IPNetwork(client_sock[0]), IPNetwork(client_sock_ipv6[0])]
     )
     yield factory
 
@@ -203,8 +211,8 @@ async def protocol_factory_allowed_senders_server_wrong_senders(echo_action, ini
 
 
 @pytest.fixture
-async def tcp_server_allowed_senders_ipv4(protocol_factory_allowed_senders_server, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host=sock[0], port=sock[1])
+async def tcp_server_allowed_senders_ipv4(protocol_factory_allowed_senders_server, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host=server_sock[0], port=server_sock[1])
     await server.start()
     yield server
     if server.is_started():
@@ -212,8 +220,8 @@ async def tcp_server_allowed_senders_ipv4(protocol_factory_allowed_senders_serve
 
 
 @pytest.fixture
-async def tcp_server_allowed_senders_ipv6(protocol_factory_allowed_senders_server, sock_ipv6) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host=sock_ipv6[0], port=sock_ipv6[1])
+async def tcp_server_allowed_senders_ipv6(protocol_factory_allowed_senders_server, server_sock_ipv6) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server, host=server_sock_ipv6[0], port=server_sock_ipv6[1])
     await server.start()
     yield server
     if server.is_started():
@@ -221,8 +229,8 @@ async def tcp_server_allowed_senders_ipv6(protocol_factory_allowed_senders_serve
 
 
 @pytest.fixture
-async def tcp_server_allowed_senders_ipv4_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host=sock[0], port=sock[1])
+async def tcp_server_allowed_senders_ipv4_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host=server_sock[0], port=server_sock[1])
     await server.start()
     yield server
     if server.is_started():
@@ -230,8 +238,8 @@ async def tcp_server_allowed_senders_ipv4_wrong_senders(protocol_factory_allowed
 
 
 @pytest.fixture
-async def tcp_server_allowed_senders_ipv6_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host='::1', port=sock[1])
+async def tcp_server_allowed_senders_ipv6_wrong_senders(protocol_factory_allowed_senders_server_wrong_senders, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_allowed_senders_server_wrong_senders, host='::1', port=server_sock[1])
     await server.start()
     yield server
     if server.is_started():
@@ -250,8 +258,8 @@ async def udp_protocol_factory_allowed_senders_wrong_senders(echo_action) -> Dat
 
 
 @pytest.fixture
-async def udp_server_allowed_senders_ipv4(udp_protocol_factory_allowed_senders, sock) -> UDPServer:
-    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock[0], port=sock[1])
+async def udp_server_allowed_senders_ipv4(udp_protocol_factory_allowed_senders, server_sock) -> UDPServer:
+    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=server_sock[0], port=server_sock[1])
 
 
 @pytest.fixture
@@ -263,8 +271,8 @@ async def udp_server_allowed_senders_ipv4_started(udp_server_allowed_senders_ipv
 
 
 @pytest.fixture
-async def udp_server_allowed_senders_ipv6(udp_protocol_factory_allowed_senders, sock_ipv6) -> UDPServer:
-    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1])
+async def udp_server_allowed_senders_ipv6(udp_protocol_factory_allowed_senders, server_sock_ipv6) -> UDPServer:
+    yield UDPServer(protocol_factory=udp_protocol_factory_allowed_senders, host=server_sock_ipv6[0], port=server_sock_ipv6[1])
 
 
 @pytest.fixture
@@ -276,8 +284,8 @@ async def udp_server_allowed_senders_ipv6_started(udp_server_allowed_senders_ipv
 
 
 @pytest.fixture
-async def udp_server_allowed_senders_wrong_senders_ipv4(udp_protocol_factory_allowed_senders_wrong_senders, sock) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=sock[0], port=sock[1])
+async def udp_server_allowed_senders_wrong_senders_ipv4(udp_protocol_factory_allowed_senders_wrong_senders, server_sock) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=server_sock[0], port=server_sock[1])
     await server.start()
     yield server
     if server.is_started():
@@ -285,8 +293,9 @@ async def udp_server_allowed_senders_wrong_senders_ipv4(udp_protocol_factory_all
 
 
 @pytest.fixture
-async def udp_server_allowed_senders_wrong_senders_ipv6(udp_protocol_factory_allowed_senders_wrong_senders, sock_ipv6) -> UDPServer:
-    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=sock_ipv6[0], port=sock_ipv6[1])
+async def udp_server_allowed_senders_wrong_senders_ipv6(udp_protocol_factory_allowed_senders_wrong_senders, server_sock_ipv6) -> UDPServer:
+    server = UDPServer(protocol_factory=udp_protocol_factory_allowed_senders_wrong_senders, host=server_sock_ipv6[0],
+                       port=server_sock_ipv6[1])
     await server.start()
     yield server
     if server.is_started():
@@ -390,11 +399,11 @@ def udp_allowed_senders_not_ok_args(request):
 
 
 @pytest.fixture
-async def sftp_protocol_factory_server_allowed_senders(buffered_file_storage_action, peer, peer_ipv6) -> SFTPOSAuthProtocolFactory:
+async def sftp_protocol_factory_server_allowed_senders(buffered_file_storage_action, client_sock, client_sock_ipv6) -> SFTPOSAuthProtocolFactory:
     factory = SFTPOSAuthProtocolFactory(
         action=buffered_file_storage_action,
         dataformat=JSONObject,
-        allowed_senders=[IPNetwork(peer[0]), IPNetwork(peer_ipv6[0])]
+        allowed_senders=[IPNetwork(client_sock[0]), IPNetwork(client_sock_ipv6[0])]
     )
     yield factory
 
@@ -410,8 +419,8 @@ async def sftp_protocol_factory_server_not_allowed_senders(buffered_file_storage
 
 
 @pytest.fixture
-async def sftp_server_allowed_senders_ip4(sftp_protocol_factory_server_allowed_senders, sock, tmp_path, ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host=sock[0], port=sock[1],
+async def sftp_server_allowed_senders_ip4(sftp_protocol_factory_server_allowed_senders, server_sock, tmp_path, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host=server_sock[0], port=server_sock[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
@@ -420,8 +429,8 @@ async def sftp_server_allowed_senders_ip4(sftp_protocol_factory_server_allowed_s
 
 
 @pytest.fixture
-async def sftp_server_allowed_senders_ipv6(sftp_protocol_factory_server_allowed_senders, sock_ipv6, tmp_path, ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1],
+async def sftp_server_allowed_senders_ipv6(sftp_protocol_factory_server_allowed_senders, server_sock_ipv6, tmp_path, ssh_host_key) -> SFTPServer:
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_allowed_senders, host=server_sock_ipv6[0], port=server_sock_ipv6[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
@@ -430,10 +439,10 @@ async def sftp_server_allowed_senders_ipv6(sftp_protocol_factory_server_allowed_
 
 
 @pytest.fixture
-async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_allowed_senders, sock, tmp_path,
+async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_allowed_senders, server_sock, tmp_path,
                                               ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=sock[0], port=sock[1],
-                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=server_sock[0],
+                        port=server_sock[1], server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
     if server.is_started():
@@ -441,10 +450,10 @@ async def sftp_server_not_allowed_senders_ip4(sftp_protocol_factory_server_not_a
 
 
 @pytest.fixture
-async def sftp_server_not_allowed_senders_ipv6(sftp_protocol_factory_server_not_allowed_senders, sock_ipv6, tmp_path,
+async def sftp_server_not_allowed_senders_ipv6(sftp_protocol_factory_server_not_allowed_senders, server_sock_ipv6, tmp_path,
                                                ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=sock_ipv6[0], port=sock_ipv6[1],
-                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_not_allowed_senders, host=server_sock_ipv6[0],
+                        port=server_sock_ipv6[1], server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
     if server.is_started():
@@ -492,8 +501,9 @@ def sftp_client_wrong_senders(sftp_allowed_senders_not_ok_args) -> SFTPClient:
 
 
 @pytest.fixture
-async def tcp_server_connections_expire(protocol_factory_server_connections_expire, sock) -> TCPServer:
-    server = TCPServer(protocol_factory=protocol_factory_server_connections_expire, host=sock[0], port=sock[1])
+async def tcp_server_connections_expire(protocol_factory_server_connections_expire, server_sock) -> TCPServer:
+    server = TCPServer(protocol_factory=protocol_factory_server_connections_expire, host=server_sock[0],
+                       port=server_sock[1])
     await server.start()
     yield server
     if server.is_started():
@@ -501,9 +511,9 @@ async def tcp_server_connections_expire(protocol_factory_server_connections_expi
 
 
 @pytest.fixture
-async def tcp_client_connections_expire(protocol_factory_client_connections_expire, sock, peer) -> TCPServer:
-    yield TCPClient(protocol_factory=protocol_factory_client_connections_expire, host=sock[0], port=sock[1],
-                    srcip=peer[0], srcport=0)
+async def tcp_client_connections_expire(protocol_factory_client_connections_expire, server_sock, client_sock) -> TCPServer:
+    yield TCPClient(protocol_factory=protocol_factory_client_connections_expire, host=server_sock[0],
+                    port=server_sock[1], srcip=client_sock[0], srcport=0)
 
 
 @pytest.fixture(params=[
@@ -527,10 +537,10 @@ def client_expire_connections(tcp_connections_expire_args) -> BaseServer:
 
 
 @pytest.fixture
-async def sftp_server_expire_connections(sftp_protocol_factory_server_expired_connections, sock, tmp_path,
+async def sftp_server_expire_connections(sftp_protocol_factory_server_expired_connections, server_sock, tmp_path,
                                          ssh_host_key) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_expired_connections, host=sock[0], port=sock[1],
-                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    server = SFTPServer(protocol_factory=sftp_protocol_factory_server_expired_connections, host=server_sock[0],
+                        port=server_sock[1], server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     await server.start()
     yield server
     if server.is_started():
@@ -538,10 +548,10 @@ async def sftp_server_expire_connections(sftp_protocol_factory_server_expired_co
 
 
 @pytest.fixture
-async def sftp_client_expire_connections(sftp_protocol_factory_client_expired_connections, sock, peer,
+async def sftp_client_expire_connections(sftp_protocol_factory_client_expired_connections, server_sock, client_sock,
                                          sftp_username_password) -> SFTPServer:
-    yield SFTPClient(protocol_factory=sftp_protocol_factory_client_expired_connections, host=sock[0], port=sock[1],
-                     srcip=peer[0], srcport=0, username=sftp_username_password[0],
+    yield SFTPClient(protocol_factory=sftp_protocol_factory_client_expired_connections, host=server_sock[0],
+                     port=server_sock[1], srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
                      password=sftp_username_password[1])
 
 

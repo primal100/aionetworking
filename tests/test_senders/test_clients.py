@@ -16,6 +16,8 @@ class TestClientStartStop:
             assert client.is_started()
             assert conn.transport
             assert sorted(conn.context.keys()) == sorted(client_context.keys())
+            assert conn.context['server'] == client_context['server']
+            assert client_context['address'] == client_context['address']
             assert client.transport
             assert client.conn
         assert client.is_closing()
@@ -41,7 +43,7 @@ class TestClientStartStop:
 class TestClientAllowedSenders:
     @pytest.mark.asyncio
     async def test_00_tcp_client_connect_allowed(self, tcp_server_started_allowed_senders, tcp_client_allowed_senders,
-                                                echo_encoded, echo_response_object):
+                                                 echo_encoded, echo_response_object):
         async with tcp_client_allowed_senders as conn:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object

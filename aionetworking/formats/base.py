@@ -43,15 +43,15 @@ class BaseMessageObject(MessageObject, Protocol):
         return cls.codec_cls(cls, **kwargs)
 
     @property
+    def sender(self) -> str:
+        return self.context.get('host', self.context.get('peer'))
+
+    @property
+    def address(self) -> str:
+        return self.context['address']
+
+    @property
     def peer(self) -> str:
-        return self.context['alias']
-
-    @property
-    def peer_safe(self) -> str:
-        return self.context['alias'].replace('::', '.').replace(':', '.')
-
-    @property
-    def full_peer(self) -> str:
         return self.context['peer']
 
     def __getstate__(self):

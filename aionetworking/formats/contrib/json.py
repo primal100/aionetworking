@@ -22,7 +22,7 @@ class JSONCodec(BaseCodec):
             start = pos
             data = encoded.decode()
             msg, pos = json.JSONDecoder().raw_decode(data, idx=pos)
-            yield (encoded[start:pos], msg)
+            yield encoded[start:pos], msg
 
     def encode(self, decoded: Any, **kwargs) -> bytes:
         return json.dumps(decoded).encode()
