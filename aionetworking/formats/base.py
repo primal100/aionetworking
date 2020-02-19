@@ -66,10 +66,6 @@ class BaseMessageObject(MessageObject, Protocol):
         except KeyError:
             return default
 
-    def __getitem__(self, item):
-        if isinstance(self.decoded, (list, tuple, dict)):
-            return self.decoded[item]
-
     @property
     def uid(self) -> Any:
         try:

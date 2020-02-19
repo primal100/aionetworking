@@ -12,7 +12,7 @@ from aionetworking.logging.utils_logging import p
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.logging import LoggerType
 
-from typing import ClassVar, AnyStr
+from typing import Any, ClassVar, AnyStr
 from aionetworking.types.formats import MessageObjectType
 
 
@@ -208,9 +208,11 @@ class BaseFileStorage(BaseAction, Protocol):
         msg.logger.debug('Data written to file %s', path)
         return path
 
-    async def do_one(self, msg: MessageObjectType) -> None:
+    async def do_one(self, msg: MessageObjectType) -> Any:
         self._status.set_started()
-        await self.write_one(msg)
+        if getattr(msg, 'store', True):
+            await self.write_one(msg)
+        return getattr(msg, 'response', None)
 
 
 @dataclass

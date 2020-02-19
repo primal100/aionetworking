@@ -34,4 +34,6 @@ class JSONObject(BaseMessageObject):
     codec_cls = JSONCodec
 
     def __getattr__(self, item):
-        return self.decoded[item]
+        if item in self.decoded:
+            return self.decoded[item]
+        raise AttributeError
