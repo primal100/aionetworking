@@ -18,7 +18,6 @@ from aionetworking.types.formats import MessageObjectType
 
 @dataclass
 class ManagedFile:
-
     path: Path
     mode: str = 'ab'
     buffering: int = -1
@@ -172,7 +171,6 @@ def default_data_dir():
 
 @dataclass
 class BaseFileStorage(BaseAction, Protocol):
-
     base_path: Path = field(default_factory=default_data_dir, metadata={'pickle': True})
     path: str = ''
     attr: str = 'encoded'
@@ -184,6 +182,13 @@ class BaseFileStorage(BaseAction, Protocol):
             if isinstance(self.separator, str):
                 self.separator = self.separator.encode()
         self._status.is_started()
+        settings.ACTION_CONFIG = {
+            'base_path': self.base_path,
+            'path': self.path,
+            'attr': self.attr,
+            'mode': self.mode,
+            'separator': self.separator
+        }
 
     def _get_full_path(self, msg: MessageObjectType) -> Path:
         return self.base_path / self._get_path(msg)
