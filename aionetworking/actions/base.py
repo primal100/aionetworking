@@ -1,8 +1,8 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-import warnings
+from dataclasses import dataclass, field, asdict
 
 from aionetworking.compatibility import Protocol
+from aionetworking import settings
 from aionetworking.logging.loggers import logger_cv
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.formats import MessageObjectType
@@ -10,9 +10,6 @@ from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
 
 from typing import Any, TypeVar, AsyncGenerator
-
-
-warnings.filterwarnings("ignore", message="fields may not start with an underscore")
 
 
 ActionType = TypeVar('ActionType', bound='BaseAction')
