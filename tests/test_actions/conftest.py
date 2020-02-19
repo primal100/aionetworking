@@ -2,9 +2,10 @@ import asyncio
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
+from aionetworking.formats.contrib.json import JSONObject
 from tests.test_formats.conftest import *
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 @pytest.fixture
@@ -156,3 +157,31 @@ def echo_decode_error_response(echo_request_invalid_json) -> Dict:
 async def echo_action(tmp_path) -> FileStorage:
     action = EchoAction()
     yield action
+
+
+class JSONObjectWithKeepAlive(JSONObject):
+    @property
+    def store(self) -> bool:
+        return self.decoded['method'] != 'keepalive'
+
+    @property
+    def response(self) -> Optional[Dict[str, Any]]:
+        if self.decoded['method'] == 'keepalive':
+            return {'result': 'keepalive-response'}
+        return None
+
+
+@pytest.fixture
+def keep_alive_request_decoded() -> Dict[str, str]:
+    return {'method': 'keepalive'}
+
+
+@pytest.fixture
+def keep_alive_request_encoded() -> bytes:
+    return b'{"method": "keepalive"}'
+
+
+@pytest.fixture
+def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context, timestamp) -> JSONObjectWithKeepAlive:
+    return JSONObjectWithKeepAlive(keep_alive_request_encoded, keep_alive_request_decoded, context=context,
+            received_timestamp=timestamp)

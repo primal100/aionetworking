@@ -77,12 +77,19 @@ class TestJsonBufferedFileStorage:
         packets = await alist(get_recording_from_file(expected_file))
         assert packets == json_recording_data
 
-    def test_02_action_pickle(self, buffered_file_storage_recording_action):
+    @pytest.mark.asyncio
+    async def test_02_do_one_response(self, tmp_path, buffered_file_storage_action, keepalive_object):
+        response = await buffered_file_storage_action.do_one(keepalive_object)
+        expected_file = Path(tmp_path/'data/Encoded/127.0.0.1_JSON.JSON')
+        assert not expected_file.exists()
+        assert response == {'result': 'keepalive-response'}
+
+    def test_03_action_pickle(self, buffered_file_storage_recording_action):
         data = pickle.dumps(buffered_file_storage_recording_action)
         action = pickle.loads(data)
         assert action == buffered_file_storage_recording_action
 
-    def test_03_pre_action_pickle(self, buffered_file_storage_recording_action):
+    def test_04_pre_action_pickle(self, buffered_file_storage_recording_action):
         data = pickle.dumps(buffered_file_storage_recording_action)
         action = pickle.loads(data)
         assert action == buffered_file_storage_recording_action
