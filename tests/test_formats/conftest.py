@@ -45,12 +45,22 @@ def server_sock_str(server_sock) -> str:
 
 @pytest.fixture
 def server_hostname(server_sock) -> str:
-    return hostname_or_ip(server_sock[0])
+    return 'localhost'
 
 
 @pytest.fixture
 def client_hostname(client_sock) -> str:
-    return hostname_or_ip(client_sock[0])
+    return 'localhost'
+
+
+@pytest.fixture
+def server_hostname_ip6(server_sock) -> str:
+    return 'ip6-localhost'
+
+
+@pytest.fixture
+def client_hostname_ip6(client_sock) -> str:
+    return 'ip6-localhost'
 
 
 @pytest.fixture

@@ -232,11 +232,15 @@ def pipe_address_by_os() -> Path:
 ###Networking###
 
 def hostname_or_ip(host: str):
+    if os.name == 'nt':
+        if host == '127.0.0.1':
+            return 'localhost'
+        elif host == '::1':
+            return 'ip6-localhost'
     try:
         return socket.gethostbyaddr(host)[0]
     except socket.herror:
         return host
-
 
 
 def addr_tuple_to_str(addr: Sequence):

@@ -123,16 +123,16 @@ async def udp_server_two_way_started(udp_server_two_way) -> UDPServer:
 
 
 @pytest.fixture
-async def pipe_server_one_way(protocol_factory_one_way_server, pipe_path) -> BaseServer:
-    server = pipe_server(protocol_factory=protocol_factory_one_way_server, path=pipe_path)
+async def pipe_server_one_way(protocol_factory_one_way_server_pipe, pipe_path) -> BaseServer:
+    server = pipe_server(protocol_factory=protocol_factory_one_way_server_pipe, path=pipe_path)
     yield server
     if server.is_started():
         await server.close()
 
 
 @pytest.fixture
-async def pipe_server_two_way(protocol_factory_two_way_server, pipe_path) -> BaseServer:
-    server = pipe_server(protocol_factory=protocol_factory_two_way_server, path=pipe_path)
+async def pipe_server_two_way(protocol_factory_two_way_server_pipe, pipe_path) -> BaseServer:
+    server = pipe_server(protocol_factory=protocol_factory_two_way_server_pipe, path=pipe_path)
     yield server
     if server.is_started():
         await server.close()

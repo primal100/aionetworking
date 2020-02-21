@@ -2,7 +2,6 @@ import asyncio
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
-from aionetworking.formats.contrib.json import JSONObject
 from tests.test_formats.conftest import *
 
 from typing import List, Dict, Optional

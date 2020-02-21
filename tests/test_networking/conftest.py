@@ -390,6 +390,18 @@ async def protocol_factory_one_way_server(buffered_file_storage_action,
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
+        dataformat=JSONObject,
+        hostname_lookup=True
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_one_way_server_pipe(buffered_file_storage_action,
+                                          buffered_file_storage_recording_action) -> StreamServerProtocolFactory:
+    factory = StreamServerProtocolFactory(
+        preaction=buffered_file_storage_recording_action,
+        action=buffered_file_storage_action,
         dataformat=JSONObject
     )
     yield factory
@@ -407,10 +419,22 @@ async def protocol_factory_one_way_server_started(protocol_factory_one_way_serve
 
 
 @pytest.fixture
+async def protocol_factory_one_way_server_pipe_started(protocol_factory_one_way_server_pipe, initial_server_context,
+                                                       server_sock_str) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    await protocol_factory_one_way_server_pipe.start()
+    if not protocol_factory_one_way_server_pipe.full_name:
+        protocol_factory_one_way_server_pipe.set_name(f'Pipe Server {server_sock_str}', 'tcp')
+    yield protocol_factory_one_way_server_pipe
+    await protocol_factory_one_way_server_pipe.close()
+
+
+@pytest.fixture
 async def protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
         action=echo_action,
         dataformat=JSONObject,
+        hostname_lookup=True,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
     )
@@ -458,7 +482,20 @@ async def protocol_factory_two_way_server(echo_action, buffered_file_storage_rec
     factory = StreamServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
-        dataformat=JSONObject
+        dataformat=JSONObject,
+        hostname_lookup=True
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_two_way_server_pipe(echo_action, buffered_file_storage_recording_action,
+                                               initial_server_context) -> StreamServerProtocolFactory:
+    context_cv.set(initial_server_context)
+    factory = StreamServerProtocolFactory(
+        preaction=buffered_file_storage_recording_action,
+        action=echo_action,
+        dataformat=JSONObject,
     )
     yield factory
 
@@ -475,9 +512,21 @@ async def protocol_factory_two_way_server_started(protocol_factory_two_way_serve
 
 
 @pytest.fixture
+async def protocol_factory_two_way_server_pipe_started(protocol_factory_two_way_server_pipe, server_sock_str,
+                                                       initial_server_context) -> StreamServerProtocolFactory:
+        context_cv.set(initial_server_context)
+        await protocol_factory_two_way_server_pipe.start()
+        if not protocol_factory_two_way_server_pipe.full_name:
+            protocol_factory_two_way_server_pipe.set_name(f'Pipe Server {server_sock_str}', 'tcp')
+        yield protocol_factory_two_way_server_pipe
+        await protocol_factory_two_way_server_pipe.close()
+
+
+@pytest.fixture
 async def protocol_factory_one_way_client() -> StreamClientProtocolFactory:
     factory = StreamClientProtocolFactory(
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        hostname_lookup=True)
     yield factory
 
 
@@ -495,7 +544,8 @@ async def protocol_factory_one_way_client_started(protocol_factory_one_way_clien
 async def protocol_factory_two_way_client(echo_requester) -> StreamClientProtocolFactory:
     factory = StreamClientProtocolFactory(
         requester=echo_requester,
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        hostname_lookup=True)
     yield factory
 
 
@@ -510,11 +560,47 @@ async def protocol_factory_two_way_client_started(protocol_factory_two_way_clien
 
 
 @pytest.fixture
+async def protocol_factory_one_way_client_pipe() -> StreamClientProtocolFactory:
+    factory = StreamClientProtocolFactory(
+        dataformat=JSONObject)
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_one_way_client_pipe_started(protocol_factory_one_way_client_pipe, initial_client_context) -> StreamClientProtocolFactory:
+    context_cv.set(initial_client_context)
+    await protocol_factory_one_way_client_pipe.start()
+    if not protocol_factory_one_way_client_pipe.full_name:
+        protocol_factory_one_way_client_pipe.set_name('Pipe Client 127.0.0.1:0', 'tcp')
+    yield protocol_factory_one_way_client_pipe
+    await protocol_factory_one_way_client_pipe.close()
+
+
+@pytest.fixture
+async def protocol_factory_two_way_client_pipe(echo_requester) -> StreamClientProtocolFactory:
+    factory = StreamClientProtocolFactory(
+        requester=echo_requester,
+        dataformat=JSONObject)
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_two_way_client_pipe_started(protocol_factory_two_way_client_pipe, initial_client_context) -> StreamClientProtocolFactory:
+    context_cv.set(initial_client_context)
+    await protocol_factory_two_way_client_pipe.start()
+    if not protocol_factory_two_way_client_pipe.full_name:
+        protocol_factory_two_way_client_pipe.set_name('Pipe Client 127.0.0.1:0', 'tcp')
+    yield protocol_factory_two_way_client_pipe
+    await protocol_factory_two_way_client_pipe.close()
+
+
+@pytest.fixture
 async def udp_protocol_factory_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action) -> DatagramServerProtocolFactory:
     factory = DatagramServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
         dataformat=JSONObject,
+        hostname_lookup=True
     )
     yield factory
 
@@ -536,6 +622,7 @@ async def udp_protocol_factory_server_connections_expire(echo_action) -> StreamS
     factory = DatagramServerProtocolFactory(
         action=echo_action,
         dataformat=JSONObject,
+        hostname_lookup=True,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
     )
@@ -560,6 +647,7 @@ async def udp_protocol_factory_two_way_server(echo_action, buffered_file_storage
     factory = DatagramServerProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=echo_action,
+        hostname_lookup=True,
         dataformat=JSONObject)
     yield factory
 
@@ -579,7 +667,8 @@ async def udp_protocol_factory_two_way_server_started(udp_protocol_factory_two_w
 @pytest.fixture
 async def udp_protocol_factory_one_way_client() -> DatagramClientProtocolFactory:
     factory = DatagramClientProtocolFactory(
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        hostname_lookup=True)
     yield factory
 
 
@@ -598,7 +687,8 @@ async def udp_protocol_factory_one_way_client_started(udp_protocol_factory_one_w
 async def udp_protocol_factory_two_way_client(echo_requester) -> DatagramClientProtocolFactory:
     factory = DatagramClientProtocolFactory(
         requester=echo_requester,
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        hostname_lookup=True)
     yield factory
 
 
@@ -620,7 +710,7 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp',
-                               preaction=buffered_file_storage_recording_action)
+                               preaction=buffered_file_storage_recording_action, hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -630,7 +720,8 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 @pytest.fixture
 async def tcp_protocol_one_way_client(initial_client_context) -> TCPClientConnection:
     context_cv.set(initial_client_context)
-    conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0")
+    conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0",
+                               hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -643,7 +734,8 @@ async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
     context_cv.set(initial_server_context)
     conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
                                parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp',
-                               preaction=buffered_file_storage_recording_action)
+                               preaction=buffered_file_storage_recording_action,
+                               hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -654,7 +746,7 @@ async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
 async def tcp_protocol_two_way_client(echo_requester, initial_client_context) -> TCPClientConnection:
     context_cv.set(initial_client_context)
     conn = TCPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='tcp',
-                               parent_name="TCP Client 127.0.0.1:0")
+                               parent_name="TCP Client 127.0.0.1:0", hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -667,7 +759,7 @@ async def udp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
     context_cv.set(udp_initial_server_context)
     conn = UDPServerConnection(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name=f"UDP Server {server_sock_str}", peer_prefix='udp',
-                               preaction=buffered_file_storage_recording_action)
+                               preaction=buffered_file_storage_recording_action, hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -677,7 +769,8 @@ async def udp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 @pytest.fixture
 async def udp_protocol_one_way_client(udp_initial_client_context) -> UDPClientConnection:
     context_cv.set(udp_initial_client_context)
-    conn = UDPClientConnection(dataformat=JSONObject, peer_prefix='udp', parent_name="UDP Client 127.0.0.1:0")
+    conn = UDPClientConnection(dataformat=JSONObject, peer_prefix='udp', parent_name="UDP Client 127.0.0.1:0",
+                               hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -690,7 +783,8 @@ async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
     context_cv.set(udp_initial_server_context)
     conn = UDPServerConnection(dataformat=JSONObject, action=echo_action,
                                parent_name=f"UDP Server {server_sock_str}", peer_prefix='udp',
-                               preaction=buffered_file_storage_recording_action)
+                               preaction=buffered_file_storage_recording_action,
+                               hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -701,7 +795,7 @@ async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
 async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context) -> UDPClientConnection:
     context_cv.set(udp_initial_client_context)
     conn = UDPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='udp',
-                               parent_name="UDP Client 127.0.0.1:0")
+                               parent_name="UDP Client 127.0.0.1:0", hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -1002,7 +1096,8 @@ async def sftp_protocol_factory_server(buffered_file_storage_action,
     factory = SFTPOSAuthProtocolFactory(
         preaction=buffered_file_storage_recording_action,
         action=buffered_file_storage_action,
-        dataformat=JSONObject)
+        dataformat=JSONObject,
+        hostname_lookup=True)
     yield factory
 
 
@@ -1022,6 +1117,7 @@ async def sftp_protocol_factory_server_expired_connections(buffered_file_storage
     factory = SFTPOSAuthProtocolFactory(
         action=buffered_file_storage_action,
         dataformat=JSONObject,
+        hostname_lookup=True,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
     )
@@ -1032,6 +1128,7 @@ async def sftp_protocol_factory_server_expired_connections(buffered_file_storage
 async def sftp_protocol_factory_client_expired_connections() -> SFTPClientProtocolFactory:
     factory = SFTPClientProtocolFactory(
         dataformat=JSONObject,
+        hostname_lookup=True,
         expire_connections_after_inactive_minutes=1 / 60,
         expire_connections_check_interval_minutes=0.2 / 60
     )
@@ -1053,6 +1150,7 @@ async def sftp_protocol_factory_server_expired_connections_started(sftp_protocol
 async def sftp_protocol_factory_client(tmpdir) -> SFTPClientProtocolFactory:
     factory = SFTPClientProtocolFactory(
         dataformat=JSONObject,
+        hostname_lookup=True,
         base_path=Path(tmpdir) / 'sftp_sent',
     )
     yield factory
@@ -1074,7 +1172,7 @@ async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_fi
     context_cv.set(sftp_initial_server_context)
     protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
                                parent_name=f"SFTP Server {server_sock_str}", peer_prefix='sftp',
-                               preaction=buffered_file_storage_recording_action)
+                               preaction=buffered_file_storage_recording_action, hostname_lookup=True)
     yield protocol
     if not protocol.is_closing():
         protocol.close()
@@ -1085,7 +1183,7 @@ async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_fi
 async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
     context_cv.set(sftp_initial_client_context)
     protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
-                                  base_path=Path(tmpdir) / 'sftp_sent')
+                                  base_path=Path(tmpdir) / 'sftp_sent', hostname_lookup=True)
     yield protocol
     if not protocol.is_closing():
         protocol.close()
@@ -1277,7 +1375,7 @@ def ssl_object(request):
 async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_server_context, server_sock, server_sock_ipv6,
                                                       server_sock_str, client_hostname) -> TCPServerConnection:
     context_cv.set(initial_server_context)
-    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
+    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action, hostname_lookup=True,
                                allowed_senders=[IPNetwork(server_sock[0]), IPNetwork(server_sock_ipv6[0])],
                                parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp')
     yield conn
@@ -1290,7 +1388,7 @@ async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_serve
 async def tcp_protocol_two_way_server_allowed_senders_hostname(echo_action, initial_server_context,
                                                       server_sock_str, client_hostname) -> TCPServerConnection:
     context_cv.set(initial_server_context)
-    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action,
+    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action, hostname_lookup=True,
                                allowed_senders=[IPNetwork(client_hostname)],
                                parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp')
     yield conn
@@ -1304,6 +1402,7 @@ async def udp_protocol_factory_allowed_senders(echo_action, server_sock, server_
     factory = DatagramServerProtocolFactory(
         action=echo_action,
         dataformat=JSONObject,
+        hostname_lookup=True,
         allowed_senders=[IPNetwork(server_sock[0]), IPNetwork(server_sock_ipv6[0])])
     await factory.start()
     yield factory

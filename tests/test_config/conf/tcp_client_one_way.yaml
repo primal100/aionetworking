@@ -5,3 +5,4 @@ srcip: 127.0.0.1
 srcport: 0
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
+                  hostname_lookup: True
