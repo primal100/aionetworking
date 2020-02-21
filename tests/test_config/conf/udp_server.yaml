@@ -11,4 +11,4 @@ protocol_factory: !DatagramServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   allowed_senders: !IPNetwork [127.0.0.1, "::1"]
-
+                  hostname_lookup: True

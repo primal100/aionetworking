@@ -18,5 +18,6 @@ ssl_handshake_timeout: 60
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester
+                  hostname_lookup: True
 ---
 log_config_file: !Path "{conf}/logging.yaml"

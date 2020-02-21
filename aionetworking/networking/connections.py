@@ -140,6 +140,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     transport: asyncio.BaseTransport = field(default=None, init=False)
     pause_reading_on_buffer_size: int = None
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
+    hostname_lookup: bool = False
     connection_lost_tasks: List[AsyncCallable] = field(default_factory=list)
     _unprocessed_data: int = field(default=0, init=False, repr=False)
 
@@ -227,13 +228,17 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
             sockname: Tuple[str, int] = transport.get_extra_info('sockname')[0:2]
             peer_str = addr_tuple_to_str(peer)
             sock_str = addr_tuple_to_str(sockname)
+            if self.hostname_lookup:
+                host = hostname_or_ip(peer[0])
+            else:
+                host = peer[0]
             self.context: AFINETContext = {
                 'protocol_name': self.context['protocol_name'],
                 'peer': peer_str,
                 'own': sock_str,
                 'address': peer[0],
                 'port': peer[1],
-                'host': hostname_or_ip(peer[0]),
+                'host': host,
                 'alias': '',
                 'server': sock_str if self.adaptor_cls.is_receiver else peer_str,
                 'client': peer_str if self.adaptor_cls.is_receiver else sock_str

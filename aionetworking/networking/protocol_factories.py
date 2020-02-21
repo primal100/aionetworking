@@ -34,6 +34,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     dataformat: Type[BaseMessageObject] = None
     logger: LoggerType = field(default_factory=get_logger_receiver)
     pause_reading_on_buffer_size: int = None
+    hostname_lookup: bool = False
     expire_connections_after_inactive_minutes: Union[int, float] = 0
     expire_connections_check_interval_minutes: Union[int, float] = 1
     aliases: Dict[str, str] = field(default_factory=dict)
@@ -70,8 +71,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         return self.connection_cls(parent_name=self.full_name, peer_prefix=self.peer_prefix, action=self.action,
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
-                                   allowed_senders=self.allowed_senders, codec_config=self.codec_config,
-                                   **self._additional_connection_kwargs())
+                                   hostname_lookup=self.hostname_lookup, allowed_senders=self.allowed_senders,
+                                   codec_config=self.codec_config, **self._additional_connection_kwargs())
 
     def __getstate__(self):
         return dataclass_getstate(self)
