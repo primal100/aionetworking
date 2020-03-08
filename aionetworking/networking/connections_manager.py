@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
@@ -60,10 +59,6 @@ class ConnectionsManager:
 
     async def wait_num_has_connected(self, parent_name: str, num: int) -> None:
         await self._counters.wait_for_total_increments(parent_name, num)
-
-    #async def wait_all_messages_processed(self, parent_name: str) -> None:
-    #    tasks = [conn.close_actions() for conn in self if conn.parent_name == parent_name]
-    #    await asyncio.gather(*tasks)
 
     def get(self, key: str, default: bool = "_raise") -> SimpleNetworkConnectionType:
         if default == "_raise":

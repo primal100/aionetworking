@@ -108,9 +108,6 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     async def wait_num_connected(self, num: int) -> None:
         await connections_manager.wait_num_connections(self.full_name, num)
 
-    #async def wait_all_messages_processed(self) -> None:
-    #    await connections_manager.wait_all_messages_processed(self.full_name)
-
     async def wait_all_closed(self) -> None:
         await connections_manager.wait_num_connections(self.full_name, 0)
 
