@@ -32,6 +32,7 @@ class BaseMessageObject(MessageObject, Protocol):
 
     def __post_init__(self):
         self.logger = self.parent_logger.new_msg_logger(self)
+        self.context = self.context or {}
 
     @classmethod
     def _get_codec_kwargs(cls) -> Dict:

@@ -1,12 +1,12 @@
 from __future__ import annotations
 from abc import abstractmethod
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .exceptions import ServerException
 from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status, send_notify_start_signal
-from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, get_logger_receiver
+from aionetworking.networking.connections_manager import get_unique_name
 from aionetworking.types.logging import LoggerType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.networking import ProtocolFactoryType
@@ -77,8 +77,10 @@ class BaseServer(BaseReceiver, Protocol):
     server: asyncio.AbstractServer = field(default=None, init=False)
 
     def __post_init__(self) -> None:
+        self._full_name = get_unique_name(self.full_name)
+        self.protocol_factory = replace(self.protocol_factory)
         self.protocol_factory.set_logger(self.logger)
-        self.protocol_factory.set_name(self.full_name, self.peer_prefix)
+        self.protocol_factory.set_name(self._full_name, self.peer_prefix)
 
     @property
     @abstractmethod

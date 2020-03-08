@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import datetime
 import contextvars
 
@@ -42,6 +42,14 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False)
     _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.preaction:
+            self.preaction = replace(self.preaction)
+        if self.action:
+            self.action = replace(self.action)
+        if self.requester:
+            self.requester = replace(self.requester)
 
     async def start(self) -> None:
         self._context = contextvars.copy_context()

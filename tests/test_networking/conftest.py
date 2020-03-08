@@ -8,6 +8,7 @@ from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFact
 from aionetworking import context_cv
 from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking import ConnectionsManager
+from aionetworking.networking.connections_manager import clear_unique_names
 from aionetworking.networking import (TCPServerConnection, TCPClientConnection,
                                       UDPServerConnection, UDPClientConnection)
 from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPFactory, SFTPClientProtocol
@@ -420,11 +421,11 @@ async def protocol_factory_one_way_server_started(protocol_factory_one_way_serve
 
 @pytest.fixture
 async def protocol_factory_one_way_server_pipe_started(protocol_factory_one_way_server_pipe, initial_server_context,
-                                                       server_sock_str) -> StreamServerProtocolFactory:
+                                                       pipe_path) -> StreamServerProtocolFactory:
     context_cv.set(initial_server_context)
     await protocol_factory_one_way_server_pipe.start()
     if not protocol_factory_one_way_server_pipe.full_name:
-        protocol_factory_one_way_server_pipe.set_name(f'Pipe Server {server_sock_str}', 'tcp')
+        protocol_factory_one_way_server_pipe.set_name(f'Pipe Server {pipe_path}', 'pipe')
     yield protocol_factory_one_way_server_pipe
     await protocol_factory_one_way_server_pipe.close()
 
@@ -512,12 +513,12 @@ async def protocol_factory_two_way_server_started(protocol_factory_two_way_serve
 
 
 @pytest.fixture
-async def protocol_factory_two_way_server_pipe_started(protocol_factory_two_way_server_pipe, server_sock_str,
-                                                       initial_server_context) -> StreamServerProtocolFactory:
+async def protocol_factory_two_way_server_pipe_started(protocol_factory_two_way_server_pipe,
+                                                       initial_server_context, pipe_path) -> StreamServerProtocolFactory:
         context_cv.set(initial_server_context)
         await protocol_factory_two_way_server_pipe.start()
         if not protocol_factory_two_way_server_pipe.full_name:
-            protocol_factory_two_way_server_pipe.set_name(f'Pipe Server {server_sock_str}', 'tcp')
+            protocol_factory_two_way_server_pipe.set_name(f'Pipe Server {pipe_path}', 'pipe')
         yield protocol_factory_two_way_server_pipe
         await protocol_factory_two_way_server_pipe.close()
 
@@ -531,11 +532,11 @@ async def protocol_factory_one_way_client() -> StreamClientProtocolFactory:
 
 
 @pytest.fixture
-async def protocol_factory_one_way_client_started(protocol_factory_one_way_client, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_one_way_client_started(protocol_factory_one_way_client, initial_client_context, server_sock_str) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     await protocol_factory_one_way_client.start()
     if not protocol_factory_one_way_client.full_name:
-        protocol_factory_one_way_client.set_name('TCP Client 127.0.0.1:0', 'tcp')
+        protocol_factory_one_way_client.set_name(f'TCP Client {server_sock_str}', 'tcp')
     yield protocol_factory_one_way_client
     await protocol_factory_one_way_client.close()
 
@@ -550,11 +551,11 @@ async def protocol_factory_two_way_client(echo_requester) -> StreamClientProtoco
 
 
 @pytest.fixture
-async def protocol_factory_two_way_client_started(protocol_factory_two_way_client, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_two_way_client_started(protocol_factory_two_way_client, initial_client_context, server_sock_str) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     await protocol_factory_two_way_client.start()
     if not protocol_factory_two_way_client.full_name:
-        protocol_factory_two_way_client.set_name('TCP Client 127.0.0.1:0', 'tcp')
+        protocol_factory_two_way_client.set_name(f'TCP Client {server_sock_str}', 'tcp')
     yield protocol_factory_two_way_client
     await protocol_factory_two_way_client.close()
 
@@ -567,11 +568,11 @@ async def protocol_factory_one_way_client_pipe() -> StreamClientProtocolFactory:
 
 
 @pytest.fixture
-async def protocol_factory_one_way_client_pipe_started(protocol_factory_one_way_client_pipe, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_one_way_client_pipe_started(protocol_factory_one_way_client_pipe, initial_client_context, pipe_path) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     await protocol_factory_one_way_client_pipe.start()
     if not protocol_factory_one_way_client_pipe.full_name:
-        protocol_factory_one_way_client_pipe.set_name('Pipe Client 127.0.0.1:0', 'tcp')
+        protocol_factory_one_way_client_pipe.set_name(f'Pipe Client {pipe_path}', 'pipe')
     yield protocol_factory_one_way_client_pipe
     await protocol_factory_one_way_client_pipe.close()
 
@@ -585,11 +586,11 @@ async def protocol_factory_two_way_client_pipe(echo_requester) -> StreamClientPr
 
 
 @pytest.fixture
-async def protocol_factory_two_way_client_pipe_started(protocol_factory_two_way_client_pipe, initial_client_context) -> StreamClientProtocolFactory:
+async def protocol_factory_two_way_client_pipe_started(protocol_factory_two_way_client_pipe, initial_client_context, pipe_path) -> StreamClientProtocolFactory:
     context_cv.set(initial_client_context)
     await protocol_factory_two_way_client_pipe.start()
     if not protocol_factory_two_way_client_pipe.full_name:
-        protocol_factory_two_way_client_pipe.set_name('Pipe Client 127.0.0.1:0', 'tcp')
+        protocol_factory_two_way_client_pipe.set_name(f'Pipe Client {pipe_path}', 'pipe')
     yield protocol_factory_two_way_client_pipe
     await protocol_factory_two_way_client_pipe.close()
 
@@ -611,7 +612,7 @@ async def udp_protocol_factory_one_way_server_started(udp_protocol_factory_one_w
     context_cv.set(udp_initial_server_context)
     await udp_protocol_factory_one_way_server.start()
     if not udp_protocol_factory_one_way_server.full_name:
-        udp_protocol_factory_one_way_server.set_name(f'UDP Server{server_sock_str}', 'udp')
+        udp_protocol_factory_one_way_server.set_name(f'UDP Server {server_sock_str}', 'udp')
     yield udp_protocol_factory_one_way_server
     if udp_protocol_factory_one_way_server.transport and not udp_protocol_factory_one_way_server.transport.is_closing():
         await udp_protocol_factory_one_way_server.close()
@@ -673,11 +674,11 @@ async def udp_protocol_factory_one_way_client() -> DatagramClientProtocolFactory
 
 
 @pytest.fixture
-async def udp_protocol_factory_one_way_client_started(udp_protocol_factory_one_way_client, udp_initial_client_context) -> DatagramClientProtocolFactory:
+async def udp_protocol_factory_one_way_client_started(udp_protocol_factory_one_way_client, udp_initial_client_context, server_sock_str) -> DatagramClientProtocolFactory:
     context_cv.set(udp_initial_client_context)
     await udp_protocol_factory_one_way_client.start()
     if not udp_protocol_factory_one_way_client.full_name:
-        udp_protocol_factory_one_way_client.set_name('UDP Client 127.0.0.1:0', 'udp')
+        udp_protocol_factory_one_way_client.set_name(f'UDP Client {server_sock_str}', 'udp')
     yield udp_protocol_factory_one_way_client
     if udp_protocol_factory_one_way_client.transport and not udp_protocol_factory_one_way_client.transport.is_closing():
         await udp_protocol_factory_one_way_client.close()
@@ -693,12 +694,12 @@ async def udp_protocol_factory_two_way_client(echo_requester) -> DatagramClientP
 
 
 @pytest.fixture
-async def udp_protocol_factory_two_way_client_started(udp_protocol_factory_two_way_client,
+async def udp_protocol_factory_two_way_client_started(udp_protocol_factory_two_way_client, server_sock_str,
                                                       udp_initial_client_context) -> DatagramClientProtocolFactory:
     context_cv.set(udp_initial_client_context)
     await udp_protocol_factory_two_way_client.start()
     if not udp_protocol_factory_two_way_client.full_name:
-        udp_protocol_factory_two_way_client.set_name('UDP Client 127.0.0.1:0', 'udp')
+        udp_protocol_factory_two_way_client.set_name(f'UDP Client {server_sock_str}', 'udp')
     yield udp_protocol_factory_two_way_client
     if udp_protocol_factory_two_way_client.transport and not udp_protocol_factory_two_way_client.transport.is_closing():
         await udp_protocol_factory_two_way_client.close()
@@ -718,9 +719,9 @@ async def tcp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 
 
 @pytest.fixture
-async def tcp_protocol_one_way_client(initial_client_context) -> TCPClientConnection:
+async def tcp_protocol_one_way_client(initial_client_context, server_sock_str) -> TCPClientConnection:
     context_cv.set(initial_client_context)
-    conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name="TCP Client 127.0.0.1:0",
+    conn = TCPClientConnection(dataformat=JSONObject, peer_prefix='tcp', parent_name=f"TCP Client {server_sock_str}",
                                hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -743,10 +744,10 @@ async def tcp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
 
 
 @pytest.fixture
-async def tcp_protocol_two_way_client(echo_requester, initial_client_context) -> TCPClientConnection:
+async def tcp_protocol_two_way_client(echo_requester, initial_client_context, server_sock_str) -> TCPClientConnection:
     context_cv.set(initial_client_context)
     conn = TCPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='tcp',
-                               parent_name="TCP Client 127.0.0.1:0", hostname_lookup=True)
+                               parent_name=f"TCP Client {server_sock_str}", hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -767,9 +768,9 @@ async def udp_protocol_one_way_server(buffered_file_storage_action, buffered_fil
 
 
 @pytest.fixture
-async def udp_protocol_one_way_client(udp_initial_client_context) -> UDPClientConnection:
+async def udp_protocol_one_way_client(udp_initial_client_context, server_sock_str) -> UDPClientConnection:
     context_cv.set(udp_initial_client_context)
-    conn = UDPClientConnection(dataformat=JSONObject, peer_prefix='udp', parent_name="UDP Client 127.0.0.1:0",
+    conn = UDPClientConnection(dataformat=JSONObject, peer_prefix='udp', parent_name=f"UDP Client {server_sock_str}",
                                hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
@@ -792,10 +793,10 @@ async def udp_protocol_two_way_server(echo_action, buffered_file_storage_recordi
 
 
 @pytest.fixture
-async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context) -> UDPClientConnection:
+async def udp_protocol_two_way_client(echo_requester, udp_initial_client_context, server_sock_str) -> UDPClientConnection:
     context_cv.set(udp_initial_client_context)
     conn = UDPClientConnection(requester=echo_requester, dataformat=JSONObject, peer_prefix='udp',
-                               parent_name="UDP Client 127.0.0.1:0", hostname_lookup=True)
+                               parent_name=f"UDP Client {server_sock_str}", hostname_lookup=True)
     yield conn
     if conn.transport and not conn.transport.is_closing():
         conn.transport.close()
@@ -1157,11 +1158,11 @@ async def sftp_protocol_factory_client(tmpdir) -> SFTPClientProtocolFactory:
 
 
 @pytest.fixture
-async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp_protocol_factory_client, tmpdir) -> SFTPClientProtocolFactory:
+async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp_protocol_factory_client, tmpdir, server_sock_str) -> SFTPClientProtocolFactory:
     context_cv.set(sftp_initial_client_context)
     await sftp_protocol_factory_client.start()
     if not sftp_protocol_factory_client.full_name:
-        sftp_protocol_factory_client.set_name('SFTP Client 127.0.0.1:0', 'sftp')
+        sftp_protocol_factory_client.set_name(f'SFTP Client {server_sock_str}', 'sftp')
     yield sftp_protocol_factory_client
     await sftp_protocol_factory_client.close()
 
@@ -1180,9 +1181,9 @@ async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_fi
 
 
 @pytest.fixture
-async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir) -> SFTPClientProtocol:
+async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir, server_sock_str) -> SFTPClientProtocol:
     context_cv.set(sftp_initial_client_context)
-    protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name="SFTP Client 127.0.0.1:0",
+    protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp', parent_name=f"SFTP Client {server_sock_str}",
                                   base_path=Path(tmpdir) / 'sftp_sent', hostname_lookup=True)
     yield protocol
     if not protocol.is_closing():
@@ -1454,3 +1455,10 @@ def simple_network_connections(queue, client_sock_str) -> List[SimpleNetworkConn
 @pytest.fixture
 def simple_network_connection(simple_network_connections) -> SimpleNetworkConnectionType:
     return simple_network_connections[0]
+
+
+@pytest.fixture
+def reset_endpoint_names():
+    clear_unique_names()
+    yield
+    clear_unique_names()

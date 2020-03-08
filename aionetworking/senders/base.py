@@ -2,17 +2,17 @@ from __future__ import annotations
 from abc import abstractmethod
 import asyncio
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from aionetworking.compatibility import Protocol
-from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, get_logger_sender
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.networking import ProtocolFactoryType, ConnectionType
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
 from aionetworking.futures.value_waiters import StatusWaiter
+from aionetworking.networking.connections_manager import get_unique_name
 from .protocols import SenderProtocol
 
 from typing import Optional
@@ -65,7 +65,9 @@ class BaseClient(BaseSender, Protocol):
 
     def __post_init__(self):
         self.protocol_factory.set_logger(self.logger)
-        self.protocol_factory.set_name(self.full_name, self.peer_prefix)
+        self.protocol_factory = replace(self.protocol_factory)
+        self._full_name = get_unique_name(self.full_name)
+        self.protocol_factory.set_name(self._full_name, self.peer_prefix)
 
     @abstractmethod
     async def _open_connection(self) -> ConnectionType: ...
@@ -76,7 +78,7 @@ class BaseClient(BaseSender, Protocol):
 
     @property
     def full_name(self) -> str:
-        return f"{self.name} {self.src}"
+        return f"{self.name} {self.dst}"
 
     async def _close_connection(self) -> None:
         self.transport.close()
