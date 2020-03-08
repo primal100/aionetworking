@@ -66,3 +66,21 @@ class TestTwoWayServer:
             await asyncio.sleep(0.1)  # Workaround for bpo-38471
         assert echo_response == echo_response_object
         assert notification == echo_notification_object
+
+    @pytest.mark.asyncio
+    async def test_01_send_multiple_senders(self, reset_endpoint_names, tcp_server_two_way_started, tcp_client_two_way,
+                                            tcp_client_two_way_two, tmp_path, echo_response_object,
+                                            echo_exception_response_object, echo_notification_object, server_sock_str):
+        assert tcp_server_two_way_started.protocol_factory.full_name == f"TCP Server {server_sock_str}"
+        assert tcp_client_two_way.protocol_factory.full_name == f"TCP Client {server_sock_str}"
+        assert tcp_client_two_way_two.protocol_factory.full_name == f"TCP Client {server_sock_str}_2"
+        async with tcp_client_two_way as conn1, tcp_client_two_way_two as conn2:
+            echo_response1 = await asyncio.wait_for(conn1.echo(), timeout=2)
+            echo_response2 = await asyncio.wait_for(conn2.echo(), timeout=2)
+            conn1.subscribe()
+            conn2.subscribe()
+            notification1 = await asyncio.wait_for(conn1.wait_notification(), timeout=2)
+            notification2 = await asyncio.wait_for(conn2.wait_notification(), timeout=2)
+        assert echo_response1 == echo_response2 == echo_response_object
+        assert notification1 == notification2 == echo_notification_object
+

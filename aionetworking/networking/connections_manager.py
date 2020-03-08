@@ -8,6 +8,24 @@ from aionetworking.types.networking import SimpleNetworkConnectionType
 from aionetworking.futures.counters import Counters
 
 
+endpoint_names = {}
+
+
+def get_unique_name(name: str) -> str:
+    index = endpoint_names.get(name)
+    if index:
+        full_name = f'{name}_{index}'
+        endpoint_names[name] += 1
+    else:
+        full_name = name
+        endpoint_names[name] = 2
+    return full_name
+
+
+def clear_unique_names() -> None:
+    endpoint_names.clear()
+
+
 @dataclass
 class ConnectionsManager:
     _connections: Dict[str, SimpleNetworkConnectionType] = field(init=False, default_factory=dict)

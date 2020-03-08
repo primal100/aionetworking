@@ -16,8 +16,14 @@ def tcp_client_one_way(protocol_factory_one_way_client, server_sock, client_sock
 
 @pytest.fixture
 def tcp_client_two_way(protocol_factory_two_way_client, server_sock, client_sock) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1], srcip=client_sock[0],
-                     srcport=0)
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1],
+                     srcip=client_sock[0], srcport=0)
+
+
+@pytest.fixture
+def tcp_client_two_way_two(protocol_factory_two_way_client, server_sock, client_sock) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_two_way_client, host=server_sock[0], port=server_sock[1],
+                     srcip=client_sock[0], srcport=0)
 
 
 @pytest.fixture

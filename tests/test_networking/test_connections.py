@@ -146,9 +146,9 @@ class TestConnectionOneWayServer:
 
 
 class TestConnectionOneWayClient:
-    def test_00_is_child(self, one_way_client_connection, one_way_client_protocol_name):
-        assert one_way_client_connection.is_child(f"{one_way_client_protocol_name.upper()} Client 127.0.0.1:0")
-        assert not one_way_client_connection.is_child("ABC Client 127.0.0.1:0")
+    def test_00_is_child(self, one_way_client_connection, one_way_client_protocol_name, server_sock_str):
+        assert one_way_client_connection.is_child(f"{one_way_client_protocol_name.upper()} Client {server_sock_str}")
+        assert not one_way_client_connection.is_child(f"ABC Client {server_sock_str}")
 
     @pytest.mark.asyncio
     async def test_01_pickle(self, one_way_client_connection):

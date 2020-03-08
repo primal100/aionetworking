@@ -1,5 +1,5 @@
 psutil>=5.7.0
-asyncssh>=2.1.0
+asyncssh>=2.2.0
 pyyaml>=5.3
 uvloop>=0.14.0;os_name=='posix'
 pamela>=1.0.0;os_name=='posix'

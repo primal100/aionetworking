@@ -135,9 +135,9 @@ class TestConnectionClient:
         sftp_factory_client.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE20190101010101000000",
                                                     remotepath='/')
 
-    def test_02_is_child(self, one_way_client_connection, sftp_protocol_one_way_client):
-        assert sftp_protocol_one_way_client.is_child("SFTP Client 127.0.0.1:0")
-        assert not sftp_protocol_one_way_client.is_child("ABC Client 127.0.0.1:0")
+    def test_02_is_child(self, one_way_client_connection, sftp_protocol_one_way_client, server_sock_str):
+        assert sftp_protocol_one_way_client.is_child(f"SFTP Client {server_sock_str}")
+        assert not sftp_protocol_one_way_client.is_child(f"ABC Client {server_sock_str}")
 
     @pytest.mark.asyncio
     async def test_03_pickle(self, one_way_client_connection):
