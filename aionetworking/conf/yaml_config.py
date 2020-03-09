@@ -95,12 +95,14 @@ def configure_logging(path: Path):
 def node_from_file(path: Union[str, Path], paths: Dict[str, Union[str, Path]] = None) -> \
         Union[ReceiverType, SenderType]:
     stream = open(path, 'r')
-    return node_from_config(stream, paths=paths)
+    parent = Path(path).parent
+    return node_from_config(stream, paths=paths, parent=parent)
 
 
-def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None) -> \
+def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None, parent: Path = None) -> \
         Union[ReceiverType, SenderType]:
     paths = paths or get_paths()
+    paths['this'] = parent
     load_path(paths)
     configs = list(yaml.safe_load_all(conf))
     node = configs[0]
@@ -122,7 +124,8 @@ def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None) ->
 
 def node_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[str, Path]] = None) -> Union[ReceiverType, SenderType]:
     f = open(str(conf_path), 'r')
-    return node_from_config(f, paths=paths)
+    parent_path = Path(conf_path).parent
+    return node_from_config(f, paths=paths, parent=parent_path)
 
 
 def server_from_config_file(conf_path: Union[Path, str], paths: Dict[str, Union[str, Path]] = None) -> ReceiverType:
