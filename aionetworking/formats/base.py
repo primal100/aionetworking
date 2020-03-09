@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
@@ -17,6 +17,11 @@ from aionetworking.compatibility import Protocol
 from aionetworking.types.formats import MessageObjectType, CodecType
 
 
+def current_time() -> datetime.datetime:
+    # Required to work with freeze_gun
+    return datetime.datetime.now()
+
+
 @dataclass
 class BaseMessageObject(MessageObject, Protocol):
     name = None
@@ -28,7 +33,7 @@ class BaseMessageObject(MessageObject, Protocol):
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
     parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
-    received_timestamp: datetime = field(default_factory=datetime.now, compare=False, repr=False, hash=False)
+    received_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
 
     def __post_init__(self):
         self.logger = self.parent_logger.new_msg_logger(self)
@@ -86,7 +91,7 @@ class BaseMessageObject(MessageObject, Protocol):
         return pformat(self.decoded)
 
     @property
-    def timestamp(self) -> datetime:
+    def timestamp(self) -> datetime.datetime:
         return self.received_timestamp
 
     def filter(self) -> bool:
