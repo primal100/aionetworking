@@ -27,7 +27,7 @@ class TCPServer(BaseNetworkServer):
     name = "TCP Server"
     peer_prefix = 'tcp'
     protocol_factory: StreamServerProtocolFactory = None
-    reuse_address: bool = False
+    reuse_address: bool = True
 
     ssl: Optional[ServerSideSSL] = None
     ssl_handshake_timeout: Optional[int] = None
@@ -77,37 +77,6 @@ class UnixSocketServer(BaseServer):
     async def _get_server(self) -> asyncio.AbstractServer:
         return await self.loop.create_unix_server(self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
                                                   ssl_handshake_timeout=self.ssl_handshake_timeout, backlog=self.backlog)
-
-
-class ServeForeverHelper:
-    def __init__(self, receiver: BaseServer):
-        self._receiver = receiver
-        self._serving_forever_fut = None
-        self._loop = self._receiver.loop
-
-    async def serve_forever(self):
-        if self._serving_forever_fut is not None:
-            raise RuntimeError(
-                f'server {self!r} is already being awaited on serve_forever()')
-        self._serving_forever_fut = self._loop.create_future()
-
-        try:
-            await self._serving_forever_fut
-        except asyncio.CancelledError:
-            try:
-                self._receiver.close()
-                await self._receiver.wait_stopped()
-            finally:
-                raise
-        finally:
-            self._serving_forever_fut = None
-
-    def close(self):
-        self._receiver.close()
-        if (self._serving_forever_fut is not None and
-                not self._serving_forever_fut.done()):
-            self._serving_forever_fut.cancel()
-            self._serving_forever_fut = None
 
 
 @dataclass

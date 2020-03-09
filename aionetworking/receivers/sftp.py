@@ -17,7 +17,7 @@ class SFTPServer(BaseNetworkServer):
     sftp_factory = SFTPFactory
     name = 'SFTP Server'
     peer_prefix = 'sftp'
-    reuse_address: bool = False
+    reuse_address: bool = True
     sftp_log_level: InitVar[int] = 1
     allow_scp: bool = False
     server_host_key: Path = ()
