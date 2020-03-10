@@ -6,7 +6,6 @@ import os
 import sys
 
 from dataclasses import dataclass, field
-from contextvars import ContextVar
 
 from .base import BaseServer, BaseNetworkServer
 from aionetworking.networking.connections import UDPServerConnection
@@ -17,9 +16,6 @@ from aionetworking.futures.value_waiters import StatusWaiter
 
 import socket
 from typing import List, Optional, Union
-
-
-test_cv = ContextVar('test_cv', default='default')
 
 
 @dataclass

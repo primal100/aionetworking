@@ -114,7 +114,7 @@ class BaseCodec(Codec):
     logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
 
     def __post_init__(self):
-        pass
+        self.context = self.context or {}
 
     async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
         yield (encoded, encoded)
@@ -126,6 +126,8 @@ class BaseCodec(Codec):
         return aone(self.decode(encoded, **kwargs))
 
     async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+        _context = self.context.copy()
+        _context.update(kwargs.pop('context', {}))
         async for encoded, decoded in self.decode(encoded, **kwargs):
             yield self.msg_obj(encoded, decoded, context=self.context, parent_logger=self.logger, **kwargs)
 
