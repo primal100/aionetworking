@@ -66,14 +66,18 @@ class TestSignalServerManager:
     @pytest.mark.asyncio
     async def test_00_start_close(self, signal_server_manager, patch_systemd, server_port):
         task = asyncio.create_task(signal_server_manager.serve_until_stopped())
-        await asyncio.wait_for(signal_server_manager.wait_server_started(), timeout=2)
-        signal_server_manager.close()
-        await asyncio.wait_for(task, timeout=1)
-        await asyncio.wait_for(signal_server_manager.wait_server_stopped(), timeout=1)
-        if patch_systemd:
-            daemon, journal = patch_systemd
-            daemon.notify.assert_has_calls([status_call(server_port), ready_call, stopping_call])
-            assert daemon.notify.call_count == 3
+        try:
+            await asyncio.wait_for(signal_server_manager.wait_server_started(), timeout=2)
+            signal_server_manager.close()
+        except asyncio.TimeoutError:
+            await asyncio.wait_for(task, timeout=2)
+        else:
+            await asyncio.wait_for(task, timeout=1)
+            await asyncio.wait_for(signal_server_manager.wait_server_stopped(), timeout=1)
+            if patch_systemd:
+                daemon, journal = patch_systemd
+                daemon.notify.assert_has_calls([status_call(server_port), ready_call, stopping_call])
+                assert daemon.notify.call_count == 3
 
     @pytest.mark.asyncio
     async def test_01_check_reload_no_change(self, signal_server_manager_started):
