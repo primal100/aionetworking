@@ -395,30 +395,30 @@ class Operator(CallableFromString):
 class Expression:
     attr: str
     op: Operator
-    value_type: Builtin
     value: Any
     case_sensitive: bool = True
 
     @classmethod
     def from_string(cls, string: str):
-        attr, op, value_type, value = string.split()
+        attr, op, value = string.split()
         if op.startswith('i'):
             case_sensitive = True
             op = op.split('i')[1]
         else:
             case_sensitive = False
         op = Operator(op)
-        return cls(attr, op, value_type, value, case_sensitive=case_sensitive)
+        return cls(attr, op, value, case_sensitive=case_sensitive)
 
     def __call__(self, obj: Any) -> bool:
         if not self.attr or self.attr == 'self':
             value = obj
         else:
             value = getattr(obj, self.attr)
+        value_type = type(value)
         if self.case_sensitive:
             if isinstance(value, Iterable):
                 value = [v.lower() for v in value]
             else:
                 value = value.lower()
             return self.op(value, self.value.lower())
-        return self.op(value, self.value)
+        return self.op(value, value_type(self.value))

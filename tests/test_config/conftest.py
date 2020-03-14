@@ -199,7 +199,7 @@ def peer_filter(client_sock) -> PeerFilter:
 
 @pytest.fixture
 def message_filter() -> MessageFilter:
-    return MessageFilter(Expression.from_string("method == istr login"))
+    return MessageFilter(Expression.from_string("method == login"))
 
 
 @pytest.fixture()
