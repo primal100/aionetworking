@@ -15,7 +15,7 @@ formatters:
         format: "{msg} {start} {end} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {interval}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB"
         style: '{'
     raw:
-        format: "{peer} {message}"
+        format: "{peer} {asctime} {levelname} {message}"
         style: '{'
     msg:
         format: "{peer} {msg_obj.request_id}"

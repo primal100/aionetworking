@@ -138,10 +138,15 @@ class BaseCodec(Codec):
                 self.logger.on_msg_decoded(msg)
             yield msg
             i += 1
-        self.logger.on_buffer_decoded(i)
+        self.logger.on_buffer_decoded(encoded, i)
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
-        return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, parent_logger=self.logger, **kwargs)
+        try:
+            return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context,
+                                parent_logger=self.logger, **kwargs)
+        except Exception as exc:
+            obj = self.msg_obj(b'', decoded, context=self.context, parent_logger=self.logger, **kwargs)
+            self.logger.on_encode_failed(obj, exc)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)
