@@ -53,23 +53,28 @@ class TestConnectionLoggerNoStats:
                                    debug_logging):
         receiver_connection_logger.on_buffer_received(json_rpc_login_request_encoded)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
-        json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
-        assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
 
-    def test_02_on_msg_processed(self, receiver_connection_logger, json_object, caplog):
+    def test_02_on_buffer_decoded(self, receiver_connection_logger, caplog, json_rpc_login_request_encoded,
+                                  debug_logging):
+        receiver_connection_logger.on_buffer_decoded(json_rpc_login_request_encoded, 1)
+        json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
+        assert caplog.record_tuples[0] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
+        assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO, "Decoded 1 message in buffer")
+
+    def test_03_on_msg_processed(self, receiver_connection_logger, json_object, caplog):
         receiver_connection_logger.on_msg_processed(json_object)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Finished processing message 1')
 
-    def test_03_on_msg_sent(self, receiver_connection_logger, caplog, json_rpc_logout_request_encoded):
+    def test_04_on_msg_sent(self, receiver_connection_logger, caplog, json_rpc_logout_request_encoded):
         receiver_connection_logger.on_msg_sent(json_rpc_logout_request_encoded)
         assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
 
-    def test_04_connection_finished_no_error(self, receiver_connection_logger, caplog, client_sock_str, server_sock_str):
+    def test_05_connection_finished_no_error(self, receiver_connection_logger, caplog, client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished()
         assert caplog.record_tuples == [('receiver.connection', logging.INFO,
                                          f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')]
 
-    def test_05_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog,
+    def test_06_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog,
                                                client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished(zero_division_exception)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.ERROR, 'division by zero')
@@ -82,34 +87,39 @@ class TestConnectionLoggerStats:
     async def test_00_has_stats_logger(self, receiver_connection_logger_stats, stats_logger):
         assert receiver_connection_logger_stats._stats_logger == stats_logger
 
-    def test_01_on_buffer_received(self, receiver_connection_logger_stats, json_rpc_login_request_encoded, caplog, debug_logging):
+    def test_01_on_buffer_received(self, receiver_connection_logger_stats, json_rpc_login_request_encoded, caplog,
+                                   debug_logging):
         assert receiver_connection_logger_stats._stats_logger.received == 0
         receiver_connection_logger_stats.on_buffer_received(json_rpc_login_request_encoded)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
-        if isinstance(json_rpc_login_request_encoded, bytes):
-            json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
-        assert caplog.record_tuples[1] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
         assert receiver_connection_logger_stats._stats_logger.received == 79
 
-    def test_02_on_msg_processed(self, receiver_connection_logger_stats, json_object, caplog):
+    def test_02_on_buffer_decoded(self, receiver_connection_logger, caplog, json_rpc_login_request_encoded,
+                                  debug_logging):
+        receiver_connection_logger.on_buffer_decoded(json_rpc_login_request_encoded, 1)
+        json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
+        assert caplog.record_tuples[0] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
+        assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO, "Decoded 1 message in buffer")
+
+    def test_03_on_msg_processed(self, receiver_connection_logger_stats, json_object, caplog):
         assert receiver_connection_logger_stats._stats_logger.processed == 0
         receiver_connection_logger_stats.on_msg_processed(json_object)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Finished processing message 1')
         assert receiver_connection_logger_stats._stats_logger.processed == 79
 
-    def test_03_on_msg_sent(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded, debug_logging):
+    def test_04_on_msg_sent(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded, debug_logging):
         assert receiver_connection_logger_stats._stats_logger.msgs.sent == 0
         receiver_connection_logger_stats.on_msg_sent(json_rpc_login_request_encoded)
         assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
         assert receiver_connection_logger_stats._stats_logger.msgs.sent == 1
 
-    def test_04_connection_finished_no_error(self, receiver_connection_logger_stats, caplog, client_sock_str, server_sock_str):
+    def test_05_connection_finished_no_error(self, receiver_connection_logger_stats, caplog, client_sock_str, server_sock_str):
         receiver_connection_logger_stats.connection_finished()
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO,
                                            f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
         assert caplog.record_tuples[1] == ('receiver.stats', logging.INFO, 'ALL')
 
-    def test_05_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog,
+    def test_06_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog,
                                                client_sock_str, server_sock_str):
         receiver_connection_logger_stats.connection_finished(zero_division_exception)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.ERROR, 'division by zero')

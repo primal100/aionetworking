@@ -210,7 +210,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self.logger.on_msg_processed(msg_obj)
 
     def _on_decoding_error(self, buffer: bytes, exc: BaseException):
-        self.logger.manage_error(exc)
+        self.logger.manage_decode_error(buffer, exc)
         response = self.action.on_decode_error(buffer, exc)
         if response:
             self.encode_and_send_msg(response)

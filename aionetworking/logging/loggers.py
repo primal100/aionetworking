@@ -157,21 +157,26 @@ class ConnectionLogger(Logger):
         except UnicodeDecodeError:
             return binascii.hexlify(data).decode('utf-8')
 
-    def _raw_received(self, data: bytes, *args, **kwargs) -> None:
-        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+    def _raw_received(self, data: bytes, level: int, *args, **kwargs) -> None:
+        if self._raw_received_logger.isEnabledFor(level):
             msg = self._convert_raw_to_hex(data)
-            self._raw_received_logger.debug(msg, *args, **kwargs)
+            self._raw_received_logger.log(level, msg, *args, **kwargs)
 
-    def _raw_sent(self, data: bytes, *args, **kwargs) -> None:
-        if self._raw_received_logger.isEnabledFor(logging.DEBUG):
+    def _raw_sent(self, data: bytes, level: int, *args, **kwargs) -> None:
+        if self._raw_received_logger.isEnabledFor(level):
             msg = self._convert_raw_to_hex(data)
-            self._raw_sent_logger.debug(msg, *args, **kwargs)
+            self._raw_sent_logger.log(level, msg, *args, **kwargs)
+
+    def manage_decode_error(self, buffer: bytes, exc: BaseException):
+        self._raw_received(buffer, logging.ERROR)
+        self.error('Failed to decode message')
+        self.manage_error(exc)
 
     def _msg_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         self._msg_received_logger.debug(msg, *args, detail={'msg_obj': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
 
-    def _msg_sent(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
-        self._msg_sent_logger.debug(msg, *args, detail={'msg_obj': msg_obj, 'direction': 'SENT'}, **kwargs)
+    def _msg_sent(self, msg_obj: MessageObjectType, level: int, *args, msg: str = '', **kwargs) -> None:
+        self._msg_sent_logger.log(level, msg, *args, detail={'msg_obj': msg_obj, 'direction': 'SENT'}, **kwargs)
 
     def on_msg_decoded(self, msg_obj: MessageObjectType) -> None:
         self._msg_received(msg_obj)
@@ -182,17 +187,22 @@ class ConnectionLogger(Logger):
 
     def on_buffer_received(self, data: bytes) -> None:
         self.info("Received buffer containing %s bytes", len(data))
-        self._raw_received(data)
 
-    def on_buffer_decoded(self, num: int) -> None:
+    def on_buffer_decoded(self, data: bytes, num: int) -> None:
+        self._raw_received(data, logging.DEBUG)
         self.info("Decoded %s in buffer", p.no('message', num))
 
+    def on_encode_failed(self, msg_obj: MessageObjectType, exc: BaseException):
+        self._msg_sent(msg_obj, logging.ERROR)
+        self.error('Failed to encode message %s', msg_obj)
+        self.manage_error(exc)
+
     def on_sending_decoded_msg(self, msg_obj: MessageObjectType) -> None:
-        self._msg_sent(msg_obj)
+        self._msg_sent(msg_obj, logging.DEBUG)
 
     def on_sending_encoded_msg(self, data: bytes) -> None:
         self.debug("Sending message")
-        self._raw_sent(data)
+        self._raw_sent(data, logging.DEBUG)
 
     def on_msg_sent(self, data: bytes) -> None:
         self.debug('Message sent')
