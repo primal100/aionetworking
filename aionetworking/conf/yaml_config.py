@@ -111,7 +111,7 @@ def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None, pa
         log_config_file = misc_config.pop('log_config_file')
         node_name = misc_config.pop('node_name', None)  #3.8 assignment expression
         if not node_name:
-            node_name = node.full_name.replace(' ', '_')
+            node_name = node.full_name.replace(' ', '_').replace(':', '_')
         paths['node'] = node_name
         paths['name'] = node.name.replace(' ', '_')
         paths['host'] = node.host

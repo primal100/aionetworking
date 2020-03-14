@@ -131,11 +131,6 @@ class ConnectionLogger(Logger):
         self._msg_received_logger = self.get_sibling('msg_received', cls=Logger)
         self._msg_sent_logger = self.get_sibling('msg_sent', cls=Logger)
 
-    def manage_decode_error(self, buffer: bytes, exc: BaseException):
-        self._raw_received_logger.error(buffer)
-        self.logger.error('Failed to decode message')
-        self.manage_error(exc)
-
     def new_msg_logger(self, msg_obj: MessageObjectType):
         return self.get_sibling("msg", cls=Logger, extra={'msg_obj': msg_obj})
 
@@ -171,6 +166,11 @@ class ConnectionLogger(Logger):
         if self._raw_received_logger.isEnabledFor(level):
             msg = self._convert_raw_to_hex(data)
             self._raw_sent_logger.log(level, msg, *args, **kwargs)
+
+    def manage_decode_error(self, buffer: bytes, exc: BaseException):
+        self._raw_received(buffer, logging.ERROR)
+        self.error('Failed to decode message')
+        self.manage_error(exc)
 
     def _msg_received(self, msg_obj: MessageObjectType, *args, msg: str = '', **kwargs) -> None:
         self._msg_received_logger.debug(msg, *args, detail={'msg_obj': msg_obj, 'direction': 'RECEIVED'}, **kwargs)
