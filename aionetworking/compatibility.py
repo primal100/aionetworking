@@ -107,8 +107,7 @@ def default_server_port() -> int:
         return base_port + 12
     if isinstance(loop, asyncio.SelectorEventLoop):
         return base_port
-    else:
-        return base_port + 1
+    return base_port + 1
 
 
 def default_client_port() -> int:

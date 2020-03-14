@@ -26,7 +26,7 @@ def load_default_ports():
 def path_constructor(paths, loader, node) -> Optional[Path]:
     value = loader.construct_scalar(node)
     if value:
-        path = Path(value.format(**paths))
+        path = Path.resolve(Path(value.format(**paths)))
         return path
     return None
 
