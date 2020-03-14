@@ -44,7 +44,7 @@ class BaseMessageObject(MessageObject, Protocol):
         return {}
 
     @classmethod
-    def get_codec(cls, first_buffer_received: Optional[bytes], **kwargs) -> CodecType:
+    def get_codec(cls, first_buffer_received: Optional[bytes] = None, **kwargs) -> CodecType:
         kwargs.update(cls._get_codec_kwargs())
         return cls.codec_cls(cls, **kwargs)
 
