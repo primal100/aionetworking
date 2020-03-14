@@ -189,13 +189,6 @@ def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) 
                 f'{linux_loop_type} is not a valid loop name. Choose either proactor or selector')
 
 
-###Logging###
-
-def log_exception(ex: BaseException) -> Sequence[str]:
-        return [line.rstrip('\n') for line in
-                traceback.format_exception(ex.__class__, ex, ex.__traceback__)]
-
-
 ###Multiprocessing###
 
 _mmap_counter = itertools.count()

@@ -34,16 +34,12 @@ class TestLogger:
     def test_04_manage_error(self, receiver_logger, caplog, zero_division_exception) -> None:
         receiver_logger.manage_error(zero_division_exception)
         log = caplog.record_tuples[0]
-        assert log[0] == 'receiver'
-        assert log[1] == logging.ERROR
-        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert log == ('receiver', logging.ERROR, 'division by zero')
 
     def test_05_manage_critical_error(self, receiver_logger, caplog, zero_division_exception) -> None:
         receiver_logger.manage_critical_error(zero_division_exception)
         log = caplog.record_tuples[0]
-        assert log[0] == 'receiver'
-        assert log[1] == logging.CRITICAL
-        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert log == ('receiver', logging.CRITICAL, 'division by zero')
 
     def test_06_log_num_connections(self, receiver_logger, caplog, debug_logging):
         receiver_logger.log_num_connections("closed", 4)

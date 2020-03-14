@@ -72,10 +72,7 @@ class TestConnectionLoggerNoStats:
     def test_05_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog,
                                                client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished(zero_division_exception)
-        log = caplog.record_tuples[0]
-        assert log[0] == 'receiver.connection'
-        assert log[1] == logging.ERROR
-        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.ERROR, 'division by zero')
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
                                            f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
 
@@ -115,10 +112,7 @@ class TestConnectionLoggerStats:
     def test_05_connection_finished_with_error(self, receiver_connection_logger_stats, zero_division_exception, caplog,
                                                client_sock_str, server_sock_str):
         receiver_connection_logger_stats.connection_finished(zero_division_exception)
-        log = caplog.record_tuples[0]
-        assert log[0] == 'receiver.connection'
-        assert log[1] == logging.ERROR
-        assert 'ZeroDivisionError: division by zero' in log[2]
+        assert caplog.record_tuples[0] == ('receiver.connection', logging.ERROR, 'division by zero')
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
                                            f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
         assert caplog.record_tuples[2] == ('receiver.stats', logging.INFO, 'ALL')

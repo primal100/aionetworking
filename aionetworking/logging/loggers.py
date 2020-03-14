@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from aionetworking.compatibility import get_current_task_name
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
-from aionetworking.utils import log_exception, SystemInfo, supports_system_info
+from aionetworking.utils import SystemInfo, supports_system_info
 from aionetworking.logging.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
 from aionetworking.futures.schedulers import TaskScheduler
 
@@ -22,11 +22,11 @@ class BaseLogger(logging.LoggerAdapter, ABC):
 
     def manage_error(self, exc: BaseException) -> None:
         if exc:
-            self.error(log_exception(exc))
+            self.error(exc, exc_info=exc)
 
     def manage_critical_error(self, exc: BaseException) -> None:
         if exc:
-            self.critical(log_exception(exc))
+            self.critical(exc, exc_info=exc)
 
     @abstractmethod
     def _get_connection_logger_cls(self) -> Type: ...
