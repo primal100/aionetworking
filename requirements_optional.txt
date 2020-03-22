@@ -1,6 +1,6 @@
 psutil>=5.7.0
 asyncssh>=2.2.0
-pyyaml>=5.3
+pyyaml>=5.3.1
 uvloop>=0.14.0;os_name=='posix'
 pamela>=1.0.0;os_name=='posix'
 pywin32>=227;os_name=='nt'

@@ -58,6 +58,7 @@ class BaseMessageObject(MessageObject, Protocol):
 
     @property
     def peer(self) -> str:
+        print(self.context)
         return self.context['peer']
 
     def __getstate__(self):
@@ -108,6 +109,7 @@ class BaseCodec(Codec):
     write_mode = 'wb'
     append_mode = 'ab'
     log_msgs = True
+    supports_notifications = False
 
     msg_obj: Type[MessageObjectType]
     context: Dict[str, Any] = field(default_factory=context_cv.get)
@@ -117,7 +119,7 @@ class BaseCodec(Codec):
         self.context = self.context or {}
 
     async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
-        yield (encoded, encoded)
+        yield encoded, encoded
 
     def encode(self, decoded: Any, **kwargs) -> bytes:
         return decoded
