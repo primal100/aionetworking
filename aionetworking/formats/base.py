@@ -34,10 +34,15 @@ class BaseMessageObject(MessageObject, Protocol):
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
     parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
     received_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
+    received: bool = field(default=True, compare=False)
 
     def __post_init__(self):
         self.logger = self.parent_logger.new_msg_logger(self)
         self.context = self.context or {}
+
+    @property
+    def received_or_sent(self) -> str:
+        return "RECEIVED" if self.received else "SENT"
 
     @classmethod
     def _get_codec_kwargs(cls) -> Dict:
@@ -144,10 +149,10 @@ class BaseCodec(Codec):
 
     def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
         try:
-            return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context,
+            return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, received=False,
                                 parent_logger=self.logger, **kwargs)
         except Exception as exc:
-            obj = self.msg_obj(b'', decoded, context=self.context, parent_logger=self.logger, **kwargs)
+            obj = self.msg_obj(b'', decoded, context=self.context, parent_logger=self.logger, received=False, **kwargs)
             self.logger.on_encode_failed(obj, exc)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
