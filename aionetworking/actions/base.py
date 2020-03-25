@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 
 from aionetworking.compatibility import Protocol
-from aionetworking import settings
 from aionetworking.logging.loggers import logger_cv
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.formats import MessageObjectType

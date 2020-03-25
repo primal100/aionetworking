@@ -7,7 +7,6 @@ import builtins
 import operator
 import os
 import re
-import traceback
 import time
 import itertools
 import sys
@@ -19,7 +18,7 @@ from functools import wraps
 
 from .compatibility import Protocol
 from pathlib import Path
-from typing import Sequence, Callable, List, AnyStr, Tuple, Union, AsyncGenerator, Any, TYPE_CHECKING, Generator, Iterable
+from typing import Sequence, Callable, List, AnyStr, Tuple, Union, AsyncGenerator, Any, TYPE_CHECKING, Optional, Iterable
 from ipaddress import IPv4Network, IPv6Network
 
 try:
@@ -399,15 +398,17 @@ class Expression:
     case_sensitive: bool = True
 
     @classmethod
-    def from_string(cls, string: str):
-        attr, op, value = string.split()
-        if op.startswith('i'):
-            case_sensitive = True
-            op = op.split('i')[1]
-        else:
-            case_sensitive = False
-        op = Operator(op)
-        return cls(attr, op, value, case_sensitive=case_sensitive)
+    def from_string(cls, string: str) -> Optional[Expression]:
+        if string:
+            attr, op, value = string.split()
+            if op.startswith('i'):
+                case_sensitive = True
+                op = op.split('i')[1]
+            else:
+                case_sensitive = False
+            op = Operator(op)
+            return cls(attr, op, value, case_sensitive=case_sensitive)
+        return None
 
     def __call__(self, obj: Any) -> bool:
         if not self.attr or self.attr == 'self':

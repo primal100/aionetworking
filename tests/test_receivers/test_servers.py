@@ -25,17 +25,17 @@ class TestServerStartStop:
     async def test_00_server_start(self, server_receiver, capsys):
         assert not server_receiver.is_started()
         task = asyncio.create_task(server_receiver.start())
-        await asyncio.wait_for(server_receiver.wait_started(), timeout=5)
+        await asyncio.wait_for(server_receiver.wait_started(), timeout=4)
         assert server_receiver.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
     async def test_01_serve_forever(self, server_receiver, capsys):
         assert not server_receiver.is_started()
         task = asyncio.create_task(server_receiver.serve_forever())
-        await asyncio.wait_for(server_receiver.wait_started(), timeout=2)
+        await asyncio.wait_for(server_receiver.wait_started(), timeout=4)
         assert server_receiver.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
@@ -51,9 +51,9 @@ class TestServerStartStop:
     async def test_02_server_close(self, server_started):
         assert server_started.is_started()
         task = asyncio.create_task(server_started.close())
-        await asyncio.wait_for(server_started.wait_stopped(), timeout=2)
+        await asyncio.wait_for(server_started.wait_stopped(), timeout=4)
         assert not server_started.is_started()
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
     async def test_03_server_wait_started(self, server_receiver, capsys):
@@ -63,7 +63,7 @@ class TestServerStartStop:
         assert not task.done()
         await server_receiver.start()
         assert server_receiver.is_started()
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
 
@@ -75,7 +75,7 @@ class TestServerStartStop:
         assert not task.done()
         await server_started.close()
         assert server_started.is_closing()
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
     async def test_05_server_already_started(self, server_started):
@@ -101,11 +101,11 @@ class TestServerStartStop:
     async def test_08_server_start_quiet(self, server_quiet, capsys):
         assert not server_quiet.is_started()
         task = asyncio.create_task(server_quiet.start())
-        await asyncio.wait_for(server_quiet.wait_started(), timeout=2)
+        await asyncio.wait_for(server_quiet.wait_started(), timeout=4)
         assert server_quiet.is_started()
         captured = capsys.readouterr()
         assert captured.out == ''
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('signal_num', [
@@ -115,10 +115,10 @@ class TestServerStartStop:
     async def test_09_serve_until_close_signal(self, server_quiet, signal_num, patch_systemd, server_port):
         assert not server_quiet.is_started()
         task = asyncio.create_task(server_quiet.serve_until_close_signal())
-        await asyncio.wait_for(server_quiet.wait_started(), timeout=2)
+        await asyncio.wait_for(server_quiet.wait_started(), timeout=4)
         status = next(server_quiet.listening_on_msgs)
         os.kill(os.getpid(), signal_num)
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=4)
         assert server_quiet.is_closed()
         if patch_systemd:
             daemon, journal = patch_systemd

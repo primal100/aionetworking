@@ -59,6 +59,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     def _set_codecs(self, buffer: Optional[bytes]):
         context_cv.set(self.context)
+        connection_logger_cv.set(self.logger)
         self.codec = self.dataformat.get_codec(buffer, **self.codec_config)
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer)
 
@@ -165,7 +166,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
 
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
         async for msg in msgs:
-            if msg.request_id:
+            if msg.request_id is not None:
                 try:
                     self._scheduler.set_result(msg.request_id, msg)
                 except KeyError:
@@ -183,17 +184,27 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.action.supports_notifications:
-            self._notifications_task = self._scheduler.task_with_callback(self._send_notifications(), name='Notifications')
+            self._notifications_task = self._scheduler.task_with_callback(self._send_action_notifications(), name='Notifications')
         else:
             self._notifications_task = None
+
+    def _set_codecs(self, buffer: Optional[bytes]):
+        super()._set_codecs(buffer)
+        if self.codec.supports_notifications and not self._notifications_task:
+            self._notifications_task = self._scheduler.task_with_callback(self._send_codec_notifications(),
+                                                                          name='Notifications')
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
         if self._notifications_task:
             self._notifications_task.cancel()
         await super().close(exc)
 
-    async def _send_notifications(self):
+    async def _send_action_notifications(self):
         async for item in self.action.get_notifications(self.context['peer']):
+            self.encode_and_send_msg(item)
+
+    async def _send_codec_notifications(self):
+        async for item in self.codec.get_notifications():
             self.encode_and_send_msg(item)
 
     def _on_exception(self, exc: BaseException, msg_obj: MessageObjectType) -> None:
