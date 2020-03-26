@@ -47,27 +47,29 @@ class TestSenderAdaptorOneWay:
         one_way_sender_adaptor.send_data(json_rpc_login_request_encoded)
         assert queue.get_nowait() == json_rpc_login_request_encoded
 
-    def test_03_encode_and_send_msg(self, one_way_sender_adaptor, json_rpc_login_request_encoded,
+    @pytest.mark.asyncio
+    async def test_03_encode_and_send_msg(self, one_way_sender_adaptor, json_rpc_login_request_encoded,
                                     json_rpc_login_request, queue, json_client_codec):
         one_way_sender_adaptor.encode_and_send_msg(json_rpc_login_request)
         assert one_way_sender_adaptor.codec == json_client_codec
-        assert queue.get_nowait() == json_rpc_login_request_encoded
+        assert await asyncio.wait_for(queue.get(), 1) == json_rpc_login_request_encoded
 
-    def test_04_encode_and_msgs(self, one_way_sender_adaptor, json_decoded_multi, json_encoded_multi, queue):
+    @pytest.mark.asyncio
+    async def test_04_encode_and_msgs(self, one_way_sender_adaptor, json_decoded_multi, json_encoded_multi, queue):
         one_way_sender_adaptor.encode_and_send_msgs(json_decoded_multi)
-        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
+        assert [await asyncio.wait_for(queue.get(), 1), await asyncio.wait_for(queue.get(), 1)] == json_encoded_multi
 
     @pytest.mark.asyncio
     async def test_05_play_recording(self, one_way_sender_adaptor, file_containing_json_recording: Path,
                                      json_encoded_multi, queue):
         await asyncio.wait_for(one_way_sender_adaptor.play_recording(file_containing_json_recording, timing=False),
                                timeout=0.1)
-        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
+        assert [await asyncio.wait_for(queue.get(), 1), await asyncio.wait_for(queue.get(), 1)] == json_encoded_multi
 
     @pytest.mark.asyncio
     async def test_06_play_recording_delay(self, one_way_sender_adaptor, file_containing_json_recording: Path,
                                            json_encoded_multi, queue):
         coro = one_way_sender_adaptor.play_recording(file_containing_json_recording, timing=True)
         time_taken = await time_coro(coro)
-        assert [queue.get_nowait(), queue.get_nowait()] == json_encoded_multi
+        assert [await asyncio.wait_for(queue.get(), 1), await asyncio.wait_for(queue.get(), 1)] == json_encoded_multi
         assert time_taken > 1.1

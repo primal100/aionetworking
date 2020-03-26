@@ -12,8 +12,9 @@ class TestJsonCodec:
         decoded = await alist(json_codec.decode(json_buffer))
         assert decoded == decoded_result
 
-    def test_01_encode(self, json_codec, json_rpc_login_request, json_rpc_login_request_encoded):
-        encoded = json_codec.encode(json_rpc_login_request)
+    @pytest.mark.asyncio
+    async def test_01_encode(self, json_codec, json_rpc_login_request, json_rpc_login_request_encoded):
+        encoded = await json_codec.encode(json_rpc_login_request)
         assert encoded == json_rpc_login_request_encoded
 
     @pytest.mark.asyncio
@@ -21,8 +22,9 @@ class TestJsonCodec:
         decoded = await alist(json_codec.decode_buffer(json_buffer, received_timestamp=timestamp))
         assert decoded == json_objects
 
-    def test_03_from_decoded(self, json_codec, json_rpc_login_request, json_object, timestamp):
-        encoded = json_codec.from_decoded(json_rpc_login_request, received_timestamp=timestamp)
+    @pytest.mark.asyncio
+    async def test_03_encode_obj(self, json_codec, json_rpc_login_request, json_object, timestamp):
+        encoded = await json_codec.encode_obj(json_rpc_login_request, received_timestamp=timestamp)
         assert encoded == json_object
 
     @pytest.mark.asyncio
@@ -62,8 +64,8 @@ class TestJsonObject:
 class TestBufferObject:
     @pytest.mark.asyncio
     async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
-        buffer_obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
-        buffer_obj2 = buffer_codec.from_decoded(json_encoded_multi[1], received_timestamp=timestamp)
+        buffer_obj1 = await buffer_codec.encode_obj(json_encoded_multi[0], received_timestamp=timestamp)
+        buffer_obj2 = await buffer_codec.encode_obj(json_encoded_multi[1], received_timestamp=timestamp)
         recording = buffer_obj1.encoded + buffer_obj2.encoded
         packets = await alist(get_recording(recording))
         assert packets == json_recording_data

@@ -126,7 +126,7 @@ class BaseCodec(Codec):
     async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
         yield encoded, encoded
 
-    def encode(self, decoded: Any, **kwargs) -> bytes:
+    async def encode(self, decoded: Any, **kwargs) -> bytes:
         return decoded
 
     def decode_one(self, encoded: bytes, **kwargs) -> Any:
@@ -147,9 +147,10 @@ class BaseCodec(Codec):
             i += 1
         self.logger.on_buffer_decoded(encoded, i)
 
-    def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType:
+    async def encode_obj(self, decoded: Any, **kwargs) -> MessageObjectType:
         try:
-            return self.msg_obj(self.encode(decoded, **kwargs), decoded, context=self.context, received=False,
+            encoded = await self.encode(decoded, **kwargs)
+            return self.msg_obj(encoded, decoded, context=self.context, received=False,
                                 parent_logger=self.logger, **kwargs)
         except Exception as exc:
             obj = self.msg_obj(b'', decoded, context=self.context, parent_logger=self.logger, received=False, **kwargs)

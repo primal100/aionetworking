@@ -248,10 +248,8 @@ class TestServerDatagramProtocolFactoryAllowedSenders:
         udp_transport_server.set_protocol(protocol_factory)
         peer = (ip_address, client_sock[1])
         protocol_factory.datagram_received(echo_encoded, peer)
-        await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
+        assert await asyncio.wait_for(queue.get(), 2) == (peer, echo_response_encoded)
         udp_transport_server.close()
-        await protocol_factory.close()
-        assert await queue.get() == (peer, echo_response_encoded)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ip_address", ['127.0.0.2', '::2'])

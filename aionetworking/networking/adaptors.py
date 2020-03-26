@@ -18,7 +18,7 @@ from aionetworking.futures.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Generator, Dict, Sequence, Type, Optional, AsyncIterator
+from typing import Any, Callable, Generator, Dict, Sequence, Type, Optional, AsyncIterator, Optional
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
@@ -39,7 +39,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     context: Dict[str, Any] = field(default_factory=context_cv.get)
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
-    send: Callable[[bytes], None] = field(default=not_implemented_callable, repr=False, compare=False)
+    send: Callable[[bytes], Optional[asyncio.Future]] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
 
     def __post_init__(self) -> None:
@@ -63,15 +63,21 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.codec = self.dataformat.get_codec(buffer, **self.codec_config)
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer)
 
-    def _encode_msg(self, decoded: Any) -> MessageObjectType:
+    def encode_and_send_msg(self, decoded: Any) -> None:
         if not self.codec:
             self._set_codecs(decoded)
-        return self.codec.from_decoded(decoded)
+        encode_task = asyncio.create_task(self.codec.encode_obj(decoded))
 
-    def encode_and_send_msg(self, msg_decoded: Any) -> None:
-        msg_obj = self._encode_msg(msg_decoded)
-        self.logger.on_sending_decoded_msg(msg_obj)
-        self.send_data(msg_obj.encoded)
+        def on_task_finished(task: asyncio.Future):
+            exception = task.exception()
+            if exception:
+                self.logger.manage_error(exception)
+            else:
+                msg_obj = task.result()
+                self.logger.on_sending_decoded_msg(msg_obj)
+                self.send_data(msg_obj.encoded)
+
+        encode_task.add_done_callback(on_task_finished)
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None:
         for decoded_msg in decoded_msgs:
@@ -79,7 +85,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     async def _run_preaction(self, buffer: bytes, timestamp: datetime.datetime = None) -> None:
         self.logger.info('Running preaction')
-        buffer_obj = self.buffer_codec.from_decoded(buffer, received_timestamp=timestamp)
+        buffer_obj = await self.buffer_codec.encode_obj(buffer, received_timestamp=timestamp)
         if not self.preaction.filter(buffer_obj):
             await self.preaction.do_one(buffer_obj)
 
@@ -139,16 +145,19 @@ class SenderAdaptor(BaseAdaptorProtocol):
         return await self.send_data_and_wait(msg_obj.request_id, msg_obj.encoded)
 
     async def encode_send_wait(self, decoded: Any) -> asyncio.Future:
-        msg_obj = self._encode_msg(decoded)
+        if not self.codec:
+            self._set_codecs(decoded)
+        msg_obj = await self.codec.encode_obj(decoded)
+        self.logger.on_sending_decoded_msg(msg_obj)
         return await self.send_msg_and_wait(msg_obj)
 
     def _run_method(self, method: Callable, *args, **kwargs) -> None:
-        msg_decoded = method(*args, **kwargs)
-        self.encode_and_send_msg(msg_decoded)
+        decoded = method(*args, **kwargs)
+        self.encode_and_send_msg(decoded)
 
     async def _run_method_and_wait(self, method: Callable, *args, **kwargs) -> asyncio.Future:
-        msg_decoded = method(*args, **kwargs)
-        return await self.encode_send_wait(msg_decoded)
+        decoded = method(*args, **kwargs)
+        return await self.encode_send_wait(decoded)
 
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None:
         prev_timestamp = None
