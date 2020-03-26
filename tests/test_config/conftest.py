@@ -25,6 +25,19 @@ def tcp_server_one_way_yaml_config_path(conf_dir) -> Path:
 
 
 @pytest.fixture
+def tcp_server_one_way_yaml_with_env_config_path(conf_dir) -> Path:
+    return conf_dir / "tcp_server_one_way_with_env.yaml"
+
+
+@pytest.fixture
+async def tcp_server_one_way_env_port(protocol_factory_one_way_server, server_sock) -> TCPServer:
+    env_ip = '10.10.10.10'
+    os.environ['IP'] = str(env_ip)
+    server = TCPServer(protocol_factory=protocol_factory_one_way_server, host=env_ip, port=server_sock[1])
+    yield server
+
+
+@pytest.fixture
 def tcp_client_one_way_yaml_config_path(conf_dir):
     return conf_dir / "tcp_client_one_way.yaml"
 

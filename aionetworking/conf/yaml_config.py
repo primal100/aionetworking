@@ -21,7 +21,7 @@ from aionetworking.receivers.yaml_constructors import load_tcp_server, load_udp_
 from aionetworking.requesters.yaml_constructors import load_echo_requester
 from aionetworking.types.senders import SenderType
 from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_client, load_pipe_client
-from .yaml_constructors import load_ip_network, load_path, load_default_ports
+from .yaml_constructors import load_ip_network, load_path, load_default_ports, load_env_variable
 from aionetworking import settings
 
 from pathlib import Path
@@ -44,6 +44,7 @@ def get_paths(app_home: Union[str, Path] = None, volatile_home: Union[str, Path]
 
 
 def load_minimal_tags() -> None:
+    load_env_variable()
     load_default_ports()
     load_logger()
     load_receiver_logger()
