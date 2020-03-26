@@ -25,7 +25,7 @@ class PickleCodec(BaseCodec):
             current_pos = data.tell()
             yield encoded[start_pos:current_pos], decoded
 
-    def encode(self, decoded: Any, **kwargs) -> bytes:
+    async def encode(self, decoded: Any, **kwargs) -> bytes:
         return pickle.dumps(decoded, protocol=self.protocol)
 
 

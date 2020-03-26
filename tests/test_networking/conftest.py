@@ -282,10 +282,10 @@ async def udp_one_way_sender_adaptor(udp_client_context, queue) -> SenderAdaptor
 
 @pytest.fixture
 async def file_containing_json_recording(tmpdir, buffer_codec, json_encoded_multi, timestamp) -> Path:
-    obj1 = buffer_codec.from_decoded(json_encoded_multi[0], received_timestamp=timestamp)
+    obj1 = await buffer_codec.encode_obj(json_encoded_multi[0], received_timestamp=timestamp)
     await asyncio.sleep(1)
-    obj2 = buffer_codec.from_decoded(json_encoded_multi[1],
-                                     received_timestamp=timestamp + datetime.timedelta(seconds=1, microseconds=200000))
+    obj2 = await buffer_codec.encode_obj(json_encoded_multi[1],
+                                   received_timestamp=timestamp + datetime.timedelta(seconds=1, microseconds=200000))
     p = Path(tmpdir.mkdir("recording") / "json.recording")
     p.write_bytes(obj1.encoded + obj2.encoded)
     return p

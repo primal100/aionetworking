@@ -55,14 +55,14 @@ class Codec(Protocol):
     def decode_one(self, encoded: bytes, **kwargs) -> Any: ...
 
     @abstractmethod
-    def encode(self, decoded: Any, **kwargs) -> bytes: ...
+    async def encode(self, decoded: Any, **kwargs) -> bytes: ...
 
     @abstractmethod
     async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None, None]:
         yield
 
     @abstractmethod
-    def from_decoded(self, decoded: Any, **kwargs) -> MessageObjectType: ...
+    async def encode_obj(self, decoded: Any, **kwargs) -> MessageObjectType: ...
 
     @abstractmethod
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:

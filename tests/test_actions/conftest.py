@@ -43,8 +43,8 @@ async def buffered_file_storage_recording_action(tmp_path) -> BufferedFileStorag
 
 
 @pytest.fixture
-def buffer_objects(json_encoded_multi, buffer_codec, timestamp):
-    return [buffer_codec.from_decoded(decoded, received_timestamp=timestamp) for decoded in json_encoded_multi]
+async def buffer_objects(json_encoded_multi, buffer_codec, timestamp):
+    yield [await buffer_codec.encode_obj(decoded, received_timestamp=timestamp) for decoded in json_encoded_multi]
 
 
 @pytest.fixture
