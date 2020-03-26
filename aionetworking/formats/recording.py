@@ -17,18 +17,18 @@ class BufferCodec(PickleCodec):
         async for encoded, decoded in super().decode(encoded, **kwargs):
             yield encoded, recorded_packet(*decoded)
 
-    def encode(self, decoded: bytes, received_timestamp=None, **kwargs) -> bytes:
+    async def encode(self, decoded: bytes, system_timestamp=None, **kwargs) -> bytes:
         if self.context:
             sender = self.context.get('address')
         else:
             sender = None
         packet_data = (
             False,
-            received_timestamp,
+            system_timestamp,
             sender,
             decoded
         )
-        return super().encode(packet_data, **kwargs)
+        return await super().encode(packet_data, **kwargs)
 
 
 @dataclass

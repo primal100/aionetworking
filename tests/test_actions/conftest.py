@@ -44,7 +44,7 @@ async def buffered_file_storage_recording_action(tmp_path) -> BufferedFileStorag
 
 @pytest.fixture
 async def buffer_objects(json_encoded_multi, buffer_codec, timestamp):
-    yield [await buffer_codec.encode_obj(decoded, received_timestamp=timestamp) for decoded in json_encoded_multi]
+    yield [await buffer_codec.encode_obj(decoded, system_timestamp=timestamp) for decoded in json_encoded_multi]
 
 
 @pytest.fixture
@@ -183,4 +183,4 @@ def keep_alive_request_encoded() -> bytes:
 @pytest.fixture
 def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context, timestamp) -> JSONObjectWithKeepAlive:
     return JSONObjectWithKeepAlive(keep_alive_request_encoded, keep_alive_request_decoded, context=context,
-            received_timestamp=timestamp)
+            system_timestamp=timestamp)
