@@ -61,6 +61,12 @@ class TestYamlConfig:
             assert logger.propagate is False
             assert len(logger.handlers) == 2
 
+    def test_02_yaml_config_node_with_env_var(self, tcp_server_one_way_yaml_with_env_config_path,
+                                              tcp_server_one_way_env_port, all_paths, load_all_yaml_tags,
+                                              reset_logging):
+        node = node_from_config_file(tcp_server_one_way_yaml_with_env_config_path, paths=all_paths)
+        assert node == tcp_server_one_way_env_port
+
 
 class TestSignalServerManager:
     @pytest.mark.asyncio

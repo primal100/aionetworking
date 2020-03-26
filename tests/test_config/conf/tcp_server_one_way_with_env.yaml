@@ -1,0 +1,22 @@
+!TCPServer
+host: !ENV ${IP}
+port: !Port
+quiet: False
+logger: !ReceiverLogger
+  stats_interval: 0
+  stats_fixed_start_time: true
+  datefmt: '%Y-%m-%d %H:%M:%S.%f'
+protocol_factory: !StreamServerProtocolFactory
+                  action: !BufferedFileStorage
+                           base_path: !Path "{data}"
+                           path: "Encoded/{msg.address}_{msg.name}.{msg.name}"
+                           buffering: 0
+                           close_file_after_inactivity: 2
+                  preaction: !BufferedFileStorage
+                             base_path: !Path "{temp}/recordings"
+                             path: "{msg.address}.recording"
+                             buffering: 0
+                             close_file_after_inactivity: 2
+                  dataformat: !JSON
+                  pause_reading_on_buffer_size: null
+                  hostname_lookup: True
