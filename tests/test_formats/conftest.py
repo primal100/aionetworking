@@ -110,12 +110,12 @@ def json_rpc_login_request(user1) -> Dict[str, Any]:
 
 @pytest.fixture
 async def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestamp) -> JSONObject:
-    return await json_codec.encode_obj(json_rpc_logout_request, received_timestamp=timestamp)
+    return await json_codec.encode_obj(json_rpc_logout_request, system_timestamp=timestamp)
 
 
 @pytest.fixture
 async def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp) -> JSONObject:
-    return await json_codec.encode_obj(json_rpc_login_request, received_timestamp=timestamp)
+    return await json_codec.encode_obj(json_rpc_login_request, system_timestamp=timestamp)
 
 
 @pytest.fixture
@@ -168,13 +168,13 @@ def file_containing_multi_json(tmpdir, json_buffer) -> Path:
 
 @pytest.fixture
 def json_object(json_rpc_login_request_encoded, json_rpc_login_request, context, timestamp) -> MessageObjectType:
-    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context, received_timestamp=timestamp)
+    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context, system_timestamp=timestamp)
 
 
 @pytest.fixture
 def json_objects(json_encoded_multi, json_decoded_multi, timestamp, context) -> List[MessageObjectType]:
     return [JSONObject(encoded, json_decoded_multi[i], context=context,
-            received_timestamp=timestamp) for i, encoded in
+            system_timestamp=timestamp) for i, encoded in
             enumerate(json_encoded_multi)]
 
 

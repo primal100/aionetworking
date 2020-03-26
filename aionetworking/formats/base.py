@@ -33,7 +33,7 @@ class BaseMessageObject(MessageObject, Protocol):
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
     parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
-    received_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
+    system_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
     received: bool = field(default=True, compare=False)
 
     def __post_init__(self):
@@ -98,7 +98,7 @@ class BaseMessageObject(MessageObject, Protocol):
 
     @property
     def timestamp(self) -> datetime.datetime:
-        return self.received_timestamp
+        return self.system_timestamp
 
     def filter(self) -> bool:
         return False

@@ -85,7 +85,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
 
     async def _run_preaction(self, buffer: bytes, timestamp: datetime.datetime = None) -> None:
         self.logger.info('Running preaction')
-        buffer_obj = await self.buffer_codec.encode_obj(buffer, received_timestamp=timestamp)
+        buffer_obj = await self.buffer_codec.encode_obj(buffer, system_timestamp=timestamp)
         if not self.preaction.filter(buffer_obj):
             await self.preaction.do_one(buffer_obj)
 
@@ -97,7 +97,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         if self.preaction:
             self._scheduler.task_with_callback(self._run_preaction(buffer, timestamp),
                                                name=f"{self.context['peer']}-Preaction")
-        msgs_generator = self.codec.decode_buffer(buffer, received_timestamp=timestamp)
+        msgs_generator = self.codec.decode_buffer(buffer, system_timestamp=timestamp)
         task = self._scheduler.task_with_callback(self.process_msgs(msgs_generator, buffer), name='Process_Msgs')
         return task
 
