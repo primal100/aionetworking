@@ -157,7 +157,7 @@ class BaseCodec(Codec):
             self.logger.on_encode_failed(obj, exc)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
-        self.logger.debug('Creating new %s messages from %s', self.codec_name, file_path)
+        self.logger.debug('Loading new %s messages from %s', self.codec_name, file_path)
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
         async for item in self.decode_buffer(encoded, **kwargs):
