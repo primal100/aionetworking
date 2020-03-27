@@ -18,12 +18,12 @@ class TestOneWayServer:
                                               one_way_client_context, connections_manager, json_codec):
         async with one_way_client as conn:
             conn.encode_and_send_msgs(json_decoded_multi)
-            await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), timeout=1)
+            await asyncio.wait_for(one_way_server_started.wait_num_has_connected(1), 3)
             assert conn.context.keys() == one_way_client_context.keys()
             await asyncio.sleep(0.1) # Workaround for bpo-38471
         one_way_server_started.close_all_connections()
         await one_way_server_started.wait_num_connections(0)
-        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
+        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), 3)
         recording_file_path = next(tmp_path.glob('recordings/*.recording'))
         assert recording_file_path.exists()
         expected_file = next(Path(tmp_path / 'data/Encoded').glob('*.JSON'))
@@ -37,8 +37,8 @@ class TestOneWayServer:
         async with one_way_client as conn:
             await conn.play_recording(new_recording_path)
             await asyncio.sleep(0.1)  # Workaround for bpo-38471
-        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(2), timeout=1)
-        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), timeout=1)
+        await asyncio.wait_for(one_way_server_started.wait_num_has_connected(2), 3)
+        await asyncio.wait_for(one_way_server_started.wait_all_tasks_done(), 3)
         expected_file = next(Path(tmp_path / 'data/Encoded').glob('*.JSON'))
         assert expected_file.exists()
         objs = await alist(json_codec.from_file(expected_file))
