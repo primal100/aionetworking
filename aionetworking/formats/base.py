@@ -129,14 +129,17 @@ class BaseCodec(Codec):
     async def encode(self, decoded: Any, **kwargs) -> bytes:
         return decoded
 
-    def decode_one(self, encoded: bytes, **kwargs) -> Any:
-        return aone(self.decode(encoded, **kwargs))
+    async def decode_one(self, encoded: bytes, **kwargs) -> Any:
+        return await aone(self.decode(encoded, **kwargs))
 
-    async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
-        _context = self.context.copy()
-        _context.update(kwargs.pop('context', {}))
+    async def _from_buffer(self, encoded: bytes, context: Dict[str, Any] = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+        if context:
+            complete_context = self.context.copy()
+            complete_context.update(context)
+        else:
+            complete_context = self.context
         async for encoded, decoded in self.decode(encoded, **kwargs):
-            yield self.msg_obj(encoded, decoded, context=self.context, parent_logger=self.logger, **kwargs)
+            yield self.msg_obj(encoded, decoded, context=complete_context, parent_logger=self.logger, **kwargs)
 
     async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         i = 0
