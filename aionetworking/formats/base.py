@@ -63,7 +63,6 @@ class BaseMessageObject(MessageObject, Protocol):
 
     @property
     def peer(self) -> str:
-        print(self.context)
         return self.context['peer']
 
     def __getstate__(self):
