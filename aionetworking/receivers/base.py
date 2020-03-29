@@ -10,12 +10,12 @@ from aionetworking.networking.connections_manager import get_unique_name
 from aionetworking.types.logging import LoggerType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.networking import ProtocolFactoryType
-from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_loop
+from aionetworking.utils import dataclass_getstate, dataclass_setstate, run_in_loop, addr_tuple_to_str
 import sys
 from .protocols import ReceiverProtocol
 
 from aionetworking.compatibility import Protocol
-from typing import Optional, Generator
+from typing import Optional, Generator, List, Tuple
 
 
 @dataclass
@@ -91,10 +91,12 @@ class BaseServer(BaseReceiver, Protocol):
         return f"{self.name} {self.listening_on}"
 
     @property
+    def listening_on_sockets(self) -> List[Tuple[str, int]]:
+        return [socket.getsockname() for socket in self.server.sockets]
+
+    @property
     def listening_on_msgs(self) -> Generator[str, None, None]:
-        sockets = self.server.sockets
-        for sock in sockets:
-            sock_name = sock.getsockname()
+        for sock_name in self.listening_on_sockets:
             if isinstance(sock_name, (tuple, list)):
                 listening_on = ':'.join([str(v) for v in sock_name])
             else:
@@ -188,7 +190,18 @@ class BaseNetworkServer(BaseServer, Protocol):
     port: int = 4000
     reuse_port: Optional[bool] = None
     backlog: int = 100
+    _actual_listening_on: Optional[Tuple[str, int]] = field(default=None, init=False, repr=False)
 
     @property
     def listening_on(self) -> str:
-        return f"{self.host}:{self.port}"
+        local_addr = self.actual_local_addr
+        local_addr = local_addr or (self.host, self.port)
+        return addr_tuple_to_str(local_addr)
+
+    @property
+    def actual_local_addr(self) -> Optional[Tuple[str, int]]:
+        if self.is_started():
+            self._actual_listening_on = self.listening_on_sockets[0]
+            return self._actual_listening_on
+        if self._actual_listening_on:
+            return self._actual_listening_on

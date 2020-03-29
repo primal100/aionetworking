@@ -15,7 +15,7 @@ from aionetworking.utils import unix_address, pipe_address
 from aionetworking.futures.value_waiters import StatusWaiter
 
 import socket
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 
 @dataclass
@@ -155,6 +155,10 @@ class DatagramServer(asyncio.AbstractServer):
         if start_serving:
             asyncio.create_task(self.start_serving())
             self._status.set_starting()
+
+    @property
+    def listening_on_sockets(self) -> List[Tuple[str, int]]:
+        return [self._transport.get_extra_info('sockname')]
 
     async def start_serving(self):
         if self.is_serving():

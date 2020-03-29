@@ -7,13 +7,13 @@ import socket
 import sys
 
 from aionetworking.compatibility import get_client_kwargs
-from aionetworking.utils import IPNetwork
+from aionetworking.utils import get_ip_port
 from aionetworking.networking.protocol_factories import DatagramClientProtocolFactory
 from aionetworking.types.networking import ConnectionType
 from aionetworking.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
 
-from typing import Union, Optional
+from typing import Union, Optional, List, Tuple
 
 
 @dataclass
@@ -43,11 +43,6 @@ class TCPClient(BaseNetworkClient):
         self.transport, self.conn = await self.loop.create_connection(
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context, local_addr=self.local_addr,
             ssl_handshake_timeout=self.ssl_handshake_timeout, server_hostname=self.server_hostname, **extra_kwargs)
-        network = IPNetwork(self.host)
-        if network.is_ipv6:
-            self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
-        else:
-            self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         return self.conn
 
 
@@ -136,11 +131,6 @@ class UDPClient(BaseNetworkClient):
         self.transport, protocol_factory = await self.loop.create_datagram_endpoint(
             self.protocol_factory, remote_addr=(self.host, self.port), local_addr=self.local_addr,
             reuse_port=self.reuse_port, allow_broadcast=self.allow_broadcast)
-        network = IPNetwork(self.host)
-        if network.is_ipv6:
-            self.actual_srcip, self.actual_srcport, self.flowinfo, self.scope_id = self.transport.get_extra_info('sockname')
-        else:
-            self.actual_srcip, self.actual_srcport = self.transport.get_extra_info('sockname')
         self.conn = protocol_factory.new_peer()
         await self.conn.wait_connected()
         return self.conn
