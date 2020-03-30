@@ -10,7 +10,7 @@ from aionetworking.compatibility import Protocol
 from aionetworking.logging.loggers import logger_cv, get_logger_sender
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.networking import ProtocolFactoryType, ConnectionType
-from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop
+from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop, get_ip_port
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.networking.connections_manager import get_unique_name
 from .protocols import SenderProtocol
@@ -144,8 +144,7 @@ class BaseNetworkClient(BaseClient, Protocol):
     port: int = 4000
     srcip: str = None
     srcport: int = 0
-    actual_srcip: str = field(default=None, init=False, compare=False)
-    actual_srcport: int = field(default=None, init=False, compare=False)
+    _actual_src: Optional[Tuple[str, int]] = field(default=None, init=False, repr=False)
 
     @property
     def local_addr(self) -> Optional[Tuple[str, int]]:
@@ -155,7 +154,11 @@ class BaseNetworkClient(BaseClient, Protocol):
 
     @property
     def actual_local_addr(self) -> Tuple[str, int]:
-        return self.actual_srcip, self.actual_srcport
+        if self.host and self.transport:
+            self._actual_src= get_ip_port(self.host, self.transport)
+            return self._actual_listening_on
+        if self._actual_src:
+            return self._actual_src
 
     @property
     def src(self) -> str:

@@ -34,7 +34,7 @@ class BaseMessageObject(MessageObject, Protocol):
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
     parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
     system_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
-    received: bool = field(default=True, compare=False)
+    received: bool = field(default=True, compare=False, repr=False)
 
     def __post_init__(self):
         self.logger = self.parent_logger.new_msg_logger(self)

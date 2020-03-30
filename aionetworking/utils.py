@@ -289,6 +289,16 @@ def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], hostna
     return any(n.supernet_of(network.ip_network, hostname) for n in networks)
 
 
+
+def get_ip_port(host: str, transport) -> Tuple[str, int]:
+    network = IPNetwork(host)
+    if network.is_ipv6:
+        actual_ip, actual_port, flowinfo, scope_id = transport.get_extra_info('sockname')
+    else:
+        actual_ip, actual_port = transport.get_extra_info('sockname')
+    return actual_ip, actual_port
+
+
 ###System###
 
 
