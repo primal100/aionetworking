@@ -91,8 +91,8 @@ class TaskScheduler:
             task.cancel()
 
     @staticmethod
-    def get_next_time(delay: Union[int, float], current_time: datetime = None) -> float:
-        now = current_time or datetime.now()
+    def get_next_time(delay: Union[int, float]) -> float:
+        now = datetime.now()
         hour = now.hour if delay <= 60 else 0
         start_time = datetime(now.year, now.month, now.day, hour, 0, 0)
         while start_time < now + timedelta(minutes=1):
@@ -100,9 +100,9 @@ class TaskScheduler:
         td = (start_time - now).total_seconds()
         return td
 
-    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float], current_time: datetime = None):
+    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float]):
         if fixed_start_time:
-            return self.get_next_time(delay, current_time=current_time)
+            return self.get_next_time(delay)
         elif immediate:
             return 0
         else:

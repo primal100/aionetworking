@@ -1,6 +1,5 @@
 import pytest
 import asyncio
-from datetime import datetime
 
 
 class TestTaskScheduler:
@@ -54,42 +53,35 @@ class TestTaskScheduler:
         with pytest.raises(ValueError):
             await task_scheduler.run_wait_fut(3, set_result, 'abc')
 
-    @pytest.mark.parametrize('delay,start_interval', [(
-            3600, 1800.0),
-            (7200, 5400.0)])
+    @pytest.mark.parametrize('delay,start_interval', [
+            pytest.param(3600, 3540.0, id='hourly'),
+            pytest.param(7200, 3540.0, id='2-hourly'),
+            pytest.param(10800, 7140.0, id='3-hourly'),
+    ])
     @pytest.mark.asyncio
-    async def test_06_get_next_time(self, task_scheduler, delay, start_interval):
-        current_time = datetime(2019, 1, 1, 6, 30)
-        interval = task_scheduler.get_next_time(delay, current_time=current_time)
+    async def test_06_get_next_time(self, task_scheduler, delay, start_interval, fixed_timestamp):
+        interval = task_scheduler.get_next_time(delay)
         assert interval == start_interval
 
     @pytest.mark.parametrize('fixed_start_time,immediate,delay,start_interval', [
-        (False, True, 3600, 0),
-        (True, False, 3600, 1800.0),
-        (True, True, 7200, 5400.0),
-        (False, False, 7200, 7200.0),
+        pytest.param(False, True, 3600, 0, id='hourly'),
+        pytest.param(True, False, 3600, 3540.0, id='2-hourly'),
+        pytest.param(True, True, 7200, 3540.0, id='3-hourly'),
     ])
     @pytest.mark.asyncio
-    async def test_07_get_start_interval(self, task_scheduler, fixed_start_time, immediate, delay, start_interval):
-        current_time = datetime(2019, 1, 1, 6, 30)
-        interval = task_scheduler.get_start_interval(fixed_start_time, immediate, delay, current_time=current_time)
+    async def test_07_get_start_interval(self, task_scheduler, fixed_start_time, immediate, delay, start_interval,
+                                         fixed_timestamp):
+        interval = task_scheduler.get_start_interval(fixed_start_time, immediate, delay)
         assert interval == start_interval
 
-    @pytest.mark.parametrize('immediate,num', [(True, 3), (False, 2)])
+    @pytest.mark.parametrize('immediate,num,coro_or_cb', [(True, 3, 'coro'), (False, 2, 'cb')])
     @pytest.mark.asyncio
-    async def test_08_periodic_coro_lifecycle(self, task_scheduler, immediate, num):
+    async def test_08_periodic_coro_lifecycle(self, task_scheduler, immediate, num, coro_or_cb):
         queue = asyncio.Queue()
-        task_scheduler.call_coro_periodic(0.1, queue.put, 'abc', immediate=immediate)
-        await asyncio.sleep(0.25)
-        await task_scheduler.close()
-        await asyncio.sleep(0.15)
-        assert queue.qsize() == num
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize('immediate,num', [(True, 3), (False, 2)])
-    async def test_09_periodic_cb_lifecycle(self, task_scheduler, immediate, num):
-        queue = asyncio.Queue()
-        task_scheduler.call_cb_periodic(0.1, queue.put_nowait, 'abc', immediate=immediate)
+        if coro_or_cb == 'coro':
+            task_scheduler.call_coro_periodic(0.1, queue.put, 'abc', immediate=immediate)
+        else:
+            task_scheduler.call_cb_periodic(0.1, queue.put_nowait, 'abc', immediate=immediate)
         await asyncio.sleep(0.25)
         await task_scheduler.close()
         await asyncio.sleep(0.15)

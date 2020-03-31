@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import datetime
 import os
+import pytest
+import freezegun
 from aionetworking.utils import set_loop_policy
 
 
@@ -25,3 +28,16 @@ def get_fixture(request, param=None):
     if not param:
         param = request.param
     return request.getfixturevalue(param.__name__)
+
+
+@pytest.fixture
+def timestamp() -> datetime.datetime:
+    return datetime.datetime(2019, 1, 1, 1, 1)
+
+
+@pytest.fixture
+def fixed_timestamp(timestamp) -> datetime.datetime:
+    freezer = freezegun.freeze_time(timestamp)
+    freezer.start()
+    yield datetime.datetime.now()
+    freezer.stop()

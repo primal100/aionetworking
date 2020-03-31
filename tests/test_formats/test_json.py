@@ -33,10 +33,9 @@ class TestJsonCodec:
         assert await alist(objects) == json_objects
 
     @pytest.mark.asyncio
-    async def test_05_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
+    async def test_05_one_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
         obj = await json_codec.one_from_file(file_containing_multi_json, system_timestamp=timestamp)
         assert obj == json_object
-        await asyncio.get_event_loop().shutdown_asyncgens()
 
 
 class TestJsonObject:

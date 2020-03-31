@@ -2,6 +2,7 @@ import asyncio
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
+import pytest
 from tests.test_formats.conftest import *
 
 from typing import List, Dict, Optional
@@ -17,24 +18,56 @@ async def managed_file(tmp_path) -> ManagedFile:
 
 
 @pytest.fixture
-async def file_storage_action(tmp_path) -> FileStorage:
-    action = FileStorage(base_path=tmp_path / 'data',
-                         path='Encoded/{msg.name}/{msg.address}_{msg.uid}.{msg.name}')
+def data_dir(tmp_path) -> Path:
+    return tmp_path / 'data'
+
+
+@pytest.fixture
+def recordings_dir(tmp_path) -> Path:
+    return tmp_path / 'recordings'
+
+
+@pytest.fixture
+async def file_storage_action(data_dir) -> FileStorage:
+    action = FileStorage(base_path=data_dir,
+                         path='{msg.address}_{msg.uid}.{msg.name}')
     yield action
 
 
 @pytest.fixture
-async def buffered_file_storage_action(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=tmp_path / 'data', close_file_after_inactivity=2,
-                                 path='Encoded/{msg.address}_{msg.name}.{msg.name}', buffering=0)
+def expected_action_files(file_storage, data_dir, json_objects) -> Dict[Path, List[MessageObjectType]]:
+    if isinstance(file_storage, FileStorage):
+        return {
+            Path(data_dir / '127.0.0.1_1.JSON'): [json_objects[0]],
+            Path(data_dir / '127.0.0.1_2.JSON'): [json_objects[1]]
+        }
+    return {
+        Path(data_dir / '127.0.0.1.JSON'): json_objects,
+    }
+
+
+@pytest.fixture
+async def buffered_file_storage_action(data_dir) -> BufferedFileStorage:
+    action = BufferedFileStorage(base_path=data_dir, close_file_after_inactivity=2,
+                                 path='{msg.address}.{msg.name}', buffering=0)
     yield action
     if not action.is_closing():
         await action.close()
 
 
+@pytest.fixture(params=[
+    pytest.param(False, id='FileStorageAction'),
+    pytest.param(True, id='BufferedFileStorageAction')
+])
+def file_storage(request, file_storage_action, buffered_file_storage_action):
+    if request.param:
+        return buffered_file_storage_action
+    return file_storage_action
+
+
 @pytest.fixture
-async def buffered_file_storage_recording_action(tmp_path) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=Path(tmp_path / 'recordings'), close_file_after_inactivity=2,
+async def buffered_file_storage_recording_action(recordings_dir) -> BufferedFileStorage:
+    action = BufferedFileStorage(base_path=recordings_dir, close_file_after_inactivity=2,
                                  path='{msg.address}.recording', buffering=0)
     yield action
     if not action.is_closing():
@@ -183,4 +216,5 @@ def keep_alive_request_encoded() -> bytes:
 @pytest.fixture
 def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context, timestamp) -> JSONObjectWithKeepAlive:
     return JSONObjectWithKeepAlive(keep_alive_request_encoded, keep_alive_request_decoded, context=context,
-            system_timestamp=timestamp)
+           system_timestamp=timestamp)
+

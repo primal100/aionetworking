@@ -1,21 +1,17 @@
 from __future__ import annotations
 import pytest
 from dataclasses import dataclass
-import datetime
 from pathlib import Path
 from aionetworking import JSONObject, JSONCodec
 from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
-from aionetworking.utils import hostname_or_ip
 from aionetworking.types.formats import MessageObjectType
 from aionetworking.types.networking import AFINETContext
 
 from typing import Dict, Any, List, NamedTuple, Tuple, Type
 
 
-@pytest.fixture
-def timestamp() -> datetime.datetime:
-    return datetime.datetime(2019, 1, 1, 1, 1)
+
 
 
 @pytest.fixture
