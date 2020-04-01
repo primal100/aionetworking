@@ -114,7 +114,7 @@ class TestConnectionClient:
 
     @pytest.mark.asyncio
     async def test_00_send(self, sftp_protocol_one_way_client, sftp_factory_client,
-                           sftp_one_way_conn_client, json_rpc_login_request_encoded, patch_datetime_now, tmpdir):
+                           sftp_one_way_conn_client, json_rpc_login_request_encoded, fixed_timestamp, tmpdir):
         sftp_protocol_one_way_client.connection_made(sftp_one_way_conn_client)
         await sftp_protocol_one_way_client.set_sftp(sftp_factory_client)
         sftp_factory_client.realpath.assert_awaited_with('/')
@@ -125,7 +125,7 @@ class TestConnectionClient:
 
     @pytest.mark.asyncio
     async def test_01_send_data_adaptor_method(self, sftp_protocol_one_way_client, json_rpc_login_request_encoded,
-                                               sftp_factory_client, sftp_one_way_conn_client, patch_datetime_now,
+                                               sftp_factory_client, sftp_one_way_conn_client, fixed_timestamp,
                                                tmpdir):
         sftp_protocol_one_way_client.connection_made(sftp_one_way_conn_client)
         await sftp_protocol_one_way_client.set_sftp(sftp_factory_client)

@@ -1,11 +1,13 @@
-import asyncio
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
-import pytest
+from aionetworking.formats import get_recording_from_file
+from aionetworking.utils import alist
 from tests.test_formats.conftest import *
+from tests.test_actions.actions import file_storage_actions, duplex_actions, get_recording_buffered_file_storage
+import pytest
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, Coroutine
 
 
 @pytest.fixture
@@ -28,51 +30,85 @@ def recordings_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
-async def file_storage_action(data_dir) -> FileStorage:
-    action = FileStorage(base_path=data_dir,
-                         path='{msg.address}_{msg.uid}.{msg.name}')
-    yield action
+def sender(connection_type, pipe_path, context) -> str:
+    return context['address']
 
 
 @pytest.fixture
-def expected_action_files(file_storage, data_dir, json_objects) -> Dict[Path, List[MessageObjectType]]:
-    if isinstance(file_storage, FileStorage):
-        return {
-            Path(data_dir / '127.0.0.1_1.JSON'): [json_objects[0]],
-            Path(data_dir / '127.0.0.1_2.JSON'): [json_objects[1]]
-        }
+def expected_files_buffered_storage(data_dir, json_objects, sender) -> Dict[Path, List[MessageObjectType]]:
     return {
-        Path(data_dir / '127.0.0.1.JSON'): json_objects,
+        Path(data_dir / f'{sender}.JSON'): json_objects,
     }
 
 
+async def _assert_file_storage_ok(expected_action_files, json_codec):
+    for path, objects in expected_action_files.items():
+            assert path.exists()
+            items = await alist(json_codec.from_file(path))
+            assert sorted(items, key=str) == sorted(objects, key=str)
+
+
+@pytest.fixture()
+def assert_file_storage_ok(expected_action_files, json_codec) -> Coroutine:
+    return _assert_file_storage_ok(expected_action_files, json_codec)
+
+
+@pytest.fixture()
+def assert_buffered_file_storage_ok(expected_files_buffered_storage, json_codec) -> Coroutine:
+    return _assert_file_storage_ok(expected_files_buffered_storage, json_codec)
+
+
 @pytest.fixture
-async def buffered_file_storage_action(data_dir) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=data_dir, close_file_after_inactivity=2,
-                                 path='{msg.address}.{msg.name}', buffering=0)
-    yield action
-    if not action.is_closing():
-        await action.close()
+def assert_recordings_ok(recordings_dir, recording_data, sender) -> Coroutine:
+    async def coro():
+        expected_file = recordings_dir / f'{sender}.recording'
+        assert expected_file.exists()
+        packets = await alist(get_recording_from_file(expected_file))
+        assert packets == recording_data
+    return coro()
+
+
+@pytest.fixture
+def expected_action_files(file_storage, data_dir, expected_files_buffered_storage, json_objects,
+                          sender) -> Dict[Path, List[MessageObjectType]]:
+    if isinstance(file_storage, FileStorage):
+        return {
+            Path(data_dir / f'{sender}_1.JSON'): [json_objects[0]],
+            Path(data_dir / f'{sender}_2.JSON'): [json_objects[1]]
+        }
+    return expected_files_buffered_storage
 
 
 @pytest.fixture(params=[
-    pytest.param(False, id='FileStorageAction'),
-    pytest.param(True, id='BufferedFileStorageAction')
+    'FileStorageAction',
+    'BufferedFileStorageAction'
 ])
-def file_storage(request, file_storage_action, buffered_file_storage_action):
-    if request.param:
-        return buffered_file_storage_action
-    return file_storage_action
-
-
-@pytest.fixture
-async def buffered_file_storage_recording_action(recordings_dir) -> BufferedFileStorage:
-    action = BufferedFileStorage(base_path=recordings_dir, close_file_after_inactivity=2,
-                                 path='{msg.address}.recording', buffering=0)
+async def file_storage(request, data_dir) -> Union[FileStorage, BufferedFileStorage]:
+    action_callable = file_storage_actions[request.param]
+    action = action_callable(data_dir)
     yield action
     if not action.is_closing():
         await action.close()
-    await asyncio.sleep(1)
+
+
+@pytest.fixture
+async def action(duplex_type, endpoint, data_dir) -> Optional[Union[FileStorage, BufferedFileStorage]]:
+    if endpoint == 'server':
+        action_callable = duplex_actions[duplex_type]
+        action = action_callable(data_dir)
+        yield action
+        if not action.is_closing():
+            await action.close()
+    else:
+        yield None
+
+
+@pytest.fixture
+async def recording_file_storage(recordings_dir) -> Union[BufferedFileStorage]:
+    action = get_recording_buffered_file_storage(recordings_dir)
+    yield action
+    if not action.is_closing():
+        await action.close()
 
 
 @pytest.fixture
@@ -216,5 +252,5 @@ def keep_alive_request_encoded() -> bytes:
 @pytest.fixture
 def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context, timestamp) -> JSONObjectWithKeepAlive:
     return JSONObjectWithKeepAlive(keep_alive_request_encoded, keep_alive_request_decoded, context=context,
-           system_timestamp=timestamp)
+                                   system_timestamp=timestamp)
 

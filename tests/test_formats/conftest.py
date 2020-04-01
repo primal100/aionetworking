@@ -6,12 +6,8 @@ from aionetworking import JSONObject, JSONCodec
 from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
 from aionetworking.types.formats import MessageObjectType
-from aionetworking.types.networking import AFINETContext
 
-from typing import Dict, Any, List, NamedTuple, Tuple, Type
-
-
-
+from typing import Dict, Any, List, NamedTuple, Optional, Tuple, Type
 
 
 @pytest.fixture
@@ -32,6 +28,12 @@ def server_sock(server_port) -> Tuple[str, int]:
 @pytest.fixture
 def client_sock(client_port) -> Tuple[str, int]:
     return '127.0.0.1', client_port
+
+
+@pytest.fixture
+def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Optional[Tuple[str, int]]:
+    if connection_type != 'pipe':
+        return client_sock if endpoint == 'server' else server_sock
 
 
 @pytest.fixture
@@ -77,16 +79,6 @@ def client_sock_ipv6() -> Tuple[str, int, int, int]:
 @pytest.fixture
 def client_sock_ipv6str(client_sock_ipv6) -> str:
     return f'{client_sock_ipv6[0]}:{client_sock_ipv6[1]}'
-
-
-@pytest.fixture
-def context(client_sock, client_sock_str, client_hostname, server_sock, server_sock_str) -> AFINETContext:
-    context: AFINETContext = {
-        'protocol_name': 'TCP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
-        'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str, 'client': client_sock_str,
-        'own': server_sock_str, 'address': client_sock[0]
-    }
-    return context
 
 
 @pytest.fixture
@@ -175,12 +167,26 @@ def json_objects(json_encoded_multi, json_decoded_multi, timestamp, context) -> 
 
 
 @pytest.fixture
-def json_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, timestamp) -> List[
+def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, sender, timestamp) -> List[
                         NamedTuple]:
-    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender='127.0.0.1',
+    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
+                            data=b'{"id": 1, "method": "echo"}')]
+
+
+@pytest.fixture
+def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, sender, timestamp) -> List[
+                        NamedTuple]:
+    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
                             data=json_rpc_login_request_encoded),
-            recorded_packet(sent_by_server=False, timestamp=timestamp, sender='127.0.0.1',
+            recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
                             data=json_rpc_logout_request_encoded)]
+
+
+@pytest.fixture
+def recording_data(one_way_recording_data, two_way_recording_data, duplex_type) -> List[recorded_packet]:
+    if duplex_type == 'twoway':
+        return two_way_recording_data
+    return one_way_recording_data
 
 
 @pytest.fixture

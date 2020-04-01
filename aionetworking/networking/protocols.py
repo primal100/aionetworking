@@ -38,9 +38,6 @@ class ProtocolFactoryProtocol(Protocol):
     @abstractmethod
     async def wait_num_has_connected(self, num: int) -> None: ...
 
-    #@abstractmethod
-    #async def wait_all_messages_processed(self) -> None: ...
-
     @abstractmethod
     async def close_actions(self) -> None: ...
 
@@ -107,9 +104,6 @@ class SimpleNetworkConnectionProtocol(Protocol):
     peer: str
     parent_name: str
     queue: asyncio.Queue
-
-    @abstractmethod
-    async def wait_all_messages_processed(self) -> None: ...
 
     @abstractmethod
     def encode_and_send_msg(self, msg_decoded: Any) -> None: ...

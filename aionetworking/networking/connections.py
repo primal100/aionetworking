@@ -39,7 +39,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     logger: LoggerType = field(default_factory=logger_cv.get, metadata={'pickle': True})
 
     def __post_init__(self):
-        self.context['protocol_name'] = self.name
+        names = self.parent_name.split(' ')
+        self.context['protocol_name'] = f'{names[0]} {names[1]}'
 
     def __getattr__(self, item):
         if self._adaptor:

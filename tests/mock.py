@@ -19,6 +19,12 @@ class MockAFUnixSocket:
         return 1
 
 
+class MockNamedPipeHandle:
+    def __init__(self, handle: int):
+        self.handle = handle
+
+
+
 class MockTransportMixin:
     _is_closing = False
 

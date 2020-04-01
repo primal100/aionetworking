@@ -1,10 +1,12 @@
 import ssl
+import pytest
 
 
 class TestSSL:
 
-    def test_00_get_ssl_server_context(self, ssl_object):
-        context = ssl_object.context
+    @pytest.mark.connections('tcp_oneway_all')
+    def test_00_get_ssl_context(self, ssl_context):
+        context = ssl_context.context
         assert context.check_hostname is True
         assert context.verify_mode == ssl.CERT_REQUIRED
 
