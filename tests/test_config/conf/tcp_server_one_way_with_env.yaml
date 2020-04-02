@@ -1,6 +1,6 @@
 !TCPServer
 host: !ENV ${IP}
-port: !Port
+port: 0
 quiet: False
 logger: !ReceiverLogger
   stats_interval: 0

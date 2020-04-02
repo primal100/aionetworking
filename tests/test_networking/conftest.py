@@ -83,8 +83,8 @@ def echo_decode_error_response_encoded(echo_exception_request_encoded) -> bytes:
 
 
 @pytest.fixture
-def requester(echo_requester, endpoint, duplex_type) -> Optional[EchoRequester]:
-    if endpoint == 'client' and duplex_type == 'twoway':
+def requester(echo_requester, duplex_type) -> Optional[EchoRequester]:
+    if duplex_type == 'twoway':
         return echo_requester
 
 
@@ -241,6 +241,10 @@ def parent_name(connection_type, endpoint, server_sock_as_string) -> str:
 @pytest.fixture
 async def connection(connection_cls, connection_type, action, endpoint, preaction, parent_name,
                      requester, server_sock_as_string, hostname_lookup) -> TCPServerConnection:
+    if endpoint == 'client':
+        action = None
+    else:
+        requester = None
     conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction,
                           requester=requester, parent_name=parent_name,
                           peer_prefix=connection_type, hostname_lookup=hostname_lookup)
@@ -301,7 +305,7 @@ async def protocol_factory_started(protocol_factory, parent_name, connection_typ
 
 
 @pytest.fixture
-async def protocol_factory_client(requester, connection_type, endpoint) -> StreamClientProtocolFactory:
+async def protocol_factory_client(requester, connection_type) -> StreamClientProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamClientProtocolFactory,
         'udp': DatagramClientProtocolFactory,
@@ -660,13 +664,22 @@ def ssl_client_key(ssl_client_dir) -> Path:
 
 
 @pytest.fixture
-def ssl_context(ssl_server_cert, ssl_server_key, ssl_client_key, ssl_client_cert, ssl_client_dir, ssl_server_dir,
-                endpoint) -> Union[ServerSideSSL, ClientSideSSL]:
+def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
+    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
+                         cafile=ssl_client_cert, capath=ssl_client_dir)
+
+
+@pytest.fixture
+def client_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
+    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
+                         cafile=ssl_client_cert, capath=ssl_client_dir)
+
+
+@pytest.fixture
+def ssl_context(server_side_ssl, client_side_ssl, endpoint) -> Union[ServerSideSSL, ClientSideSSL]:
     if endpoint == 'server':
-        return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
-                             cafile=ssl_client_cert, capath=ssl_client_dir)
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
-                         cafile=ssl_server_cert, capath=ssl_server_dir, cadata=ssl_server_cert.read_text())
+        return server_side_ssl
+    return client_side_ssl
 
 
 """@pytest.fixture

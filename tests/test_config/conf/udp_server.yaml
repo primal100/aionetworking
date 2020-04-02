@@ -1,6 +1,6 @@
 !UDPServer
 host: 127.0.0.1
-port: !Port
+port: 0
 quiet: False
 logger: !ReceiverLogger
   stats_interval: 0

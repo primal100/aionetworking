@@ -116,30 +116,6 @@ def server_pipe_address_load(pipe_path):
     yaml.add_constructor('!PipeAddr', pipe_address_constructor, Loader=yaml.SafeLoader)
 
 
-@pytest.fixture(params=[
-        lazy_fixture(
-            (tcp_server_one_way_yaml_config_path.__name__, tcp_server_one_way.__name__)),
-        lazy_fixture(
-            (tcp_client_one_way_yaml_config_path.__name__, tcp_client_one_way.__name__)),
-        lazy_fixture(
-            (tcp_server_two_way_ssl_yaml_config_path.__name__, tcp_server_two_way_ssl.__name__)),
-        lazy_fixture(
-            (tcp_client_two_way_ssl_yaml_config_path.__name__, tcp_client_two_way_ssl_no_cadata.__name__)),
-        lazy_fixture(
-            (udp_server_yaml_config_path.__name__, udp_server_allowed_senders_ipv4.__name__)),
-        lazy_fixture(
-            (pipe_server_yaml_config_path.__name__, pipe_server_two_way.__name__)),
-        lazy_fixture(
-            (pipe_client_yaml_config_path.__name__, pipe_client_two_way.__name__)),
-        lazy_fixture(
-            (sftp_server_yaml_config_path.__name__, sftp_server.__name__)),
-        lazy_fixture(
-            (sftp_client_yaml_config_path.__name__, sftp_client.__name__))
-])
-def config_files_args(request):
-    return request.param
-
-
 @pytest.fixture
 def config_file(config_files_args):
     return config_files_args[0]

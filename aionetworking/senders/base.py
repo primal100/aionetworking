@@ -155,10 +155,10 @@ class BaseNetworkClient(BaseClient, Protocol):
     @property
     def actual_local_addr(self) -> Tuple[str, int]:
         if self.host and self.transport:
-            self._actual_src= get_ip_port(self.host, self.transport)
+            self._actual_listening_on = get_ip_port(self.host, self.transport)
             return self._actual_listening_on
-        if self._actual_src:
-            return self._actual_src
+        if self._actual_listening_on:
+            return self._actual_listening_on
 
     @property
     def src(self) -> str:

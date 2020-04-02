@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .servers import TCPServer, UDPServer, pipe_server
+from .servers import TCPServer, UDPServer, PipeServer
 import yaml
 
 
@@ -21,9 +21,9 @@ def load_udp_server(Loader=yaml.SafeLoader):
     yaml.add_constructor('!UDPServer', udp_server_constructor, Loader=Loader)
 
 
-def pipe_server_constructor(loader, node) -> pipe_server:
+def pipe_server_constructor(loader, node) -> PipeServer:
     value = loader.construct_mapping(node) if node.value else {}
-    return pipe_server(**value)
+    return PipeServer(**value)
 
 
 def load_pipe_server(Loader=yaml.SafeLoader):

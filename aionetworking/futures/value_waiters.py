@@ -41,7 +41,8 @@ class ValueWaiter:
 
     def _check_waiters(self):
         if self._val in self._waiters:
-            self._waiters[self._val].set_result(True)
+            if not self._waiters[self._val].done():
+                self._waiters[self._val].set_result(True)
             self._waiters.pop(self._val)
 
     def set_value(self, value: str):

@@ -100,8 +100,9 @@ def pipe_path(server_port) -> Path:
         path.unlink()
 
 
-@pytest.fixture
-def tcp_server_context(server_sock_str, client_sock, client_hostname, client_sock_str) -> AFINETContext:
+def _tcp_server_context(server_sock, client_sock, client_hostname) -> AFINETContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
     context: AFINETContext = {
         'protocol_name': 'TCP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
         'address': client_sock[0], 'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str,
@@ -111,7 +112,18 @@ def tcp_server_context(server_sock_str, client_sock, client_hostname, client_soc
 
 
 @pytest.fixture
-def tcp_client_context(server_sock, server_sock_str, server_hostname, client_sock_str) -> AFINETContext:
+def tcp_server_context_fixed_port(server_sock, client_sock, client_hostname) -> AFINETContext:
+    return _tcp_server_context(server_sock, client_sock, client_hostname)
+
+
+@pytest.fixture
+def tcp_server_context_actual_port(actual_server_sock, actual_client_sock, client_hostname) -> AFINETContext:
+    return _tcp_server_context(actual_server_sock, actual_client_sock, client_hostname)
+
+
+def _tcp_client_context(server_sock, client_sock, server_hostname) -> AFINETContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
     context: AFINETContext = {
         'protocol_name': 'TCP Client', 'host': server_hostname, 'port': server_sock[1], 'peer': server_sock_str,
         'address': server_sock[0], 'alias': f'{server_hostname}({server_sock_str})', 'server': server_sock_str,
@@ -121,7 +133,18 @@ def tcp_client_context(server_sock, server_sock_str, server_hostname, client_soc
 
 
 @pytest.fixture
-def udp_server_context(server_sock_str, client_sock, client_hostname, client_sock_str) -> AFINETContext:
+def tcp_client_context_fixed_port(server_sock, client_sock, client_hostname) -> AFINETContext:
+    return _tcp_client_context(server_sock, client_sock, client_hostname)
+
+
+@pytest.fixture
+def tcp_client_context_actual_port(actual_server_sock, actual_client_sock, client_hostname) -> AFINETContext:
+    return _tcp_client_context(actual_server_sock, actual_client_sock, client_hostname)
+
+
+def _udp_server_context(server_sock, client_sock, client_hostname) -> AFINETContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
     context: AFINETContext = {
         'protocol_name': 'UDP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
         'address': client_sock[0], 'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str,
@@ -131,7 +154,18 @@ def udp_server_context(server_sock_str, client_sock, client_hostname, client_soc
 
 
 @pytest.fixture
-def udp_client_context(server_sock, server_sock_str, server_hostname, client_sock_str) -> AFINETContext:
+def udp_server_context_fixed_port(server_sock, client_sock, client_hostname) -> AFINETContext:
+    return _udp_server_context(server_sock, client_sock, client_hostname)
+
+
+@pytest.fixture
+def udp_server_context_actual_port(actual_server_sock, actual_client_sock, client_hostname) -> AFINETContext:
+    return _udp_server_context(actual_server_sock, actual_client_sock, client_hostname)
+
+
+def _udp_client_context(server_sock, client_sock, server_hostname) -> AFINETContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
     context: AFINETContext = {
         'protocol_name': 'UDP Client', 'host': server_hostname, 'port': server_sock[1], 'peer': server_sock_str,
         'address': server_sock[0], 'alias': f'{server_hostname}({server_sock_str})', 'server': server_sock_str,
@@ -141,16 +175,27 @@ def udp_client_context(server_sock, server_sock_str, server_hostname, client_soc
 
 
 @pytest.fixture
-def context(connection_type, endpoint, tcp_server_context, udp_server_context, tcp_client_context, udp_client_context,
-            pipe_server_context, pipe_client_context) -> Dict[str, Any]:
+def udp_client_context_fixed_port(server_sock, client_sock, client_hostname) -> AFINETContext:
+    return _udp_client_context(server_sock, client_sock, client_hostname)
+
+
+@pytest.fixture
+def udp_client_context_actual_port(actual_server_sock, actual_client_sock, client_hostname) -> AFINETContext:
+    return _udp_client_context(actual_server_sock, actual_client_sock, client_hostname)
+
+
+@pytest.fixture
+def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client_context_fixed_port,
+            udp_server_context_fixed_port, udp_client_context_fixed_port, pipe_server_context,
+            pipe_client_context) -> Dict[str, Any]:
     contexts = {
         'tcp': {
-            'server': tcp_server_context,
-            'client': tcp_client_context
+            'server': tcp_server_context_fixed_port,
+            'client': tcp_client_context_fixed_port
         },
         'udp': {
-            'server': udp_server_context,
-            'client': udp_client_context
+            'server': udp_server_context_fixed_port,
+            'client': udp_client_context_fixed_port
         },
         'pipe': {
             'server': pipe_server_context,
@@ -158,6 +203,26 @@ def context(connection_type, endpoint, tcp_server_context, udp_server_context, t
         }
     }
     return contexts[connection_type][endpoint]
+
+
+@pytest.fixture
+def server_context(connection_type, tcp_server_context_actual_port, udp_server_context_actual_port, pipe_server_context) -> Dict[str, Any]:
+    contexts = {
+        'tcp': tcp_server_context_actual_port,
+        'udp': udp_server_context_actual_port,
+        'pipe': pipe_server_context
+    }
+    return contexts[connection_type]
+
+
+@pytest.fixture
+def client_context(connection_type, tcp_client_context_actual_port, udp_client_context_actual_port, pipe_client_context) -> Dict[str, Any]:
+    contexts = {
+        'tcp': tcp_client_context_actual_port,
+        'udp': udp_client_context_actual_port,
+        'pipe': pipe_client_context
+    }
+    return contexts[connection_type]
 
 
 if hasattr(socket, 'AF_UNIX'):

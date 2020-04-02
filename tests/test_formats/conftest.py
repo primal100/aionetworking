@@ -87,6 +87,11 @@ def json_codec(context) -> JSONCodec:
 
 
 @pytest.fixture
+def json_server_codec(server_context) -> JSONCodec:
+    return JSONCodec(JSONObject, context=server_context)
+
+
+@pytest.fixture
 def user1() -> List[str, str]:
     return ['user1', 'password']
 
@@ -167,18 +172,25 @@ def json_objects(json_encoded_multi, json_decoded_multi, timestamp, context) -> 
 
 
 @pytest.fixture
-def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, sender, timestamp) -> List[
+def json_server_objects(json_encoded_multi, json_decoded_multi, timestamp, server_context) -> List[MessageObjectType]:
+    return [JSONObject(encoded, json_decoded_multi[i], context=server_context,
+            system_timestamp=timestamp) for i, encoded in
+            enumerate(json_encoded_multi)]
+
+
+@pytest.fixture
+def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address, timestamp) -> List[
                         NamedTuple]:
-    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
+    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
                             data=b'{"id": 1, "method": "echo"}')]
 
 
 @pytest.fixture
-def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, sender, timestamp) -> List[
+def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address, timestamp) -> List[
                         NamedTuple]:
-    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
+    return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
                             data=json_rpc_login_request_encoded),
-            recorded_packet(sent_by_server=False, timestamp=timestamp, sender=sender,
+            recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
                             data=json_rpc_logout_request_encoded)]
 
 

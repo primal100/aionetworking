@@ -125,7 +125,7 @@ class WindowsPipeServer(BaseServer):
         return bool(self.server)
 
 
-def pipe_server(path: Union[str, Path] = None, **kwargs):
+def PipeServer(path: Union[str, Path] = None, **kwargs):
     if hasattr(socket, 'AF_UNIX'):
         return UnixSocketServer(path=path, **kwargs)
     if sys.platform == 'win32':

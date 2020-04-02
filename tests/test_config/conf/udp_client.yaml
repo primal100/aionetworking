@@ -1,6 +1,6 @@
 !UDPClient
 host: 127.0.0.1
-port: 0
+port: !Port
 quiet: False
 logger: !SenderLogger
   stats_interval: 0
