@@ -161,26 +161,6 @@ def tcp_client_misc_yaml_config_stream(tcp_client_misc_yaml_config_path):
     return open(tcp_client_misc_yaml_config_path, 'r')
 
 
-@pytest.fixture(params=[
-        lazy_fixture(
-            (tcp_server_misc_yaml_config_path.__name__, tcp_server_one_way.__name__)),
-        lazy_fixture(
-            (tcp_client_misc_yaml_config_path.__name__, tcp_client_two_way_ssl_no_cadata.__name__)),
-])
-def config_files_with_logging_args(request):
-    return request.param
-
-
-@pytest.fixture
-def config_file_logging(config_files_with_logging_args):
-    return config_files_with_logging_args[0]
-
-
-@pytest.fixture
-def expected_object_logging(config_files_with_logging_args):
-    return config_files_with_logging_args[1]
-
-
 @pytest.fixture
 def peer_filter(client_sock) -> PeerFilter:
     return PeerFilter([client_sock[0]])
@@ -234,11 +214,11 @@ async def receiver_logger() -> Logger:
 
 
 @pytest.fixture
-async def receiver_connection_logger(receiver_logger, tcp_server_context, caplog) -> ConnectionLogger:
+async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
     caplog.set_level(logging.ERROR, "receiver.stats")
-    yield receiver_logger.get_connection_logger(extra=tcp_server_context)
+    yield receiver_logger.get_connection_logger(extra=context)
     caplog.set_level(logging.ERROR, "receiver.connection")
     caplog.set_level(logging.ERROR, "receiver.msg_received")
 
@@ -275,11 +255,11 @@ def sender_connection_logger(sender_logger, tcp_client_context) -> ConnectionLog
 
 
 @pytest.fixture
-async def receiver_connection_logger_stats(receiver_logger, tcp_server_context, caplog) -> ConnectionLoggerStats:
+async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "receiver.stats")
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
-    logger = receiver_logger.get_connection_logger(extra=tcp_server_context)
+    logger = receiver_logger.get_connection_logger(extra=context)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
@@ -304,14 +284,12 @@ def zero_division_exception() -> BaseException:
         return e
 
 
-@pytest.fixture(params=[receiver_connection_logger.__name__, receiver_connection_logger_stats.__name__])
-def _connection_logger(request):
-    return lazy_fixture(request.param)
-
-
-@pytest.fixture
-async def connection_logger(_connection_logger):
-    yield _connection_logger
+@pytest.fixture(params=['', 'stats'])
+async def connection_logger(request, receiver_connection_logger, receiver_connection_logger_stats):
+    if request.param == 'stats':
+        yield receiver_connection_logger_stats
+    else:
+        yield receiver_connection_logger
 
 
 @pytest.fixture

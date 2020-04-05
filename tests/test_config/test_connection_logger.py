@@ -6,10 +6,10 @@ class TestConnectionLogger:
     def test_00_logger_init(self, connection_logger):
         assert connection_logger.logger.name == 'receiver.connection'
 
-    def test_01_process(self, connection_logger, tcp_server_context):
+    def test_01_process(self, connection_logger, context):
         msg, kwargs = connection_logger.process("Hello World", {})
         assert kwargs['extra']['taskname'] == "No Running Loop"
-        assert msg, kwargs == ("Hello World", {'extra': tcp_server_context})
+        assert msg, kwargs == ("Hello World", {'extra': context})
 
     def test_02_new_connection(self, connection_logger, caplog, client_sock_str, server_sock_str):
         connection_logger.new_connection()
