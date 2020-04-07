@@ -45,7 +45,6 @@ async def _assert_file_storage_ok(expected_action_files, json_codec):
         assert path.exists()
         items = await alist(json_codec.from_file(path))
         assert sorted(items, key=str) == sorted(objects, key=str)
-        path.unlink()
 
 
 @pytest.fixture()
@@ -63,13 +62,6 @@ def assert_buffered_file_storage_ok(data_dir, json_objects, json_codec, client_a
 def assert_server_buffered_file_storage_ok(data_dir, json_server_objects, json_server_codec, client_address) -> Coroutine:
     files = get_expected_files_buffered_storage(data_dir, json_server_objects, client_address)
     return _assert_file_storage_ok(files, json_server_codec)
-
-
-@pytest.fixture
-def client_address(client_sock, pipe_path, connection_type):
-    if connection_type == 'pipe':
-        return pipe_path.name
-    return client_sock[0]
 
 
 @pytest.fixture

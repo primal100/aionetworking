@@ -214,12 +214,14 @@ def connection_cls(connection_type, endpoint) -> Type:
         'server': {
             'tcp': TCPServerConnection,
             'udp': UDPServerConnection,
-            'pipe': TCPServerConnection
+            'pipe': TCPServerConnection,
+            'sftp': SFTPServerOSAuthProtocol
         },
         'client': {
             'tcp': TCPClientConnection,
             'udp': UDPClientConnection,
-            'pipe': TCPClientConnection
+            'pipe': TCPClientConnection,
+            'sftp': SFTPClientProtocol
         }
     }
     return connection_classes[endpoint][connection_type]
@@ -239,19 +241,31 @@ def parent_name(connection_type, endpoint, server_sock_as_string) -> str:
 
 
 @pytest.fixture
+def connection_kwargs(connection_type, endpoint, tmpdir) -> Dict[str, Any]:
+    if connection_type == 'sftp' and endpoint == 'client':
+        return {'client': {'base_path': Path(tmpdir) / 'sftp_sent'}, 'server': {}}
+    return {'server': {}, 'client': {}}
+
+
+@pytest.fixture
 async def connection(connection_cls, connection_type, action, endpoint, preaction, parent_name,
-                     requester, server_sock_as_string, hostname_lookup) -> TCPServerConnection:
+                     requester, server_sock_as_string, hostname_lookup, connection_kwargs) -> TCPServerConnection:
     if endpoint == 'client':
         action = None
     else:
         requester = None
-    conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction,
-                          requester=requester, parent_name=parent_name,
-                          peer_prefix=connection_type, hostname_lookup=hostname_lookup)
+    conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction, requester=requester,
+                          parent_name=parent_name, peer_prefix=connection_type, hostname_lookup=hostname_lookup,
+                          **connection_kwargs[endpoint])
     yield conn
-    if conn.transport and not conn.transport.is_closing():
-        conn.transport.close()
-    await conn.wait_closed()
+    if connection_type == 'sftp':
+        if not conn.is_closing():
+            conn.close()
+            await conn.wait_closed()
+    else:
+        if conn.transport and not conn.transport.is_closing():
+            conn.transport.close()
+    await asyncio.wait_for(conn.wait_closed(), 1)
 
 
 @pytest.fixture
@@ -274,23 +288,34 @@ async def connection_connected(connection, transport):
 
 
 @pytest.fixture
+async def sftp_connection_connected(connection, endpoint, sftp_conn, sftp_factory):
+    connection.connection_made(sftp_conn)
+    if endpoint == 'client':
+        await connection.set_sftp(sftp_factory)
+    yield connection
+
+
+
+@pytest.fixture
 def hostname_lookup(connection_type) -> bool:
     return connection_type != 'pipe'
 
 
 @pytest.fixture
-async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup) -> StreamServerProtocolFactory:
+async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup, connection_kwargs) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
         'udp': DatagramServerProtocolFactory,
         'pipe': StreamServerProtocolFactory,
+        'sftp': SFTPOSAuthProtocolFactory
     }
     factory_cls = protocol_factory_classes[connection_type]
     factory = factory_cls(
         preaction=recording_file_storage,
         action=action,
         dataformat=JSONObject,
-        hostname_lookup=hostname_lookup
+        hostname_lookup=hostname_lookup,
+        **connection_kwargs['server']
     )
     yield factory
 
@@ -305,17 +330,19 @@ async def protocol_factory_started(protocol_factory, parent_name, connection_typ
 
 
 @pytest.fixture
-async def protocol_factory_client(requester, connection_type) -> StreamClientProtocolFactory:
+async def protocol_factory_client(requester, connection_type, connection_kwargs) -> StreamClientProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamClientProtocolFactory,
         'udp': DatagramClientProtocolFactory,
         'pipe': StreamClientProtocolFactory,
+        'sftp': SFTPClientProtocolFactory
     }
     factory_cls = protocol_factory_classes[connection_type]
     factory = factory_cls(
         dataformat=JSONObject,
         requester=requester,
-        hostname_lookup=True)
+        hostname_lookup=True,
+        **connection_kwargs['client'])
     yield factory
 
 
@@ -503,45 +530,15 @@ async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp
 
 
 @pytest.fixture
-async def sftp_protocol_one_way_server(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                       sftp_initial_server_context, server_sock_str) -> SFTPServerOSAuthProtocol:
-    context_cv.set(sftp_initial_server_context)
-    protocol = SFTPServerOSAuthProtocol(dataformat=JSONObject, action=buffered_file_storage_action,
-                                        parent_name=f"SFTP Server {server_sock_str}", peer_prefix='sftp',
-                                        preaction=buffered_file_storage_recording_action, hostname_lookup=True)
-    yield protocol
-    if not protocol.is_closing():
-        protocol.close()
-        await protocol.wait_closed()
+def sftp_extra(endpoint, extra_server_inet_sftp, extra_client_inet_sftp) -> Dict[str, Any]:
+    if endpoint == 'server':
+        return extra_server_inet_sftp
+    return extra_client_inet_sftp
 
 
 @pytest.fixture
-async def sftp_protocol_one_way_client(sftp_initial_client_context, tmpdir, server_sock_str) -> SFTPClientProtocol:
-    context_cv.set(sftp_initial_client_context)
-    protocol = SFTPClientProtocol(dataformat=JSONObject, peer_prefix='sftp',
-                                  parent_name=f"SFTP Client {server_sock_str}",
-                                  base_path=Path(tmpdir) / 'sftp_sent', hostname_lookup=True)
-    yield protocol
-    if not protocol.is_closing():
-        protocol.close()
-        await protocol.wait_closed()
-
-
-@pytest.fixture
-def sftp_conn_server(request, extra_server_inet_sftp, sftp_protocol) -> MockSFTPConn:
-    sftp_protocol = request.getfixturevalue(sftp_protocol.name)
-    yield MockSFTPConn(sftp_protocol, extra=extra_server_inet_sftp)
-
-
-@pytest.fixture
-def server_sftp_conn(extra_server_inet_sftp, sftp_protocol_one_way_server) -> MockSFTPConn:
-    yield MockSFTPConn(sftp_protocol_one_way_server, extra=extra_server_inet_sftp)
-
-
-@pytest.fixture
-def sftp_conn_client(request, extra_client_inet_sftp, sftp_protocol) -> MockSFTPConn:
-    sftp_protocol = request.getfixturevalue(sftp_protocol.name)
-    yield MockSFTPConn(sftp_protocol, extra=extra_client_inet_sftp)
+def sftp_conn(sftp_extra, connection) -> MockSFTPConn:
+    yield MockSFTPConn(connection, extra=sftp_extra)
 
 
 @pytest.fixture
@@ -569,58 +566,31 @@ async def sftp_factory_client(sftp_one_way_conn_client) -> SFTPFactory:
 
 
 @pytest.fixture
-def sftp_factory(request, sftp_conn, tmpdir) -> SFTPFactory:
-    sftp_conn = request.getfixturevalue(sftp_conn.name)
+def sftp_factory(sftp_conn, tmpdir) -> SFTPFactory:
     path = Path(tmpdir) / "sftp_received"
-    yield SFTPFactory(sftp_conn, base_upload_dir=path)
+    sftp_factory = SFTPFactory(sftp_conn, base_upload_dir=path)
+    sftp_factory.realpath = AsyncMock(return_value='/')
+    sftp_factory.put = AsyncMock()
+    yield sftp_factory
 
 
 @pytest.fixture
-async def sftp_one_way_receiver_adaptor(buffered_file_storage_action, buffered_file_storage_recording_action,
-                                        sftp_server_context) -> ReceiverAdaptor:
-    context_cv.set(sftp_server_context)
-    adaptor = ReceiverAdaptor(JSONObject, action=buffered_file_storage_action,
-                              preaction=buffered_file_storage_recording_action)
+def sftp_context(endpoint, sftp_server_context, sftp_client_context) -> Dict[str, Any]:
+    if endpoint == 'server':
+        return sftp_server_context
+    return sftp_client_context
+
+
+@pytest.fixture
+async def sftp_adaptor(action, preaction, endpoint, sftp_context, queue) -> ReceiverAdaptor:
+    context_cv.set(sftp_context)
+    if endpoint == 'server':
+        adaptor = ReceiverAdaptor(JSONObject, action=action,
+                                  preaction=preaction)
+    else:
+        adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
     yield adaptor
     await adaptor.close()
-
-
-@pytest.fixture
-async def sftp_one_way_sender_adaptor(sftp_client_context, queue) -> SenderAdaptor:
-    context_cv.set(sftp_client_context)
-    adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait)
-    yield adaptor
-    await adaptor.close()
-
-
-@pytest.fixture
-def sftp_protocol_factory(sftp_connection_args) -> Union[SFTPOSAuthProtocolFactory, SFTPClientProtocolFactory]:
-    return sftp_connection_args[0]
-
-
-@pytest.fixture
-def sftp_protocol(sftp_connection_args) -> Union[SFTPServerOSAuthProtocol, SFTPClientProtocol]:
-    return sftp_connection_args[1]
-
-
-@pytest.fixture
-def sftp_conn(sftp_connection_args) -> MockSFTPConn:
-    return sftp_connection_args[2]
-
-
-@pytest.fixture
-def sftp_adaptor(sftp_connection_args) -> Union[SenderAdaptor, ReceiverAdaptor]:
-    return sftp_connection_args[3]
-
-
-@pytest.fixture
-def sftp_peer(sftp_connection_args) -> Tuple[str, int]:
-    return sftp_connection_args[4]
-
-
-@pytest.fixture
-def sftp_connection_is_stored(sftp_connection_args) -> bool:
-    return sftp_connection_args[5]
 
 
 @pytest.fixture

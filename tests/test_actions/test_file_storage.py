@@ -70,4 +70,4 @@ class TestJsonBufferedFileStorage:
 
         await recording_file_storage.do_one(buffer_objects[0])
         await recording_file_storage.do_one(buffer_objects[1])
-        await assert_recordings_ok()
+        await assert_recordings_ok

@@ -187,7 +187,7 @@ def udp_client_context_actual_port(actual_server_sock, actual_client_sock, clien
 @pytest.fixture
 def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client_context_fixed_port,
             udp_server_context_fixed_port, udp_client_context_fixed_port, pipe_server_context,
-            pipe_client_context) -> Dict[str, Any]:
+            pipe_client_context, sftp_server_context, sftp_client_context) -> Dict[str, Any]:
     contexts = {
         'tcp': {
             'server': tcp_server_context_fixed_port,
@@ -200,6 +200,10 @@ def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client
         'pipe': {
             'server': pipe_server_context,
             'client': pipe_client_context
+        },
+        'sftp': {
+            'server': sftp_server_context,
+            'client': sftp_client_context
         }
     }
     return contexts[connection_type][endpoint]

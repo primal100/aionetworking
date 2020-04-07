@@ -1,11 +1,8 @@
 import asyncio
 import pytest
 import pickle
-from pathlib import Path
 
 from aionetworking.networking.exceptions import MethodNotFoundError, MessageFromNotAuthorizedHost
-from aionetworking.formats import get_recording_from_file
-from aionetworking.utils import alist
 
 
 @pytest.mark.connections()
@@ -122,8 +119,8 @@ class TestConnectionAllowedSenders:
 @pytest.mark.connections('all_oneway_server')
 class TestConnectionOneWayServer:
     @pytest.mark.asyncio
-    async def test_00_data_received(self, connection_connected, json_rpc_login_request_encoded, transport, fixed_timestamp,
-                                    json_rpc_logout_request_encoded, assert_recordings_ok,
+    async def test_00_data_received(self, connection_connected, json_rpc_login_request_encoded, transport,
+                                    fixed_timestamp, json_rpc_logout_request_encoded, assert_recordings_ok,
                                     assert_buffered_file_storage_ok):
         connection_connected.data_received(json_rpc_login_request_encoded)
         await asyncio.sleep(1.2)

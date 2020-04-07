@@ -62,9 +62,9 @@ class TestJsonObject:
 
 class TestBufferObject:
     @pytest.mark.asyncio
-    async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
+    async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, recording_data, context, timestamp):
         buffer_obj1 = await buffer_codec.encode_obj(json_encoded_multi[0], system_timestamp=timestamp)
         buffer_obj2 = await buffer_codec.encode_obj(json_encoded_multi[1], system_timestamp=timestamp)
         recording = buffer_obj1.encoded + buffer_obj2.encoded
         packets = await alist(get_recording(recording))
-        assert packets == json_recording_data
+        assert packets == recording_data

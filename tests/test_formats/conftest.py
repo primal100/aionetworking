@@ -186,6 +186,13 @@ def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_reque
 
 
 @pytest.fixture
+def client_address(client_sock, pipe_path, connection_type):
+    if connection_type == 'pipe':
+        return pipe_path.name
+    return client_sock[0]
+
+
+@pytest.fixture
 def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address, timestamp) -> List[
                         NamedTuple]:
     return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
