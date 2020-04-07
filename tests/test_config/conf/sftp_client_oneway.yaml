@@ -13,4 +13,4 @@ protocol_factory: !SFTPClientProtocolFactory
                   dataformat: !JSON
                   hostname_lookup: True
 ---
-log_config_file: !Path "{conf}/logging.yaml"
+log_config_file: !Path "{this}/logging.yaml"

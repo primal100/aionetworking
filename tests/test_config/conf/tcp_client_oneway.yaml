@@ -6,3 +6,5 @@ srcport: 0
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   hostname_lookup: True
+---
+log_config_file: !Path "{this}/logging.yaml"

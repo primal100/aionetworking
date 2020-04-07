@@ -7,4 +7,4 @@ logger: !SenderLogger
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
 ---
-log_config_file: !Path "{conf}/logging.yaml"
+log_config_file: !Path "{this}/logging.yaml"

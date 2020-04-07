@@ -10,3 +10,5 @@ protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester
                   hostname_lookup: True
+---
+log_config_file: !Path "{this}/logging.yaml"

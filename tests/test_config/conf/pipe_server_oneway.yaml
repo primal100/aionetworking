@@ -18,4 +18,4 @@ protocol_factory: !StreamServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
 ---
-log_config_file: !Path "{conf}/logging.yaml"
+log_config_file: !Path "{this}/logging.yaml"

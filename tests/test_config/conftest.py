@@ -21,7 +21,12 @@ def reset_logging():
 
 @pytest.fixture
 def tcp_server_one_way_yaml_config_path(conf_dir) -> Path:
-    return conf_dir / "tcp_server_one_way.yaml"
+    return conf_dir / "tcp_server_oneway.yaml"
+
+
+@pytest.fixture
+def logging_yaml_path(conf_dir) -> Path:
+    return conf_dir / "logging.yaml"
 
 
 @pytest.fixture
@@ -315,9 +320,11 @@ def stats_formatter() -> logging.Formatter:
 
 
 @pytest.fixture
-def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags) -> Path:
+def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, logging_yaml_path, load_all_yaml_tags) -> Path:
     path = tmp_path / tcp_server_one_way_yaml_config_path.name
     shutil.copy(str(tcp_server_one_way_yaml_config_path), str(path))
+    logging_path = tmp_path / logging_yaml_path.name
+    shutil.copy(str(logging_yaml_path), str(logging_path))
     return path
 
 
