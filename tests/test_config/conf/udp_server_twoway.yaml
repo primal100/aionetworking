@@ -8,7 +8,13 @@ logger: !ReceiverLogger
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !DatagramServerProtocolFactory
                   action: !EchoAction
+                  preaction: !BufferedFileStorage
+                      base_path: !Path "{temp}/recordings"
+                      path: "{msg.address}.recording"
+                      buffering: 0
+                      close_file_after_inactivity: 2
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
-                  allowed_senders: !IPNetwork [127.0.0.1, "::1"]
                   hostname_lookup: True
+---
+log_config_file: !Path "{conf}/logging.yaml"

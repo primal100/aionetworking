@@ -50,12 +50,10 @@ async def ssh_host_key(tmp_path) -> Path:
 
 
 @pytest.fixture
-async def sftp_server(sftp_protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
-    server = SFTPServer(protocol_factory=sftp_protocol_factory_server, host=server_sock[0], port=server_sock[1],
+async def sftp_server(protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
+    server = SFTPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=server_sock[1],
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     yield server
-    if server.is_started():
-        await server.close()
 
 
 @pytest.fixture
@@ -71,11 +69,12 @@ async def sftp_server_started(sftp_server) -> SFTPServer:
 
 
 @pytest.fixture
-async def server(connection_type, tcp_server, udp_server, pipe_server) -> BaseServer:
+async def server(connection_type, tcp_server, udp_server, pipe_server, sftp_server) -> BaseServer:
     servers = {
         'tcp': tcp_server,
         'udp': udp_server,
-        'pipe': pipe_server
+        'pipe': pipe_server,
+        'sftp': sftp_server
     }
     server = servers[connection_type]
     yield server

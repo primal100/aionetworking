@@ -103,12 +103,12 @@ def json_rpc_login_request(user1) -> Dict[str, Any]:
 
 @pytest.fixture
 async def json_rpc_logout_request_object(json_rpc_logout_request, json_codec, timestamp) -> JSONObject:
-    return await json_codec.encode_obj(json_rpc_logout_request, system_timestamp=timestamp)
+    yield await json_codec.encode_obj(json_rpc_logout_request, system_timestamp=timestamp)
 
 
 @pytest.fixture
 async def json_rpc_login_request_object(json_rpc_login_request, json_codec, timestamp) -> JSONObject:
-    return await json_codec.encode_obj(json_rpc_login_request, system_timestamp=timestamp)
+    yield await json_codec.encode_obj(json_rpc_login_request, system_timestamp=timestamp)
 
 
 @pytest.fixture

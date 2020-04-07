@@ -45,9 +45,21 @@ def tcp_client(protocol_factory_client, actual_server_sock, client_sock) -> TCPC
 
 
 @pytest.fixture
+def tcp_client_fixed_port(protocol_factory_client, server_sock, client_sock) -> TCPClient:
+    return TCPClient(protocol_factory=protocol_factory_client, host=server_sock[0], port=server_sock[1],
+                     srcip=client_sock[0], srcport=0)
+
+
+@pytest.fixture
 def udp_client(protocol_factory_client, actual_server_sock) -> UDPClient:
     return UDPClient(protocol_factory=protocol_factory_client, host=actual_server_sock[0],
                      port=actual_server_sock[1])
+
+
+@pytest.fixture
+def udp_client_fixed_port(protocol_factory_client, server_sock) -> UDPClient:
+    return UDPClient(protocol_factory=protocol_factory_client, host=server_sock[0],
+                     port=server_sock[1])
 
 
 @pytest.fixture
@@ -56,11 +68,24 @@ def pipe_client(protocol_factory_client, pipe_path):
 
 
 @pytest.fixture
-async def client(connection_type, tcp_client, udp_client, pipe_client) -> BaseNetworkClient:
+async def client(connection_type, tcp_client, udp_client, pipe_client, sftp_client) -> BaseNetworkClient:
     clients = {
         'tcp': tcp_client,
         'udp': udp_client,
-        'pipe': pipe_client
+        'pipe': pipe_client,
+        'sftp': sftp_client
+    }
+    client = clients[connection_type]
+    yield client
+
+
+@pytest.fixture
+async def client_fixed_port(connection_type, tcp_client_fixed_port, udp_client_fixed_port, pipe_client, sftp_client_fixed_port) -> BaseNetworkClient:
+    clients = {
+        'tcp': tcp_client_fixed_port,
+        'udp': udp_client_fixed_port,
+        'pipe': pipe_client,
+        'sftp': sftp_client_fixed_port
     }
     client = clients[connection_type]
     yield client
@@ -71,7 +96,6 @@ async def client_connected(client, connections_manager):
     await asyncio.wait_for(client.connect(), 3)
     yield client
     await asyncio.wait_for(client.close(), 3)
-
 
 
 @pytest.fixture
@@ -105,8 +129,15 @@ def tcp_client_ssl_no_cadata(protocol_factory_two_way_client, server_sock, clien
 
 
 @pytest.fixture
-def sftp_client(sftp_protocol_factory_client, server_sock, client_sock, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=sftp_protocol_factory_client, host=server_sock[0], port=server_sock[1],
+def sftp_client(protocol_factory_client, actual_server_sock, client_sock, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=protocol_factory_client, host=actual_server_sock[0], port=actual_server_sock[1],
+                      srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
+                      password=sftp_username_password[1])
+
+
+@pytest.fixture
+def sftp_client_fixed_port(protocol_factory_client, server_sock, client_sock, sftp_username_password, patch_os_auth_ok) -> SFTPClient:
+    return SFTPClient(protocol_factory=protocol_factory_client, host=server_sock[0], port=server_sock[1],
                       srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
                       password=sftp_username_password[1])
 

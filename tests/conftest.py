@@ -39,6 +39,8 @@ def pytest_generate_tests(metafunc):
             connection_type_params, duplex_type_params, endpoint_params = connection_args[0].split('_')
         if connection_type_params == 'all':
             connection_type_params = ('tcp', 'udp', 'pipe')
+        elif connection_type_params == 'allplus':
+            connection_type_params = ('tcp', 'udp', 'pipe', 'sftp')
         else:
             connection_type_params = (connection_type_params,)
         if duplex_type_params == 'all':
@@ -210,11 +212,12 @@ def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client
 
 
 @pytest.fixture
-def server_context(connection_type, tcp_server_context_actual_port, udp_server_context_actual_port, pipe_server_context) -> Dict[str, Any]:
+def server_context(connection_type, tcp_server_context_actual_port, udp_server_context_actual_port, pipe_server_context, sftp_server_context) -> Dict[str, Any]:
     contexts = {
         'tcp': tcp_server_context_actual_port,
         'udp': udp_server_context_actual_port,
-        'pipe': pipe_server_context
+        'pipe': pipe_server_context,
+        'sftp': sftp_server_context
     }
     return contexts[connection_type]
 

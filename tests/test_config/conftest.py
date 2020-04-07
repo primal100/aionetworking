@@ -26,14 +26,14 @@ def tcp_server_one_way_yaml_config_path(conf_dir) -> Path:
 
 @pytest.fixture
 def tcp_server_one_way_yaml_with_env_config_path(conf_dir) -> Path:
-    return conf_dir / "tcp_server_one_way_with_env.yaml"
+    return conf_dir / "tcp_server_oneway_with_env.yaml"
 
 
 @pytest.fixture
-async def tcp_server_one_way_env_port(protocol_factory_one_way_server, server_sock) -> TCPServer:
+async def tcp_server_one_way_env_ip(protocol_factory_server) -> TCPServer:
     env_ip = '10.10.10.10'
     os.environ['IP'] = str(env_ip)
-    server = TCPServer(protocol_factory=protocol_factory_one_way_server, host=env_ip, port=server_sock[1])
+    server = TCPServer(protocol_factory=protocol_factory_server, host=env_ip, port=0)
     yield server
 
 
@@ -117,8 +117,9 @@ def server_pipe_address_load(pipe_path):
 
 
 @pytest.fixture
-def config_file(config_files_args):
-    return config_files_args[0]
+def config_file(conf_dir, connection_type, endpoint, duplex_type):
+    filename = f'{connection_type}_{endpoint}_{duplex_type}.yaml'
+    return conf_dir / filename
 
 
 @pytest.fixture
@@ -127,8 +128,8 @@ def config_file_stream(config_file):
 
 
 @pytest.fixture
-def expected_object(config_files_args):
-    return config_files_args[1]
+def expected_object(server, client_fixed_port, endpoint):
+    return server if endpoint == 'server' else client_fixed_port
 
 
 @pytest.fixture
@@ -316,7 +317,7 @@ def stats_formatter() -> logging.Formatter:
 @pytest.fixture
 def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags) -> Path:
     path = tmp_path / tcp_server_one_way_yaml_config_path.name
-    shutil.copy(tcp_server_one_way_yaml_config_path, path)
+    shutil.copy(str(tcp_server_one_way_yaml_config_path), str(path))
     return path
 
 

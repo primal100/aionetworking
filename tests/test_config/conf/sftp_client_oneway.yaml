@@ -12,3 +12,5 @@ protocol_factory: !SFTPClientProtocolFactory
                   base_path: !Path "{temp}/sftp_sent"
                   dataformat: !JSON
                   hostname_lookup: True
+---
+log_config_file: !Path "{conf}/logging.yaml"

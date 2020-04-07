@@ -1,12 +1,12 @@
-!UDPClient
+!TCPClient
 host: 127.0.0.1
 port: !Port
-quiet: False
+srcip: 127.0.0.1
 logger: !SenderLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
-protocol_factory: !DatagramClientProtocolFactory
+protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester
                   hostname_lookup: True

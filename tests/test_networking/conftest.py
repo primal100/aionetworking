@@ -295,7 +295,6 @@ async def sftp_connection_connected(connection, endpoint, sftp_conn, sftp_factor
     yield connection
 
 
-
 @pytest.fixture
 def hostname_lookup(connection_type) -> bool:
     return connection_type != 'pipe'
@@ -330,7 +329,7 @@ async def protocol_factory_started(protocol_factory, parent_name, connection_typ
 
 
 @pytest.fixture
-async def protocol_factory_client(requester, connection_type, connection_kwargs) -> StreamClientProtocolFactory:
+async def protocol_factory_client(requester, connection_type, connection_kwargs, hostname_lookup) -> StreamClientProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamClientProtocolFactory,
         'udp': DatagramClientProtocolFactory,
@@ -341,7 +340,7 @@ async def protocol_factory_client(requester, connection_type, connection_kwargs)
     factory = factory_cls(
         dataformat=JSONObject,
         requester=requester,
-        hostname_lookup=True,
+        hostname_lookup=hostname_lookup,
         **connection_kwargs['client'])
     yield factory
 

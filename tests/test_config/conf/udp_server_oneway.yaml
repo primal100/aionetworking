@@ -1,15 +1,15 @@
-!TCPServer
-host: !ENV ${IP}
+!UDPServer
+host: 127.0.0.1
 port: 0
 quiet: False
 logger: !ReceiverLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
-protocol_factory: !StreamServerProtocolFactory
+protocol_factory: !DatagramServerProtocolFactory
                   action: !BufferedFileStorage
                            base_path: !Path "{data}"
-                           path: "Encoded/{msg.address}_{msg.name}.{msg.name}"
+                           path: "{msg.address}.{msg.name}"
                            buffering: 0
                            close_file_after_inactivity: 2
                   preaction: !BufferedFileStorage
@@ -20,3 +20,5 @@ protocol_factory: !StreamServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
+---
+log_config_file: !Path "{conf}/logging.yaml"

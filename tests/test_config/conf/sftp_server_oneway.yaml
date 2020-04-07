@@ -1,4 +1,4 @@
-!TCPServer
+!SFTPServer
 host: 127.0.0.1
 port: !Port
 quiet: False
@@ -6,7 +6,9 @@ logger: !ReceiverLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
-protocol_factory: !StreamServerProtocolFactory
+server_host_key: !Path "{temp}/skey"
+base_upload_dir: !Path "{temp}/sftp_received"
+protocol_factory: !SFTPServerProtocolFactory
                   action: !BufferedFileStorage
                            base_path: !Path "{data}"
                            path: "{msg.address}.{msg.name}"

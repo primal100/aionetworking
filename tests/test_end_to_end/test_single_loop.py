@@ -11,7 +11,7 @@ from aionetworking.compatibility import datagram_supported, supports_pipe_or_uni
     supports_pipe_or_unix_connections_in_other_process
 
 
-@pytest.mark.connections('all_oneway_all')
+@pytest.mark.connections('allplus_oneway_all')
 class TestOneWayServer:
     @pytest.mark.asyncio
     async def test_00_send(self, server_started, client_connection_started, json_decoded_multi,
