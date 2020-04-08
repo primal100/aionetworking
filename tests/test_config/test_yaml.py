@@ -83,7 +83,6 @@ def port_from_out(out: str) -> int:
     return int(re.search(r'[1-6][0-9]{3,4}', out)[0])
 
 
-@pytest.mark.skip
 class TestSignalServerManager:
     @pytest.mark.asyncio
     async def test_00_start_close(self, signal_server_manager, patch_systemd, server_sock, capsys, reset_logging):

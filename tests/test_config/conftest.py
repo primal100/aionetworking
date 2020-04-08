@@ -3,7 +3,6 @@ import yaml
 import shutil
 import logging.config
 
-from aionetworking import Logger
 from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
@@ -17,8 +16,6 @@ import asyncio
 def reset_logging():
     logger = logging.getLogger()
     yield
-    logger.manager._clear_cache()
-    logging.config._clearExistingHandlers()
     logger.manager.loggerDict = {}
 
 
