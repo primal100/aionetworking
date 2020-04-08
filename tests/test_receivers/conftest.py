@@ -14,8 +14,8 @@ async def tcp_server(protocol_factory_server, server_sock) -> TCPServer:
 
 
 @pytest.fixture
-async def tcp_server_ipv6(protocol_factory_server, server_sock_ipv6) -> TCPServer:
-    yield TCPServer(protocol_factory=protocol_factory_server, host=server_sock_ipv6[0], port=0)
+async def tcp_server_allowed_senders(protocol_factory_server_allowed_senders, allowed_sender) -> TCPServer:
+    yield TCPServer(protocol_factory=protocol_factory_server_allowed_senders, host=allowed_sender[0], port=0)
 
 
 @pytest.fixture
@@ -42,6 +42,12 @@ async def udp_server(protocol_factory_server, server_sock) -> UDPServer:
 
 
 @pytest.fixture
+async def udp_server_allowed_senders(protocol_factory_server_allowed_senders, allowed_sender) -> UDPServer:
+    server = UDPServer(protocol_factory=protocol_factory_server_allowed_senders, host=allowed_sender[0], port=0)
+    yield server
+
+
+@pytest.fixture
 async def pipe_server(protocol_factory_server, pipe_path) -> BaseServer:
     server = PipeServer(protocol_factory=protocol_factory_server, path=pipe_path)
     yield server
@@ -57,6 +63,13 @@ async def ssh_host_key(tmp_path) -> Path:
 @pytest.fixture
 async def sftp_server(protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
     server = SFTPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=0,
+                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
+    yield server
+
+
+@pytest.fixture
+async def sftp_server_allowed_senders(protocol_factory_server_allowed_senders, ssh_host_key, tmp_path) -> SFTPServer:
+    server = SFTPServer(protocol_factory=protocol_factory_server_allowed_senders, host='localhost', port=0,
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     yield server
 
@@ -83,6 +96,22 @@ async def server(connection_type, tcp_server, tcp_server_ssl, udp_server, pipe_s
         'sftp': sftp_server
     }
     server = servers[connection_type]
+    yield server
+    if server.is_started():
+        await server.close()
+
+
+@pytest.fixture
+async def server_allowed_senders(connection_type, tcp_server_allowed_senders, udp_server_allowed_senders, sftp_server_allowed_senders) -> BaseServer:
+    servers = {
+        'tcp': tcp_server_allowed_senders,
+        'tcpssl': tcp_server_ssl,
+        'udp': udp_server_allowed_senders,
+        'pipe': pipe_server,
+        'sftp': sftp_server_allowed_senders
+    }
+    server = servers[connection_type]
+    await server.start()
     yield server
     if server.is_started():
         await server.close()

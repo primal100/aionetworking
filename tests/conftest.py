@@ -43,6 +43,8 @@ def pytest_generate_tests(metafunc):
             connection_type_params = ('tcp', 'tcpssl', 'udp', 'pipe', 'sftp')
         elif connection_type_params == 'sslsftp':
             connection_type_params = ('tcpssl', 'sftp')
+        elif connection_type_params == 'inet':
+            connection_type_params = ('tcp', 'udp')
         else:
             connection_type_params = (connection_type_params,)
         if duplex_type_params == 'all':

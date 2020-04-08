@@ -299,6 +299,65 @@ async def connection(connection_cls, connection_type, action, endpoint, preactio
     await asyncio.wait_for(conn.wait_closed(), 1)
 
 
+@pytest.fixture(params=['ipv4', 'ipv6'])
+def client_sock_ip_versions(request, client_sock, client_sock_ipv6) -> str:
+    if request.param == 'ipv4':
+        return client_sock[0]
+    return client_sock_ipv6[0]
+
+
+@pytest.fixture(params=['ipv4', 'ipv6', 'hostname'])
+def allowed_sender_type(request) -> str:
+    return request.param
+
+
+@pytest.fixture
+def allowed_sender(allowed_sender_type, client_sock, client_sock_ipv6, client_hostname) -> Tuple[str, str]:
+    if allowed_sender_type == 'ipv4':
+        return client_sock[0], client_sock[0]
+    elif allowed_sender_type == 'ipv6':
+        return client_sock_ipv6[0], client_sock_ipv6[0]
+    return client_sock[0], client_hostname
+
+
+@pytest.fixture
+def incorrect_allowed_sender(allowed_sender_type, client_sock, client_sock_ipv6, client_hostname) -> Tuple[str, str]:
+    if allowed_sender_type == 'ipv4':
+        return '127.0.0.2', '127.0.0.2'
+    elif allowed_sender_type == 'ipv6':
+        return '::2', '::2'
+    return '127.0.0.2', 'localhost2'
+
+
+@pytest.fixture
+def allowed_senders(allowed_sender_type, client_sock, client_sock_ipv6, client_hostname) -> Tuple[IPNetwork, IPNetwork]:
+    if allowed_sender_type == 'hostname':
+        return IPNetwork('10.10.10.10'), IPNetwork(client_hostname)
+    return IPNetwork(client_sock[0]), IPNetwork(client_sock_ipv6[0])
+
+
+@pytest.fixture
+async def connection_allowed_senders(connection_cls, connection_type, action, endpoint, preaction, parent_name, peer_prefix,
+                                     requester, server_sock_as_string, hostname_lookup, connection_kwargs, server_sock,
+                                     allowed_senders) -> TCPServerConnection:
+    if endpoint == 'client':
+        action = None
+    else:
+        requester = None
+    conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction, requester=requester,
+                          parent_name=parent_name, peer_prefix=peer_prefix, hostname_lookup=hostname_lookup,
+                          allowed_senders=allowed_senders, **connection_kwargs)
+    yield conn
+    if connection_type == 'sftp':
+        if not conn.is_closing():
+            conn.close()
+            await conn.wait_closed()
+    else:
+        if conn.transport and not conn.transport.is_closing():
+            conn.transport.close()
+    await asyncio.wait_for(conn.wait_closed(), 1)
+
+
 @pytest.fixture
 async def second_connection(connection_cls, connection_type, action, endpoint, preaction, parent_name,
                             requester, server_sock_as_string, hostname_lookup) -> TCPServerConnection:
@@ -350,6 +409,81 @@ async def protocol_factory_server(connection_type, action, recording_file_storag
         **connection_kwargs_server
     )
     yield factory
+
+
+@pytest.fixture
+async def protocol_factory_server_allowed_senders(connection_type, action, recording_file_storage, hostname_lookup, allowed_senders, connection_kwargs_server) -> StreamServerProtocolFactory:
+    protocol_factory_classes = {
+        'tcp': StreamServerProtocolFactory,
+        'tcpssl': StreamServerProtocolFactory,
+        'udp': DatagramServerProtocolFactory,
+        'pipe': StreamServerProtocolFactory,
+        'sftp': SFTPOSAuthProtocolFactory
+    }
+    factory_cls = protocol_factory_classes[connection_type]
+    factory = factory_cls(
+        preaction=recording_file_storage,
+        action=action,
+        dataformat=JSONObject,
+        hostname_lookup=hostname_lookup,
+        timeout=5,
+        allowed_senders=allowed_senders,
+        **connection_kwargs_server
+    )
+    yield factory
+
+
+@pytest.fixture
+async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup, connection_kwargs_server, parent_name) -> StreamServerProtocolFactory:
+    protocol_factory_classes = {
+        'tcp': StreamServerProtocolFactory,
+        'tcpssl': StreamServerProtocolFactory,
+        'udp': DatagramServerProtocolFactory,
+        'pipe': StreamServerProtocolFactory,
+        'sftp': SFTPOSAuthProtocolFactory
+    }
+    factory_cls = protocol_factory_classes[connection_type]
+    factory = factory_cls(
+        action=action,
+        dataformat=JSONObjectWithCodecKwargs,
+        hostname_lookup=hostname_lookup,
+        timeout=5,
+        codec_config={'test_param': 'abc'},
+        **connection_kwargs_server
+    )
+    await factory.start()
+    if not factory.full_name:
+        factory.set_name(parent_name, connection_type)
+    yield factory
+    factory.close_all_connections(None)
+    await factory.close()
+
+
+@pytest.fixture
+async def protocol_factory_expire_connections(connection_type, action, hostname_lookup, connection_kwargs_server, parent_name) -> StreamServerProtocolFactory:
+    protocol_factory_classes = {
+        'tcp': StreamServerProtocolFactory,
+        'tcpssl': StreamServerProtocolFactory,
+        'udp': DatagramServerProtocolFactory,
+        'pipe': StreamServerProtocolFactory,
+        'sftp': SFTPOSAuthProtocolFactory
+    }
+    factory_cls = protocol_factory_classes[connection_type]
+    factory = factory_cls(
+        action=action,
+        dataformat=JSONObject,
+        hostname_lookup=hostname_lookup,
+        timeout=5,
+        expire_connections_after_inactive_minutes=1 / 60,
+        expire_connections_check_interval_minutes=0.2 / 60,
+        **connection_kwargs_server
+    )
+    await factory.start()
+    if not factory.full_name:
+        factory.set_name(parent_name, connection_type)
+    yield factory
+    factory.close_all_connections(None)
+    await factory.close()
 
 
 @pytest.fixture

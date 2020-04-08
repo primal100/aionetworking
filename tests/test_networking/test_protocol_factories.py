@@ -32,29 +32,26 @@ class TestStreamProtocolFactories:
         await asyncio.wait_for(protocol_factory_started.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
 
-    @pytest.mark.skip
     @pytest.mark.asyncio
-    async def test_02_protocol_factory_custom_codec_config(self, protocol_factory_one_way_server_codec_kwargs,
-                                                           tcp_transport, json_codec_with_kwargs,
+    async def test_02_protocol_factory_custom_codec_config(self, protocol_factory_codec_kwargs,
+                                                           json_codec_with_kwargs, transport,
                                                            json_rpc_login_request_encoded):
-        new_connection = protocol_factory_one_way_server_codec_kwargs()
+        new_connection = protocol_factory_codec_kwargs()
         assert new_connection.codec_config == {'test_param': 'abc'}
-        new_connection.connection_made(tcp_transport)
-        tcp_transport.set_protocol(new_connection)
+        new_connection.connection_made(transport)
+        transport.set_protocol(new_connection)
         new_connection.data_received(json_rpc_login_request_encoded)
         adaptor = new_connection._adaptor
         assert adaptor.codec_config == {'test_param': 'abc'}
         assert adaptor.codec.msg_obj == json_codec_with_kwargs.msg_obj
         assert adaptor.codec.test_param == json_codec_with_kwargs.test_param
-        tcp_transport.close()
 
-    @pytest.mark.skip
     @pytest.mark.asyncio
-    async def test_03_protocol_factory_connections_expire(self, protocol_factory_server_connections_expire_started,
-                                                          tcp_transport, echo_encoded, echo_response):
-        new_connection = protocol_factory_server_connections_expire_started()
-        new_connection.connection_made(tcp_transport)
-        tcp_transport.set_protocol(new_connection)
+    async def test_03_protocol_factory_connections_expire(self, protocol_factory_expire_connections,
+                                                          transport, echo_encoded, echo_response):
+        new_connection = protocol_factory_expire_connections()
+        new_connection.connection_made(transport)
+        transport.set_protocol(new_connection)
         connection_time = new_connection.last_msg
         assert isinstance(connection_time, datetime.datetime)
         await asyncio.sleep(0.1)
@@ -70,7 +67,7 @@ class TestStreamProtocolFactories:
         assert not new_connection.is_closing()
         await asyncio.sleep(0.8)
         assert new_connection.is_closing()
-        await protocol_factory_server_connections_expire_started.wait_all_closed()
+        await protocol_factory_expire_connections.wait_all_closed()
 
 
 @pytest.mark.connections('udp_oneway_server')
@@ -102,16 +99,15 @@ class TestOneWayServerDatagramProtocolFactory:
         assert connections_manager.total == 0
         await assert_buffered_file_storage_ok
 
-    @pytest.mark.skip
     @pytest.mark.asyncio
-    async def test_01_protocol_factory_connections_expire(self, udp_protocol_factory_server_connections_expire_started,
-                                                          udp_transport_server, echo_encoded, echo_response, client_sock,
+    async def test_01_protocol_factory_connections_expire(self, protocol_factory_expire_connections,
+                                                          transport, echo_encoded, echo_response, client_sock,
                                                           connections_manager, server_sock_str, client_sock_str):
-        protocol_factory = udp_protocol_factory_server_connections_expire_started()
-        protocol_factory.connection_made(udp_transport_server)
-        udp_transport_server.set_protocol(protocol_factory)
+        protocol_factory = protocol_factory_expire_connections()
+        protocol_factory.connection_made(transport)
+        transport.set_protocol(protocol_factory)
         protocol_factory.datagram_received(echo_encoded, client_sock)
-        await asyncio.wait_for(udp_protocol_factory_server_connections_expire_started.wait_num_connected(1), timeout=1)
+        await asyncio.wait_for(protocol_factory_expire_connections.wait_num_connected(1), timeout=1)
         full_peername = f"udp_{server_sock_str}_{client_sock_str}"
         new_connection = connections_manager.get(full_peername)
         msg_received_time = new_connection.last_msg
@@ -125,7 +121,7 @@ class TestOneWayServerDatagramProtocolFactory:
         assert not new_connection.is_closing()
         await asyncio.sleep(0.8)
         assert new_connection.is_closing()
-        await udp_protocol_factory_server_connections_expire_started.wait_all_closed()
+        await protocol_factory_expire_connections.wait_all_closed()
 
 
 @pytest.mark.connections('udp_oneway_client')

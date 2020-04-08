@@ -180,9 +180,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
         async for msg in msgs:
             if msg.request_id is not None:
                 try:
-                    print('Setting for', msg.request_id)
                     self._scheduler.set_result(msg.request_id, msg)
-                    print('Set done for', msg.request_id)
                 except KeyError:
                     self._notification_queue.put_nowait(msg)
             else:

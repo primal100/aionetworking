@@ -84,35 +84,21 @@ class TestSFTPClient:
             await sftp_client_wrong_password.connect()
 
 
-@pytest.mark.skip
+@pytest.mark.connections('inet_twoway_all')
 class TestClientAllowedSenders:
     @pytest.mark.asyncio
-    async def test_00_tcp_client_connect_allowed(self, tcp_server_started_allowed_senders, tcp_client_allowed_senders,
-                                                 echo_encoded, echo_response_object):
-        async with tcp_client_allowed_senders as conn:
+    async def test_00_client_connect_allowed(self, server_allowed_senders, client_allowed_senders, echo_encoded,
+                                             echo_response_object):
+        async with client_allowed_senders as conn:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object
 
     @pytest.mark.asyncio
-    async def test_01_tcp_client_connect_not_allowed_ip4(self, tcp_server_started_wrong_senders,
-                                                         tcp_client_wrong_senders, echo_encoded):
-        async with tcp_client_wrong_senders as conn:
-            with pytest.raises((ConnectionResetError, ConnectionAbortedError, RemoteConnectionClosedError)):
-                await conn.send_data_and_wait(1, echo_encoded)
-
-    @pytest.mark.asyncio
-    async def test_02_udp_client_connect_allowed(self, udp_server_started_allowed_senders, udp_client_allowed_senders,
-                                                 echo_encoded, echo_response_object):
-        async with udp_client_allowed_senders as conn:
-            response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
-            assert response == echo_response_object
-
-    @pytest.mark.asyncio
-    async def test_03_udp_client_connect_not_allowed(self, udp_server_started_wrong_senders, udp_client_wrong_senders,
-                                                     echo_encoded):
-        async with udp_client_wrong_senders as conn:
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
+    async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender,
+                                                 echo_encoded):
+        async with client_incorrect_sender as conn:
+            with pytest.raises((ConnectionResetError, ConnectionAbortedError, RemoteConnectionClosedError, asyncio.TimeoutError)):
+                await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), 2)
 
 
 @pytest.mark.skip

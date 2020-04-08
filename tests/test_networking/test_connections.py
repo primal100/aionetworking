@@ -53,69 +53,6 @@ class TestConnectionShared:
         assert protocol == connection
 
 
-@pytest.mark.skip
-class TestConnectionAllowedSenders:
-    @pytest.mark.asyncio
-    async def test_00_sender_valid_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(client_sock[0], client_sock[0]) is True
-
-    @pytest.mark.asyncio
-    async def test_01_sender_valid_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock_ipv6):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid(client_sock_ipv6[0], client_sock_ipv6[0]) is True
-
-    @pytest.mark.asyncio
-    async def test_02_sender_valid_hostname_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname, client_hostname):
-        assert tcp_protocol_two_way_server_allowed_senders_hostname._sender_valid('10.10.10.10', client_hostname) is True
-
-    @pytest.mark.asyncio
-    async def test_03_sender_valid_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('127.0.0.2', 'abcd') is False
-
-    @pytest.mark.asyncio
-    async def test_04_sender_valid_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        assert tcp_protocol_two_way_server_allowed_senders._sender_valid('::2', 'abcd') is False
-
-    @pytest.mark.asyncio
-    async def test_05_check_peer_ipv4_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock):
-        tcp_protocol_two_way_server_allowed_senders.context['address'] = client_sock[0]
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
-        tcp_protocol_two_way_server_allowed_senders._check_peer()
-
-    @pytest.mark.asyncio
-    async def test_06_check_peer_ipv6_ok(self, tcp_protocol_two_way_server_allowed_senders, client_sock_ipv6):
-        tcp_protocol_two_way_server_allowed_senders.context['address'] = client_sock_ipv6[0]
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
-        tcp_protocol_two_way_server_allowed_senders._check_peer()
-
-    @pytest.mark.asyncio
-    async def test_07_check_peer_hostname_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname, client_hostname):
-        tcp_protocol_two_way_server_allowed_senders_hostname.context['address'] = '10.10.10.10'
-        tcp_protocol_two_way_server_allowed_senders_hostname.context['host'] = client_hostname
-        tcp_protocol_two_way_server_allowed_senders_hostname._check_peer()
-
-    @pytest.mark.asyncio
-    async def test_08_check_peer_ipv4_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['address'] = '127.0.0.2'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
-        with pytest.raises(MessageFromNotAuthorizedHost):
-            tcp_protocol_two_way_server_allowed_senders._check_peer()
-
-    @pytest.mark.asyncio
-    async def test_09_check_peer_ipv6_not_ok(self, tcp_protocol_two_way_server_allowed_senders):
-        tcp_protocol_two_way_server_allowed_senders.context['address'] = '::2'
-        tcp_protocol_two_way_server_allowed_senders.context['host'] = 'abcd'
-        with pytest.raises(MessageFromNotAuthorizedHost):
-            tcp_protocol_two_way_server_allowed_senders._check_peer()
-
-    @pytest.mark.asyncio
-    async def test_13_check_peer_hostname_not_ok(self, tcp_protocol_two_way_server_allowed_senders_hostname):
-        tcp_protocol_two_way_server_allowed_senders_hostname.context['peer'] = '10.10.10.10:11111'
-        tcp_protocol_two_way_server_allowed_senders_hostname.context['address'] = '10.10.10.10'
-        tcp_protocol_two_way_server_allowed_senders_hostname.context['host'] = 'abcd'
-        with pytest.raises(MessageFromNotAuthorizedHost):
-            tcp_protocol_two_way_server_allowed_senders_hostname._check_peer()
-
-
 @pytest.mark.connections('all_oneway_server')
 class TestConnectionOneWayServer:
     @pytest.mark.asyncio
@@ -202,3 +139,26 @@ class TestConnectionTwoWayClient:
     async def test_04_no_method(self, connection_connected, transport):
         with pytest.raises(MethodNotFoundError):
             connection_connected.ech()
+
+
+class TestConnectionAllowedSenders:
+    @pytest.mark.asyncio
+    async def test_00_sender_valid_ok(self, connection_allowed_senders, allowed_sender):
+        assert connection_allowed_senders._sender_valid(*allowed_sender) is True
+
+    @pytest.mark.asyncio
+    async def test_01_sender_valid_not_ok(self, connection_allowed_senders, incorrect_allowed_sender):
+        assert connection_allowed_senders._sender_valid(*incorrect_allowed_sender) is False
+
+    @pytest.mark.asyncio
+    async def test_02_check_peer_ok(self, connection_allowed_senders, allowed_sender):
+        connection_allowed_senders.context['address'] = allowed_sender[0]
+        connection_allowed_senders.context['host'] = allowed_sender[1]
+        connection_allowed_senders._check_peer()
+
+    @pytest.mark.asyncio
+    async def test_03_check_peer_not_ok(self, connection_allowed_senders, incorrect_allowed_sender):
+        connection_allowed_senders.context['address'] = incorrect_allowed_sender[0]
+        connection_allowed_senders.context['host'] = incorrect_allowed_sender[1]
+        with pytest.raises(MessageFromNotAuthorizedHost):
+            connection_allowed_senders._check_peer()
