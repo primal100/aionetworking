@@ -17,6 +17,7 @@ def raise_signal(signal_num, host, port):
         os.kill(os.getpid(), signal_num)
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize('signal_num', [
     pytest.param(signal.SIGINT, marks=pytest.mark.skipif(not supports_keyboard_interrupt(), reason='Loop does not support keyboard interrupts')),
     pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
@@ -49,6 +50,7 @@ def assert_reload_ok(signal_num, host, port, tmp_config_file, event):
     modify_config_file(tmp_config_file, host, new_host)
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize('signal_num', [
     pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
 ])

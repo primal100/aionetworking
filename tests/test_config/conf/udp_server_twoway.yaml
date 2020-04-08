@@ -16,5 +16,6 @@ protocol_factory: !DatagramServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

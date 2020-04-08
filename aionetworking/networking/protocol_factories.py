@@ -40,7 +40,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     aliases: Dict[str, str] = field(default_factory=dict)
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
-    scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False)
+    timeout: int = None
+    _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False)
     _context: contextvars.Context = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self):
@@ -63,7 +64,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.requester.start())
         await asyncio.gather(*coros)
         if self.expire_connections_after_inactive_minutes:
-            self.scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
+            self._scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
                                             self.check_expired_connections,
                                             task_name=f'Check expired connections for {self.full_name}')
 
@@ -136,8 +137,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                 self.close_connection(conn, None)
 
     async def close(self) -> None:
-        await asyncio.gather(self.scheduler.close(), self.wait_num_connected(0))
-        await self.close_actions()
+        await asyncio.wait_for(asyncio.gather(self._scheduler.close(), self.wait_num_connected(0)), self.timeout)
+        await asyncio.wait_for(self.close_actions(), self.timeout)
         connections_manager.clear_server(self.full_name)
 
 

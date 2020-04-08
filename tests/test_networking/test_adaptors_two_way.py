@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import logging
 
 from aionetworking.networking.exceptions import MethodNotFoundError
 
@@ -70,10 +71,11 @@ class TestSenderAdaptorTwoWay:
     @pytest.mark.asyncio
     async def test_03_on_data_received_response(self, adaptor, echo_response_encoded, timestamp,
                                                 echo_response_object, json_codec):
+        a = logging
         fut = asyncio.Future()
         adaptor._scheduler._futures[1] = fut
         task = adaptor.on_data_received(echo_response_encoded, timestamp)
-        result = await asyncio.wait_for(fut, timeout=1)
+        result = await asyncio.wait_for(fut, timeout=200)
         await task
         assert result == echo_response_object
         assert adaptor.codec == json_codec
@@ -82,7 +84,7 @@ class TestSenderAdaptorTwoWay:
     async def test_04_on_data_received_notification(self, adaptor, echo_notification_server_encoded,
                                                     echo_notification_object, timestamp):
         task = adaptor.on_data_received(echo_notification_server_encoded, timestamp)
-        result = await asyncio.wait_for(adaptor.wait_notification(), timeout=1)
+        result = await asyncio.wait_for(adaptor.wait_notification(), timeout=2)
         await task
         assert result == echo_notification_object
 
@@ -91,7 +93,7 @@ class TestSenderAdaptorTwoWay:
         msg = await queue.get()
         assert msg == echo_encoded
         task2 = adaptor.on_data_received(echo_response_encoded, timestamp=timestamp)
-        result = await asyncio.wait_for(task1, timeout=1)
+        result = await asyncio.wait_for(task1, timeout=2)
         await task2
         assert result == echo_response_object
 
@@ -130,7 +132,7 @@ class TestSenderAdaptorTwoWay:
         msg = await queue.get()
         assert msg == echo_notification_client_encoded
         task2 = adaptor.on_data_received(echo_notification_server_encoded, timestamp=timestamp)
-        result = await asyncio.wait_for(adaptor.wait_notification(), timeout=1)
+        result = await asyncio.wait_for(adaptor.wait_notification(), timeout=2)
         await task2
         assert result == echo_notification_object
 

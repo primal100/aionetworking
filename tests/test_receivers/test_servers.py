@@ -133,10 +133,10 @@ class TestServerStartStop:
         assert server == server
 
 
-@pytest.mark.connections
-class TestAlternativeServerStartStop:
+@pytest.mark.connections('sslsftp_oneway_all')
+class TestSSLAndSFTPServer:
     @pytest.mark.asyncio
-    async def test_00_ssl_server_start(self, tcp_server_ssl, capsys):
+    async def test_00_server_start(self, tcp_server_ssl, capsys):
         assert not tcp_server_ssl.is_started()
         task = asyncio.create_task(tcp_server_ssl.start())
         await asyncio.wait_for(tcp_server_ssl.wait_started(), timeout=4)
@@ -146,12 +146,7 @@ class TestAlternativeServerStartStop:
         await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
-    async def test_01_ipv6_server_start(self, tcp_server_ipv6, capsys):
-        assert not tcp_server_ipv6.is_started()
-        task = asyncio.create_task(tcp_server_ipv6.start())
-        await asyncio.wait_for(tcp_server_ipv6.wait_started(), timeout=4)
-        assert tcp_server_ipv6.is_started()
-        captured = capsys.readouterr()
-        assert captured.out.startswith("Serving")
-        await asyncio.wait_for(task, timeout=4)
-
+    async def test_01_pickle_server(self, server):
+        data = pickle.dumps(server)
+        server = pickle.loads(data)
+        assert server == server

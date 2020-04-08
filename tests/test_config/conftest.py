@@ -1,6 +1,7 @@
 from __future__ import annotations
 import yaml
 import shutil
+import logging.config
 
 from aionetworking import Logger
 from aionetworking.logging import PeerFilter, MessageFilter
@@ -16,6 +17,8 @@ import asyncio
 def reset_logging():
     logger = logging.getLogger()
     yield
+    logger.manager._clear_cache()
+    logging.config._clearExistingHandlers()
     logger.manager.loggerDict = {}
 
 
@@ -214,17 +217,11 @@ def log_record_msg_object_not_included(json_rpc_logout_request_object) -> loggin
 
 
 @pytest.fixture
-async def receiver_logger() -> Logger:
-    logger = Logger(name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
-    yield logger
-
-
-@pytest.fixture
-async def receiver_connection_logger(receiver_logger, context, caplog) -> ConnectionLogger:
+async def receiver_connection_logger(receiver_logger, tcp_server_context_fixed_port, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
     caplog.set_level(logging.ERROR, "receiver.stats")
-    yield receiver_logger.get_connection_logger(extra=context)
+    yield receiver_logger.get_connection_logger(extra=tcp_server_context_fixed_port)
     caplog.set_level(logging.ERROR, "receiver.connection")
     caplog.set_level(logging.ERROR, "receiver.msg_received")
 
@@ -256,8 +253,8 @@ def sender_logger() -> Logger:
 
 
 @pytest.fixture
-def sender_connection_logger(sender_logger, tcp_client_context) -> ConnectionLogger:
-    return sender_logger.get_connection_logger(extra=tcp_client_context)
+def sender_connection_logger(sender_logger, tcp_client_context_fixed_port) -> ConnectionLogger:
+    return sender_logger.get_connection_logger(extra=tcp_client_context_fixed_port)
 
 
 @pytest.fixture

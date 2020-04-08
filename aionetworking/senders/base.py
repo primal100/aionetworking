@@ -81,6 +81,7 @@ class BaseClient(BaseSender, Protocol):
         return f"{self.name} {self.dst}"
 
     async def _close_connection(self) -> None:
+        await self.conn.wait_current_tasks()
         self.transport.close()
         await self.conn.wait_closed()
         self.transport = None

@@ -19,9 +19,14 @@ async def tcp_server_ipv6(protocol_factory_server, server_sock_ipv6) -> TCPServe
 
 
 @pytest.fixture
-async def tcp_server_ssl(protocol_factory_server, server_sock, server_side_ssl) -> TCPServer:
+def ssl_handshake_timeout() -> Optional[int]:
+    return 60
+
+
+@pytest.fixture
+async def tcp_server_ssl(protocol_factory_server, server_sock, server_side_ssl, ssl_handshake_timeout) -> TCPServer:
     yield TCPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=0, ssl=server_side_ssl,
-                    ssl_handshake_timeout=10)
+                    ssl_handshake_timeout=ssl_handshake_timeout)
 
 
 @pytest.fixture
@@ -51,7 +56,7 @@ async def ssh_host_key(tmp_path) -> Path:
 
 @pytest.fixture
 async def sftp_server(protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
-    server = SFTPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=server_sock[1],
+    server = SFTPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=0,
                         server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
     yield server
 
@@ -69,9 +74,10 @@ async def sftp_server_started(sftp_server) -> SFTPServer:
 
 
 @pytest.fixture
-async def server(connection_type, tcp_server, udp_server, pipe_server, sftp_server) -> BaseServer:
+async def server(connection_type, tcp_server, tcp_server_ssl, udp_server, pipe_server, sftp_server) -> BaseServer:
     servers = {
         'tcp': tcp_server,
+        'tcpssl': tcp_server_ssl,
         'udp': udp_server,
         'pipe': pipe_server,
         'sftp': sftp_server

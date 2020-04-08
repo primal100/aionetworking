@@ -3,9 +3,6 @@ import pytest
 import pickle
 from pathlib import Path
 
-from aionetworking.formats import get_recording_from_file
-from aionetworking.utils import alist
-
 
 @pytest.mark.connections('sftp_oneway_all')
 class TestConnectionShared:
@@ -84,11 +81,11 @@ class TestConnectionServerOSAuth:
 class TestConnectionClient:
 
     @pytest.mark.asyncio
-    async def test_00_send(self, sftp_connection_connected, sftp_factory, fixed_timestamp,
-                           json_rpc_login_request_encoded, tmpdir):
+    async def test_00_send(self, sftp_connection_connected, sftp_factory, fixed_timestamp, tmpdir,
+                           json_rpc_login_request_encoded):
         sftp_factory.realpath.assert_awaited_with('/')
         await sftp_connection_connected.send(json_rpc_login_request_encoded)
-        sftp_factory.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE20190101010100000000",
+        sftp_factory.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE201901010101000000000000",
                                              remotepath='/')
 
     @pytest.mark.asyncio
@@ -96,7 +93,7 @@ class TestConnectionClient:
                                                json_rpc_login_request_encoded, tmpdir):
         sftp_connection_connected.send_data(json_rpc_login_request_encoded)
         await sftp_connection_connected.wait_tasks_done()
-        sftp_factory.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE20190101010100000000",
+        sftp_factory.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE201901010101000000000000",
                                                   remotepath='/')
 
 

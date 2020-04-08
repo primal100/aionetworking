@@ -63,21 +63,21 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.codec = self.dataformat.get_codec(buffer, **self.codec_config)
         self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer)
 
+    def on_encode_task_finished(self, task: asyncio.Future):
+        exception = task.exception()
+        if exception:
+            self.logger.manage_error(exception)
+        else:
+            msg_obj = task.result()
+            self.logger.on_sending_decoded_msg(msg_obj)
+            self.send_data(msg_obj.encoded)
+        self._scheduler.task_done(task)
+
     def encode_and_send_msg(self, decoded: Any) -> None:
         if not self.codec:
             self._set_codecs(decoded)
-        encode_task = asyncio.create_task(self.codec.encode_obj(decoded))
 
-        def on_task_finished(task: asyncio.Future):
-            exception = task.exception()
-            if exception:
-                self.logger.manage_error(exception)
-            else:
-                msg_obj = task.result()
-                self.logger.on_sending_decoded_msg(msg_obj)
-                self.send_data(msg_obj.encoded)
-
-        encode_task.add_done_callback(on_task_finished)
+        self._scheduler.task_with_callback(self.codec.encode_obj(decoded), callback=self.on_encode_task_finished)
 
     def encode_and_send_msgs(self, decoded_msgs: Sequence[Any]) -> None:
         for decoded_msg in decoded_msgs:
@@ -100,6 +100,9 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         msgs_generator = self.codec.decode_buffer(buffer, system_timestamp=timestamp)
         task = self._scheduler.task_with_callback(self.process_msgs(msgs_generator, buffer), name='Process_Msgs')
         return task
+
+    async def wait_current_tasks(self) -> None:
+        await self._scheduler.wait_current_tasks()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
         await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
@@ -177,7 +180,9 @@ class SenderAdaptor(BaseAdaptorProtocol):
         async for msg in msgs:
             if msg.request_id is not None:
                 try:
+                    print('Setting for', msg.request_id)
                     self._scheduler.set_result(msg.request_id, msg)
+                    print('Set done for', msg.request_id)
                 except KeyError:
                     self._notification_queue.put_nowait(msg)
             else:
@@ -193,14 +198,15 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.action.supports_notifications:
-            self._notifications_task = self._scheduler.task_with_callback(self._send_action_notifications(), name='Notifications')
+            self._notifications_task = self._scheduler.task_with_callback(self._send_action_notifications(),
+                                                                          continuous=True, name='Notifications')
         else:
             self._notifications_task = None
 
     def _set_codecs(self, buffer: Optional[bytes]):
         super()._set_codecs(buffer)
         if self.codec.supports_notifications and not self._notifications_task:
-            self._notifications_task = self._scheduler.task_with_callback(self._send_codec_notifications(),
+            self._notifications_task = self._scheduler.task_with_callback(self._send_codec_notifications(), continuous=True,
                                                                           name='Notifications')
 
     async def close(self, exc: Optional[BaseException] = None) -> None:

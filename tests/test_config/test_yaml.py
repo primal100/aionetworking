@@ -19,15 +19,22 @@ def status_call(port, host='127.0.0.1'):
 
 
 class TestYamlConfig:
-    @pytest.mark.connections('all')
-    def test_00_yaml_config_node(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter, reset_logging, server_pipe_address_load):
+    @pytest.mark.connections('allplus_oneway_all')
+    def test_00_yaml_config_node_oneway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter, reset_logging, server_pipe_address_load):
+        node = node_from_config_file(config_file, paths=all_paths)
+        assert node.protocol_factory.action == expected_object.protocol_factory.action
+        assert node.protocol_factory == expected_object.protocol_factory
+        assert node == expected_object
+
+    @pytest.mark.connections('all_twoway_all')
+    def test_01_yaml_config_node_twoway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter, reset_logging, server_pipe_address_load):
         node = node_from_config_file(config_file, paths=all_paths)
         assert node.protocol_factory.action == expected_object.protocol_factory.action
         assert node.protocol_factory == expected_object.protocol_factory
         assert node == expected_object
 
     @pytest.mark.connections('tcp_oneway_server')
-    def test_01_yaml_config_node_with_logging(self, config_file, expected_object, all_paths,
+    def test_02_yaml_config_node_with_logging(self, config_file, expected_object, all_paths,
                                               load_all_yaml_tags, peer_filter, reset_logging):
         node = node_from_config_file(config_file, paths=all_paths)
         assert node == expected_object
@@ -65,7 +72,7 @@ class TestYamlConfig:
             assert len(logger.handlers) == 2
 
     @pytest.mark.connections('tcp_oneway_server')
-    def test_02_yaml_config_node_with_env_var(self, tcp_server_one_way_yaml_with_env_config_path,
+    def test_03_yaml_config_node_with_env_var(self, tcp_server_one_way_yaml_with_env_config_path,
                                               tcp_server_one_way_env_ip, all_paths, load_all_yaml_tags,
                                               reset_logging):
         node = node_from_config_file(tcp_server_one_way_yaml_with_env_config_path, paths=all_paths)
@@ -76,9 +83,10 @@ def port_from_out(out: str) -> int:
     return int(re.search(r'[1-6][0-9]{3,4}', out)[0])
 
 
+@pytest.mark.skip
 class TestSignalServerManager:
     @pytest.mark.asyncio
-    async def test_00_start_close(self, signal_server_manager, patch_systemd, server_sock, capsys):
+    async def test_00_start_close(self, signal_server_manager, patch_systemd, server_sock, capsys, reset_logging):
         task = asyncio.create_task(signal_server_manager.serve_until_stopped())
         try:
             await asyncio.wait_for(signal_server_manager.wait_server_started(), timeout=2)
@@ -96,7 +104,7 @@ class TestSignalServerManager:
                 assert daemon.notify.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_01_check_reload_no_change(self, signal_server_manager_started):
+    async def test_01_check_reload_no_change(self, signal_server_manager_started, reset_logging):
         current_server_id = id(signal_server_manager_started.server)
         signal_server_manager_started.check_reload()
         await asyncio.sleep(1)
@@ -113,7 +121,7 @@ class TestSignalServerManager:
 
     @pytest.mark.asyncio
     async def test_02_check_reload_with_change(self, patch_systemd, signal_server_manager_started, tmp_config_file,
-                                               capsys):
+                                               capsys, reset_logging):
         current_server_id = id(signal_server_manager_started.server)
         assert signal_server_manager_started.server.host == '127.0.0.1'
         self.modify_config_file(tmp_config_file)
@@ -132,7 +140,7 @@ class TestSignalServerManager:
             assert daemon.notify.call_count == 6
 
     @pytest.mark.asyncio
-    async def test_03_check_reload_file_deleted(self, patch_systemd, signal_server_manager, tmp_config_file, capsys):
+    async def test_03_check_reload_file_deleted(self, patch_systemd, signal_server_manager, tmp_config_file, capsys, reset_logging):
         task = asyncio.create_task(signal_server_manager.serve_until_stopped())
         await signal_server_manager.wait_server_started()
         tmp_config_file.unlink()
@@ -159,7 +167,7 @@ class TestSignalServerManager:
         pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
-    async def test_04_close_signal(self, patch_systemd, signal_server_manager, signal_num, capsys):
+    async def test_04_close_signal(self, patch_systemd, signal_server_manager, signal_num, capsys, reset_logging):
         task = asyncio.create_task(self.send_signal(signal_server_manager, signal_num))
         await signal_server_manager.serve_until_stopped()
         await task
@@ -176,7 +184,7 @@ class TestSignalServerManager:
     @pytest.mark.parametrize('signal_num', [
         pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
     ])
-    async def test_05_reload_no_change_on_signal(self, signal_server_manager_started, signal_num):
+    async def test_05_reload_no_change_on_signal(self, signal_server_manager_started, signal_num, reset_logging):
         current_server_id = id(signal_server_manager_started.server)
         await self.send_signal(signal_server_manager_started, signal_num)
         await asyncio.sleep(1)
@@ -188,7 +196,7 @@ class TestSignalServerManager:
         pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
     ])
     async def test_06_reload_change_on_signal(self, patch_systemd, signal_server_manager_started, signal_num,
-                                              tmp_config_file, server_port):
+                                              tmp_config_file, server_port, reset_logging):
         current_server_id = id(signal_server_manager_started.server)
         assert signal_server_manager_started.server.host == '127.0.0.1'
         self.modify_config_file(tmp_config_file)
@@ -209,7 +217,7 @@ class TestSignalServerManager:
         pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
     ])
     async def test_07_reload_no_file_signal(self, patch_systemd, signal_server_manager, signal_num,
-                                            tmp_config_file, capsys):
+                                            tmp_config_file, capsys, reset_logging):
         task = asyncio.create_task(signal_server_manager.serve_until_stopped())
         await signal_server_manager.wait_server_started()
         tmp_config_file.unlink()

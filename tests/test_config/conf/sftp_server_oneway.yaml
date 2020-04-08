@@ -1,6 +1,6 @@
 !SFTPServer
 host: 127.0.0.1
-port: !Port
+port: 0
 quiet: False
 logger: !ReceiverLogger
   stats_interval: 0
@@ -22,5 +22,6 @@ protocol_factory: !SFTPServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

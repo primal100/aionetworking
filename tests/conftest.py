@@ -7,7 +7,7 @@ import socket
 import freezegun
 from pathlib import Path
 from aionetworking.utils import set_loop_policy, pipe_address_by_os
-from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext
+from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext, SFTPContext
 
 from typing import Dict, Any
 
@@ -40,7 +40,9 @@ def pytest_generate_tests(metafunc):
         if connection_type_params == 'all':
             connection_type_params = ('tcp', 'udp', 'pipe')
         elif connection_type_params == 'allplus':
-            connection_type_params = ('tcp', 'udp', 'pipe', 'sftp')
+            connection_type_params = ('tcp', 'tcpssl', 'udp', 'pipe', 'sftp')
+        elif connection_type_params == 'sslsftp':
+            connection_type_params = ('tcpssl', 'sftp')
         else:
             connection_type_params = (connection_type_params,)
         if duplex_type_params == 'all':
@@ -189,9 +191,13 @@ def udp_client_context_actual_port(actual_server_sock, actual_client_sock, clien
 @pytest.fixture
 def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client_context_fixed_port,
             udp_server_context_fixed_port, udp_client_context_fixed_port, pipe_server_context,
-            pipe_client_context, sftp_server_context, sftp_client_context) -> Dict[str, Any]:
+            pipe_client_context, sftp_server_context_fixed_port, sftp_client_context_fixed_port) -> Dict[str, Any]:
     contexts = {
         'tcp': {
+            'server': tcp_server_context_fixed_port,
+            'client': tcp_client_context_fixed_port
+        },
+        'tcpssl': {
             'server': tcp_server_context_fixed_port,
             'client': tcp_client_context_fixed_port
         },
@@ -204,30 +210,45 @@ def context(connection_type, endpoint, tcp_server_context_fixed_port, tcp_client
             'client': pipe_client_context
         },
         'sftp': {
-            'server': sftp_server_context,
-            'client': sftp_client_context
+            'server': sftp_server_context_fixed_port,
+            'client': sftp_client_context_fixed_port
         }
     }
     return contexts[connection_type][endpoint]
 
 
 @pytest.fixture
-def server_context(connection_type, tcp_server_context_actual_port, udp_server_context_actual_port, pipe_server_context, sftp_server_context) -> Dict[str, Any]:
+def server_context(connection_type, tcp_server_context_actual_port, udp_server_context_actual_port, pipe_server_context, sftp_server_context_actual_port) -> Dict[str, Any]:
     contexts = {
         'tcp': tcp_server_context_actual_port,
+        'tcpssl': tcp_server_context_actual_port,
         'udp': udp_server_context_actual_port,
         'pipe': pipe_server_context,
-        'sftp': sftp_server_context
+        'sftp': sftp_server_context_actual_port
     }
     return contexts[connection_type]
 
 
 @pytest.fixture
-def client_context(connection_type, tcp_client_context_actual_port, udp_client_context_actual_port, pipe_client_context) -> Dict[str, Any]:
+def server_context_fixed_port(connection_type, tcp_server_context_fixed_port, udp_server_context_fixed_port, pipe_server_context, sftp_server_context_fixed_port) -> Dict[str, Any]:
+    contexts = {
+        'tcp': tcp_server_context_fixed_port,
+        'tcpssl': tcp_server_context_fixed_port,
+        'udp': udp_server_context_fixed_port,
+        'pipe': pipe_server_context,
+        'sftp': sftp_server_context_fixed_port
+    }
+    return contexts[connection_type]
+
+
+@pytest.fixture
+def client_context(connection_type, tcp_client_context_actual_port, udp_client_context_actual_port, pipe_client_context, sftp_client_context_actual_port) -> Dict[str, Any]:
     contexts = {
         'tcp': tcp_client_context_actual_port,
+        'tcpssl': tcp_client_context_actual_port,
         'udp': udp_client_context_actual_port,
-        'pipe': pipe_client_context
+        'pipe': pipe_client_context,
+        'sftp': sftp_client_context_actual_port
     }
     return contexts[connection_type]
 
@@ -276,7 +297,6 @@ def sftp_server_context(server_sock_str, client_sock, client_hostname, client_so
     return context
 
 
-
 @pytest.fixture
 def sftp_client_context(server_sock, server_sock_str, server_hostname, client_sock_str) -> SFTPContext:
     context: SFTPContext = {
@@ -285,3 +305,50 @@ def sftp_client_context(server_sock, server_sock_str, server_hostname, client_so
         'client': client_sock_str, 'own': client_sock_str, 'username': 'testuser'
     }
     return context
+
+
+@pytest.fixture
+def sftp_username() -> str:
+    return 'testuser'
+
+
+def _sftp_server_context(server_sock, client_sock, client_hostname, sftp_username) -> SFTPContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
+    context: SFTPContext = {
+        'protocol_name': 'SFTP Server', 'host': client_hostname, 'port': client_sock[1], 'peer': client_sock_str,
+        'address': client_sock[0], 'alias': f'{client_hostname}({client_sock_str})', 'server': server_sock_str,
+        'client': client_sock_str, 'own': server_sock_str, 'username': sftp_username
+    }
+    return context
+
+
+@pytest.fixture
+def sftp_server_context_fixed_port(server_sock, client_sock, client_hostname, sftp_username) -> SFTPContext:
+    return _sftp_server_context(server_sock, client_sock, client_hostname, sftp_username)
+
+
+@pytest.fixture
+def sftp_server_context_actual_port(actual_server_sock, actual_client_sock, client_hostname, sftp_username) -> SFTPContext:
+    return _sftp_server_context(actual_server_sock, actual_client_sock, client_hostname, sftp_username)
+
+
+def _sftp_client_context(server_sock, client_sock, server_hostname, sftp_username) -> SFTPContext:
+    client_sock_str = f'{client_sock[0]}:{client_sock[1]}'
+    server_sock_str = f'{server_sock[0]}:{server_sock[1]}'
+    context: SFTPContext = {
+        'protocol_name': 'SFTP Client', 'host': server_hostname, 'port': server_sock[1], 'peer': server_sock_str,
+        'address': server_sock[0], 'alias': f'{server_hostname}({server_sock_str})', 'server': server_sock_str,
+        'client': client_sock_str, 'own': client_sock_str, 'username': sftp_username
+    }
+    return context
+
+
+@pytest.fixture
+def sftp_client_context_fixed_port(server_sock, client_sock, client_hostname, sftp_username) -> SFTPContext:
+    return _sftp_client_context(server_sock, client_sock, client_hostname, sftp_username)
+
+
+@pytest.fixture
+def sftp_client_context_actual_port(actual_server_sock, actual_client_sock, client_hostname, sftp_username) -> SFTPContext:
+    return _sftp_client_context(actual_server_sock, actual_client_sock, client_hostname, sftp_username)

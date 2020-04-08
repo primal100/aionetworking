@@ -209,8 +209,8 @@ def recording_data(one_way_recording_data, two_way_recording_data, duplex_type) 
 
 
 @pytest.fixture
-def buffer_codec(context) -> BufferCodec:
-    return BufferCodec(BufferObject, context=context)
+def buffer_codec(server_context_fixed_port) -> BufferCodec:
+    return BufferCodec(BufferObject, context=server_context_fixed_port)
 
 
 @pytest.fixture

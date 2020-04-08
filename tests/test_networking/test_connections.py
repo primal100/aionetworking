@@ -27,8 +27,8 @@ class TestConnectionShared:
         assert connections_manager.total == 1
         assert connections_manager.get(connection.peer) == connection
         connection.close()
+        await asyncio.wait_for(connection.wait_closed(), 2)
         assert transport.is_closing()
-        await connection.wait_closed()
         assert connections_manager.total == 0
 
     @pytest.mark.asyncio

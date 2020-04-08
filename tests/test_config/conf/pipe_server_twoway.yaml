@@ -13,5 +13,6 @@ protocol_factory: !StreamServerProtocolFactory
                              close_file_after_inactivity: 2
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

@@ -7,7 +7,8 @@ import logging
 import datetime
 from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory, \
                            DatagramClientProtocolFactory)
-from aionetworking import context_cv
+from aionetworking import context_cv, Logger
+from aionetworking.logging.loggers import connection_logger_cv
 from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking import ConnectionsManager
 from aionetworking.networking.connections_manager import clear_unique_names
@@ -21,7 +22,7 @@ from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorT
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
 
-from typing import Callable, Union
+from typing import Callable
 
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, MockNamedPipeHandle
 
@@ -95,8 +96,16 @@ def preaction(recording_file_storage, endpoint) -> Optional[BufferedFileStorage]
 
 
 @pytest.fixture
-async def adaptor(context, endpoint, duplex_type, action, preaction, queue, requester) -> AdaptorType:
+async def receiver_logger() -> Logger:
+    logger = Logger(name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
+    yield logger
+
+
+@pytest.fixture
+async def adaptor(context, endpoint, duplex_type, action, preaction, queue, requester, receiver_logger) -> AdaptorType:
     context_cv.set(context)
+    logger = receiver_logger.get_connection_logger(extra=context)
+    connection_logger_cv.set(logger)
     if endpoint == 'server':
         adaptor = ReceiverAdaptor(JSONObject, action=action, preaction=preaction, send=queue.put_nowait)
     else:
@@ -190,6 +199,7 @@ def mock_extra_client(connection_type, extra_client_inet, extra_client_pipe) -> 
 def mock_transport_class(connection_type) -> Type:
     classes = {
         'tcp': MockTCPTransport,
+        'tcpssl': MockTCPTransport,
         'udp': MockDatagramTransport,
         'pipe': MockTCPTransport
     }
@@ -198,7 +208,7 @@ def mock_transport_class(connection_type) -> Type:
 
 @pytest.fixture
 async def transport(mock_transport_class, connection_type, queue, peer, endpoint,
-                         mock_extra_server, mock_extra_client) -> asyncio.Transport:
+                    mock_extra_server, mock_extra_client) -> asyncio.Transport:
     extra = mock_extra_server if endpoint == 'server' else mock_extra_client
     transport = mock_transport_class(queue, extra=extra)
     if connection_type == 'udp':
@@ -213,12 +223,14 @@ def connection_cls(connection_type, endpoint) -> Type:
     connection_classes = {
         'server': {
             'tcp': TCPServerConnection,
+            'tcpssl': TCPServerConnection,
             'udp': UDPServerConnection,
             'pipe': TCPServerConnection,
             'sftp': SFTPServerOSAuthProtocol
         },
         'client': {
             'tcp': TCPClientConnection,
+            'tcpssl': TCPServerConnection,
             'udp': UDPClientConnection,
             'pipe': TCPClientConnection,
             'sftp': SFTPClientProtocol
@@ -235,28 +247,47 @@ def server_sock_as_string(connection_type, server_sock_str, pipe_path) -> str:
 
 
 @pytest.fixture
-def parent_name(connection_type, endpoint, server_sock_as_string) -> str:
+def peer_prefix(connection_type) -> str:
+    if connection_type == 'tcpssl':
+        return 'tcp'
+    return connection_type
+
+
+@pytest.fixture
+def parent_name(connection_type, endpoint, server_sock_as_string, peer_prefix) -> str:
     endpoint_type = endpoint.capitalize()
-    return f"{connection_type.upper()} {endpoint_type} {server_sock_as_string}"
+    return f"{peer_prefix.upper()} {endpoint_type} {server_sock_as_string}"
 
 
 @pytest.fixture
-def connection_kwargs(connection_type, endpoint, tmpdir) -> Dict[str, Any]:
-    if connection_type == 'sftp' and endpoint == 'client':
-        return {'client': {'base_path': Path(tmpdir) / 'sftp_sent'}, 'server': {}}
-    return {'server': {}, 'client': {}}
+def connection_kwargs_server(connection_type, tmpdir) -> Dict[str, Any]:
+    return {}
 
 
 @pytest.fixture
-async def connection(connection_cls, connection_type, action, endpoint, preaction, parent_name,
+def connection_kwargs_client(connection_type, tmpdir) -> Dict[str, Any]:
+    if connection_type == 'sftp':
+        return {'base_path': Path(tmpdir) / 'sftp_sent'}
+    return {}
+
+
+@pytest.fixture
+def connection_kwargs(connection_kwargs_server, connection_kwargs_client, endpoint) -> Dict[str, Any]:
+    if endpoint == 'server':
+        return connection_kwargs_server
+    return connection_kwargs_client
+
+
+@pytest.fixture
+async def connection(connection_cls, connection_type, action, endpoint, preaction, parent_name, peer_prefix,
                      requester, server_sock_as_string, hostname_lookup, connection_kwargs) -> TCPServerConnection:
     if endpoint == 'client':
         action = None
     else:
         requester = None
     conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction, requester=requester,
-                          parent_name=parent_name, peer_prefix=connection_type, hostname_lookup=hostname_lookup,
-                          **connection_kwargs[endpoint])
+                          parent_name=parent_name, peer_prefix=peer_prefix, hostname_lookup=hostname_lookup,
+                          **connection_kwargs)
     yield conn
     if connection_type == 'sftp':
         if not conn.is_closing():
@@ -301,9 +332,10 @@ def hostname_lookup(connection_type) -> bool:
 
 
 @pytest.fixture
-async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup, connection_kwargs) -> StreamServerProtocolFactory:
+async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup, connection_kwargs_server) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
+        'tcpssl': StreamServerProtocolFactory,
         'udp': DatagramServerProtocolFactory,
         'pipe': StreamServerProtocolFactory,
         'sftp': SFTPOSAuthProtocolFactory
@@ -314,7 +346,8 @@ async def protocol_factory_server(connection_type, action, recording_file_storag
         action=action,
         dataformat=JSONObject,
         hostname_lookup=hostname_lookup,
-        **connection_kwargs['server']
+        timeout=5,
+        **connection_kwargs_server
     )
     yield factory
 
@@ -329,9 +362,10 @@ async def protocol_factory_started(protocol_factory, parent_name, connection_typ
 
 
 @pytest.fixture
-async def protocol_factory_client(requester, connection_type, connection_kwargs, hostname_lookup) -> StreamClientProtocolFactory:
+async def protocol_factory_client(requester, connection_type, connection_kwargs_client, hostname_lookup) -> StreamClientProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamClientProtocolFactory,
+        'tcpssl': StreamClientProtocolFactory,
         'udp': DatagramClientProtocolFactory,
         'pipe': StreamClientProtocolFactory,
         'sftp': SFTPClientProtocolFactory
@@ -341,7 +375,7 @@ async def protocol_factory_client(requester, connection_type, connection_kwargs,
         dataformat=JSONObject,
         requester=requester,
         hostname_lookup=hostname_lookup,
-        **connection_kwargs['client'])
+        **connection_kwargs_client)
     yield factory
 
 
@@ -634,14 +668,14 @@ def ssl_client_key(ssl_client_dir) -> Path:
 
 @pytest.fixture
 def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
-    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
+    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_server_cert, key=ssl_server_key,
                          cafile=ssl_client_cert, capath=ssl_client_dir)
 
 
 @pytest.fixture
-def client_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
-    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_server_cert, key=ssl_server_key,
-                         cafile=ssl_client_cert, capath=ssl_client_dir)
+def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir):
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_client_cert, key=ssl_client_key,
+                         cafile=ssl_server_cert, capath=ssl_server_dir)
 
 
 @pytest.fixture

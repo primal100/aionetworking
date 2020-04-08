@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import pytest
+import asyncssh
 
 from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
@@ -40,6 +41,47 @@ class TestClientStartStop:
         data = pickle.dumps(client)
         new_client = pickle.loads(data)
         assert new_client == client
+
+
+@pytest.mark.connections('sslsftp_oneway_all')
+class TestSSLAndSFTPClient:
+    @pytest.mark.asyncio
+    async def test_00_client_start(self, client):
+        assert not client.is_started()
+        async with client as conn:
+            assert client.is_started()
+            assert client.conn
+        assert client.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_01_check_client_context(self, client_connected, client_context):
+        assert client_connected.conn.context == client_context
+
+    @pytest.mark.asyncio
+    async def test_02_check_server_context(self, client_connected, server_context, connections_manager):
+        peername = f"{client_connected.conn.peer_prefix}_{server_context['own']}_{server_context['peer']}"
+        server_connection = connections_manager.get(peername)
+        assert server_connection.context == server_context
+
+    @pytest.mark.asyncio
+    async def test_03_client_connect_close(self, server_started, client):
+        await client.connect()
+        await client.close()
+        assert client.is_closing()
+
+    @pytest.mark.asyncio
+    async def test_04_client_pickle(self, client):
+        data = pickle.dumps(client)
+        new_client = pickle.loads(data)
+        assert new_client == client
+
+
+@pytest.mark.connections('sftp_oneway_all')
+class TestSFTPClient:
+    @pytest.mark.asyncio
+    async def test_00_client_wrong_password(self, server_started, sftp_client_wrong_password):
+        with pytest.raises(asyncssh.misc.PermissionDenied):
+            await sftp_client_wrong_password.connect()
 
 
 @pytest.mark.skip

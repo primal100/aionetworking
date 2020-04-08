@@ -6,8 +6,21 @@ logger: !ReceiverLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
+ssl: !ServerSideSSL
+     ssl: True
+     cert: !Path "{ssl}/server/certificate.pem"
+     key: !Path "{ssl}/server/privkey.pem"
+     cafile: !Path "{ssl}/client/certificate.pem"
+     capath: !Path "{ssl}/client"
+     cert_required: True
+     check_hostname: False
+ssl_handshake_timeout: 60
 protocol_factory: !StreamServerProtocolFactory
-                  action: !EchoAction
+                  action: !BufferedFileStorage
+                           base_path: !Path "{data}"
+                           path: "{msg.address}.{msg.name}"
+                           buffering: 0
+                           close_file_after_inactivity: 2
                   preaction: !BufferedFileStorage
                              base_path: !Path "{temp}/recordings"
                              path: "{msg.address}.recording"
@@ -17,5 +30,3 @@ protocol_factory: !StreamServerProtocolFactory
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
                   timeout: 5
----
-log_config_file: !Path "{this}/logging.yaml"

@@ -70,6 +70,16 @@ def expected_recordings_file(recordings_dir, client_address) -> Path:
 
 
 @pytest.fixture
+async def recordings_file_with_data(expected_recordings_file, buffer_objects, buffer_codec, assert_recordings_ok) -> Path:
+    expected_recordings_file.parent.mkdir(parents=True, exist_ok=True)
+    with expected_recordings_file.open('wb') as f:
+        for obj in buffer_objects:
+            f.write(obj.encoded)
+    await assert_recordings_ok
+    return expected_recordings_file
+
+
+@pytest.fixture
 def assert_recordings_ok(expected_recordings_file, recording_data) -> Coroutine:
     async def coro():
         expected_file = expected_recordings_file
