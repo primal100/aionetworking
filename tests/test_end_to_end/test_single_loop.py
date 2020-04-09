@@ -1,14 +1,5 @@
 import asyncio
-from operator import attrgetter
 import pytest
-from pathlib import Path
-
-from aionetworking.utils import alist
-from aionetworking.actions.echo import InvalidRequestError
-
-###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections, \
-    supports_pipe_or_unix_connections_in_other_process
 
 
 async def wait_connections_closed(server_started, client_connected, connection_type):

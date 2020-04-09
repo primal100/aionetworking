@@ -9,7 +9,7 @@ from aionetworking.networking.exceptions import MethodNotFoundError, MessageFrom
 class TestConnectionShared:
 
     @pytest.mark.asyncio
-    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager, connection_type):
+    async def test_00_connection_made_lost(self, connection, transport, adaptor, connections_manager, peer_prefix):
         assert not transport.is_closing()
         assert connections_manager.total == 0
         assert connection.logger
@@ -21,7 +21,7 @@ class TestConnectionShared:
         assert not transport.is_closing()
         assert connection._adaptor.context == adaptor.context
         assert connection._adaptor == adaptor
-        assert connection.peer == f"{connection_type}_{adaptor.context['own']}_{adaptor.context['peer']}"
+        assert connection.peer == f"{peer_prefix}_{adaptor.context['own']}_{adaptor.context['peer']}"
         assert connection.logger is not None
         assert connection.transport == transport
         assert connections_manager.total == 1

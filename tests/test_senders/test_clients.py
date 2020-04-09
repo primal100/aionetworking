@@ -94,10 +94,9 @@ class TestClientAllowedSenders:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object
 
-    @pytest.mark.skipif(os.name=='nt' and not py38, reason='Mysteriously fails in windows < 3.7')
+    @pytest.mark.skipif(os.name == 'nt' and not py38, reason='Mysteriously fails in windows < 3.7')
     @pytest.mark.asyncio
-    async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender,
-                                                 echo_encoded):
+    async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender, echo_encoded):
         async with client_incorrect_sender as conn:
             with pytest.raises((ConnectionResetError, ConnectionAbortedError, RemoteConnectionClosedError, asyncio.TimeoutError)):
                 await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), 2)
@@ -130,7 +129,7 @@ class TestConnectionsExpire:
             assert conn.transport.is_closing()
             assert connections_manager.total == 0
 
-    @pytest.mark.skip(not datagram_supported(), reason='UDP is not supported for this loop in this python version')
+    @pytest.mark.skipif(not datagram_supported(), reason='UDP is not supported for this loop in this python version')
     @pytest.mark.connections('udp_oneway_all')
     @pytest.mark.asyncio
     async def test_02_connections_expire_after_msg_received_udp(self, server_expire_connections, client_connections_expire,

@@ -149,7 +149,7 @@ async def client_allowed_senders(connection_type, tcp_client_allowed_sender, udp
 
 @pytest.fixture
 async def client_incorrect_sender(connection_type, allowed_sender_type, tcp_client_incorrect_sender, udp_client_incorrect_sender, sftp_client_incorrect_sender) -> BaseNetworkClient:
-    if allowed_sender_type == 'ipv6':
+    if allowed_sender_type == 'ipv6':   ####No space localhost address in IPV6
         pytest.skip()
     clients = {
         'tcp': tcp_client_incorrect_sender,

@@ -214,33 +214,3 @@ class TestTwoWayClientDatagramProtocolFactory:
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
         assert connections_manager.total == 0
 
-
-@pytest.mark.skip
-class TestServerDatagramProtocolFactoryAllowedSenders:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("ip_address", ['127.0.0.1', '::1'])
-    async def test_00_allowed_senders_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, client_sock,
-                                         connections_manager, queue, echo_encoded, echo_response_encoded, ip_address):
-        protocol_factory = udp_protocol_factory_allowed_senders()
-        protocol_factory.connection_made(udp_transport_server)
-        udp_transport_server.set_protocol(protocol_factory)
-        peer = (ip_address, client_sock[1])
-        protocol_factory.datagram_received(echo_encoded, peer)
-        assert await asyncio.wait_for(queue.get(), 2) == (peer, echo_response_encoded)
-        udp_transport_server.close()
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("ip_address", ['127.0.0.2', '::2'])
-    async def test_01_allowed_senders_not_ok(self, udp_protocol_factory_allowed_senders, udp_transport_server, connections_manager,
-                                             queue, echo_encoded, echo_response_encoded, ip_address, client_sock):
-        protocol_factory = udp_protocol_factory_allowed_senders()
-        protocol_factory.connection_made(udp_transport_server)
-        udp_transport_server.set_protocol(protocol_factory)
-        peer = (ip_address, client_sock[1])
-        protocol_factory.datagram_received(echo_encoded, peer)
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(protocol_factory.wait_num_connected(1), timeout=1)
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(queue.get(), timeout=1)
-        udp_transport_server.close()
-        await protocol_factory.close()

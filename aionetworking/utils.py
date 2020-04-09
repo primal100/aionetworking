@@ -323,6 +323,26 @@ def wait_server_started_raise_signal(signal_num: int, host: str, capsys, pid: in
     return out, port
 
 
+def modify_config_file(tmp_config_file, old_host, new_host):
+    with open(str(tmp_config_file), "rt") as f:
+        data = f.read()
+        data = data.replace(old_host, new_host)
+    with open(str(tmp_config_file), 'wt') as f:
+        f.write(data)
+
+
+def assert_reload_ok(signal_num: int, host: str, new_host: str, tmp_config_file: Path, capsys) -> Tuple[str, int]:
+    out, port = wait_on_capsys(capsys)
+    assert is_listening_on((host, port))
+    modify_config_file(tmp_config_file, host, new_host)
+    raise_signal(signal_num)
+    out, new_port = wait_on_capsys(capsys)
+    assert not is_listening_on((host, port))
+    assert is_listening_on((new_host, new_port))
+    raise_signal(signal.SIGINT)
+    return out, new_port
+
+
 def get_ip_port(host: str, transport) -> Tuple[str, int]:
     network = IPNetwork(host)
     if network.is_ipv6:

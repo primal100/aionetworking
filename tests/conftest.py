@@ -274,15 +274,15 @@ if hasattr(socket, 'AF_UNIX'):
     @pytest.fixture
     def pipe_server_context(pipe_path) -> AFUNIXContext:
         context: AFUNIXContext = {
-            'protocol_name': 'Unix Server', 'address': Path(pipe_path).name, 'peer': '1', 'own': str(pipe_path),
-            'alias': '/tmp/test.1', 'server': pipe_path, 'client': '1', 'fd': 1,
+            'protocol_name': 'UNIX Server', 'address': Path(pipe_path).name, 'peer': '1', 'own': str(pipe_path),
+            'alias': f'{str(pipe_path)}.1', 'server': str(pipe_path), 'client': '1', 'fd': 1,
         }
         return context
 
     @pytest.fixture
     def pipe_client_context(pipe_path) -> AFUNIXContext:
         context: AFUNIXContext = {
-            'protocol_name': 'Unix Client', 'address': Path(pipe_path).name, 'peer': str(pipe_path), 'own': '1',
+            'protocol_name': 'UNIX Client', 'address': Path(pipe_path).name, 'peer': str(pipe_path), 'own': '1',
             'alias': f'{pipe_path}.1', 'server': str(pipe_path), 'client': '1', 'fd': 1
         }
         return context

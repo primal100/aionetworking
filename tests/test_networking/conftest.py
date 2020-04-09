@@ -2,6 +2,7 @@ import asyncio
 import asyncssh
 import os
 import socket
+from socket import AddressFamily, SocketKind
 
 import logging
 import datetime
@@ -22,7 +23,7 @@ from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorT
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
 
-from typing import Callable
+from typing import Callable, Type
 
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, MockNamedPipeHandle
 
@@ -139,14 +140,14 @@ def extra_client_inet(client_sock, server_sock) -> dict:
 @pytest.fixture
 def extra_server_pipe(pipe_path) -> Dict[str, Any]:
     if hasattr(socket, 'AF_UNIX'):
-        return {'peername': str(pipe_path), 'socket': MockAFUnixSocket()}
+        return {'peername': '', 'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX, 'type': SocketKind.SOCK_STREAM, 'proto': 0, 'laddr': str(pipe_path), 'sockname': str(pipe_path)}
     return {'addr': str(pipe_path), 'pipe': MockNamedPipeHandle(12345)}
 
 
 @pytest.fixture
 def extra_client_pipe(pipe_path) -> Dict[str, Any]:
     if hasattr(socket, 'AF_UNIX'):
-        return {'peername': str(pipe_path), 'socket': MockAFUnixSocket()}
+        return {'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX, 'type': SocketKind.SOCK_STREAM, 'proto': 0, 'raddr': str(pipe_path), 'sockname' : '', 'peername': str(pipe_path)}
     return {'addr': str(pipe_path), 'pipe': MockNamedPipeHandle(12346)}
 
 
@@ -250,6 +251,8 @@ def server_sock_as_string(connection_type, server_sock_str, pipe_path) -> str:
 def peer_prefix(connection_type) -> str:
     if connection_type == 'tcpssl':
         return 'tcp'
+    if connection_type == 'pipe' and os.name == 'posix':
+        return 'unix'
     return connection_type
 
 

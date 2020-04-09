@@ -1,13 +1,13 @@
 from __future__ import annotations
+import os
 import pytest
-from dataclasses import dataclass
 from pathlib import Path
+from dataclasses import dataclass
 from aionetworking import JSONObject, JSONCodec
 from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
-from aionetworking.types.formats import MessageObjectType
 
-from typing import Dict, Any, List, NamedTuple, Optional, Tuple, Type
+from typing import Tuple, Union
 
 
 @pytest.fixture
@@ -31,9 +31,12 @@ def client_sock(client_port) -> Tuple[str, int]:
 
 
 @pytest.fixture
-def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Optional[Tuple[str, int]]:
+def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Union[str, [Tuple[str, int]]]:
     if connection_type != 'pipe':
         return client_sock if endpoint == 'server' else server_sock
+    elif os.name == 'nt':
+        return None
+    return str(pipe_path) if endpoint == 'client' else ''
 
 
 @pytest.fixture

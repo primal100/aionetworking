@@ -115,25 +115,8 @@ class TestSFTPProtocolFactories:
         await asyncio.wait_for(protocol_factory_started.close(), timeout=2)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
 
-    @pytest.mark.skip
-    async def test_01_protocol_factory_connections_expire(self, sftp_protocol_factory_server_expired_connections_started,
-                                                          server_sftp_conn, json_rpc_login_request_encoded):
-        new_connection = sftp_protocol_factory_server_expired_connections_started()
-        new_connection.connection_made(server_sftp_conn)
-        server_sftp_conn._owner = new_connection
-        connection_time = new_connection.last_msg
-        await asyncio.sleep(0.02)
-        new_connection.data_received(json_rpc_login_request_encoded)
-        assert new_connection.last_msg > connection_time
-        assert not new_connection.is_closing()
-        await asyncio.sleep(0.3)
-        assert not new_connection.is_closing()
-        await asyncio.sleep(1)
-        assert new_connection.is_closing()
-        await sftp_protocol_factory_server_expired_connections_started.wait_all_closed()
-
     @pytest.mark.asyncio
-    async def test_02_pickle_protocol_factory(self, protocol_factory):
+    async def test_01_pickle_protocol_factory(self, protocol_factory):
         data = pickle.dumps(protocol_factory)
         factory = pickle.loads(data)
         assert factory == protocol_factory

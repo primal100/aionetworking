@@ -115,8 +115,10 @@ class TestSignalServerManager:
             f.write(data)
 
     @pytest.mark.asyncio
-    async def test_02_check_reload_with_change(self, patch_systemd, signal_server_manager_started, tmp_config_file,
-                                               capsys, reset_logging):
+    async def test_02_check_reload_with_change(self, capsys, patch_systemd, signal_server_manager_started, tmp_config_file,
+                                               reset_logging):
+        out = capsys.readouterr().out
+        port1 = port_from_out(out)
         current_server_id = id(signal_server_manager_started.server)
         assert signal_server_manager_started.server.host == '127.0.0.1'
         self.modify_config_file(tmp_config_file)
@@ -128,10 +130,10 @@ class TestSignalServerManager:
         if patch_systemd:
             daemon, journal = patch_systemd
             out = capsys.readouterr().out
-            port = port_from_out(out)
+            port2 = port_from_out(out)
             daemon.notify.assert_has_calls(
-                [status_call(port), ready_call, reloading_call, restarting_status,
-                 status_call(port, host='127.0.0.2'), ready_call])
+                [status_call(port1), ready_call, reloading_call, restarting_status,
+                 status_call(port2, host='127.0.0.2'), ready_call])
             assert daemon.notify.call_count == 6
 
     @pytest.mark.asyncio
@@ -190,8 +192,10 @@ class TestSignalServerManager:
     @pytest.mark.parametrize('signal_num', [
         pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
     ])
-    async def test_06_reload_change_on_signal(self, patch_systemd, signal_server_manager_started, signal_num,
+    async def test_06_reload_change_on_signal(self, capsys, patch_systemd, signal_server_manager_started, signal_num,
                                               tmp_config_file, server_port, reset_logging):
+        out = capsys.readouterr().out
+        port1 = port_from_out(out)
         current_server_id = id(signal_server_manager_started.server)
         assert signal_server_manager_started.server.host == '127.0.0.1'
         self.modify_config_file(tmp_config_file)
@@ -200,11 +204,13 @@ class TestSignalServerManager:
         await asyncio.wait_for(signal_server_manager_started.wait_server_started(), timeout=2)
         assert signal_server_manager_started.server.host == '127.0.0.2'
         assert id(signal_server_manager_started.server) != current_server_id
+        out = capsys.readouterr().out
+        port2 = port_from_out(out)
         if patch_systemd:
             daemon, journal = patch_systemd
             daemon.notify.assert_has_calls(
-                [status_call(server_port), ready_call, reloading_call, restarting_status,
-                 status_call(server_port, host='127.0.0.2'), ready_call])
+                [status_call(port1), ready_call, reloading_call, restarting_status,
+                 status_call(port2, host='127.0.0.2'), ready_call])
             assert daemon.notify.call_count == 6
 
     @pytest.mark.asyncio
