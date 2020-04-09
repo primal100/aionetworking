@@ -160,7 +160,6 @@ class SFTPServerProtocolFactory(BaseProtocolFactory):
 @dataclass
 class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
     name = 'SFTP Client'
-    store_connections = False
     adaptor_cls = SenderAdaptor
     sftp = None
     cwd = None

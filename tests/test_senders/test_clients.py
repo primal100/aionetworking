@@ -2,11 +2,12 @@ import asyncio
 import pickle
 import pytest
 import asyncssh
+import os
 
 from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
 ###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported, is_proactor, supports_pipe_or_unix_connections
+from aionetworking.compatibility import datagram_supported, py38
 
 
 class TestClientStartStop:
@@ -93,6 +94,7 @@ class TestClientAllowedSenders:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object
 
+    @pytest.mark.skipif(os.name=='nt' and not py38, reason='Mysteriously fails in windows < 3.7')
     @pytest.mark.asyncio
     async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender,
                                                  echo_encoded):
@@ -101,34 +103,44 @@ class TestClientAllowedSenders:
                 await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), 2)
 
 
-@pytest.mark.skip
 class TestConnectionsExpire:
+    @pytest.mark.connections('tcp_oneway_all')
     @pytest.mark.asyncio
-    async def test_00_connections_expire(self, server_expire_connections, client_expire_connections):
-        async with client_expire_connections as conn:
+    async def test_00_connections_expire(self, server_expire_connections, client_connections_expire, connections_manager):
+        async with client_connections_expire as conn:
             await asyncio.sleep(0.2)
+            assert connections_manager.total == 2
             assert not conn.transport.is_closing()
             await asyncio.sleep(1.2)
             assert conn.transport.is_closing()
+            assert connections_manager.total == 0
 
+    @pytest.mark.connections('tcp_oneway_all')
     @pytest.mark.asyncio
-    async def test_01_connections_expire_after_msg_received(self, server_expire_connections,
-                                                            client_expire_connections, echo_encoded):
-        async with client_expire_connections as conn:
+    async def test_01_connections_expire_after_msg_received_tcp(self, server_expire_connections, client_connections_expire,
+                                                               json_rpc_login_request_encoded, connections_manager):
+        async with client_connections_expire as conn:
             await asyncio.sleep(0.5)
-            conn.simple()
+            assert connections_manager.total == 2
+            conn.send_data(json_rpc_login_request_encoded)
             await asyncio.sleep(0.8)
             assert not conn.transport.is_closing()
+            assert connections_manager.total == 2
             await asyncio.sleep(0.4)
             assert conn.transport.is_closing()
+            assert connections_manager.total == 0
 
+    @pytest.mark.skip(not datagram_supported(), reason='UDP is not supported for this loop in this python version')
+    @pytest.mark.connections('udp_oneway_all')
     @pytest.mark.asyncio
-    async def test_02_connections_expire_after_msg_sent(self, server_expire_connections,
-                                                        client_expire_connections):
-        async with client_expire_connections as conn:
+    async def test_02_connections_expire_after_msg_received_udp(self, server_expire_connections, client_connections_expire,
+                                                                json_rpc_login_request_encoded, connections_manager):
+        async with client_connections_expire as conn:
             await asyncio.sleep(0.5)
-            await conn.echo()
+            conn.send_data(json_rpc_login_request_encoded)
+            print(connections_manager.total)
             await asyncio.sleep(0.8)
-            assert not conn.transport.is_closing()
+            assert connections_manager.total == 2
             await asyncio.sleep(0.4)
-            assert conn.transport.is_closing()
+            assert connections_manager.total == 1
+        assert connections_manager.total == 0

@@ -19,6 +19,11 @@ def actual_server_sock_allowed_senders(server_allowed_senders) -> Optional[Tuple
 
 
 @pytest.fixture
+def actual_server_sock_expired_connections(server_expire_connections) -> Optional[Tuple[str, int]]:
+    return getattr(server_expire_connections, 'actual_local_addr', (None, None))
+
+
+@pytest.fixture
 def actual_server_sock_ipv6(tcp_server_ipv6_started) -> Tuple[str, int]:
     return tcp_server_ipv6_started.actual_local_addr
 
@@ -98,6 +103,12 @@ def udp_client_incorrect_sender(protocol_factory_client, actual_server_sock_allo
 
 
 @pytest.fixture
+def udp_client_connections_expire(protocol_factory_client, actual_server_sock_expired_connections, client_sock) -> UDPClient:
+    return UDPClient(protocol_factory=protocol_factory_client, host=actual_server_sock_expired_connections[0],
+                     port=actual_server_sock_expired_connections[1], srcip=client_sock[0])
+
+
+@pytest.fixture
 def udp_client_fixed_port(protocol_factory_client, server_sock) -> UDPClient:
     return UDPClient(protocol_factory=protocol_factory_client, host=server_sock[0],
                      port=server_sock[1])
@@ -148,6 +159,16 @@ async def client_incorrect_sender(connection_type, allowed_sender_type, tcp_clie
         'sftp': sftp_client_incorrect_sender
     }
     yield clients[connection_type]
+
+
+@pytest.fixture
+async def client_connections_expire(connection_type, tcp_client_connections_expire, udp_client_connections_expire) -> BaseNetworkClient:
+    clients = {
+        'tcp': tcp_client_connections_expire,
+        'udp': udp_client_connections_expire,
+    }
+    yield clients[connection_type]
+
 
 
 @pytest.fixture
@@ -421,7 +442,6 @@ async def sftp_server_not_allowed_senders_ipv6(sftp_protocol_factory_server_not_
         await server.close()
 
 
-
 @pytest.fixture
 async def tcp_server_connections_expire(protocol_factory_server_connections_expire, server_sock) -> TCPServer:
     server = TCPServer(protocol_factory=protocol_factory_server_connections_expire, host=server_sock[0],
@@ -433,9 +453,9 @@ async def tcp_server_connections_expire(protocol_factory_server_connections_expi
 
 
 @pytest.fixture
-async def tcp_client_connections_expire(protocol_factory_client_connections_expire, server_sock, client_sock) -> TCPServer:
-    yield TCPClient(protocol_factory=protocol_factory_client_connections_expire, host=server_sock[0],
-                    port=server_sock[1], srcip=client_sock[0], srcport=0)
+async def tcp_client_connections_expire(protocol_factory_client_connections_expire, actual_server_sock_expired_connections, client_sock) -> TCPServer:
+    yield TCPClient(protocol_factory=protocol_factory_client_connections_expire, host=actual_server_sock_expired_connections[0],
+                    port=actual_server_sock_expired_connections[1], srcip=client_sock[0], srcport=0)
 
 
 @pytest.fixture

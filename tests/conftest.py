@@ -6,6 +6,7 @@ import pytest
 import socket
 import freezegun
 from pathlib import Path
+from aionetworking.compatibility import supports_pipe_or_unix_connections, datagram_supported
 from aionetworking.utils import set_loop_policy, pipe_address_by_os
 from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext, SFTPContext
 
@@ -30,6 +31,10 @@ def pytest_configure(config):
 
 
 def pytest_generate_tests(metafunc):
+    skipifwindowsxdist_marks = [mark for mark in metafunc.definition.iter_markers(name="skipifwindowsxdist")]
+    if skipifwindowsxdist_marks:
+        if hasattr(metafunc.config, 'slaveinput'):
+            pytest.skip("Test doesn't work correctly in windows with xdist")
     connection_marks = [mark for mark in metafunc.definition.iter_markers(name="connections")]
     if connection_marks:
         connection_args = connection_marks[0].args
@@ -38,13 +43,23 @@ def pytest_generate_tests(metafunc):
         else:
             connection_type_params, duplex_type_params, endpoint_params = connection_args[0].split('_')
         if connection_type_params == 'all':
-            connection_type_params = ('tcp', 'udp', 'pipe')
+            connection_type_params = ['tcp']
+            if datagram_supported():
+                connection_type_params.append('udp')
+            if supports_pipe_or_unix_connections():
+                connection_type_params.append('pipe')
         elif connection_type_params == 'allplus':
-            connection_type_params = ('tcp', 'tcpssl', 'udp', 'pipe', 'sftp')
+            connection_type_params = ['tcp', 'tcpssl', 'sftp']
+            if datagram_supported():
+                connection_type_params.append('udp')
+            if supports_pipe_or_unix_connections():
+                connection_type_params.append('pipe')
         elif connection_type_params == 'sslsftp':
-            connection_type_params = ('tcpssl', 'sftp')
+            connection_type_params = ['tcpssl', 'sftp']
         elif connection_type_params == 'inet':
-            connection_type_params = ('tcp', 'udp')
+            connection_type_params = ['tcp']
+            if datagram_supported():
+                connection_type_params.append('udp')
         else:
             connection_type_params = (connection_type_params,)
         if duplex_type_params == 'all':

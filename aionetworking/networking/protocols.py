@@ -77,7 +77,6 @@ class ConnectionProtocol(Protocol):
 @dataclass
 class ConnectionDataclassProtocol(ConnectionProtocol, Protocol):
     name = None
-    store_connections = True
 
     parent_name: str = None
     action: ActionType = None

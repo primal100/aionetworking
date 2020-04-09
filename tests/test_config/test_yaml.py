@@ -1,11 +1,11 @@
 import logging
 import pytest
 import asyncio
-import re
 import signal
 import os
 from unittest.mock import call
 from aionetworking.conf.yaml_config import node_from_config_file
+from aionetworking.utils import port_from_out
 
 
 ready_call = call('READY=1')
@@ -77,10 +77,6 @@ class TestYamlConfig:
                                               reset_logging):
         node = node_from_config_file(tcp_server_one_way_yaml_with_env_config_path, paths=all_paths)
         assert node == tcp_server_one_way_env_ip
-
-
-def port_from_out(out: str) -> int:
-    return int(re.search(r'[1-6][0-9]{3,4}', out)[0])
 
 
 class TestSignalServerManager:

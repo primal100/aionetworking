@@ -65,8 +65,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         await asyncio.gather(*coros)
         if self.expire_connections_after_inactive_minutes:
             self._scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
-                                            self.check_expired_connections,
-                                            task_name=f'Check expired connections for {self.full_name}')
+                                             self.check_expired_connections,
+                                             task_name=f'Check expired connections for {self.full_name}')
 
     def __call__(self) -> NetworkConnectionType:
         return self._context.run(self._new_connection)
@@ -137,7 +137,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                 self.close_connection(conn, None)
 
     async def close(self) -> None:
-        await asyncio.wait_for(asyncio.gather(self._scheduler.close(), self.wait_num_connected(0)), self.timeout)
+        await asyncio.wait([self._scheduler.close(), self.wait_num_connected(0)], timeout=self.timeout)
         await asyncio.wait_for(self.close_actions(), self.timeout)
         connections_manager.clear_server(self.full_name)
 
@@ -183,7 +183,7 @@ class BaseDatagramProtocolFactory(asyncio.DatagramProtocol, BaseProtocolFactory)
         if ok:
             return conn
 
-    def datagram_received(self, data: Union[bytes, Text], addr: Tuple[str, int]) -> None:
+    def datagram_received(self, data: bytes, addr: Tuple[str, int]) -> None:
         addr = addr[0:2]
         peer = self.connection_cls.get_peername(self.peer_prefix, addr_tuple_to_str(addr), addr_tuple_to_str(self.sock))
         conn = connections_manager.get(peer, None)
