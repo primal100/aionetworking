@@ -1,6 +1,6 @@
 from __future__ import annotations
 import yaml
-from .clients import TCPClient, UDPClient, pipe_client
+from .clients import TCPClient, UDPClient, PipeClient
 
 
 def tcp_client_constructor(loader, node) -> TCPClient:
@@ -23,7 +23,7 @@ def load_udp_client(Loader=yaml.SafeLoader):
 
 def pipe_client_constructor(loader, node):
     value = loader.construct_mapping(node) if node.value else {}
-    return pipe_client(**value)
+    return PipeClient(**value)
 
 
 def load_pipe_client(Loader=yaml.SafeLoader):

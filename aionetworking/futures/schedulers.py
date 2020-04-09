@@ -19,20 +19,25 @@ class TaskScheduler:
     _counter: Counter = field(default_factory=Counter, init=False)
     _futures: Dict[Any, asyncio.Future] = field(default_factory=dict, init=False)
     _periodic_tasks: List[asyncio.Future] = field(default_factory=list, init=False)
+    _current_tasks: List[asyncio.Future] = field(default_factory=list, init=False)
 
     def task_done(self, future: asyncio.Future) -> None:
         self._counter.decrement()
+        if future in self._current_tasks:
+            self._current_tasks.remove(future)
 
     def create_task(self, coro: Awaitable, name: str = None, include_hierarchy: bool = True,
-                    separator: str = ':') -> asyncio.Future:
+                    separator: str = ':', continuous: bool = False) -> asyncio.Future:
         self._counter.increment()
         task = asyncio.create_task(coro)
         set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
+        if not continuous:
+            self._current_tasks.append(task)
         return task
 
     def task_with_callback(self, coro: Awaitable, callback: Callable = None, name: str = None,
-                           include_hierarchy: bool = True, separator: str = ':') -> asyncio.Future:
-        task = self.create_task(coro, name=name, include_hierarchy=include_hierarchy, separator=separator)
+                           include_hierarchy: bool = True, separator: str = ':', continuous: bool = False) -> asyncio.Future:
+        task = self.create_task(coro, name=name, include_hierarchy=include_hierarchy, separator=separator, continuous=continuous)
         callback = callback or self.task_done
         task.add_done_callback(callback)
         return task
@@ -80,7 +85,12 @@ class TaskScheduler:
     async def join(self) -> None:
         await self._counter.wait_for(0)
 
-    async def close(self):
+    async def wait_current_tasks(self) -> None:
+        if self._current_tasks:
+            current_tasks = self._current_tasks.copy()
+            await asyncio.wait(current_tasks)
+
+    async def close(self) -> None:
         self.close_nowait()
         await self.join()
         await asyncio.gather(*self._periodic_tasks, return_exceptions=True)
@@ -91,8 +101,8 @@ class TaskScheduler:
             task.cancel()
 
     @staticmethod
-    def get_next_time(delay: Union[int, float], current_time: datetime = None) -> float:
-        now = current_time or datetime.now()
+    def get_next_time(delay: Union[int, float]) -> float:
+        now = datetime.now()
         hour = now.hour if delay <= 60 else 0
         start_time = datetime(now.year, now.month, now.day, hour, 0, 0)
         while start_time < now + timedelta(minutes=1):
@@ -100,9 +110,9 @@ class TaskScheduler:
         td = (start_time - now).total_seconds()
         return td
 
-    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float], current_time: datetime = None):
+    def get_start_interval(self, fixed_start_time: bool, immediate: bool, delay: Union[int, float]):
         if fixed_start_time:
-            return self.get_next_time(delay, current_time=current_time)
+            return self.get_next_time(delay)
         elif immediate:
             return 0
         else:

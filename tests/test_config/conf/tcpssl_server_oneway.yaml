@@ -1,11 +1,20 @@
 !TCPServer
 host: 127.0.0.1
-port: !Port
+port: 0
 quiet: False
 logger: !ReceiverLogger
   stats_interval: 0
   stats_fixed_start_time: true
   datefmt: '%Y-%m-%d %H:%M:%S.%f'
+ssl: !ServerSideSSL
+     ssl: True
+     cert: !Path "{ssl}/server/certificate.pem"
+     key: !Path "{ssl}/server/privkey.pem"
+     cafile: !Path "{ssl}/client/certificate.pem"
+     capath: !Path "{ssl}/client"
+     cert_required: True
+     check_hostname: False
+ssl_handshake_timeout: 60
 protocol_factory: !StreamServerProtocolFactory
                   action: !BufferedFileStorage
                            base_path: !Path "{data}"
@@ -20,5 +29,4 @@ protocol_factory: !StreamServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
----
-log_config_file: !Path "{this}/logging.yaml"
+                  timeout: 5

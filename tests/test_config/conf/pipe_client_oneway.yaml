@@ -6,4 +6,5 @@ logger: !SenderLogger
     datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
-                  requester: !EchoRequester
+---
+log_config_file: !Path "{this}/logging.yaml"

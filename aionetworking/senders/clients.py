@@ -110,7 +110,7 @@ class WindowsPipeClient(BaseClient):
         return self.conn
 
 
-def pipe_client(path: Union[str, Path] = None, **kwargs):
+def PipeClient(path: Union[str, Path] = None, **kwargs):
     if hasattr(socket, 'AF_UNIX'):
         return UnixSocketClient(path=path, **kwargs)
     if sys.platform == 'win32':

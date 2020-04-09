@@ -1,5 +1,5 @@
-from .receivers import TCPServer, UDPServer, UnixSocketServer, WindowsPipeServer, pipe_server
-from .senders import TCPClient, UDPClient, UnixSocketClient, WindowsPipeClient, pipe_client
+from .receivers import TCPServer, UDPServer, UnixSocketServer, WindowsPipeServer, PipeServer
+from .senders import TCPClient, UDPClient, UnixSocketClient, WindowsPipeClient, PipeClient
 from .networking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory,
                          DatagramClientProtocolFactory, ServerSideSSL, ClientSideSSL)
 from .actions import FileStorage, BufferedFileStorage

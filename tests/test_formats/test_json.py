@@ -33,10 +33,9 @@ class TestJsonCodec:
         assert await alist(objects) == json_objects
 
     @pytest.mark.asyncio
-    async def test_05_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
+    async def test_05_one_from_file(self, json_codec, file_containing_multi_json, json_object, timestamp):
         obj = await json_codec.one_from_file(file_containing_multi_json, system_timestamp=timestamp)
         assert obj == json_object
-        await asyncio.get_event_loop().shutdown_asyncgens()
 
 
 class TestJsonObject:
@@ -63,9 +62,9 @@ class TestJsonObject:
 
 class TestBufferObject:
     @pytest.mark.asyncio
-    async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, json_recording_data, context, timestamp):
+    async def test_00_buffer_recording(self, buffer_codec, json_encoded_multi, recording_data, context, timestamp):
         buffer_obj1 = await buffer_codec.encode_obj(json_encoded_multi[0], system_timestamp=timestamp)
         buffer_obj2 = await buffer_codec.encode_obj(json_encoded_multi[1], system_timestamp=timestamp)
         recording = buffer_obj1.encoded + buffer_obj2.encoded
         packets = await alist(get_recording(recording))
-        assert packets == json_recording_data
+        assert packets == recording_data

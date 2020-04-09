@@ -6,10 +6,10 @@ class TestConnectionLogger:
     def test_00_logger_init(self, connection_logger):
         assert connection_logger.logger.name == 'receiver.connection'
 
-    def test_01_process(self, connection_logger, tcp_server_context):
+    def test_01_process(self, connection_logger, context):
         msg, kwargs = connection_logger.process("Hello World", {})
         assert kwargs['extra']['taskname'] == "No Running Loop"
-        assert msg, kwargs == ("Hello World", {'extra': tcp_server_context})
+        assert msg, kwargs == ("Hello World", {'extra': context})
 
     def test_02_new_connection(self, connection_logger, caplog, client_sock_str, server_sock_str):
         connection_logger.new_connection()
@@ -94,9 +94,9 @@ class TestConnectionLoggerStats:
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
         assert receiver_connection_logger_stats._stats_logger.received == 79
 
-    def test_02_on_buffer_decoded(self, receiver_connection_logger, caplog, json_rpc_login_request_encoded,
+    def test_02_on_buffer_decoded(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded,
                                   debug_logging):
-        receiver_connection_logger.on_buffer_decoded(json_rpc_login_request_encoded, 1)
+        receiver_connection_logger_stats.on_buffer_decoded(json_rpc_login_request_encoded, 1)
         json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[0] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO, "Decoded 1 message in buffer")
@@ -126,5 +126,3 @@ class TestConnectionLoggerStats:
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO,
                                            f'TCP Server connection from {client_sock_str} to {server_sock_str} has been closed')
         assert caplog.record_tuples[2] == ('receiver.stats', logging.INFO, 'ALL')
-
-

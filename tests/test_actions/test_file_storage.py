@@ -1,39 +1,17 @@
 import pytest
 import asyncio
 import pickle
-from pathlib import Path
 
 from aionetworking.actions.file_storage import ManagedFile
-from aionetworking.formats import get_recording_from_file
 from aionetworking.utils import alist
-
-
-class TestJsonFileStorage:
-
-    @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, file_storage_action, json_objects, json_rpc_login_request_encoded,
-                             json_codec):
-        await asyncio.wait([file_storage_action.do_one(obj) for obj in json_objects])
-        expected_file = Path(tmp_path/'data/Encoded/JSON/127.0.0.1_1.JSON')
-        assert expected_file.exists()
-        item = await json_codec.one_from_file(expected_file)
-        assert item == json_objects[0]
-        expected_file = Path(tmp_path/'data/Encoded/JSON/127.0.0.1_2.JSON')
-        assert expected_file.exists()
-        item = await json_codec.one_from_file(expected_file)
-        assert item == json_objects[1]
-        await asyncio.get_event_loop().shutdown_asyncgens()
-
-    def test_01_filter(self, file_storage_action, json_object):
-        assert file_storage_action.filter(json_object) is False
 
 
 class TestManagedFile:
 
     @pytest.mark.asyncio
-    async def test_00_open_close(self, tmp_path, managed_file):
+    async def test_00_open_close(self, data_dir, managed_file):
         assert ManagedFile.num_files() == 1
-        new_path = tmp_path/'managed_file2'
+        new_path = data_dir/'managed_file2'
         f2 = ManagedFile.open(new_path, mode='ab')
         assert ManagedFile.num_files() == 2
         await f2.close()
@@ -42,9 +20,9 @@ class TestManagedFile:
         assert ManagedFile.num_files() == 0
 
     @pytest.mark.asyncio
-    async def test_01_close_all(self, tmp_path, managed_file):
+    async def test_01_close_all(self, data_dir, managed_file):
         assert ManagedFile.num_files() == 1
-        ManagedFile.open(tmp_path / 'managed_file2', mode='ab')
+        ManagedFile.open(data_dir / 'managed_file2', mode='ab')
         assert ManagedFile.num_files() == 2
         await ManagedFile.close_all()
         assert ManagedFile.num_files() == 0
@@ -56,40 +34,40 @@ class TestManagedFile:
         assert sorted(items, key=str) == sorted(json_objects, key=str)
 
 
+class TestFileStorageShared:
+
+    @pytest.mark.asyncio
+    async def test_00_do_one(self, file_storage, json_objects, json_rpc_login_request_encoded,
+                             assert_file_storage_ok):
+        await asyncio.wait([file_storage.do_one(obj) for obj in json_objects])
+        await assert_file_storage_ok
+
+    def test_01_filter(self, file_storage, json_object):
+        assert file_storage.filter(json_object) is False
+
+    @pytest.mark.asyncio
+    async def test_01_do_one_response(self, data_dir, file_storage, keepalive_object):
+        response = await file_storage.do_one(keepalive_object)
+        assert not data_dir.exists()
+        assert response == {'result': 'keepalive-response'}
+
+    def test_02_action_pickle(self, file_storage):
+        data = pickle.dumps(file_storage)
+        action = pickle.loads(data)
+        assert action == file_storage
+
+    def test_03_pre_action_pickle(self, file_storage):
+        data = pickle.dumps(file_storage)
+        action = pickle.loads(data)
+        assert action == file_storage
+
+
 class TestJsonBufferedFileStorage:
 
     @pytest.mark.asyncio
-    async def test_00_do_one(self, tmp_path, buffered_file_storage_action, json_objects, json_buffer, json_codec):
-        await asyncio.wait([buffered_file_storage_action.do_one(obj) for obj in json_objects])
-        expected_file = Path(tmp_path/'data/Encoded/127.0.0.1_JSON.JSON')
-        assert expected_file.exists()
-        items = await alist(json_codec.from_file(expected_file))
-        assert sorted(items, key=str) == sorted(json_objects, key=str)
+    async def test_00_pre_action(self, recordings_dir, recording_file_storage, buffer_objects,
+                                 assert_recordings_ok):
 
-    @pytest.mark.asyncio
-    async def test_01_pre_action(self, tmp_path, buffered_file_storage_recording_action, buffer_objects,
-                                 json_recording_data, buffer_codec):
-
-        await buffered_file_storage_recording_action.do_one(buffer_objects[0])
-        await buffered_file_storage_recording_action.do_one(buffer_objects[1])
-        expected_file = Path(tmp_path / 'recordings/127.0.0.1.recording')
-        assert expected_file.exists()
-        packets = await alist(get_recording_from_file(expected_file))
-        assert packets == json_recording_data
-
-    @pytest.mark.asyncio
-    async def test_02_do_one_response(self, tmp_path, buffered_file_storage_action, keepalive_object):
-        response = await buffered_file_storage_action.do_one(keepalive_object)
-        expected_file = Path(tmp_path/'data/Encoded/127.0.0.1_JSON.JSON')
-        assert not expected_file.exists()
-        assert response == {'result': 'keepalive-response'}
-
-    def test_03_action_pickle(self, buffered_file_storage_recording_action):
-        data = pickle.dumps(buffered_file_storage_recording_action)
-        action = pickle.loads(data)
-        assert action == buffered_file_storage_recording_action
-
-    def test_04_pre_action_pickle(self, buffered_file_storage_recording_action):
-        data = pickle.dumps(buffered_file_storage_recording_action)
-        action = pickle.loads(data)
-        assert action == buffered_file_storage_recording_action
+        await recording_file_storage.do_one(buffer_objects[0])
+        await recording_file_storage.do_one(buffer_objects[1])
+        await assert_recordings_ok

@@ -2,12 +2,11 @@ import datetime
 import asyncssh
 import aiofiles.os
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .exceptions import ProtocolException
 
 from aionetworking import settings
 from aionetworking.futures.schedulers import TaskScheduler
-from aionetworking.compatibility import cached_property
 from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocol_factories import BaseProtocolFactory
 from .connections import NetworkConnectionProtocol
@@ -161,7 +160,6 @@ class SFTPServerProtocolFactory(BaseProtocolFactory):
 @dataclass
 class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
     name = 'SFTP Client'
-    store_connections = False
     adaptor_cls = SenderAdaptor
     sftp = None
     cwd = None
@@ -171,6 +169,8 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
     prefix: str = 'FILE'
     base_path: Path = settings.TEMPDIR / "sftp_sent"
     remote_path: str = '/'
+    _last_filename_timestamp: str = field(default=None, init=False)
+    _last_filename_suffix: int = field(default=0, init=False)
 
     def __post_init__(self):
         super().__post_init__()
@@ -185,16 +185,18 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
 
     def get_filename(self):
         timestamp = datetime.datetime.now().strftime(self.strftime)
-        return self.prefix + timestamp
+        suffix = self._last_filename_suffix
+        if timestamp == self._last_filename_timestamp:
+            suffix += 1
+        else:
+            suffix = 0
+        self._last_filename_timestamp = timestamp
+        self._last_filename_suffix = suffix
+        suffix = str(suffix).zfill(4)
+        return self.prefix + timestamp + suffix
 
     async def get_tmp_path(self):
-        async with self._name_lock:
-            name = None
-            while not name or name == self._last_file_name:
-                name = self.base_path / self.get_filename()
-                await asyncio.sleep(0.000001)
-            self._last_file_name = name
-            return name
+        return self.base_path / self.get_filename()
 
     async def _put_data(self, data: bytes):
         file_path = await self.get_tmp_path()
@@ -206,11 +208,17 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
             await aremove(file_path)
         self.last_msg = datetime.datetime.now()
 
+    async def wait_current_tasks(self) -> None:
+        await self._adaptor.wait_current_tasks()
+        await self._scheduler.wait_current_tasks()
+
     def send(self, data: bytes) -> asyncio.Future:
         task = self._scheduler.task_with_callback(self._put_data(data))
         return task
 
     async def wait_tasks_done(self) -> None:
+        if self._adaptor:
+            await self._adaptor.wait_current_tasks()
         await self._scheduler.close()
 
     async def wait_closed(self) -> None:

@@ -39,7 +39,8 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     logger: LoggerType = field(default_factory=logger_cv.get, metadata={'pickle': True})
 
     def __post_init__(self):
-        self.context['protocol_name'] = self.name
+        names = self.parent_name.split(' ')
+        self.context['protocol_name'] = f'{names[0]} {names[1]}'
 
     def __getattr__(self, item):
         if self._adaptor:
@@ -115,7 +116,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         close_task = asyncio.create_task(self._close(exc))
         set_task_name(close_task, f"Close:{self.peer}")
 
-    def close(self, immediate: bool=False):
+    def close(self, immediate: bool = False):
         self.finish_connection(None)
 
     async def wait_closed(self) -> None:
@@ -266,10 +267,16 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.transport = transport
         self.initialize_connection(transport)
 
+    def _close_transport(self, task: asyncio.Future):
+        self.transport.close()
+
     def close(self, immediate: bool = False):
         if not self.transport.is_closing():
             if immediate:
                 self.transport.abort()
+            elif self._adaptor:
+                task = asyncio.create_task(self.wait_current_tasks())
+                task.add_done_callback(self._close_transport)
             else:
                 self.transport.close()
 

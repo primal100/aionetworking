@@ -7,11 +7,13 @@ import builtins
 import operator
 import os
 import re
+import signal
 import time
 import itertools
 import sys
 import socket
 import tempfile
+from aionetworking.compatibility import py38
 from aionetworking.compatibility_os import is_wsl
 from dataclasses import dataclass, fields, MISSING
 from functools import wraps
@@ -288,6 +290,57 @@ def supernet_of(network: Union[str, IPNetwork, IPv4Network, IPv6Network], hostna
         networks = filter(lambda n: not n.is_ipv6, networks)
     return any(n.supernet_of(network.ip_network, hostname) for n in networks)
 
+
+def port_from_out(out: str) -> int:
+    return int(re.search(r'[1-6][0-9]{3,4}', out)[0])
+
+
+def wait_on_capsys(capsys) -> Tuple[str, int]:
+    out = None
+    while not out:
+        out = capsys.readouterr().out
+        if not out:
+            time.sleep(0.1)
+    port = port_from_out(out)
+    return out, port
+
+
+def raise_signal(signal_num: int, pid: int = None) -> None:
+    num_times = 3 if os.name == 'nt' else 1
+    if not pid and py38:
+        for i in range(0, num_times):
+            signal.raise_signal(signal_num)
+    else:
+        pid = pid or os.getpid()
+        for i in range(0, num_times):
+            os.kill(pid, signal_num)
+
+
+def wait_server_started_raise_signal(signal_num: int, host: str, capsys, pid: int = None) -> Tuple[str, int]:
+    out, port = wait_on_capsys(capsys)
+    assert is_listening_on((host, port))
+    raise_signal(signal_num, pid=pid)
+    return out, port
+
+
+def modify_config_file(tmp_config_file, old_host, new_host):
+    with open(str(tmp_config_file), "rt") as f:
+        data = f.read()
+        data = data.replace(old_host, new_host)
+    with open(str(tmp_config_file), 'wt') as f:
+        f.write(data)
+
+
+def assert_reload_ok(signal_num: int, host: str, new_host: str, tmp_config_file: Path, capsys) -> Tuple[str, int]:
+    out, port = wait_on_capsys(capsys)
+    assert is_listening_on((host, port))
+    modify_config_file(tmp_config_file, host, new_host)
+    raise_signal(signal_num)
+    out, new_port = wait_on_capsys(capsys)
+    assert not is_listening_on((host, port))
+    assert is_listening_on((new_host, new_port))
+    raise_signal(signal.SIGINT)
+    return out, new_port
 
 
 def get_ip_port(host: str, transport) -> Tuple[str, int]:

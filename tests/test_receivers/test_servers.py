@@ -20,32 +20,33 @@ def status_call(msg):
     return call(f'STATUS={msg}')
 
 
+@pytest.mark.connections
 class TestServerStartStop:
     @pytest.mark.asyncio
-    async def test_00_server_start(self, server_receiver, capsys):
-        assert not server_receiver.is_started()
-        task = asyncio.create_task(server_receiver.start())
-        await asyncio.wait_for(server_receiver.wait_started(), timeout=4)
-        assert server_receiver.is_started()
+    async def test_00_server_start(self, server, capsys):
+        assert not server.is_started()
+        task = asyncio.create_task(server.start())
+        await asyncio.wait_for(server.wait_started(), timeout=4)
+        assert server.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
         await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
-    async def test_01_serve_forever(self, server_receiver, capsys):
-        assert not server_receiver.is_started()
-        task = asyncio.create_task(server_receiver.serve_forever())
-        await asyncio.wait_for(server_receiver.wait_started(), timeout=4)
-        assert server_receiver.is_started()
+    async def test_01_serve_forever(self, server, capsys):
+        assert not server.is_started()
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.wait_for(server.wait_started(), timeout=4)
+        assert server.is_started()
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
         await asyncio.sleep(2)
         assert not task.done()
-        assert server_receiver.is_started()
+        assert server.is_started()
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        assert server_receiver.is_closed()
+        assert server.is_closed()
 
     @pytest.mark.asyncio
     async def test_02_server_close(self, server_started):
@@ -56,13 +57,13 @@ class TestServerStartStop:
         await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
-    async def test_03_server_wait_started(self, server_receiver, capsys):
-        assert not server_receiver.is_started()
-        task = asyncio.create_task(server_receiver.wait_started())
+    async def test_03_server_wait_started(self, server, capsys):
+        assert not server.is_started()
+        task = asyncio.create_task(server.wait_started())
         await asyncio.sleep(0)
         assert not task.done()
-        await server_receiver.start()
-        assert server_receiver.is_started()
+        await server.start()
+        assert server.is_started()
         await asyncio.wait_for(task, timeout=4)
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
@@ -84,10 +85,10 @@ class TestServerStartStop:
             await server_started.start()
 
     @pytest.mark.asyncio
-    async def test_06_server_never_started(self, server_receiver):
-        assert server_receiver.is_closing()
+    async def test_06_server_never_started(self, server):
+        assert server.is_closing()
         with pytest.raises(ServerException):
-            await server_receiver.close()
+            await server.close()
 
     @pytest.mark.asyncio
     async def test_07_server_already_stopped(self, server_started):
@@ -126,7 +127,26 @@ class TestServerStartStop:
             assert daemon.notify.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_10_pickle_server(self, server_receiver):
-        data = pickle.dumps(server_receiver)
+    async def test_10_pickle_server(self, server):
+        data = pickle.dumps(server)
         server = pickle.loads(data)
-        assert server == server_receiver
+        assert server == server
+
+
+@pytest.mark.connections('sslsftp_oneway_all')
+class TestSSLAndSFTPServer:
+    @pytest.mark.asyncio
+    async def test_00_server_start(self, tcp_server_ssl, capsys):
+        assert not tcp_server_ssl.is_started()
+        task = asyncio.create_task(tcp_server_ssl.start())
+        await asyncio.wait_for(tcp_server_ssl.wait_started(), timeout=4)
+        assert tcp_server_ssl.is_started()
+        captured = capsys.readouterr()
+        assert captured.out.startswith("Serving")
+        await asyncio.wait_for(task, timeout=4)
+
+    @pytest.mark.asyncio
+    async def test_01_pickle_server(self, server):
+        data = pickle.dumps(server)
+        server = pickle.loads(data)
+        assert server == server

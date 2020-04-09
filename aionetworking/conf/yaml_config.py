@@ -115,8 +115,9 @@ def node_from_config(conf: TextIO, paths: Dict[str, Union[str, Path]] = None, pa
             node_name = node.full_name.replace(' ', '_').replace(':', '_')
         paths['node'] = node_name
         paths['name'] = node.name.replace(' ', '_')
-        paths['host'] = node.host
-        paths['port'] = node.port
+        paths['host'] = getattr(node, 'host', None)
+        paths['port'] = getattr(node, 'port', '')
+        paths['pipe_path'] = getattr(node, 'path', '')
         paths['pid'] = str(os.getpid())
         configure_logging(log_config_file)
         settings.APP_CONFIG.update(misc_config)

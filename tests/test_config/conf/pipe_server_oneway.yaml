@@ -1,15 +1,13 @@
-!TCPServer
-host: 127.0.0.1
-port: !Port
-quiet: False
+!PipeServer
+path: !PipeAddr
 logger: !ReceiverLogger
-  stats_interval: 0
-  stats_fixed_start_time: true
-  datefmt: '%Y-%m-%d %H:%M:%S.%f'
+    stats_interval: 0
+    stats_fixed_start_time: true
+    datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !StreamServerProtocolFactory
                   action: !BufferedFileStorage
                            base_path: !Path "{data}"
-                           path: "Encoded/{msg.address}_{msg.name}.{msg.name}"
+                           path: "{msg.address}.{msg.name}"
                            buffering: 0
                            close_file_after_inactivity: 2
                   preaction: !BufferedFileStorage
@@ -19,4 +17,6 @@ protocol_factory: !StreamServerProtocolFactory
                              close_file_after_inactivity: 2
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
-                  hostname_lookup: True
+                  timeout: 5
+---
+log_config_file: !Path "{this}/logging.yaml"

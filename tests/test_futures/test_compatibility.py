@@ -56,3 +56,4 @@ class TestTaskNames:
             assert task.get_name() == get_task_name(task) == "Task-10:Task-99_HelloWorld"
         else:
             assert str(id(task)) == get_task_name(task)
+        await task

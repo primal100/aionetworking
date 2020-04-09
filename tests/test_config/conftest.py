@@ -1,8 +1,8 @@
 from __future__ import annotations
 import yaml
 import shutil
+import logging.config
 
-from aionetworking import Logger
 from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
@@ -21,19 +21,24 @@ def reset_logging():
 
 @pytest.fixture
 def tcp_server_one_way_yaml_config_path(conf_dir) -> Path:
-    return conf_dir / "tcp_server_one_way.yaml"
+    return conf_dir / "tcp_server_oneway.yaml"
+
+
+@pytest.fixture
+def logging_yaml_path(conf_dir) -> Path:
+    return conf_dir / "logging.yaml"
 
 
 @pytest.fixture
 def tcp_server_one_way_yaml_with_env_config_path(conf_dir) -> Path:
-    return conf_dir / "tcp_server_one_way_with_env.yaml"
+    return conf_dir / "tcp_server_oneway_with_env.yaml"
 
 
 @pytest.fixture
-async def tcp_server_one_way_env_port(protocol_factory_one_way_server, server_sock) -> TCPServer:
+async def tcp_server_one_way_env_ip(protocol_factory_server) -> TCPServer:
     env_ip = '10.10.10.10'
     os.environ['IP'] = str(env_ip)
-    server = TCPServer(protocol_factory=protocol_factory_one_way_server, host=env_ip, port=server_sock[1])
+    server = TCPServer(protocol_factory=protocol_factory_server, host=env_ip, port=0)
     yield server
 
 
@@ -116,33 +121,10 @@ def server_pipe_address_load(pipe_path):
     yaml.add_constructor('!PipeAddr', pipe_address_constructor, Loader=yaml.SafeLoader)
 
 
-@pytest.fixture(params=[
-        lazy_fixture(
-            (tcp_server_one_way_yaml_config_path.__name__, tcp_server_one_way.__name__)),
-        lazy_fixture(
-            (tcp_client_one_way_yaml_config_path.__name__, tcp_client_one_way.__name__)),
-        lazy_fixture(
-            (tcp_server_two_way_ssl_yaml_config_path.__name__, tcp_server_two_way_ssl.__name__)),
-        lazy_fixture(
-            (tcp_client_two_way_ssl_yaml_config_path.__name__, tcp_client_two_way_ssl_no_cadata.__name__)),
-        lazy_fixture(
-            (udp_server_yaml_config_path.__name__, udp_server_allowed_senders_ipv4.__name__)),
-        lazy_fixture(
-            (pipe_server_yaml_config_path.__name__, pipe_server_two_way.__name__)),
-        lazy_fixture(
-            (pipe_client_yaml_config_path.__name__, pipe_client_two_way.__name__)),
-        lazy_fixture(
-            (sftp_server_yaml_config_path.__name__, sftp_server.__name__)),
-        lazy_fixture(
-            (sftp_client_yaml_config_path.__name__, sftp_client.__name__))
-])
-def config_files_args(request):
-    return request.param
-
-
 @pytest.fixture
-def config_file(config_files_args):
-    return config_files_args[0]
+def config_file(conf_dir, connection_type, endpoint, duplex_type):
+    filename = f'{connection_type}_{endpoint}_{duplex_type}.yaml'
+    return conf_dir / filename
 
 
 @pytest.fixture
@@ -151,58 +133,8 @@ def config_file_stream(config_file):
 
 
 @pytest.fixture
-def expected_object(config_files_args):
-    return config_files_args[1]
-
-
-@pytest.fixture
-def server_with_logging_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_server_logging.yaml"
-
-
-@pytest.fixture
-def server_with_logging_yaml_config_stream(server_with_logging_yaml_config_path):
-    return open(server_with_logging_yaml_config_path, 'r')
-
-
-@pytest.fixture
-def tcp_server_misc_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_server_misc.yaml"
-
-
-@pytest.fixture
-def tcp_server_misc_yaml_config_stream(tcp_server_misc_yaml_config_path):
-    return open(tcp_server_misc_yaml_config_path, 'r')
-
-
-@pytest.fixture
-def tcp_client_misc_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_client_misc.yaml"
-
-
-@pytest.fixture
-def tcp_client_misc_yaml_config_stream(tcp_client_misc_yaml_config_path):
-    return open(tcp_client_misc_yaml_config_path, 'r')
-
-
-@pytest.fixture(params=[
-        lazy_fixture(
-            (tcp_server_misc_yaml_config_path.__name__, tcp_server_one_way.__name__)),
-        lazy_fixture(
-            (tcp_client_misc_yaml_config_path.__name__, tcp_client_two_way_ssl_no_cadata.__name__)),
-])
-def config_files_with_logging_args(request):
-    return request.param
-
-
-@pytest.fixture
-def config_file_logging(config_files_with_logging_args):
-    return config_files_with_logging_args[0]
-
-
-@pytest.fixture
-def expected_object_logging(config_files_with_logging_args):
-    return config_files_with_logging_args[1]
+def expected_object(server, client_fixed_port, endpoint):
+    return server if endpoint == 'server' else client_fixed_port
 
 
 @pytest.fixture
@@ -252,17 +184,11 @@ def log_record_msg_object_not_included(json_rpc_logout_request_object) -> loggin
 
 
 @pytest.fixture
-async def receiver_logger() -> Logger:
-    logger = Logger(name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
-    yield logger
-
-
-@pytest.fixture
-async def receiver_connection_logger(receiver_logger, tcp_server_context, caplog) -> ConnectionLogger:
+async def receiver_connection_logger(receiver_logger, tcp_server_context_fixed_port, caplog) -> ConnectionLogger:
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
     caplog.set_level(logging.ERROR, "receiver.stats")
-    yield receiver_logger.get_connection_logger(extra=tcp_server_context)
+    yield receiver_logger.get_connection_logger(extra=tcp_server_context_fixed_port)
     caplog.set_level(logging.ERROR, "receiver.connection")
     caplog.set_level(logging.ERROR, "receiver.msg_received")
 
@@ -294,16 +220,16 @@ def sender_logger() -> Logger:
 
 
 @pytest.fixture
-def sender_connection_logger(sender_logger, tcp_client_context) -> ConnectionLogger:
-    return sender_logger.get_connection_logger(extra=tcp_client_context)
+def sender_connection_logger(sender_logger, tcp_client_context_fixed_port) -> ConnectionLogger:
+    return sender_logger.get_connection_logger(extra=tcp_client_context_fixed_port)
 
 
 @pytest.fixture
-async def receiver_connection_logger_stats(receiver_logger, tcp_server_context, caplog) -> ConnectionLoggerStats:
+async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> ConnectionLoggerStats:
     caplog.set_level(logging.INFO, "receiver.stats")
     caplog.set_level(logging.DEBUG, "receiver.connection")
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
-    logger = receiver_logger.get_connection_logger(extra=tcp_server_context)
+    logger = receiver_logger.get_connection_logger(extra=context)
     yield logger
     if not logger._is_closing:
         logger.connection_finished()
@@ -328,14 +254,12 @@ def zero_division_exception() -> BaseException:
         return e
 
 
-@pytest.fixture(params=[receiver_connection_logger.__name__, receiver_connection_logger_stats.__name__])
-def _connection_logger(request):
-    return lazy_fixture(request.param)
-
-
-@pytest.fixture
-async def connection_logger(_connection_logger):
-    yield _connection_logger
+@pytest.fixture(params=['', 'stats'])
+async def connection_logger(request, receiver_connection_logger, receiver_connection_logger_stats):
+    if request.param == 'stats':
+        yield receiver_connection_logger_stats
+    else:
+        yield receiver_connection_logger
 
 
 @pytest.fixture
@@ -360,9 +284,11 @@ def stats_formatter() -> logging.Formatter:
 
 
 @pytest.fixture
-def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, load_all_yaml_tags) -> Path:
+def tmp_config_file(tmp_path, tcp_server_one_way_yaml_config_path, logging_yaml_path, load_all_yaml_tags) -> Path:
     path = tmp_path / tcp_server_one_way_yaml_config_path.name
-    shutil.copy(tcp_server_one_way_yaml_config_path, path)
+    shutil.copy(str(tcp_server_one_way_yaml_config_path), str(path))
+    logging_path = tmp_path / logging_yaml_path.name
+    shutil.copy(str(logging_yaml_path), str(logging_path))
     return path
 
 
