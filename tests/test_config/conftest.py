@@ -138,36 +138,6 @@ def expected_object(server, client_fixed_port, endpoint):
 
 
 @pytest.fixture
-def server_with_logging_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_server_logging.yaml"
-
-
-@pytest.fixture
-def server_with_logging_yaml_config_stream(server_with_logging_yaml_config_path):
-    return open(server_with_logging_yaml_config_path, 'r')
-
-
-@pytest.fixture
-def tcp_server_misc_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_server_misc.yaml"
-
-
-@pytest.fixture
-def tcp_server_misc_yaml_config_stream(tcp_server_misc_yaml_config_path):
-    return open(tcp_server_misc_yaml_config_path, 'r')
-
-
-@pytest.fixture
-def tcp_client_misc_yaml_config_path(conf_dir):
-    return conf_dir / "tcp_client_misc.yaml"
-
-
-@pytest.fixture
-def tcp_client_misc_yaml_config_stream(tcp_client_misc_yaml_config_path):
-    return open(tcp_client_misc_yaml_config_path, 'r')
-
-
-@pytest.fixture
 def peer_filter(client_sock) -> PeerFilter:
     return PeerFilter([client_sock[0]])
 
