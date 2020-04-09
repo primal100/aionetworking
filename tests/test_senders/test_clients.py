@@ -94,7 +94,7 @@ class TestClientAllowedSenders:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object
 
-    @pytest.mark.skipif(os.name == 'nt' and not py38, reason='Mysteriously fails in windows < 3.7')
+    @pytest.mark.skipif(not py38, reason='Mysteriously fails < 3.8')
     @pytest.mark.asyncio
     async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender, echo_encoded):
         async with client_incorrect_sender as conn:
