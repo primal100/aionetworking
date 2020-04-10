@@ -58,6 +58,10 @@ class BaseMessageObject(MessageObject, Protocol):
         return self.context.get('host', self.context.get('peer'))
 
     @property
+    def receiver(self) -> str:
+        return self.context.get('own')
+
+    @property
     def address(self) -> str:
         return self.context['address']
 
