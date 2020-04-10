@@ -59,6 +59,10 @@ class BaseMessageObject(MessageObject, Protocol):
 
     @property
     def receiver(self) -> str:
+        return self.full_receiver.split(':')[0]
+
+    @property
+    def full_receiver(self) -> str:
         return self.context.get('own')
 
     @property
@@ -66,7 +70,7 @@ class BaseMessageObject(MessageObject, Protocol):
         return self.context['address']
 
     @property
-    def peer(self) -> str:
+    def full_sender(self) -> str:
         return self.context['peer']
 
     def __getstate__(self):

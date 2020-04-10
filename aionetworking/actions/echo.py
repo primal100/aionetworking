@@ -34,7 +34,7 @@ class EchoAction(BaseAction):
             id_ = msg.decoded.get('id')
             return {'id': id_, 'result': 'echo'}
         elif method == 'send_notification':
-            self._queues[msg.peer].put_nowait('notification')
+            self._queues[msg.full_sender].put_nowait('notification')
         elif method == 'simple':
             pass
         else:

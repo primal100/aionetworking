@@ -42,11 +42,13 @@ class TestJsonObject:
         codec = JSONObject.get_codec(json_buffer, context=context)
         assert codec == json_codec
 
-    def test_01_properties(self, json_object, timestamp, client_sock, server_sock_str, client_sock_str, client_hostname):
-        assert json_object.peer == client_sock_str
+    def test_01_properties(self, json_object, timestamp, server_sock, client_sock, server_sock_str, client_sock_str,
+                           client_hostname):
+        assert json_object.full_sender == client_sock_str
         assert json_object.address == client_sock[0]
         assert json_object.sender == client_hostname
-        assert json_object.receiver == server_sock_str
+        assert json_object.full_receiver == server_sock_str
+        assert json_object.receiver == server_sock[0]
         assert json_object.uid == 1
         assert json_object.request_id == 1
         assert json_object.timestamp == timestamp
