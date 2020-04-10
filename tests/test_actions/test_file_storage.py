@@ -1,4 +1,4 @@
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import asyncio
 import pickle
 

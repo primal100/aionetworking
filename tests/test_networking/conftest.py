@@ -1,14 +1,17 @@
+from tests.test_requesters.conftest import *
 import asyncio
 import asyncssh
+import datetime
 import os
 import socket
 from socket import AddressFamily, SocketKind
 
 import logging
-import datetime
-from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory, \
+from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFactory, DatagramServerProtocolFactory,
                            DatagramClientProtocolFactory)
 from aionetworking import context_cv, Logger
+from aionetworking.actions.file_storage import BufferedFileStorage
+from aionetworking.formats.contrib.json import JSONObject
 from aionetworking.logging.loggers import connection_logger_cv
 from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking import ConnectionsManager
@@ -19,15 +22,16 @@ from aionetworking.networking.sftp import SFTPClientProtocolFactory, SFTPFactory
 from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFTPServerOSAuthProtocol
 from aionetworking.networking import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
+from aionetworking.requesters.echo import EchoRequester
 from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorType
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
 
-from typing import Callable, Type
+from typing import Callable, Type, Tuple, Union, Optional, List
 
-from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, MockNamedPipeHandle
+from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, \
+    MockNamedPipeHandle
 
-from tests.test_requesters.conftest import *
 
 from unittest.mock import Mock
 
@@ -140,14 +144,16 @@ def extra_client_inet(client_sock, server_sock) -> dict:
 @pytest.fixture
 def extra_server_pipe(pipe_path) -> Dict[str, Any]:
     if hasattr(socket, 'AF_UNIX'):
-        return {'peername': '', 'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX, 'type': SocketKind.SOCK_STREAM, 'proto': 0, 'laddr': str(pipe_path), 'sockname': str(pipe_path)}
+        return {'peername': '', 'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX,
+                'type': SocketKind.SOCK_STREAM, 'proto': 0, 'laddr': str(pipe_path), 'sockname': str(pipe_path)}
     return {'addr': str(pipe_path), 'pipe': MockNamedPipeHandle(12345)}
 
 
 @pytest.fixture
 def extra_client_pipe(pipe_path) -> Dict[str, Any]:
     if hasattr(socket, 'AF_UNIX'):
-        return {'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX, 'type': SocketKind.SOCK_STREAM, 'proto': 0, 'raddr': str(pipe_path), 'sockname' : '', 'peername': str(pipe_path)}
+        return {'socket': MockAFUnixSocket(), 'fd': 1, 'family': AddressFamily.AF_UNIX, 'type': SocketKind.SOCK_STREAM,
+                'proto': 0, 'raddr': str(pipe_path), 'sockname': '', 'peername': str(pipe_path)}
     return {'addr': str(pipe_path), 'pipe': MockNamedPipeHandle(12346)}
 
 
@@ -340,7 +346,8 @@ def allowed_senders(allowed_sender_type, client_sock, client_sock_ipv6, client_h
 
 
 @pytest.fixture
-async def connection_allowed_senders(connection_cls, connection_type, action, endpoint, preaction, parent_name, peer_prefix,
+async def connection_allowed_senders(connection_cls, connection_type, action, endpoint, preaction, parent_name,
+                                     peer_prefix,
                                      requester, server_sock_as_string, hostname_lookup, connection_kwargs, server_sock,
                                      allowed_senders) -> TCPServerConnection:
     if endpoint == 'client':
@@ -394,7 +401,8 @@ def hostname_lookup(connection_type) -> bool:
 
 
 @pytest.fixture
-async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup, connection_kwargs_server) -> StreamServerProtocolFactory:
+async def protocol_factory_server(connection_type, action, recording_file_storage, hostname_lookup,
+                                  connection_kwargs_server) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
         'tcpssl': StreamServerProtocolFactory,
@@ -415,17 +423,14 @@ async def protocol_factory_server(connection_type, action, recording_file_storag
 
 
 @pytest.fixture
-async def protocol_factory_server_allowed_senders(connection_type, action, recording_file_storage, hostname_lookup, allowed_senders, connection_kwargs_server) -> StreamServerProtocolFactory:
+async def protocol_factory_server_allowed_senders(connection_type, action, hostname_lookup, allowed_senders,
+                                                  connection_kwargs_server) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
-        'tcpssl': StreamServerProtocolFactory,
         'udp': DatagramServerProtocolFactory,
-        'pipe': StreamServerProtocolFactory,
-        'sftp': SFTPOSAuthProtocolFactory
     }
     factory_cls = protocol_factory_classes[connection_type]
     factory = factory_cls(
-        preaction=recording_file_storage,
         action=action,
         dataformat=JSONObject,
         hostname_lookup=hostname_lookup,
@@ -437,7 +442,8 @@ async def protocol_factory_server_allowed_senders(connection_type, action, recor
 
 
 @pytest.fixture
-async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup, connection_kwargs_server, parent_name) -> StreamServerProtocolFactory:
+async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup, connection_kwargs_server,
+                                        parent_name) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
         'tcpssl': StreamServerProtocolFactory,
@@ -463,13 +469,11 @@ async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup
 
 
 @pytest.fixture
-async def protocol_factory_expire_connections(connection_type, action, hostname_lookup, connection_kwargs_server, parent_name) -> StreamServerProtocolFactory:
+async def protocol_factory_expire_connections(connection_type, action, hostname_lookup, connection_kwargs_server,
+                                              parent_name) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
-        'tcpssl': StreamServerProtocolFactory,
         'udp': DatagramServerProtocolFactory,
-        'pipe': StreamServerProtocolFactory,
-        'sftp': SFTPOSAuthProtocolFactory
     }
     factory_cls = protocol_factory_classes[connection_type]
     factory = factory_cls(
@@ -499,7 +503,8 @@ async def protocol_factory_started(protocol_factory, parent_name, connection_typ
 
 
 @pytest.fixture
-async def protocol_factory_client(requester, connection_type, connection_kwargs_client, hostname_lookup) -> StreamClientProtocolFactory:
+async def protocol_factory_client(requester, connection_type, connection_kwargs_client,
+                                  hostname_lookup) -> StreamClientProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamClientProtocolFactory,
         'tcpssl': StreamClientProtocolFactory,
@@ -517,7 +522,8 @@ async def protocol_factory_client(requester, connection_type, connection_kwargs_
 
 
 @pytest.fixture
-async def protocol_factory_client_started(protocol_factory_client_started, parent_name, connection_type) -> StreamClientProtocolFactory:
+async def protocol_factory_client_started(protocol_factory_client_started, parent_name,
+                                          connection_type) -> StreamClientProtocolFactory:
     await protocol_factory_client_started.start()
     if not protocol_factory_client_started.full_name:
         protocol_factory_client_started.set_name(parent_name, connection_type)
@@ -668,8 +674,8 @@ async def sftp_protocol_factory_client_expired_connections() -> SFTPClientProtoc
 
 @pytest.fixture
 async def sftp_protocol_factory_server_expired_connections_started(sftp_protocol_factory_server_expired_connections,
-                                                                   server_sock_str,
-                                                                   sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
+                                                                   server_sock_str, sftp_initial_server_context,
+                                                                   ) -> SFTPOSAuthProtocolFactory:
     context_cv.set(sftp_initial_server_context)
     await sftp_protocol_factory_server_expired_connections.start()
     if not sftp_protocol_factory_server_expired_connections.full_name:
@@ -820,12 +826,6 @@ def ssl_context(server_side_ssl, client_side_ssl, endpoint) -> Union[ServerSideS
     if endpoint == 'server':
         return server_side_ssl
     return client_side_ssl
-
-
-"""@pytest.fixture
-def client_side_ssl_no_cadata(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir) -> ClientSideSSL:
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
-                         cafile=ssl_server_cert, capath=ssl_server_dir)"""
 
 
 @pytest.fixture

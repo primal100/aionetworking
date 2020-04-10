@@ -1,5 +1,5 @@
 import asyncio
-import pytest
+import pytest   # noinspection PyPackageRequirements
 
 
 class TestCounterNum:

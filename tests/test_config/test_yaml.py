@@ -20,14 +20,16 @@ def status_call(port, host='127.0.0.1'):
 
 class TestYamlConfig:
     @pytest.mark.connections('allplus_oneway_all')
-    def test_00_yaml_config_node_oneway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter, reset_logging, server_pipe_address_load):
+    def test_00_yaml_config_node_oneway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter,
+                                        reset_logging, server_pipe_address_load):
         node = node_from_config_file(config_file, paths=all_paths)
         assert node.protocol_factory.action == expected_object.protocol_factory.action
         assert node.protocol_factory == expected_object.protocol_factory
         assert node == expected_object
 
     @pytest.mark.connections('all_twoway_all')
-    def test_01_yaml_config_node_twoway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter, reset_logging, server_pipe_address_load):
+    def test_01_yaml_config_node_twoway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter,
+                                        reset_logging, server_pipe_address_load):
         node = node_from_config_file(config_file, paths=all_paths)
         assert node.protocol_factory.action == expected_object.protocol_factory.action
         assert node.protocol_factory == expected_object.protocol_factory
@@ -115,8 +117,8 @@ class TestSignalServerManager:
             f.write(data)
 
     @pytest.mark.asyncio
-    async def test_02_check_reload_with_change(self, capsys, patch_systemd, signal_server_manager_started, tmp_config_file,
-                                               reset_logging):
+    async def test_02_check_reload_with_change(self, capsys, patch_systemd, signal_server_manager_started,
+                                               tmp_config_file, reset_logging):
         out = capsys.readouterr().out
         port1 = port_from_out(out)
         current_server_id = id(signal_server_manager_started.server)
@@ -137,7 +139,8 @@ class TestSignalServerManager:
             assert daemon.notify.call_count == 6
 
     @pytest.mark.asyncio
-    async def test_03_check_reload_file_deleted(self, patch_systemd, signal_server_manager, tmp_config_file, capsys, reset_logging):
+    async def test_03_check_reload_file_deleted(self, patch_systemd, signal_server_manager, tmp_config_file, capsys,
+                                                reset_logging):
         task = asyncio.create_task(signal_server_manager.serve_until_stopped())
         await signal_server_manager.wait_server_started()
         tmp_config_file.unlink()
@@ -155,9 +158,9 @@ class TestSignalServerManager:
             assert daemon.notify.call_count == 3
 
     @staticmethod
-    async def send_signal(server_manager, signal):
+    async def send_signal(server_manager, signal_num):
         await server_manager.wait_server_started()
-        os.kill(os.getpid(), signal)
+        os.kill(os.getpid(), signal_num)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('signal_num', [

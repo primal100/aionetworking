@@ -1,6 +1,5 @@
 import pytest
 import asyncio
-import logging
 
 from aionetworking.networking.exceptions import MethodNotFoundError
 
@@ -71,7 +70,6 @@ class TestSenderAdaptorTwoWay:
     @pytest.mark.asyncio
     async def test_03_on_data_received_response(self, adaptor, echo_response_encoded, timestamp,
                                                 echo_response_object, json_codec):
-        a = logging
         fut = asyncio.Future()
         adaptor._scheduler._futures[1] = fut
         task = adaptor.on_data_received(echo_response_encoded, timestamp)
@@ -88,7 +86,8 @@ class TestSenderAdaptorTwoWay:
         await task
         assert result == echo_notification_object
 
-    async def assert_response(self, queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
+    @staticmethod
+    async def assert_response(queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
                               echo_response_object):
         msg = await queue.get()
         assert msg == echo_encoded

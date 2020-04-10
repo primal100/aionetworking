@@ -1,10 +1,9 @@
+from tests.test_formats.conftest import *
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
 from aionetworking.formats import get_recording_from_file
 from aionetworking.utils import alist
-from aionetworking.types.formats import MessageObjectType
-from tests.test_formats.conftest import *
 from tests.test_actions.actions import file_storage_actions, duplex_actions, get_recording_buffered_file_storage
 import pytest
 
@@ -60,7 +59,8 @@ def assert_buffered_file_storage_ok(data_dir, json_objects, json_codec, client_a
 
 
 @pytest.fixture()
-def assert_server_buffered_file_storage_ok(data_dir, json_server_objects, json_server_codec, client_address) -> Coroutine:
+def assert_server_buffered_file_storage_ok(data_dir, json_server_objects, json_server_codec,
+                                           client_address) -> Coroutine:
     files = get_expected_files_buffered_storage(data_dir, json_server_objects, client_address)
     return _assert_file_storage_ok(files, json_server_codec)
 
@@ -71,7 +71,13 @@ def expected_recordings_file(recordings_dir, client_address) -> Path:
 
 
 @pytest.fixture
-async def recordings_file_with_data(expected_recordings_file, buffer_objects, buffer_codec, assert_recordings_ok) -> Path:
+async def buffer_objects(json_encoded_multi, buffer_codec, timestamp) -> List[MessageObjectType]:
+    yield [await buffer_codec.encode_obj(decoded, system_timestamp=timestamp) for decoded in json_encoded_multi]
+
+
+@pytest.fixture
+async def recordings_file_with_data(expected_recordings_file, buffer_objects, buffer_codec,
+                                    assert_recordings_ok) -> Path:
     expected_recordings_file.parent.mkdir(parents=True, exist_ok=True)
     with expected_recordings_file.open('wb') as f:
         for obj in buffer_objects:
@@ -127,11 +133,6 @@ async def recording_file_storage(recordings_dir) -> Union[BufferedFileStorage]:
     yield action
     if not action.is_closing():
         await action.close()
-
-
-@pytest.fixture
-async def buffer_objects(json_encoded_multi, buffer_codec, timestamp):
-    yield [await buffer_codec.encode_obj(decoded, system_timestamp=timestamp) for decoded in json_encoded_multi]
 
 
 @pytest.fixture
@@ -195,7 +196,8 @@ def echo_notification_client_encoded() -> bytes:
 
 
 @pytest.fixture
-def echo_notification_request_object(echo_notification_client_encoded, echo_notification_request, context) -> JSONObject:
+def echo_notification_request_object(echo_notification_client_encoded, echo_notification_request,
+                                     context) -> JSONObject:
     return JSONObject(echo_notification_client_encoded, echo_notification_request, context=context)
 
 
@@ -268,7 +270,8 @@ def keep_alive_request_encoded() -> bytes:
 
 
 @pytest.fixture
-def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context, timestamp) -> JSONObjectWithKeepAlive:
+def keepalive_object(keep_alive_request_encoded, keep_alive_request_decoded, context,
+                     timestamp) -> JSONObjectWithKeepAlive:
     return JSONObjectWithKeepAlive(keep_alive_request_encoded, keep_alive_request_decoded, context=context,
                                    system_timestamp=timestamp)
 

@@ -1,5 +1,5 @@
 import logging
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import pickle
 
 from aionetworking.compatibility import get_current_task_name, py38, set_current_task_name
@@ -29,7 +29,7 @@ class TestLogger:
         assert receiver_logger.extra == {'endpoint': f'TCP Server {server_sock_str}'}
         msg, kwargs = receiver_logger.process('Hello World', {})
         assert msg, kwargs == (
-        'Hello World', {'extra': {'taskname': 'No Running Loop', 'endpoint': f'TCP Server {server_sock_str}'}})
+            'Hello World', {'extra': {'taskname': 'No Running Loop', 'endpoint': f'TCP Server {server_sock_str}'}})
 
     def test_04_manage_error(self, receiver_logger, caplog, zero_division_exception) -> None:
         receiver_logger.manage_error(zero_division_exception)
@@ -46,11 +46,13 @@ class TestLogger:
         assert caplog.record_tuples[0] == (
             'receiver', logging.DEBUG, 'Connection closed. There are now 4 active connections.')
 
-    def test_07_get_receiver_connection_logger(self, receiver_logger, receiver_connection_logger, tcp_server_context_fixed_port):
+    def test_07_get_receiver_connection_logger(self, receiver_logger, receiver_connection_logger,
+                                               tcp_server_context_fixed_port):
         conn_logger = receiver_logger.get_connection_logger(extra=tcp_server_context_fixed_port)
         assert conn_logger == receiver_connection_logger
 
-    def test_08_get_sender_connection_logger(self, sender_logger, sender_connection_logger, tcp_client_context_fixed_port):
+    def test_08_get_sender_connection_logger(self, sender_logger, sender_connection_logger,
+                                             tcp_client_context_fixed_port):
         conn_logger = sender_logger.get_connection_logger(extra=tcp_client_context_fixed_port)
         assert conn_logger == sender_connection_logger
 

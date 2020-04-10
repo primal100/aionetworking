@@ -15,7 +15,8 @@ class MockAFUnixSocket:
     def family(self):
         return getattr(socket, "AF_UNIX", None)
 
-    def fileno(self) -> int:
+    @staticmethod
+    def fileno() -> int:
         return 1
 
 
@@ -24,9 +25,9 @@ class MockNamedPipeHandle:
         self.handle = handle
 
 
-
 class MockTransportMixin:
     _is_closing = False
+    _protocol = None
 
     def is_closing(self) -> bool:
         return self._is_closing

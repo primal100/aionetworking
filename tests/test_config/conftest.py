@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.test_senders.conftest import *
 import yaml
 import shutil
 import logging.config
@@ -8,7 +9,6 @@ from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, Stats
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
 from aionetworking.types.networking import AFINETContext
 from aionetworking.utils import Expression
-from tests.test_senders.conftest import *
 import asyncio
 
 
@@ -160,8 +160,9 @@ def log_record(client_sock_str, server_sock_str) -> logging.LogRecord:
 @pytest.fixture()
 def log_record_not_included(client_sock, server_sock_str) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{client_sock[1]}', server_sock_str),
-                                None, func='new_connection', sinfo=None)
+                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{client_sock[1]}',
+                                                                   server_sock_str),
+                               None, func='new_connection', sinfo=None)
     record.hostname = 'localhost2'
     record.host = '127.0.0.2'
     return record
@@ -178,7 +179,7 @@ def log_record_msg_object(json_rpc_login_request_object) -> logging.LogRecord:
 @pytest.fixture()
 def log_record_msg_object_not_included(json_rpc_logout_request_object) -> logging.LogRecord:
     record = logging.LogRecord('receiver.msg_received', logging.DEBUG, os.path.abspath(__file__), 180,
-                             'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
+                               'MSG RECEIVED', (), None, func='_msg_received', sinfo=None)
     record.msg_obj = json_rpc_logout_request_object
     return record
 
@@ -231,7 +232,7 @@ async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> 
     caplog.set_level(logging.DEBUG, "receiver.msg_received")
     logger = receiver_logger.get_connection_logger(extra=context)
     yield logger
-    if not logger._is_closing:
+    if not logger.is_closing:
         logger.connection_finished()
     await logger.wait_closed()
     caplog.set_level(logging.ERROR, "receiver.msg_received")
@@ -271,13 +272,14 @@ def stats_tracker() -> StatsTracker:
 async def stats_logger(context) -> StatsLogger:
     logger = StatsLogger("receiver.stats", extra=context, stats_interval=0.1, stats_fixed_start_time=False)
     yield logger
-    if not logger._is_closing:
+    if not logger.is_closing:
         logger.connection_finished()
     await logger.wait_closed()
 
 
 @pytest.fixture
 def stats_formatter() -> logging.Formatter:
+    # noinspection PyPep8
     return logging.Formatter(
         "{peer} {msg} {msgs.received} {msgs.processed} {received.kb:.2f}KB {processed.kb:.2f}KB {receive_rate.kb:.2f}KB/s {processing_rate.kb:.2f}KB/s {average_buffer_size.kb:.2f}KB {msgs.receive_interval}/s {msgs.processing_time}/s {msgs.buffer_receive_rate}/s {msgs.processing_rate}/s {msgs.buffer_processing_rate}/s {largest_buffer.kb:.2f}KB",
         style="{")

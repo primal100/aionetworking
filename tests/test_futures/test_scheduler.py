@@ -1,4 +1,4 @@
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import asyncio
 
 
@@ -48,7 +48,7 @@ class TestTaskScheduler:
 
     @pytest.mark.asyncio
     async def test_05_future_run_wait_exception(self, task_scheduler):
-        def set_result(res: str):
+        def set_result(_: str):
             task_scheduler.set_exception(3, ValueError())
         with pytest.raises(ValueError):
             await task_scheduler.run_wait_fut(3, set_result, 'abc')

@@ -45,7 +45,7 @@ class TestConnectionShared:
 class TestConnectionServer:
     @pytest.mark.asyncio
     async def test_00_data_received(self, sftp_connection_connected, sftp_factory, fixed_timestamp,
-                                    json_rpc_login_request_encoded,json_rpc_logout_request_encoded,
+                                    json_rpc_login_request_encoded, json_rpc_logout_request_encoded,
                                     assert_recordings_ok, assert_buffered_file_storage_ok):
         sftp_connection_connected.data_received(json_rpc_login_request_encoded)
         await asyncio.sleep(1.2)
@@ -94,7 +94,7 @@ class TestConnectionClient:
         sftp_connection_connected.send_data(json_rpc_login_request_encoded)
         await sftp_connection_connected.wait_tasks_done()
         sftp_factory.put.assert_awaited_with(Path(tmpdir) / "sftp_sent/FILE201901010101000000000000",
-                                                  remotepath='/')
+                                             remotepath='/')
 
 
 @pytest.mark.connections('sftp_oneway_all')
