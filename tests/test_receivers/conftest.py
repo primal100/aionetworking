@@ -1,11 +1,12 @@
+from tests.test_networking.conftest import *
 from aionetworking import TCPServer, UDPServer, PipeServer
+from aionetworking.formats.contrib.json import JSONObject
 from aionetworking.receivers import BaseServer
 from aionetworking.receivers.sftp import SFTPServer
 from scripts.generate_ssh_host_key import generate_key_in_path
 
-from tests.test_networking.conftest import *
-
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Tuple
 
 
 @pytest.fixture
@@ -75,7 +76,8 @@ async def sftp_server_allowed_senders(protocol_factory_server_allowed_senders, s
 
 
 @pytest.fixture
-async def server_allowed_senders(connection_type, tcp_server_allowed_senders, udp_server_allowed_senders, sftp_server_allowed_senders) -> BaseServer:
+async def server_allowed_senders(connection_type, tcp_server_allowed_senders, udp_server_allowed_senders,
+                                 sftp_server_allowed_senders) -> BaseServer:
     servers = {
         'tcp': tcp_server_allowed_senders,
         'tcpssl': tcp_server_ssl,
@@ -91,7 +93,7 @@ async def server_allowed_senders(connection_type, tcp_server_allowed_senders, ud
 
 
 @pytest.fixture
-async def protocol_factory_server_connections_expire(action) ->StreamServerProtocolFactory:
+async def protocol_factory_server_connections_expire(action) -> StreamServerProtocolFactory:
     factory = StreamServerProtocolFactory(
         action=action,
         dataformat=JSONObject,

@@ -1,8 +1,8 @@
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import asyncio
 
 from aionetworking.compatibility import (supports_task_name, get_task_name, get_current_task_name, set_task_name,
-    set_current_task_name)
+                                         set_current_task_name)
 
 
 class TestTaskNames:
@@ -50,7 +50,8 @@ class TestTaskNames:
 
     @pytest.mark.asyncio
     async def test_04_set_task_name_include_hierarchy(self, task):
-        current_task = self._prepare_current_task('Task-10')
+        # Following line required to change task name, pycharm gives error if task is not retrieved
+        _ = self._prepare_current_task('Task-10')
         set_task_name(task, "HelloWorld")
         if supports_task_name():
             assert task.get_name() == get_task_name(task) == "Task-10:Task-99_HelloWorld"

@@ -1,5 +1,4 @@
-import pytest
-import asyncio
+import pytest   # noinspection PyPackageRequirements
 from aionetworking.formats.contrib.json import JSONObject
 from aionetworking.formats.recording import get_recording
 from aionetworking.utils import alist

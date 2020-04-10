@@ -1,8 +1,8 @@
 import logging
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import asyncio
 try:
-    import psutil
+    import psutil   # noinspection PyPackageRequirements
 except ImportError:
     psutil = None
 
@@ -51,9 +51,9 @@ class TestStatsTracker:
         for key in stats_tracker:
             d[key] = stats_tracker[key]
         expected_keys = ['start', 'end', 'msgs', 'sent', 'received', 'processed', 'filtered', 'failed',
-                           'largest_buffer', 'send_rate', 'processing_rate', 'receive_rate', 'interval',
-                           'average_buffer_size', 'average_sent', 'msgs_per_buffer', 'not_decoded', 'not_decoded_rate',
-                           'total_done']
+                         'largest_buffer', 'send_rate', 'processing_rate', 'receive_rate', 'interval',
+                         'average_buffer_size', 'average_sent', 'msgs_per_buffer', 'not_decoded', 'not_decoded_rate',
+                         'total_done']
         assert sorted(list(d)) == sorted(expected_keys)
 
 
@@ -65,7 +65,7 @@ class TestStatsLogger:
         keys = list(kwargs['extra'].keys())
         expected_keys = ['address', 'alias', 'average_buffer_size', 'average_sent', 'client', 'end', 'failed',
                          'filtered', 'host', 'interval', 'largest_buffer', 'msgs', 'msgs_per_buffer',
-                         'not_decoded', 'not_decoded_rate', 'own', 'peer', 'port','processed', 'processing_rate',
+                         'not_decoded', 'not_decoded_rate', 'own', 'peer', 'port', 'processed', 'processing_rate',
                          'protocol_name', 'receive_rate', 'received', 'send_rate', 'sent', 'server',
                          'start', 'taskname', 'total_done']
         if psutil:
@@ -105,7 +105,8 @@ class TestStatsLogger:
         assert caplog.text.startswith(f'{client_sock_str} INTERVAL 1 1 0.05KB 0.05KB')
 
     @pytest.mark.asyncio
-    async def test_03_periodic_log(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, client_sock_str):
+    async def test_03_periodic_log(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog,
+                                   client_sock_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
@@ -119,7 +120,8 @@ class TestStatsLogger:
         assert stats_logger.processed == 0
 
     @pytest.mark.asyncio
-    async def test_04_finish_all(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, client_sock_str):
+    async def test_04_finish_all(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog,
+                                 client_sock_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)
@@ -129,7 +131,8 @@ class TestStatsLogger:
         assert caplog.text.startswith(f'{client_sock_str} ALL 1 1 0.08KB 0.08KB')
 
     @pytest.mark.asyncio
-    async def test_05_interval_end(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog, client_sock_str):
+    async def test_05_interval_end(self, stats_logger, json_rpc_login_request_encoded, stats_formatter, caplog,
+                                   client_sock_str):
         caplog.clear()
         caplog.set_level(logging.INFO, logger=stats_logger.logger_name)
         caplog.handler.setFormatter(stats_formatter)

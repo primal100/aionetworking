@@ -1,13 +1,14 @@
 from __future__ import annotations
-import os
 import pytest
+import os
 from pathlib import Path
 from dataclasses import dataclass
 from aionetworking import JSONObject, JSONCodec
 from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
+from aionetworking.types.formats import MessageObjectType
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List, Dict, Any, NamedTuple, Type, Optional
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def client_sock(client_port) -> Tuple[str, int]:
 
 
 @pytest.fixture
-def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Union[str, [Tuple[str, int]]]:
+def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Optional[Union[str, Tuple[str, int]]]:
     if connection_type != 'pipe':
         return client_sock if endpoint == 'server' else server_sock
     elif os.name == 'nt':
@@ -131,6 +132,7 @@ def json_rpc_logout_request_encoded(user1) -> bytes:
 
 @pytest.fixture
 def json_buffer() -> bytes:
+    # noinspection PyPep8
     return b'{"jsonrpc": "2.0", "id": 1, "method": "login", "params": ["user1", "password"]}{"jsonrpc": "2.0", "id": 2, "method": "logout"}'
 
 
@@ -164,7 +166,8 @@ def file_containing_multi_json(tmpdir, json_buffer) -> Path:
 
 @pytest.fixture
 def json_object(json_rpc_login_request_encoded, json_rpc_login_request, context, timestamp) -> MessageObjectType:
-    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context, system_timestamp=timestamp)
+    return JSONObject(json_rpc_login_request_encoded, json_rpc_login_request, context=context,
+                      system_timestamp=timestamp)
 
 
 @pytest.fixture
@@ -182,7 +185,8 @@ def json_server_objects(json_encoded_multi, json_decoded_multi, timestamp, serve
 
 
 @pytest.fixture
-def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address, timestamp) -> List[
+def two_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address,
+                           timestamp) -> List[
                         NamedTuple]:
     return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
                             data=b'{"id": 1, "method": "echo"}')]
@@ -196,8 +200,9 @@ def client_address(client_sock, pipe_path, connection_type):
 
 
 @pytest.fixture
-def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address, timestamp) -> List[
-                        NamedTuple]:
+def one_way_recording_data(json_rpc_login_request_encoded, json_rpc_logout_request_encoded, client_address,
+                           timestamp) -> List[
+                           NamedTuple]:
     return [recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,
                             data=json_rpc_login_request_encoded),
             recorded_packet(sent_by_server=False, timestamp=timestamp, sender=client_address,

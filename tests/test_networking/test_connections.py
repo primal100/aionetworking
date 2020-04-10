@@ -37,8 +37,8 @@ class TestConnectionShared:
         assert queue.get_nowait() == (peer, json_rpc_login_request_encoded)
 
     @pytest.mark.asyncio
-    async def test_02_send_data_adaptor_method(self, connection_connected, json_rpc_login_request_encoded, transport, queue,
-                                               peer):
+    async def test_02_send_data_adaptor_method(self, connection_connected, json_rpc_login_request_encoded, transport,
+                                               queue, peer):
         connection_connected.send_data(json_rpc_login_request_encoded)
         assert queue.get_nowait() == (peer, json_rpc_login_request_encoded)
 
@@ -95,8 +95,8 @@ class TestConnectionTwoWayServer:
 @pytest.mark.connections('all_twoway_client')
 class TestConnectionTwoWayClient:
     @pytest.mark.asyncio
-    async def test_00_send_data_and_wait(self, connection_connected, echo_encoded, echo_response_encoded, echo_response_object,
-                                         transport, queue):
+    async def test_00_send_data_and_wait(self, connection_connected, echo_encoded, echo_response_encoded,
+                                         echo_response_object, transport, queue):
         task = asyncio.create_task(connection_connected.send_data_and_wait(1, echo_encoded))
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
@@ -105,8 +105,8 @@ class TestConnectionTwoWayClient:
         assert result == echo_response_object
 
     @pytest.mark.asyncio
-    async def test_01_send_notification_and_wait(self, connection_connected, echo_notification_client_encoded, transport,
-                                                 echo_notification_server_encoded, echo_notification_object,
+    async def test_01_send_notification_and_wait(self, connection_connected, echo_notification_client_encoded,
+                                                 transport, echo_notification_server_encoded, echo_notification_object,
                                                  queue):
         connection_connected.send_data(echo_notification_client_encoded)
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)

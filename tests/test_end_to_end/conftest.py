@@ -1,4 +1,5 @@
 from tests.test_senders.conftest import *
+from aionetworking.formats.contrib.json import JSONObject
 
 
 @pytest.fixture

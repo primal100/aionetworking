@@ -14,7 +14,7 @@ def get_file_storage(data_dir: Path) -> FileStorage:
 
 def get_recording_buffered_file_storage(recordings_dir: Path) -> BufferedFileStorage:
     return BufferedFileStorage(base_path=recordings_dir, close_file_after_inactivity=2,
-                                 path='{msg.address}.recording', buffering=0)
+                               path='{msg.address}.recording', buffering=0)
 
 
 file_storage_actions: Dict[str, Callable] = {
@@ -23,7 +23,7 @@ file_storage_actions: Dict[str, Callable] = {
 }
 
 
-def get_echo_action(data_dir: Path) -> EchoAction:
+def get_echo_action(_: Path) -> EchoAction:
     return EchoAction()
 
 

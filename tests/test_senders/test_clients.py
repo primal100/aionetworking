@@ -2,11 +2,9 @@ import asyncio
 import pickle
 import pytest
 import asyncssh
-import os
 
 from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
-###Required for skipif in fixture params###
 from aionetworking.compatibility import datagram_supported, py38
 
 
@@ -49,7 +47,7 @@ class TestSSLAndSFTPClient:
     @pytest.mark.asyncio
     async def test_00_client_start(self, client):
         assert not client.is_started()
-        async with client as conn:
+        async with client:
             assert client.is_started()
             assert client.conn
         assert client.is_closing()
@@ -98,14 +96,16 @@ class TestClientAllowedSenders:
     @pytest.mark.asyncio
     async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender, echo_encoded):
         async with client_incorrect_sender as conn:
-            with pytest.raises((ConnectionResetError, ConnectionAbortedError, RemoteConnectionClosedError, asyncio.TimeoutError)):
+            with pytest.raises(
+                    (ConnectionResetError, ConnectionAbortedError, RemoteConnectionClosedError, asyncio.TimeoutError)):
                 await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), 2)
 
 
 class TestConnectionsExpire:
     @pytest.mark.connections('tcp_oneway_all')
     @pytest.mark.asyncio
-    async def test_00_connections_expire(self, server_expire_connections, client_connections_expire, connections_manager):
+    async def test_00_connections_expire(self, server_expire_connections, client_connections_expire,
+                                         connections_manager):
         async with client_connections_expire as conn:
             await asyncio.sleep(0.2)
             assert connections_manager.total == 2
@@ -116,8 +116,9 @@ class TestConnectionsExpire:
 
     @pytest.mark.connections('tcp_oneway_all')
     @pytest.mark.asyncio
-    async def test_01_connections_expire_after_msg_received_tcp(self, server_expire_connections, client_connections_expire,
-                                                               json_rpc_login_request_encoded, connections_manager):
+    async def test_01_connections_expire_after_msg_received_tcp(self, server_expire_connections, connections_manager,
+                                                                client_connections_expire,
+                                                                json_rpc_login_request_encoded):
         async with client_connections_expire as conn:
             await asyncio.sleep(0.5)
             assert connections_manager.total == 2
@@ -132,8 +133,9 @@ class TestConnectionsExpire:
     @pytest.mark.skipif(not datagram_supported(), reason='UDP is not supported for this loop in this python version')
     @pytest.mark.connections('udp_oneway_all')
     @pytest.mark.asyncio
-    async def test_02_connections_expire_after_msg_received_udp(self, server_expire_connections, client_connections_expire,
-                                                                json_rpc_login_request_encoded, connections_manager):
+    async def test_02_connections_expire_after_msg_received_udp(self, server_expire_connections, connections_manager,
+                                                                client_connections_expire,
+                                                                json_rpc_login_request_encoded):
         async with client_connections_expire as conn:
             await asyncio.sleep(0.5)
             conn.send_data(json_rpc_login_request_encoded)

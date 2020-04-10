@@ -1,4 +1,4 @@
-import pytest
+import pytest   # noinspection PyPackageRequirements
 import json
 from aionetworking.actions.echo import InvalidRequestError
 from aionetworking.utils import aone

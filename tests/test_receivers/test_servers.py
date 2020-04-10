@@ -7,9 +7,6 @@ from unittest.mock import call
 
 from aionetworking.receivers.exceptions import ServerException
 
-###Required for skipif in fixture params###
-from aionetworking.compatibility import datagram_supported, supports_pipe_or_unix_connections
-
 
 ready_call = call('READY=1')
 stopping_call = call('STOPPING=1')

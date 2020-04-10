@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from aionetworking.compatibility import get_current_task_name
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
 from aionetworking.utils import SystemInfo, supports_system_info
-from aionetworking.logging.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, p
+from aionetworking.logging.utils_logging import LoggingDatetime, LoggingTimeDelta, BytesSize, MsgsCount, BytesSizeRate, p
 from aionetworking.futures.schedulers import TaskScheduler
 
 from typing import Type, Optional, Dict, Generator, Any, Union
@@ -53,7 +53,7 @@ class Logger(BaseLogger):
     extra: dict = None
     stats_interval: Union[float, int] = 60
     stats_fixed_start_time: bool = True
-    _is_closing: bool = field(default=False, init=False)
+    is_closing: bool = field(default=False, init=False)
 
     def __init__(self, name: str, datefmt: str = '%Y-%m-%d %H:%M:%S.%f', extra: Dict = None,
                  stats_interval: Optional[Union[int, float]] = 0, stats_fixed_start_time: bool = True):
@@ -66,12 +66,12 @@ class Logger(BaseLogger):
 
     def __getstate__(self):
         state = dataclass_getstate(self)
-        if self._is_closing:
-            state['_is_closing'] = self._is_closing
+        if self.is_closing:
+            state['is_closing'] = self.is_closing
         return state
 
     def __setstate__(self, state):
-        self._is_closing = state.pop('_is_closing', self._is_closing)
+        self.is_closing = state.pop('is_closing', self.is_closing)
         dataclass_setstate(self, state)
 
     def process(self, msg, kwargs):
@@ -118,7 +118,7 @@ class Logger(BaseLogger):
                         p.no('active connection'))
 
     def _set_closing(self) -> None:
-        self._is_closing = True
+        self.is_closing = True
 
 
 @dataclass
@@ -247,11 +247,11 @@ class StatsTracker:
         return self.processed + self.failed + self.filtered
 
     @property
-    def processing_rate(self) -> float:
+    def processing_rate(self) -> BytesSizeRate:
         return self.processed / (self.msgs.processing_time or 1)
 
     @property
-    def receive_rate(self) -> float:
+    def receive_rate(self) -> BytesSizeRate:
         return self.received / (self.msgs.receive_interval or 1)
 
     @property
@@ -267,7 +267,7 @@ class StatsTracker:
         return LoggingTimeDelta(self.start, self.end)
 
     @property
-    def average_buffer_size(self) -> float:
+    def average_buffer_size(self) -> BytesSizeRate:
         return self.received / (self.msgs.received or 1)
 
     @property

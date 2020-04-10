@@ -3,9 +3,8 @@ import asyncio
 import pytest
 import signal
 import os
-from aionetworking.compatibility import supports_keyboard_interrupt, py38
+from aionetworking.compatibility import supports_keyboard_interrupt
 from aionetworking.utils import wait_server_started_raise_signal, assert_reload_ok
-from threading import Thread, Event
 
 
 class TestRunnerDirect:
