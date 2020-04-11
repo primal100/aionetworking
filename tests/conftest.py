@@ -14,20 +14,24 @@ from typing import Dict, Any
 
 
 def pytest_addoption(parser):
-    default = 'proactor' if os.name == 'nt' else 'selector'
-    choices = ('selector', 'uvloop') if os.name == 'linux' else ('proactor', 'selector')
+    if os.name == 'nt':
+        default = 'proactor' if os.name == 'nt' else 'selector'
+        choices = ('proactor', 'selector')
+    else:
+        default = 'selector'
+        choices = ('selector', 'uvloop')
     parser.addoption(
         "--loop",
         action="store",
         default=default,
-        help=f"Loop to use. Choices are: {','.join(choices)}",
+        help=f"Loop to use. Choices are: {', '.join(choices)}",
     )
 
 
 def pytest_configure(config):
     loop_type = config.getoption("--loop")
     if loop_type:
-        set_loop_policy(linux_loop_type=loop_type, windows_loop_type=loop_type)
+        set_loop_policy(posix_loop_type=loop_type, windows_loop_type=loop_type)
 
 
 def pytest_generate_tests(metafunc):
