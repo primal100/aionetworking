@@ -293,7 +293,7 @@ if __name__ == '__main__':
     setup_logging(args.loglevel, args.senderloglevel, args.asyncio_debug, args.twoway)
     if aiofile:
         settings.FILE_OPENER = aiofile.AIOFile if args.aioh else aiofiles.open
-    set_loop_policy(linux_loop_type=args.loop, windows_loop_type=args.loop)
+    set_loop_policy(posix_loop_type=args.loop, windows_loop_type=args.loop)
     params = (args.clients, args.num, args.slow_duration, args.asyncio_debug, args.pause_on_size, args.times, args.timeout)
     if args.twoway:
         coro = run_two_way(*params)

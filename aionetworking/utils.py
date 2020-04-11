@@ -158,11 +158,11 @@ def set_selector_loop_policy_windows() -> None:
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-def set_selector_loop_policy_linux() -> None:
+def set_selector_loop_policy_posix() -> None:
     asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
 
-def set_uvloop_policy_linux() -> None:
+def set_uvloop_policy_posix() -> None:
     import uvloop
     uvloop.install()
 
@@ -171,15 +171,15 @@ class InvalidLoopNameException(BaseException):
     pass
 
 
-def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) -> None:
+def set_loop_policy(posix_loop_type: str = None, windows_loop_type: str = None) -> None:
     if os.name == 'posix':
-        if linux_loop_type == 'selector':
-            set_selector_loop_policy_linux()
-        elif linux_loop_type == 'uvloop':
-            set_uvloop_policy_linux()
+        if posix_loop_type == 'selector':
+            set_selector_loop_policy_posix()
+        elif posix_loop_type == 'uvloop':
+            set_uvloop_policy_posix()
         else:
             raise InvalidLoopNameException(
-                f'{linux_loop_type} is not a valid loop name. Choose either selector or uvloop')
+                f'{posix_loop_type} is not a valid loop name. Choose either selector or uvloop')
     elif os.name == 'nt':
         if windows_loop_type == 'selector':
             set_selector_loop_policy_windows()
@@ -187,7 +187,7 @@ def set_loop_policy(linux_loop_type: str = None, windows_loop_type: str = None) 
             set_proactor_loop_policy_windows()
         else:
             raise InvalidLoopNameException(
-                f'{linux_loop_type} is not a valid loop name. Choose either proactor or selector')
+                f'{posix_loop_type} is not a valid loop name. Choose either proactor or selector')
 
 
 ###Multiprocessing###
