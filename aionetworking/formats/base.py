@@ -139,18 +139,21 @@ class BaseCodec(Codec):
     async def decode_one(self, encoded: bytes, **kwargs) -> Any:
         return await aone(self.decode(encoded, **kwargs))
 
-    async def _from_buffer(self, encoded: bytes, context: Dict[str, Any] = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+    async def create_object(self, encoded: bytes, decoded: Any, **kwargs) -> MessageObjectType:
+        return self.msg_obj(encoded, decoded, **kwargs)
+
+    async def _from_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+        async for encoded, decoded in self.decode(encoded, **kwargs):
+            yield await self.create_object(encoded, decoded, parent_logger=self.logger, **kwargs)
+
+    async def decode_buffer(self, encoded: bytes, context: Dict[str, Any] = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         if context:
             complete_context = self.context.copy()
             complete_context.update(context)
         else:
             complete_context = self.context
-        async for encoded, decoded in self.decode(encoded, **kwargs):
-            yield self.msg_obj(encoded, decoded, context=complete_context, parent_logger=self.logger, **kwargs)
-
-    async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         i = 0
-        async for msg in self._from_buffer(encoded, **kwargs):
+        async for msg in self._from_buffer(encoded, context=complete_context, **kwargs):
             if self.log_msgs:
                 self.logger.on_msg_decoded(msg)
             yield msg
@@ -160,10 +163,10 @@ class BaseCodec(Codec):
     async def encode_obj(self, decoded: Any, **kwargs) -> MessageObjectType:
         try:
             encoded = await self.encode(decoded, **kwargs)
-            return self.msg_obj(encoded, decoded, context=self.context, received=False,
-                                parent_logger=self.logger, **kwargs)
+            return await self.create_object(encoded, decoded, context=self.context, received=False,
+                                            parent_logger=self.logger, **kwargs)
         except Exception as exc:
-            obj = self.msg_obj(b'', decoded, context=self.context, parent_logger=self.logger, received=False, **kwargs)
+            obj = await self.create_object(b'', decoded, context=self.context, parent_logger=self.logger, received=False, **kwargs)
             self.logger.on_encode_failed(obj, exc)
 
     async def from_file(self, file_path: Path, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
