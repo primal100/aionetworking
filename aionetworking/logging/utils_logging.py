@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 from datetime import datetime, timedelta
 import inflect
 
@@ -152,7 +152,7 @@ class BytesSizeRate(float):
 
 class BytesSize(int):
 
-    def __add__(self, other) -> BytesSize:
+    def __add__(self, other) -> 'BytesSize':
         return BytesSize(other + int(self))
 
     def __floordiv__(self, other) -> BytesSizeRate:

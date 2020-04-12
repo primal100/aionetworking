@@ -4,6 +4,7 @@ import asyncio
 import signal
 import os
 from unittest.mock import call
+from aionetworking.compatibility import create_task
 from aionetworking.conf.yaml_config import node_from_config_file
 from aionetworking.utils import port_from_out
 
@@ -84,7 +85,7 @@ class TestYamlConfig:
 class TestSignalServerManager:
     @pytest.mark.asyncio
     async def test_00_start_close(self, signal_server_manager, patch_systemd, server_sock, capsys, reset_logging):
-        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        task = create_task(signal_server_manager.serve_until_stopped())
         try:
             await asyncio.wait_for(signal_server_manager.wait_server_started(), timeout=2)
             signal_server_manager.close()
@@ -141,7 +142,7 @@ class TestSignalServerManager:
     @pytest.mark.asyncio
     async def test_03_check_reload_file_deleted(self, patch_systemd, signal_server_manager, tmp_config_file, capsys,
                                                 reset_logging):
-        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        task = create_task(signal_server_manager.serve_until_stopped())
         await signal_server_manager.wait_server_started()
         tmp_config_file.unlink()
         signal_server_manager.check_reload()
@@ -168,7 +169,7 @@ class TestSignalServerManager:
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
     async def test_04_close_signal(self, patch_systemd, signal_server_manager, signal_num, capsys, reset_logging):
-        task = asyncio.create_task(self.send_signal(signal_server_manager, signal_num))
+        task = create_task(self.send_signal(signal_server_manager, signal_num))
         await signal_server_manager.serve_until_stopped()
         await task
         await asyncio.wait_for(signal_server_manager.server.wait_stopped(), timeout=10)
@@ -222,7 +223,7 @@ class TestSignalServerManager:
     ])
     async def test_07_reload_no_file_signal(self, patch_systemd, signal_server_manager, signal_num,
                                             tmp_config_file, capsys, reset_logging):
-        task = asyncio.create_task(signal_server_manager.serve_until_stopped())
+        task = create_task(signal_server_manager.serve_until_stopped())
         await signal_server_manager.wait_server_started()
         tmp_config_file.unlink()
         await self.send_signal(signal_server_manager, signal_num)

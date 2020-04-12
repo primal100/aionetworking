@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from aionetworking.compatibility import create_task
 
 
 class TestNetworkConnections:
@@ -8,7 +9,7 @@ class TestNetworkConnections:
     async def test_00_multiple_connections(self, connections_manager, simple_network_connection):
         parent_name = simple_network_connection.parent_name
         peer = simple_network_connection.peer
-        task1 = asyncio.create_task(connections_manager.wait_num_connections(parent_name, 1))
+        task1 = create_task(connections_manager.wait_num_connections(parent_name, 1))
         await simple_network_connection.wait_all_messages_processed()
         await asyncio.sleep(0)
         assert not task1.done()
@@ -18,7 +19,7 @@ class TestNetworkConnections:
         assert connection == simple_network_connection
         await asyncio.sleep(0)
         assert task1.done()
-        task = asyncio.create_task(connections_manager.wait_num_connections(parent_name, 0))
+        task = create_task(connections_manager.wait_num_connections(parent_name, 0))
         await asyncio.sleep(0)
         assert not task.done()
         connections_manager.remove_connection(simple_network_connection)

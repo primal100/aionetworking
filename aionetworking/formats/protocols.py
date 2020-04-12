@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -64,7 +62,7 @@ class MessageObject(Protocol):
 class Codec(Protocol):
 
     @abstractmethod
-    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes], None]:
         yield
 
     @abstractmethod
@@ -74,7 +72,7 @@ class Codec(Protocol):
     async def encode(self, decoded: Any, **kwargs) -> bytes: ...
 
     @abstractmethod
-    async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None, None]:
+    async def decode_buffer(self, encoded: bytes, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         yield
 
     @abstractmethod

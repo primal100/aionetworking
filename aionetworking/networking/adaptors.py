@@ -7,7 +7,7 @@ from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.compatibility import Protocol
+from aionetworking.compatibility import Protocol, create_task
 from aionetworking.logging.loggers import connection_logger_cv, ConnectionLogger
 from aionetworking.context import context_cv
 from aionetworking.types.formats import MessageObjectType, CodecType
@@ -109,7 +109,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int: ...
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None: ...
 
 
 @dataclass
@@ -176,7 +176,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
                 self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:
         async for msg in msgs:
             if msg.request_id is not None:
                 try:
@@ -185,7 +185,6 @@ class SenderAdaptor(BaseAdaptorProtocol):
                     self._notification_queue.put_nowait(msg)
             else:
                 self._notification_queue.put_nowait(msg)
-        return len(buffer)
 
 
 @dataclass
@@ -245,16 +244,18 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self._on_success(result, msg_obj)
         except BaseException as e:
             self._on_exception(e, msg_obj)
+            #raise
 
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:
         tasks = []
         try:
             async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
-                    tasks.append(asyncio.create_task(self._process_msg(msg_obj)))
+                    tasks.append(create_task(self._process_msg(msg_obj)))
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.gather(*tasks)
+            done, pending = await asyncio.wait(tasks)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
-        return len(buffer)
+            raise
+

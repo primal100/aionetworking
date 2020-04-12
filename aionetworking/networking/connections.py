@@ -1,13 +1,13 @@
-from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 import datetime
+from functools import partial
 import socket
 
 from .exceptions import MessageFromNotAuthorizedHost
 
-from aionetworking.compatibility import set_task_name
+from aionetworking.compatibility import create_task, set_task_name
 from aionetworking.context import context_cv
 from aionetworking.logging.loggers import logger_cv, connection_logger_cv
 from aionetworking.types.logging import LoggerType, ConnectionLoggerType
@@ -113,7 +113,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             self._adaptor.logger.info('Finishing connection')
             self._delete_connection()
         self._status.set_stopping()
-        close_task = asyncio.create_task(self._close(exc))
+        close_task = create_task(self._close(exc))
         set_task_name(close_task, f"Close:{self.peer}")
 
     def close(self, immediate: bool = False):
@@ -187,7 +187,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     def run_connection_lost_tasks(self) -> None:
         if self.connection_lost_tasks:
             connection_lost_tasks = [t() for t in self.connection_lost_tasks]
-            asyncio.create_task(asyncio.wait(connection_lost_tasks))
+            create_task(asyncio.wait(connection_lost_tasks))
 
     def eof_received(self) -> bool:
         return False
@@ -275,7 +275,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
             if immediate:
                 self.transport.abort()
             elif self._adaptor:
-                task = asyncio.create_task(self.wait_current_tasks())
+                task = create_task(self.wait_current_tasks())
                 task.add_done_callback(self._close_transport)
             else:
                 self.transport.close()
@@ -285,13 +285,14 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
         self.run_connection_lost_tasks()
         self.finish_connection(exc)
 
-    def _resume_reading(self, fut: asyncio.Future):
-        self._unprocessed_data -= fut.result()
+    def _resume_reading(self, datalen: int, fut: asyncio.Future):
+        self._unprocessed_data -= datalen
         if (self.pause_reading_on_buffer_size is not None and not self.transport.is_reading() and
                 not self.transport.is_closing()):
-                if self.pause_reading_on_buffer_size >= self._unprocessed_data:
-                    self.transport.resume_reading()
-                    self._adaptor.logger.info('Reading resumed')
+            if self.pause_reading_on_buffer_size >= self._unprocessed_data:
+                self.transport.resume_reading()
+                self._adaptor.logger.info('Reading resumed')
+        fut.result()
 
     def data_received(self, data: bytes) -> None:
         self.last_msg = datetime.datetime.now()
@@ -301,7 +302,7 @@ class BaseStreamConnection(NetworkConnectionProtocol, Protocol):
                 self.transport.pause_reading()
                 self.logger.info('Reading Paused')
         task = self._adaptor.on_data_received(data, timestamp=self.last_msg)
-        task.add_done_callback(self._resume_reading)
+        task.add_done_callback(partial(self._resume_reading, len(data)))
 
 
 @dataclass

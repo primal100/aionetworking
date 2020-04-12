@@ -1,5 +1,6 @@
 import asyncio
 import pytest   # noinspection PyPackageRequirements
+from aionetworking.compatibility import create_task
 
 
 class TestCounterNum:
@@ -16,7 +17,7 @@ class TestCounterNum:
 
     @pytest.mark.asyncio
     async def test_02_counter_wait_increment(self, counter):
-        task = asyncio.create_task(counter.wait_for(2))
+        task = create_task(counter.wait_for(2))
         counter.increment()
         assert counter.num == 1
         await asyncio.sleep(0)
@@ -33,7 +34,7 @@ class TestCounterNum:
     async def test_03_counter_wait_decrement(self, counter):
         counter.increment()
         assert counter.num == 1
-        task = asyncio.create_task(counter.wait_for(0))
+        task = create_task(counter.wait_for(0))
         await asyncio.sleep(0)
         assert not task.done()
         counter.decrement()
@@ -72,7 +73,7 @@ class TestCounterTotalIncrements:
 
     @pytest.mark.asyncio
     async def test_02_counter_wait_increment(self, counter):
-        task = asyncio.create_task(counter.wait_for_total_increments(2))
+        task = create_task(counter.wait_for_total_increments(2))
         counter.increment()
         assert counter.total_increments == 1
         await asyncio.sleep(0)
@@ -89,7 +90,7 @@ class TestCounterTotalIncrements:
     async def test_03_counter_wait_decrement(self, counter):
         counter.increment()
         assert counter.total_increments == 1
-        task = asyncio.create_task(counter.wait_for_total_increments(2))
+        task = create_task(counter.wait_for_total_increments(2))
         await asyncio.sleep(0)
         assert not task.done()
         counter.decrement()
@@ -128,7 +129,7 @@ class TestCountersNum:
 
     @pytest.mark.asyncio
     async def test_02_counters_wait_increment(self, counters):
-        task = asyncio.create_task(counters.wait_for('abc', 2))
+        task = create_task(counters.wait_for('abc', 2))
         counters.increment('abc')
         assert counters.get_num('abc') == 1
         await asyncio.sleep(0)
@@ -145,7 +146,7 @@ class TestCountersNum:
     async def test_03_counters_wait_decrement(self, counters):
         counters.increment('abc')
         assert counters.get_num('abc') == 1
-        task = asyncio.create_task(counters.wait_for('abc', 0))
+        task = create_task(counters.wait_for('abc', 0))
         await asyncio.sleep(0)
         assert not task.done()
         counters.decrement('abc')
@@ -162,8 +163,8 @@ class TestCountersNum:
         counters.increment('xyz')
         assert counters.get_num('abc') == 1
         assert counters.get_num('xyz') == 1
-        task_abc = asyncio.create_task(counters.wait_for('abc', 0))
-        task_xyz = asyncio.create_task(counters.wait_for('xyz', 0))
+        task_abc = create_task(counters.wait_for('abc', 0))
+        task_xyz = create_task(counters.wait_for('xyz', 0))
         await asyncio.sleep(0)
         assert not task_abc.done()
         assert not task_xyz.done()
@@ -196,7 +197,7 @@ class TestCountersTotalIncrements:
 
     @pytest.mark.asyncio
     async def test_02_counter_wait_increment(self, counters):
-        task = asyncio.create_task(counters.wait_for_total_increments('abc', 2))
+        task = create_task(counters.wait_for_total_increments('abc', 2))
         counters.increment('abc')
         assert counters.total_increments('abc') == 1
         await asyncio.sleep(0)
@@ -213,7 +214,7 @@ class TestCountersTotalIncrements:
     async def test_03_counter_wait_decrement(self, counters):
         counters.increment('abc')
         assert counters.total_increments('abc') == 1
-        task = asyncio.create_task(counters.wait_for_total_increments('abc', 2))
+        task = create_task(counters.wait_for_total_increments('abc', 2))
         await asyncio.sleep(0)
         assert not task.done()
         counters.decrement('abc')
@@ -234,8 +235,8 @@ class TestCountersTotalIncrements:
         counters.increment('xyz')
         assert counters.total_increments('abc') == 1
         assert counters.total_increments('xyz') == 1
-        task_abc = asyncio.create_task(counters.wait_for_total_increments('abc', 2))
-        task_xyz = asyncio.create_task(counters.wait_for_total_increments('xyz', 2))
+        task_abc = create_task(counters.wait_for_total_increments('abc', 2))
+        task_xyz = create_task(counters.wait_for_total_increments('xyz', 2))
         await asyncio.sleep(0)
         assert not task_abc.done()
         assert not task_xyz.done()

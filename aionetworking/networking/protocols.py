@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 import asyncio
 from abc import abstractmethod
 import datetime
@@ -21,10 +21,10 @@ from typing import Any, AsyncGenerator, Generator, Optional, Sequence, Union, Di
 class ProtocolFactoryProtocol(Protocol):
 
     @abstractmethod
-    def __call__(self) -> Union[ProtocolFactoryProtocol, NetworkConnectionProtocol]: ...
+    def __call__(self) -> Union['ProtocolFactoryProtocol', 'NetworkConnectionProtocol']: ...
 
     @abstractmethod
-    def is_owner(self, connection: NetworkConnectionProtocol) -> bool: ...
+    def is_owner(self, connection: 'NetworkConnectionProtocol') -> bool: ...
 
     @abstractmethod
     def set_logger(self, logger: LoggerType): ...

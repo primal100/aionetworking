@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from aionetworking.compatibility import supports_task_name
+from aionetworking.compatibility import supports_task_name, create_task
 from aionetworking import Counters, Counter, TaskScheduler
 
 from typing import Callable, Union
@@ -47,8 +47,8 @@ async def task_scheduler() -> TaskScheduler:
 async def task() -> asyncio.Task:
     async def coro(): ...
     if supports_task_name():
-        task = asyncio.create_task(coro(), name="Task-99")
+        task = create_task(coro(), name="Task-99")
     else:
-        task = asyncio.create_task(coro())
+        task = create_task(coro())
     yield task
     await task

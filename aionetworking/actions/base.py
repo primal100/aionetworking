@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 from dataclasses import dataclass, field, asdict
 
 from aionetworking.compatibility import Protocol

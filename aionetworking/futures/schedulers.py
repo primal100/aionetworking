@@ -1,11 +1,10 @@
-from __future__ import annotations
 import asyncio
 import contextvars
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, Dict, Optional, Type
 
-from aionetworking.compatibility import set_task_name
+from aionetworking.compatibility import set_task_name, create_task
 from .counters import Counter
 
 
@@ -29,7 +28,7 @@ class TaskScheduler:
     def create_task(self, coro: Awaitable, name: str = None, include_hierarchy: bool = True,
                     separator: str = ':', continuous: bool = False) -> asyncio.Future:
         self._counter.increment()
-        task = asyncio.create_task(coro)
+        task = create_task(coro)
         set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
         if not continuous:
             self._current_tasks.append(task)
@@ -131,7 +130,7 @@ class TaskScheduler:
                            fixed_start_time: bool = False, immediate: bool = False, task_name: str = None,
                            **kwargs) -> None:
         start_time_interval = self.get_start_interval(fixed_start_time, immediate, interval)
-        task = asyncio.create_task(
+        task = create_task(
             self._call_coro_periodic(interval, async_callback, start_time_interval=start_time_interval, *args, **kwargs))
         set_task_name(task, task_name)
         self._periodic_tasks.append(task)

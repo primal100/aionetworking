@@ -1,4 +1,3 @@
-from __future__ import annotations
 import asyncio
 from pathlib import Path
 from ssl import SSLContext
@@ -8,6 +7,7 @@ import sys
 from dataclasses import dataclass, field
 
 from .base import BaseServer, BaseNetworkServer
+from aionetworking.compatibility import get_server_kwargs, create_task
 from aionetworking.networking.connections import UDPServerConnection
 from aionetworking.networking.protocol_factories import DatagramServerProtocolFactory, StreamServerProtocolFactory
 from aionetworking.networking.ssl import ServerSideSSL
@@ -39,10 +39,11 @@ class TCPServer(BaseNetworkServer):
             return self.ssl.context
 
     async def _get_server(self) -> asyncio.AbstractServer:
+        extra_kwargs = get_server_kwargs(self.ssl_handshake_timeout)
         return await self.loop.create_server(self.protocol_factory, host=self.host, port=self.port,
                                              ssl=self.ssl_context, reuse_address=self.reuse_address,
                                              reuse_port=self.reuse_port, backlog=self.backlog,
-                                             ssl_handshake_timeout=self.ssl_handshake_timeout)
+                                             **extra_kwargs)
 
 
 @dataclass
@@ -71,8 +72,9 @@ class UnixSocketServer(BaseServer):
         return str(self.path)
 
     async def _get_server(self) -> asyncio.AbstractServer:
+        extra_kwargs = get_server_kwargs(self.ssl_handshake_timeout)
         return await self.loop.create_unix_server(self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
-                                                  ssl_handshake_timeout=self.ssl_handshake_timeout, backlog=self.backlog)
+                                                  backlog=self.backlog, **extra_kwargs)
 
 
 @dataclass
@@ -153,7 +155,7 @@ class DatagramServer(asyncio.AbstractServer):
         self._status = StatusWaiter()
         self._serving_forever_fut = None
         if start_serving:
-            asyncio.create_task(self.start_serving())
+            create_task(self.start_serving())
             self._status.set_starting()
 
     @property

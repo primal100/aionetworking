@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -130,7 +128,7 @@ class BaseCodec(Codec):
     def __post_init__(self):
         self.context = self.context or {}
 
-    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes], None]:
         yield encoded, encoded
 
     async def encode(self, decoded: Any, **kwargs) -> bytes:

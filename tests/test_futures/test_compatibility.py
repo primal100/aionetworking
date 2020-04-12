@@ -2,7 +2,7 @@ import pytest   # noinspection PyPackageRequirements
 import asyncio
 
 from aionetworking.compatibility import (supports_task_name, get_task_name, get_current_task_name, set_task_name,
-                                         set_current_task_name)
+                                         set_current_task_name, current_task)
 
 
 class TestTaskNames:
@@ -15,30 +15,30 @@ class TestTaskNames:
 
     @pytest.mark.asyncio
     async def test_01_get_current_task_name(self):
-        current_task = asyncio.current_task()
+        this_task = current_task()
         task_name = get_current_task_name()
         if supports_task_name():
-            assert current_task.get_name() == task_name
+            assert this_task.get_name() == task_name
         else:
-            assert str(id(current_task)) == task_name
+            assert str(id(this_task)) == task_name
 
     @staticmethod
     def _prepare_current_task(name) -> asyncio.Task:
-        current_task = asyncio.current_task()
+        this_task = current_task()
         if supports_task_name():
-            current_task.set_name(name)
-            assert current_task.get_name() == name
-        return current_task
+            this_task.set_name(name)
+            assert this_task.get_name() == name
+        return this_task
 
     @pytest.mark.asyncio
     async def test_02_set_current_task_name(self):
-        current_task = self._prepare_current_task('Task-10')
+        this_task = self._prepare_current_task('Task-10')
         set_current_task_name('TestTask')
         current_task_name = get_current_task_name()
         if supports_task_name():
-            assert current_task.get_name() == current_task_name == 'Task-10_TestTask'
+            assert this_task.get_name() == current_task_name == 'Task-10_TestTask'
         else:
-            assert str(id(current_task)) == current_task_name
+            assert str(id(this_task)) == current_task_name
 
     @pytest.mark.asyncio
     async def test_03_set_task_name_without_hierarchy(self, task):

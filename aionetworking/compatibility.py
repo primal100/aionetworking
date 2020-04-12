@@ -1,13 +1,13 @@
-from __future__ import annotations
 import asyncio
 import os
 import sys
 import socket
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Coroutine, Set
 
 
 py39 = sys.version_info >= (3, 9)
 py38 = sys.version_info >= (3, 8)
+py37 = sys.version_info >= (3, 7)
 
 
 if py38:
@@ -16,6 +16,126 @@ if py38:
 else:
     from typing_extensions import Protocol, TypedDict
     from cached_property import cached_property
+
+
+if py37:
+    run = asyncio.run
+    create_task = asyncio.create_task
+    current_task = asyncio.current_task
+    all_tasks = asyncio.all_tasks
+    WindowsSelectorEventLoopPolicy = getattr(asyncio, 'WindowsSelectorEventLoopPolicy', None)
+    WindowsProactorEventLoopPolicy = getattr(asyncio, 'WindowsProactorEventLoopPolicy', None)
+
+    def net_subnet_of(a, b) -> bool:
+        return a.subnet_of(b)
+
+    def net_supernet_of(a, b) -> bool:
+        return a.supernet_of(b)
+
+else:
+    def _is_subnet_of(a, b):
+        try:
+            # Always false if one is v4 and the other is v6.
+            if a._version != b._version:
+                raise TypeError(f"{a} and {b} are not of the same version")
+            return (b.network_address <= a.network_address and
+                    b.broadcast_address >= a.broadcast_address)
+        except AttributeError:
+            raise TypeError(f"Unable to test subnet containment "
+                            f"between {a} and {b}")
+
+
+    def net_subnet_of(self, other):
+        """Return True if this network is a subnet of other."""
+        return _is_subnet_of(self, other)
+
+
+    def net_supernet_of(self, other):
+        """Return True if this network is a supernet of other."""
+        return _is_subnet_of(other, self)
+
+    get_running_loop = asyncio.events._get_running_loop
+
+    def create_task(coro: Coroutine) -> asyncio.Task:
+        """Schedule the execution of a coroutine object in a spawn task.
+        Return a Task object.
+        """
+        loop = get_running_loop()
+        return loop.create_task(coro)
+
+    def current_task() -> asyncio.Task:
+        return asyncio.Task.current_task()
+
+    def all_tasks(loop=None) -> Set[asyncio.Task]:
+        return asyncio.Task.all_tasks(loop=loop)
+
+    class WindowsSelectorEventLoopPolicy(asyncio.events.BaseDefaultEventLoopPolicy):
+        _loop_factory = asyncio.SelectorEventLoop
+
+    if os.name == 'nt':
+        class WindowsProactorEventLoopPolicy(asyncio.events.BaseDefaultEventLoopPolicy):
+            _loop_factory = asyncio.ProactorEventLoop
+    else:
+        WindowsProactorEventLoopPolicy = None
+
+    def run(main, *, debug=False):
+        """Execute the coroutine and return the result.
+        This function runs the passed coroutine, taking care of
+        managing the asyncio event loop and finalizing asynchronous
+        generators.
+        This function cannot be called when another asyncio event loop is
+        running in the same thread.
+        If debug is True, the event loop will be run in debug mode.
+        This function always creates a new event loop and closes it at the end.
+        It should be used as a main entry point for asyncio programs, and should
+        ideally only be called once.
+        Example:
+            async def main():
+                await asyncio.sleep(1)
+                print('hello')
+            asyncio.run(main())
+        """
+        if get_running_loop() is not None:
+            raise RuntimeError(
+                "asyncio.run() cannot be called from a running event loop")
+
+        if not asyncio.coroutines.iscoroutine(main):
+            raise ValueError("a coroutine was expected, got {!r}".format(main))
+
+        loop = asyncio.events.new_event_loop()
+        try:
+            asyncio.events.set_event_loop(loop)
+            loop.set_debug(debug)
+            return loop.run_until_complete(main)
+        finally:
+            try:
+                _cancel_all_tasks(loop)
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            finally:
+                asyncio.events.set_event_loop(None)
+                loop.close()
+
+
+    def _cancel_all_tasks(loop):
+        to_cancel = all_tasks(loop)
+        if not to_cancel:
+            return
+
+        for task in to_cancel:
+            task.cancel()
+
+        loop.run_until_complete(
+            asyncio.tasks.gather(*to_cancel, loop=loop, return_exceptions=True))
+
+        for task in to_cancel:
+            if task.cancelled():
+                continue
+            if task.exception() is not None:
+                loop.call_exception_handler({
+                    'message': 'unhandled exception during asyncio.run() shutdown',
+                    'exception': task.exception(),
+                    'task': task,
+                })
 
 
 def supports_task_name():
@@ -41,13 +161,13 @@ def get_task_name(task: asyncio.Task) -> str:
 
 
 def set_current_task_name(name: str, include_hierarchy: bool = True, separator: str = ':'):
-    task = asyncio.current_task()
+    task = current_task()
     set_task_name(task, name, include_hierarchy=include_hierarchy, separator=separator)
 
 
 def get_current_task_name():
     try:
-        task = asyncio.current_task()
+        task = current_task()
         if task:
             return get_task_name(task)
         return "No Task"
@@ -90,10 +210,22 @@ def supports_keyboard_interrupt() -> bool:
     return os.name != 'nt' or (py38 and is_proactor())
 
 
-def get_client_kwargs(happy_eyeballs_delay: Optional[float] = None, interleave: Optional[int] = None) -> Dict[str, Any]:
-    if py38 and is_builtin_loop():
-        return {'happy_eyeballs_delay': happy_eyeballs_delay, 'interleave': interleave}
+def get_server_kwargs(ssl_handshake_timeout: bool = None) -> Dict[str, Any]:
+    if py37:
+        return {'ssl_handshake_timeout': ssl_handshake_timeout}
     return {}
+
+
+def get_client_kwargs(ssl_handshake_timeout: int = None, happy_eyeballs_delay: Optional[float] = None,
+                      interleave: Optional[int] = None) -> Dict[str, Any]:
+    kwargs = {}
+    if py37:
+        if ssl_handshake_timeout:
+            kwargs.update({'ssl_handshake_timeout': ssl_handshake_timeout})
+    if py38 and is_builtin_loop():
+        if happy_eyeballs_delay or interleave:
+            kwargs.update({'happy_eyeballs_delay': happy_eyeballs_delay, 'interleave': interleave})
+    return kwargs
 
 
 def default_server_port() -> int:

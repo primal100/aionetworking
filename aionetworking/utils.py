@@ -1,4 +1,3 @@
-from __future__ import annotations
 import asyncio
 from aiofiles.os import wrap
 from collections import ChainMap
@@ -13,7 +12,7 @@ import itertools
 import sys
 import socket
 import tempfile
-from aionetworking.compatibility import py38
+from aionetworking.compatibility import py38, net_supernet_of, WindowsProactorEventLoopPolicy, WindowsSelectorEventLoopPolicy
 from aionetworking.compatibility_os import is_wsl
 from dataclasses import dataclass, fields, MISSING
 from functools import wraps
@@ -151,11 +150,11 @@ def run_in_loop(f):
 
 
 def set_proactor_loop_policy_windows() -> None:
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    asyncio.set_event_loop_policy(WindowsProactorEventLoopPolicy())
 
 
 def set_selector_loop_policy_windows() -> None:
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
 def set_selector_loop_policy_posix() -> None:
@@ -277,7 +276,7 @@ class IPNetwork:
 
     def supernet_of(self, network: Union[IPv4Network, IPv6Network], hostname: str):
         if self.ip_network:
-            return self.ip_network.supernet_of(network)
+            return net_supernet_of(self.ip_network, network)
         return hostname == self.hostname
 
 
@@ -461,7 +460,7 @@ class Expression:
     case_sensitive: bool = True
 
     @classmethod
-    def from_string(cls, string: str) -> Optional[Expression]:
+    def from_string(cls, string: str) -> Optional['Expression']:
         if string:
             attr, op, value = string.split()
             if op.startswith('i'):

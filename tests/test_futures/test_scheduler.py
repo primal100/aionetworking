@@ -1,5 +1,6 @@
 import pytest   # noinspection PyPackageRequirements
 import asyncio
+from aionetworking.compatibility import create_task
 
 
 class TestTaskScheduler:
@@ -23,7 +24,7 @@ class TestTaskScheduler:
     async def test_02_future_lifecycle(self, task_scheduler):
         await asyncio.wait_for(task_scheduler.close(), timeout=1)
         fut = task_scheduler.create_future(1)
-        task = asyncio.create_task(task_scheduler.close())
+        task = create_task(task_scheduler.close())
         await asyncio.sleep(0)
         assert not task.done()
         task_scheduler.set_result(1, "abc")
