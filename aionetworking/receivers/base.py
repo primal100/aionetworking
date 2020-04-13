@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 from .exceptions import ServerException
 from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status, send_notify_start_signal
-from aionetworking.logging.loggers import logger_cv, get_logger_receiver
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.networking.connections_manager import get_unique_name
 from aionetworking.types.logging import LoggerType
 from aionetworking.futures.value_waiters import StatusWaiter
@@ -79,7 +79,6 @@ class BaseServer(BaseReceiver, Protocol):
     def __post_init__(self) -> None:
         self._full_name = get_unique_name(self.full_name)
         self.protocol_factory = replace(self.protocol_factory)
-        self.protocol_factory.set_logger(self.logger)
         self.protocol_factory.set_name(self._full_name, self.peer_prefix)
 
     @property
@@ -111,8 +110,7 @@ class BaseServer(BaseReceiver, Protocol):
         if self._status.is_starting_or_started():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self._status.set_starting()
-        logger_cv.set(self.logger)
-        await self.protocol_factory.start()
+        await self.protocol_factory.start(logger=self.logger)
         self.logger.info('Starting %s on %s', self.name, self.listening_on)
         await self._start_server()
         if not self.quiet:

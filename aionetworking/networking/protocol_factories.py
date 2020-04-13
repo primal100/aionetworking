@@ -8,7 +8,7 @@ from aionetworking.context import context_cv
 from aionetworking.formats.base import BaseMessageObject
 from aionetworking.futures import TaskScheduler
 from aionetworking.types.requesters import RequesterType
-from aionetworking.logging.loggers import logger_cv, get_logger_receiver
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str, IPNetwork
 from .transports import DatagramTransportWrapper
@@ -19,7 +19,7 @@ from .connections import TCPClientConnection, TCPServerConnection, UDPServerConn
 from .protocols import ProtocolFactoryProtocol
 from aionetworking.types.networking import ProtocolFactoryType,  NetworkConnectionType
 
-from typing import Optional, Text, Tuple, Type, Union, Sequence, Dict, Any
+from typing import Optional, Tuple, Type, Union, Sequence, Dict, Any
 
 
 @dataclass
@@ -51,16 +51,16 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
         if self.requester:
             self.requester = replace(self.requester)
 
-    async def start(self) -> None:
+    async def start(self, logger: LoggerType = None) -> None:
         self._context = contextvars.copy_context()
-        self.logger = logger_cv.get()
+        self.logger = logger or self.logger
         coros = []
         if self.action:
-            coros.append(self.action.start())
+            coros.append(self.action.start(logger=logger))
         if self.preaction:
-            coros.append(self.preaction.start())
+            coros.append(self.preaction.start(logger=logger))
         if self.requester:
-            coros.append(self.requester.start())
+            coros.append(self.requester.start(logger=logger))
         await asyncio.gather(*coros)
         if self.expire_connections_after_inactive_minutes:
             self._scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
@@ -87,13 +87,6 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
 
     def __setstate__(self, state):
         dataclass_setstate(self, state)
-
-    def set_logger(self, logger: LoggerType) -> None:
-        self.logger = logger
-        if self.action:
-            self.action.set_logger(logger)
-        if self.action:
-            self.action.set_logger(logger)
 
     def set_name(self, full_name: str, peer_prefix: str) -> None:
         self.full_name = full_name

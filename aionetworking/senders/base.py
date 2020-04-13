@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Tuple, Sequence, AnyStr
 from aionetworking.compatibility import Protocol
-from aionetworking.logging.loggers import logger_cv, get_logger_sender
+from aionetworking.logging.loggers import get_logger_sender
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.networking import ProtocolFactoryType, ConnectionType
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, run_in_loop, get_ip_port
@@ -25,7 +25,7 @@ class BaseSender(SenderProtocol, Protocol):
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
-    def loop(self) -> asyncio.SelectorEventLoop:
+    def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
 
     def __getstate__(self):
@@ -64,7 +64,6 @@ class BaseClient(BaseSender, Protocol):
     timeout: int = 5
 
     def __post_init__(self):
-        self.protocol_factory.set_logger(self.logger)
         self.protocol_factory = replace(self.protocol_factory)
         self._full_name = get_unique_name(self.full_name)
         self.protocol_factory.set_name(self._full_name, self.peer_prefix)
@@ -91,8 +90,7 @@ class BaseClient(BaseSender, Protocol):
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
-        logger_cv.set(self.logger)
-        await self.protocol_factory.start()
+        await self.protocol_factory.start(logger=self.logger)
         self.logger.info("Opening %s connection to %s", self.name, self.dst)
         connection = await self._open_connection()
         connection.add_connection_lost_task(self.on_connection_lost)

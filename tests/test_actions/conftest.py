@@ -2,6 +2,7 @@ from tests.test_formats.conftest import *
 from aionetworking import FileStorage, BufferedFileStorage
 from aionetworking.actions import ManagedFile
 from aionetworking.actions import EchoAction
+from aionetworking import Logger
 from aionetworking.formats import get_recording_from_file
 from aionetworking.utils import alist
 from tests.test_actions.actions import file_storage_actions, duplex_actions, get_recording_buffered_file_storage
@@ -128,11 +129,26 @@ async def action(duplex_type, data_dir) -> Optional[Union[FileStorage, BufferedF
 
 
 @pytest.fixture
-async def recording_file_storage(recordings_dir) -> Union[BufferedFileStorage]:
+async def action_started(action, receiver_logger, endpoint) -> Optional[Union[FileStorage, BufferedFileStorage]]:
+    if endpoint == 'server':
+        await action.start(receiver_logger)
+        yield action
+    else:
+        yield None
+
+
+@pytest.fixture
+async def recording_file_storage(recordings_dir) -> BufferedFileStorage:
     action = get_recording_buffered_file_storage(recordings_dir)
     yield action
     if not action.is_closing():
         await action.close()
+
+
+@pytest.fixture
+async def actions_logger() -> Logger:
+    logger = Logger(name='receiver.actions', stats_interval=0.1, stats_fixed_start_time=False)
+    yield logger
 
 
 @pytest.fixture

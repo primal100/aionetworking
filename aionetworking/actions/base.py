@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from aionetworking.compatibility import Protocol
-from aionetworking.logging.loggers import logger_cv
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.formats import MessageObjectType
 from aionetworking.futures.value_waiters import StatusWaiter
@@ -17,13 +17,17 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 class BaseAction(Protocol):
     supports_notifications = False
     name = 'receiver action'
-    logger: LoggerType = field(default_factory=logger_cv.get)
+    logger: LoggerType = field(default_factory=get_logger_receiver, metadata={'pickle': True})
     _status: StatusWaiter = field(default_factory=StatusWaiter, compare=False, repr=False)
 
     timeout: int = 5
 
-    def set_logger(self, logger: LoggerType) -> None:
-        self.logger = logger.get_child(name='actions')
+    def _set_logger(self, logger: LoggerType = None) -> None:
+        parent_logger = logger or self.logger
+        self.logger = parent_logger.get_child(name='actions')
+
+    async def start(self, logger: LoggerType = None) -> None:
+        self._set_logger(logger=logger)
 
     def __getstate__(self):
         return dataclass_getstate(self)
@@ -36,8 +40,6 @@ class BaseAction(Protocol):
 
     async def get_notifications(self, peer: str) -> AsyncGenerator[None, None]:
         yield
-
-    async def start(self) -> None: ...
 
     def is_closing(self) -> None:
         return self._status.is_stopping_or_stopped()

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .base import BaseAction
-from aionetworking.logging.loggers import logger_cv
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking import settings
 from aionetworking.compatibility import create_task, set_task_name, Protocol
 from aionetworking.logging.utils_logging import p
@@ -21,7 +21,7 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
-    logger: LoggerType = field(default_factory=logger_cv.get)
+    logger: LoggerType = field(default_factory=get_logger_receiver)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: 'ManagedFile' = field(default=None)
     _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)

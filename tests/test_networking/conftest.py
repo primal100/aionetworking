@@ -95,15 +95,36 @@ def requester(echo_requester, duplex_type) -> Optional[EchoRequester]:
 
 
 @pytest.fixture
+async def requester_started(requester, sender_logger, endpoint) -> Optional[EchoRequester]:
+    if endpoint == 'client' and requester:
+        await requester.start(logger=sender_logger)
+        yield requester
+    else:
+        yield None
+
+
+@pytest.fixture
 def preaction(recording_file_storage, endpoint) -> Optional[BufferedFileStorage]:
     if endpoint == 'server':
         return recording_file_storage
 
 
 @pytest.fixture
+async def preaction_started(preaction, receiver_logger) -> Optional[BufferedFileStorage]:
+    if preaction:
+        await preaction.start(logger=receiver_logger)
+    yield preaction
+
+
+@pytest.fixture
 async def receiver_logger() -> Logger:
     logger = Logger(name='receiver', stats_interval=0.1, stats_fixed_start_time=False)
     yield logger
+
+
+@pytest.fixture
+def sender_logger() -> Logger:
+    return Logger('sender')
 
 
 @pytest.fixture
@@ -288,15 +309,12 @@ def connection_kwargs(connection_kwargs_server, connection_kwargs_client, endpoi
 
 
 @pytest.fixture
-async def connection(connection_cls, connection_type, action, endpoint, preaction, parent_name, peer_prefix,
-                     requester, server_sock_as_string, hostname_lookup, connection_kwargs) -> TCPServerConnection:
-    if endpoint == 'client':
-        action = None
-    else:
-        requester = None
-    conn = connection_cls(dataformat=JSONObject, action=action, preaction=preaction, requester=requester,
+async def connection(connection_cls, connection_type, action_started, endpoint, preaction_started, parent_name,
+                     peer_prefix, requester_started, server_sock_as_string, hostname_lookup, connection_kwargs,
+                     receiver_logger) -> TCPServerConnection:
+    conn = connection_cls(dataformat=JSONObject, action=action_started, preaction=preaction_started, requester=requester_started,
                           parent_name=parent_name, peer_prefix=peer_prefix, hostname_lookup=hostname_lookup,
-                          **connection_kwargs)
+                          logger=receiver_logger, **connection_kwargs)
     yield conn
     if connection_type == 'sftp':
         if not conn.is_closing():
@@ -442,8 +460,8 @@ async def protocol_factory_server_allowed_senders(connection_type, action, hostn
 
 
 @pytest.fixture
-async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup, connection_kwargs_server,
-                                        parent_name) -> StreamServerProtocolFactory:
+async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup, receiver_logger,
+                                        connection_kwargs_server, parent_name) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
         'tcpssl': StreamServerProtocolFactory,
@@ -460,7 +478,7 @@ async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup
         codec_config={'test_param': 'abc'},
         **connection_kwargs_server
     )
-    await factory.start()
+    await factory.start(logger=receiver_logger)
     if not factory.full_name:
         factory.set_name(parent_name, connection_type)
     yield factory
@@ -470,7 +488,7 @@ async def protocol_factory_codec_kwargs(connection_type, action, hostname_lookup
 
 @pytest.fixture
 async def protocol_factory_expire_connections(connection_type, action, hostname_lookup, connection_kwargs_server,
-                                              parent_name) -> StreamServerProtocolFactory:
+                                              receiver_logger, parent_name) -> StreamServerProtocolFactory:
     protocol_factory_classes = {
         'tcp': StreamServerProtocolFactory,
         'udp': DatagramServerProtocolFactory,
@@ -485,7 +503,7 @@ async def protocol_factory_expire_connections(connection_type, action, hostname_
         expire_connections_check_interval_minutes=0.2 / 60,
         **connection_kwargs_server
     )
-    await factory.start()
+    await factory.start(logger=receiver_logger)
     if not factory.full_name:
         factory.set_name(parent_name, connection_type)
     yield factory
@@ -494,8 +512,9 @@ async def protocol_factory_expire_connections(connection_type, action, hostname_
 
 
 @pytest.fixture
-async def protocol_factory_started(protocol_factory, parent_name, connection_type) -> StreamServerProtocolFactory:
-    await protocol_factory.start()
+async def protocol_factory_started(protocol_factory, receiver_logger, parent_name,
+                                   connection_type) -> StreamServerProtocolFactory:
+    await protocol_factory.start(logger=receiver_logger)
     if not protocol_factory.full_name:
         protocol_factory.set_name(parent_name, connection_type)
     yield protocol_factory
@@ -523,8 +542,8 @@ async def protocol_factory_client(requester, connection_type, connection_kwargs_
 
 @pytest.fixture
 async def protocol_factory_client_started(protocol_factory_client_started, parent_name,
-                                          connection_type) -> StreamClientProtocolFactory:
-    await protocol_factory_client_started.start()
+                                          connection_type, receiver_logger) -> StreamClientProtocolFactory:
+    await protocol_factory_client_started.start(logger=receiver_logger)
     if not protocol_factory_client_started.full_name:
         protocol_factory_client_started.set_name(parent_name, connection_type)
     yield protocol_factory_client_started
@@ -537,8 +556,8 @@ def protocol_factory(protocol_factory_server, protocol_factory_client, endpoint)
 
 
 @pytest.fixture
-async def protocol_factory_started(protocol_factory, parent_name, connection_type) -> StreamClientProtocolFactory:
-    await protocol_factory.start()
+async def protocol_factory_started(protocol_factory, receiver_logger, parent_name, connection_type) -> StreamClientProtocolFactory:
+    await protocol_factory.start(logger=receiver_logger)
     if not protocol_factory.full_name:
         protocol_factory.set_name(parent_name, connection_type)
     yield protocol_factory

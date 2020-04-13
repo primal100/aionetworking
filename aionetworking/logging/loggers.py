@@ -438,7 +438,6 @@ def get_connection_logger_sender() -> ConnectionLogger:
     return ConnectionLogger('sender.connection')
 
 
-logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=get_logger_receiver())
 connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
                                                                                         default=ConnectionLogger(
                                                                                             'receiver.connection',

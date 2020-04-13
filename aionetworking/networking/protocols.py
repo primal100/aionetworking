@@ -1,4 +1,3 @@
-
 import asyncio
 from abc import abstractmethod
 import datetime
@@ -27,9 +26,6 @@ class ProtocolFactoryProtocol(Protocol):
     def is_owner(self, connection: 'NetworkConnectionProtocol') -> bool: ...
 
     @abstractmethod
-    def set_logger(self, logger: LoggerType): ...
-
-    @abstractmethod
     def set_name(self, name: str, peer_prefix: str): ...
 
     @abstractmethod
@@ -42,7 +38,7 @@ class ProtocolFactoryProtocol(Protocol):
     async def close_actions(self) -> None: ...
 
     @abstractmethod
-    async def start(self) -> None: ...
+    async def start(self, logger: LoggerType = None) -> None: ...
 
     @abstractmethod
     async def close(self) -> None: ...
