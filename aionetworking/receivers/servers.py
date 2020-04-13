@@ -86,7 +86,6 @@ class WindowsPipeServer(BaseServer):
 
     def __post_init__(self):
         super().__post_init__()
-        self._serving_forever_fut = None
         self.path = str(self.path).format(pid=os.getpid())
 
     def _print_listening_message(self) -> None:
@@ -95,24 +94,6 @@ class WindowsPipeServer(BaseServer):
     @property
     def listening_on(self) -> str:
         return self.path
-
-    async def serve_forever(self) -> None:
-        if self._serving_forever_fut is not None:
-            raise RuntimeError(
-                f'server {self!r} is already being awaited on serve_forever()')
-        if not self._status.is_starting_or_started():
-            await self.start()
-        self._serving_forever_fut = self.loop.create_future()
-
-        try:
-            await self._serving_forever_fut
-        except asyncio.CancelledError:
-            try:
-                await self.close()
-            finally:
-                raise
-        finally:
-            self._serving_forever_fut = None
 
     async def _get_server(self) -> asyncio.AbstractServer:
         servers = await self.loop.start_serving_pipe(self.protocol_factory, self.path)
@@ -135,7 +116,7 @@ def PipeServer(path: Union[str, Path] = None, **kwargs):
     raise OSError("Neither AF_UNIX nor Named Pipe is supported on this platform")
 
 
-class DatagramServer(asyncio.AbstractServer):
+class DatagramServer:
 
     def __init__(self, protocol_factory: DatagramServerProtocolFactory, host: str, port: int,
                  family: int = 0, proto: int = 0, flags: int = 0, sock = None, start_serving: bool = True,
@@ -153,7 +134,6 @@ class DatagramServer(asyncio.AbstractServer):
         self._transport: Optional[asyncio.DatagramTransport] = None
         self._protocol: Optional[UDPServerConnection] = None
         self._status = StatusWaiter()
-        self._serving_forever_fut = None
         if start_serving:
             create_task(self.start_serving())
             self._status.set_starting()
@@ -170,25 +150,6 @@ class DatagramServer(asyncio.AbstractServer):
             allow_broadcast=self._allow_broadcast, proto=self._proto, flags=self._flags, sock=self._sock,
             reuse_port=self._reuse_port)
         self._status.set_started()
-
-    async def serve_forever(self):
-        if self._serving_forever_fut is not None:
-            raise RuntimeError(
-                f'server {self!r} is already being awaited on serve_forever()')
-        if not self.is_serving():
-            await self.start_serving()
-        self._serving_forever_fut = self._loop.create_future()
-
-        try:
-            await self._serving_forever_fut
-        except asyncio.CancelledError:
-            try:
-                self.close()
-                await self.wait_closed()
-            finally:
-                raise
-        finally:
-            self._serving_forever_fut = None
 
     async def wait_started(self):
         await self._status.wait_started()
@@ -213,10 +174,6 @@ class DatagramServer(asyncio.AbstractServer):
     def close(self):
         self._transport.close()
         self._status.set_stopped()
-        if (self._serving_forever_fut is not None and
-                not self._serving_forever_fut.done()):
-            self._serving_forever_fut.cancel()
-            self._serving_forever_fut = None
 
     async def wait_closed(self):
         await self._status.wait_stopped()

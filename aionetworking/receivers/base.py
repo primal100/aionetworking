@@ -1,4 +1,3 @@
-
 from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field, replace
@@ -70,6 +69,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
 
 @dataclass
 class BaseServer(BaseReceiver, Protocol):
+    _serving_forever_fut = None
     name = 'Server'
     peer_prefix = 'server'
 
@@ -119,11 +119,27 @@ class BaseServer(BaseReceiver, Protocol):
             self._print_listening_message()
         self._status.set_started()
 
+    async def _serve_forever(self) -> None:
+        if self._serving_forever_fut is not None:
+            raise RuntimeError(
+                f'server {self!r} is already being awaited on serve_forever()')
+        if not self._status.is_starting_or_started():
+            await self.start()
+        self._serving_forever_fut = self.loop.create_future()
+
     async def serve_forever(self) -> None:
         if not self._status.is_starting_or_started():
             await self.start()
         try:
-            await self.server.serve_forever()
+            if hasattr(self.server, 'serve_forever'):
+                self._serving_forever_fut = asyncio.ensure_future(self.server.serve_forever())
+
+            else:
+                await self._serve_forever()
+            try:
+                await self._serving_forever_fut
+            finally:
+                self._serving_forever_fut = None
         except asyncio.CancelledError:
             try:
                 await self.close()
@@ -132,9 +148,13 @@ class BaseServer(BaseReceiver, Protocol):
 
     async def close(self) -> None:
         if self._status.is_stopping_or_stopped():
-            raise ServerException(f"{self.name} running on {self.listening_on} already stopping or stopped")
+            return None
         self._status.set_stopping()
         self.logger.info('Stopping %s running at %s', self.name, self.listening_on)
+        if (self._serving_forever_fut is not None and
+                not self._serving_forever_fut.done()):
+            self._serving_forever_fut.cancel()
+            self._serving_forever_fut = None
         await self._stop_server()
         self.logger.info('%s stopped', self.name)
         await self.protocol_factory.close()

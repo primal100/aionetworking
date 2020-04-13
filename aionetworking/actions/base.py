@@ -1,5 +1,4 @@
-
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 from aionetworking.compatibility import Protocol
 from aionetworking.logging.loggers import logger_cv

@@ -18,14 +18,11 @@ from aionetworking.futures.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Generator, Dict, Sequence, Type, Optional, AsyncIterator, Optional
+from typing import Any, Callable, Generator, Dict, Sequence, Type, AsyncIterator, Optional
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
     raise NotImplementedError
-
-
-msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
 @dataclass

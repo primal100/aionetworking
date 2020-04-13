@@ -23,13 +23,12 @@ class TestServerStartStop:
     @pytest.mark.asyncio
     async def test_00_server_start(self, server, capsys):
         assert not server.is_started()
-        await server.start()
-        await asyncio.wait_for(server.wait_started(), timeout=1)
+        await asyncio.wait_for(server.start(), 4)
         assert server.is_started()
+        await asyncio.wait_for(server.wait_started(), timeout=1)
         captured = capsys.readouterr()
         assert captured.out.startswith("Serving")
 
-    @pytest.mark.skipif(not py37, reason="serve_forever not available before 3.7")
     @pytest.mark.asyncio
     async def test_01_serve_forever(self, server, capsys):
         assert not server.is_started()
@@ -49,10 +48,9 @@ class TestServerStartStop:
     @pytest.mark.asyncio
     async def test_02_server_close(self, server_started):
         assert server_started.is_started()
-        task = create_task(server_started.close())
-        await asyncio.wait_for(server_started.wait_stopped(), timeout=4)
+        await asyncio.wait_for(server_started.close(), 2)
         assert not server_started.is_started()
-        await asyncio.wait_for(task, timeout=4)
+        await asyncio.wait_for(server_started.wait_stopped(), timeout=4)
 
     @pytest.mark.asyncio
     async def test_03_server_wait_started(self, server, capsys):
@@ -60,7 +58,7 @@ class TestServerStartStop:
         task = create_task(server.wait_started())
         await asyncio.sleep(0)
         assert not task.done()
-        await server.start()
+        await asyncio.wait_for(server.start(), 3)
         assert server.is_started()
         await asyncio.wait_for(task, timeout=4)
         captured = capsys.readouterr()
@@ -85,33 +83,22 @@ class TestServerStartStop:
     @pytest.mark.asyncio
     async def test_06_server_never_started(self, server):
         assert server.is_closing()
-        with pytest.raises(ServerException):
-            await server.close()
+        assert await server.close() is None
 
     @pytest.mark.asyncio
-    async def test_07_server_already_stopped(self, server_started):
-        assert server_started.is_started()
-        await server_started.close()
-        assert not server_started.is_started()
-        with pytest.raises(ServerException):
-            await server_started.close()
-
-    @pytest.mark.asyncio
-    async def test_08_server_start_quiet(self, server_quiet, capsys):
+    async def test_07_server_start_quiet(self, server_quiet, capsys):
         assert not server_quiet.is_started()
-        task = create_task(server_quiet.start())
-        await asyncio.wait_for(server_quiet.wait_started(), timeout=4)
+        await asyncio.wait_for(server_quiet.start(), 3)
         assert server_quiet.is_started()
         captured = capsys.readouterr()
         assert captured.out == ''
-        await asyncio.wait_for(task, timeout=4)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('signal_num', [
         pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only')),
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
-    async def test_09_serve_until_close_signal(self, server_quiet, signal_num, patch_systemd, server_port):
+    async def test_08_serve_until_close_signal(self, server_quiet, signal_num, patch_systemd, server_port):
         assert not server_quiet.is_started()
         task = create_task(server_quiet.serve_until_close_signal())
         await asyncio.wait_for(server_quiet.wait_started(), timeout=4)
@@ -125,7 +112,7 @@ class TestServerStartStop:
             assert daemon.notify.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_10_pickle_server(self, server):
+    async def test_09_pickle_server(self, server):
         data = pickle.dumps(server)
         server = pickle.loads(data)
         assert server == server
