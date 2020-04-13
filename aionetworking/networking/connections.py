@@ -9,7 +9,7 @@ from .exceptions import MessageFromNotAuthorizedHost
 
 from aionetworking.compatibility import create_task, set_task_name
 from aionetworking.context import context_cv
-from aionetworking.logging.loggers import connection_logger_cv, get_logger_receiver
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType, ConnectionLoggerType
 from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, IPNetwork, supernet_of, hostname_or_ip
@@ -70,13 +70,13 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
         return self.get_peername(self.peer_prefix, self.context.get('peer'), self.context.get('own'))
 
     def _set_adaptor(self) -> None:
-        connection_logger_cv.set(self._get_connection_logger())
         kwargs = {
             'context': self.context,
             'dataformat': self.dataformat,
             'preaction': self.preaction,
             'send': self.send,
-            'codec_config': self.codec_config
+            'codec_config': self.codec_config,
+            'logger': self._get_connection_logger()
         }
         if self.adaptor_cls.is_receiver:
             self._adaptor = self._get_receiver_adaptor(**kwargs)

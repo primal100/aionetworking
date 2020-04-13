@@ -12,7 +12,6 @@ from aionetworking import (StreamServerProtocolFactory, StreamClientProtocolFact
 from aionetworking import context_cv, Logger
 from aionetworking.actions.file_storage import BufferedFileStorage
 from aionetworking.formats.contrib.json import JSONObject
-from aionetworking.logging.loggers import connection_logger_cv
 from aionetworking.networking import ReceiverAdaptor, SenderAdaptor
 from aionetworking.networking import ConnectionsManager
 from aionetworking.networking.connections_manager import clear_unique_names
@@ -131,11 +130,10 @@ def sender_logger() -> Logger:
 async def adaptor(context, endpoint, duplex_type, action, preaction, queue, requester, receiver_logger) -> AdaptorType:
     context_cv.set(context)
     logger = receiver_logger.get_connection_logger(extra=context)
-    connection_logger_cv.set(logger)
     if endpoint == 'server':
-        adaptor = ReceiverAdaptor(JSONObject, action=action, preaction=preaction, send=queue.put_nowait)
+        adaptor = ReceiverAdaptor(JSONObject, action=action, preaction=preaction, send=queue.put_nowait, logger=logger)
     else:
-        adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait, requester=requester)
+        adaptor = SenderAdaptor(JSONObject, send=queue.put_nowait, requester=requester, logger=logger)
     yield adaptor
     await adaptor.close()
 

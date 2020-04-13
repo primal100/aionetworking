@@ -120,10 +120,21 @@ class Logger(BaseLogger):
         self.is_closing = True
 
 
+default_extra: Dict[str, Any] = {
+            'endpoint': None,
+            'protocol_name': None,
+            'server': None,
+            'client': None,
+            'alias': None,
+            'peer': None,
+        }
+
+
 @dataclass
 class ConnectionLogger(Logger):
 
     def __init__(self, *args, extra: Dict[str, Any] = None, **kwargs):
+        extra = extra or default_extra
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling('raw_sent', cls=Logger)
@@ -436,16 +447,3 @@ def get_connection_logger_receiver() -> ConnectionLogger:
 
 def get_connection_logger_sender() -> ConnectionLogger:
     return ConnectionLogger('sender.connection')
-
-
-connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
-                                                                                        default=ConnectionLogger(
-                                                                                            'receiver.connection',
-                                                                                            extra={
-                                                                                                'endpoint': None,
-                                                                                                'protocol_name': None,
-                                                                                                'server': None,
-                                                                                                'client': None,
-                                                                                                'alias': None,
-                                                                                                'peer': None,
-                                                                                            }))

@@ -5,7 +5,7 @@ from pprint import pformat
 
 from aionetworking import settings
 from aionetworking.context import context_cv
-from aionetworking.logging.loggers import connection_logger_cv
+from aionetworking.logging.loggers import get_connection_logger_receiver
 from aionetworking.types.logging import ConnectionLoggerType
 from aionetworking.utils import aone, dataclass_getstate, dataclass_setstate
 
@@ -30,7 +30,7 @@ class BaseMessageObject(MessageObject, Protocol):
     encoded: bytes
     decoded: Any = None
     context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
-    parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    parent_logger: ConnectionLoggerType = field(default_factory=get_connection_logger_receiver, compare=False, hash=False, repr=False)
     system_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
     received: bool = field(default=True, compare=False, repr=False)
 
@@ -123,7 +123,7 @@ class BaseCodec(Codec):
 
     msg_obj: Type[MessageObjectType]
     context: Dict[str, Any] = field(default_factory=context_cv.get)
-    logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    logger: ConnectionLoggerType = field(default_factory=get_connection_logger_receiver, compare=False, hash=False, repr=False)
 
     def __post_init__(self):
         self.context = self.context or {}
