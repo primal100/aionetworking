@@ -8,8 +8,8 @@ from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
 from aionetworking.compatibility import Protocol, create_task
 from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
-from aionetworking.context import context_cv
 from aionetworking.types.formats import MessageObjectType, CodecType
+from aionetworking.types.networking import BaseContext
 from aionetworking.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from aionetworking.requesters.protocols import RequesterProtocol
 from aionetworking.futures.schedulers import TaskScheduler
@@ -32,14 +32,13 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     buffer_codec: BufferCodec = None
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
     logger: ConnectionLogger = field(default_factory=get_connection_logger_receiver, compare=False, hash=False)
-    context: Dict[str, Any] = field(default_factory=context_cv.get)
+    context: BaseContext = field(default_factory=dict)
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
     send: Callable[[bytes], Optional[asyncio.Future]] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
 
     def __post_init__(self) -> None:
-        context_cv.set(self.context)
         self.logger.new_connection()
 
     def on_msg_sent(self, msg_encoded: bytes, task: Optional[asyncio.Future]):
@@ -54,9 +53,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.on_msg_sent(msg_encoded, None)
 
     def _set_codecs(self, buffer: Optional[bytes]):
-        context_cv.set(self.context)
-        self.codec = self.dataformat.get_codec(buffer, logger=self.logger, **self.codec_config)
-        self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer, logger=self.logger)
+        self.codec = self.dataformat.get_codec(buffer, logger=self.logger, context=self.context, **self.codec_config)
+        self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer, context=self.context, logger=self.logger)
 
     def on_encode_task_finished(self, task: asyncio.Future):
         exception = task.exception()

@@ -1,16 +1,10 @@
 import asyncio
-import contextvars
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, List, Union, Dict, Optional, Type
 
 from aionetworking.compatibility import set_task_name, create_task
 from .counters import Counter
-
-
-success_callback_cv: contextvars.ContextVar[Callable] = contextvars.ContextVar('success_callback_cv')
-fail_callback_cv: contextvars.ContextVar[Callable] = contextvars.ContextVar('fail_callback_cv')
-additional_cv: contextvars.ContextVar[Dict] = contextvars.ContextVar('additional_cv', default={})
 
 
 @dataclass

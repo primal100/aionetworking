@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import binascii
 import logging
-import contextvars
 from dataclasses import dataclass, field
 
 from aionetworking.compatibility import get_current_task_name

@@ -8,10 +8,9 @@ import socket
 from .exceptions import MessageFromNotAuthorizedHost
 
 from aionetworking.compatibility import create_task, set_task_name
-from aionetworking.context import context_cv
 from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType, ConnectionLoggerType
-from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext
+from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext, BaseContext
 from aionetworking.utils import addr_tuple_to_str, dataclass_getstate, dataclass_setstate, IPNetwork, supernet_of, hostname_or_ip
 from aionetworking.futures.value_waiters import StatusWaiter
 
@@ -34,7 +33,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
     _connected: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _closing: asyncio.Future = field(default_factory=asyncio.Future, init=False, compare=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
-    context: Dict[str, Any] = field(default_factory=context_cv.get, metadata={'pickle': True})
+    context: BaseContext = field(default_factory=dict, metadata={'pickle': True})
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     logger: LoggerType = field(default_factory=get_logger_receiver, metadata={'pickle': True})
 
