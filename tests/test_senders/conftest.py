@@ -50,16 +50,34 @@ def actual_client_sock_ssl(tcp_client_ssl_started) -> Tuple[str, int]:
 
 
 @pytest.fixture
-def tcp_client(protocol_factory_client, actual_server_sock, client_sock) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_client, host=actual_server_sock[0], port=actual_server_sock[1],
-                     srcip=client_sock[0], srcport=0)
+def client_kwargs(connection_type, actual_server_sock, pipe_path, client_side_ssl, ssl_handshake_timeout, sftp_username_password) -> Dict[str, Any]:
+    client_kwargs = {}
+    if connection_type == 'tcpssl':
+        client_kwargs.update({'ssl': client_side_ssl, 'ssl_handshake_timeout': ssl_handshake_timeout})
+    elif connection_type == 'sftp':
+        client_kwargs.update({'username': sftp_username_password[0], 'password': sftp_username_password[1]})
+    if connection_type == 'pipe':
+        client_kwargs.update({'path': pipe_path})
+    else:
+        client_kwargs.update({'host': actual_server_sock[0], 'port': actual_server_sock[1],
+                              'srcip': actual_server_sock[0], 'srcport': 0})
+    return client_kwargs
 
 
 @pytest.fixture
-def tcp_client_ssl(protocol_factory_client, actual_server_sock, client_sock, client_side_ssl,
-                   ssl_handshake_timeout) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_client, host=actual_server_sock[0], port=actual_server_sock[1],
-                     srcip=client_sock[0], srcport=0, ssl=client_side_ssl, ssl_handshake_timeout=ssl_handshake_timeout)
+def client_kwargs_fixed_port(connection_type, server_sock, pipe_path, client_side_ssl, ssl_handshake_timeout,
+                             sftp_username_password) -> Dict[str, Any]:
+    client_kwargs = {}
+    if connection_type == 'tcpssl':
+        client_kwargs.update({'ssl': client_side_ssl, 'ssl_handshake_timeout': ssl_handshake_timeout})
+    elif connection_type == 'sftp':
+        client_kwargs.update({'username': sftp_username_password[0], 'password': sftp_username_password[1]})
+    if connection_type == 'pipe':
+        client_kwargs.update({'path': pipe_path})
+    else:
+        client_kwargs.update({'host': server_sock[0], 'port': server_sock[1],
+                              'srcip': server_sock[0], 'srcport': 0})
+    return client_kwargs
 
 
 @pytest.fixture
@@ -76,16 +94,16 @@ def tcp_client_incorrect_sender(protocol_factory_client, actual_server_sock_allo
 
 
 @pytest.fixture
-def tcp_client_ssl_fixed_port(protocol_factory_client, server_sock, client_sock, client_side_ssl,
-                              ssl_handshake_timeout) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_client, host=server_sock[0], port=server_sock[1],
-                     srcip=client_sock[0], srcport=0, ssl=client_side_ssl, ssl_handshake_timeout=ssl_handshake_timeout)
-
-
-@pytest.fixture
-def tcp_client_fixed_port(protocol_factory_client, server_sock, client_sock) -> TCPClient:
-    return TCPClient(protocol_factory=protocol_factory_client, host=server_sock[0], port=server_sock[1],
-                     srcip=client_sock[0], srcport=0)
+def client_cls(connection_type) -> Type:
+    client_classes = {
+        'tcp': TCPClient,
+        'tcpssl': TCPClient,
+        'udp': UDPClient,
+        'pipe': PipeClient,
+        'sftp': SFTPClient
+    }
+    client_cls = client_classes[connection_type]
+    yield client_cls
 
 
 @pytest.fixture
@@ -115,27 +133,8 @@ def udp_client_connections_expire(protocol_factory_client, actual_server_sock_ex
 
 
 @pytest.fixture
-def udp_client_fixed_port(protocol_factory_client, server_sock) -> UDPClient:
-    return UDPClient(protocol_factory=protocol_factory_client, host=server_sock[0],
-                     port=server_sock[1])
-
-
-@pytest.fixture
-def pipe_client(protocol_factory_client, pipe_path):
-    return PipeClient(protocol_factory=protocol_factory_client, path=pipe_path)
-
-
-@pytest.fixture
-async def client(connection_type, tcp_client, tcp_client_ssl, udp_client, pipe_client,
-                 sftp_client) -> BaseNetworkClient:
-    clients = {
-        'tcp': tcp_client,
-        'tcpssl': tcp_client_ssl,
-        'udp': udp_client,
-        'pipe': pipe_client,
-        'sftp': sftp_client
-    }
-    client = clients[connection_type]
+async def client(connection_type, protocol_factory_client, client_cls, client_kwargs, patch_os_auth_ok) -> BaseNetworkClient:
+    client = client_cls(protocol_factory=protocol_factory_client, **client_kwargs)
     yield client
 
 
@@ -147,9 +146,7 @@ async def client_allowed_senders(connection_type, tcp_client_allowed_sender, udp
             pytest.skip()
     clients = {
         'tcp': tcp_client_allowed_sender,
-        'tcpssl': tcp_client_ssl,
         'udp': udp_client_allowed_sender,
-        'pipe': pipe_client,
         'sftp': sftp_client_allowed_sender
     }
     yield clients[connection_type]
@@ -162,9 +159,7 @@ async def client_incorrect_sender(connection_type, allowed_sender_type, tcp_clie
         pytest.skip()
     clients = {
         'tcp': tcp_client_incorrect_sender,
-        'tcpssl': tcp_client_ssl,
         'udp': udp_client_incorrect_sender,
-        'pipe': pipe_client,
         'sftp': sftp_client_incorrect_sender
     }
     yield clients[connection_type]
@@ -181,16 +176,8 @@ async def client_connections_expire(connection_type, tcp_client_connections_expi
 
 
 @pytest.fixture
-async def client_fixed_port(connection_type, tcp_client_fixed_port, tcp_client_ssl_fixed_port, udp_client_fixed_port,
-                            pipe_client, sftp_client_fixed_port) -> BaseNetworkClient:
-    clients = {
-        'tcp': tcp_client_fixed_port,
-        'tcpssl': tcp_client_ssl_fixed_port,
-        'udp': udp_client_fixed_port,
-        'pipe': pipe_client,
-        'sftp': sftp_client_fixed_port
-    }
-    client = clients[connection_type]
+async def client_fixed_port(connection_type, client_cls, protocol_factory_client, server_sock, client_sock, client_kwargs_fixed_port) -> BaseNetworkClient:
+    client = client_cls(protocol_factory=protocol_factory_client, **client_kwargs_fixed_port)
     yield client
 
 
@@ -213,14 +200,6 @@ def client_two(client) -> BaseNetworkClient:
 
 
 @pytest.fixture
-def sftp_client(protocol_factory_client, actual_server_sock, client_sock, sftp_username_password,
-                patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=protocol_factory_client, host=actual_server_sock[0], port=actual_server_sock[1],
-                      srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
-                      password=sftp_username_password[1])
-
-
-@pytest.fixture
 def sftp_client_allowed_sender(protocol_factory_client, actual_server_sock_allowed_senders, client_sock,
                                sftp_username_password, patch_os_auth_ok, allowed_sender) -> SFTPClient:
     return SFTPClient(protocol_factory=protocol_factory_client, host=actual_server_sock_allowed_senders[0],
@@ -235,13 +214,6 @@ def sftp_client_incorrect_sender(protocol_factory_client, actual_server_sock_all
                       port=actual_server_sock_allowed_senders[1], srcip=incorrect_allowed_sender[0], srcport=0, username=sftp_username_password[0],
                       password=sftp_username_password[1])
 
-
-@pytest.fixture
-def sftp_client_fixed_port(protocol_factory_client, server_sock, client_sock, sftp_username_password,
-                           patch_os_auth_ok) -> SFTPClient:
-    return SFTPClient(protocol_factory=protocol_factory_client, host=server_sock[0], port=server_sock[1],
-                      srcip=client_sock[0], srcport=0, username=sftp_username_password[0],
-                      password=sftp_username_password[1])
 
 
 @pytest.fixture

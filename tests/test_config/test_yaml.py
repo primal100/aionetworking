@@ -21,8 +21,8 @@ def status_call(port, host='127.0.0.1'):
 
 class TestYamlConfig:
     @pytest.mark.connections('allplus_oneway_all')
-    def test_00_yaml_config_node_oneway(self, config_file, expected_object, all_paths, load_all_yaml_tags, peer_filter,
-                                        reset_logging, server_pipe_address_load):
+    def test_00_yaml_config_node_oneway(self, config_file, expected_object, all_paths, load_all_yaml_tags,
+                                              peer_filter, reset_logging, server_pipe_address_load):
         node = node_from_config_file(config_file, paths=all_paths)
         assert node.protocol_factory.action == expected_object.protocol_factory.action
         assert node.protocol_factory == expected_object.protocol_factory

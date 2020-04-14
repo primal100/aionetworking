@@ -12,7 +12,7 @@ from aionetworking.types.networking import ConnectionType
 from aionetworking.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
 
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional
 
 
 @dataclass
@@ -20,12 +20,11 @@ class TCPClient(BaseNetworkClient):
     name = "TCP Client"
     peer_prefix = 'tcp'
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
-    server_hostname: Optional[str] = None
-    happy_eyeballs_delay: Optional[float] = None
-    interleave: Optional[int] = None
-
-    ssl: Optional[ClientSideSSL] = None
-    ssl_handshake_timeout: Optional[int] = None
+    server_hostname: str = None
+    happy_eyeballs_delay: float = None
+    interleave: int = None
+    ssl: ClientSideSSL = None
+    ssl_handshake_timeout: int = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
