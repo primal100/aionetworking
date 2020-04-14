@@ -1,4 +1,3 @@
-from __future__ import annotations
 import pytest
 import os
 from pathlib import Path
@@ -96,7 +95,7 @@ def json_server_codec(server_context) -> JSONCodec:
 
 
 @pytest.fixture
-def user1() -> List[str, str]:
+def user1() -> List[str]:
     return ['user1', 'password']
 
 

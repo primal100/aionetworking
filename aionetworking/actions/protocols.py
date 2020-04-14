@@ -1,5 +1,5 @@
-from __future__ import annotations
 from abc import abstractmethod
+from dataclasses import dataclass
 import warnings
 
 from aionetworking.types.formats import MessageObjectType
@@ -15,6 +15,7 @@ warnings.filterwarnings("ignore", message="fields may not start with an undersco
 ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 
 
+@dataclass
 class ActionProtocol(Protocol):
     supports_notifications = False
 
@@ -35,7 +36,7 @@ class ActionProtocol(Protocol):
         yield
 
     @abstractmethod
-    async def start(self) -> None: ...
+    async def start(self, logger: LoggerType = None) -> None: ...
 
     @abstractmethod
     async def close(self) -> None: ...

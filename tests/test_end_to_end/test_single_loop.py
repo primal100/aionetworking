@@ -29,7 +29,7 @@ class TestOneWayServer:
                                      connection_type):
         await client_connection_started.play_recording(recordings_file_with_data)
         await wait_connections_closed(server_started, client_connected, connection_type)
-        await asyncio.wait_for(assert_server_buffered_file_storage_ok, 1)
+        await asyncio.wait_for(assert_server_buffered_file_storage_ok, 2)
 
 
 @pytest.mark.connections('all_twoway_all')

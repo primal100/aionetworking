@@ -1,9 +1,9 @@
-from __future__ import annotations
 from tests.test_senders.conftest import *
 import yaml
 import shutil
 import logging.config
 
+from aionetworking.compatibility import create_task
 from aionetworking.logging import PeerFilter, MessageFilter
 from aionetworking.logging import ConnectionLogger, ConnectionLoggerStats, StatsTracker, StatsLogger
 from aionetworking.conf import load_all_tags, get_paths, SignalServerManager
@@ -304,7 +304,7 @@ async def signal_server_manager(tmp_config_file) -> SignalServerManager:
 @pytest.fixture
 async def signal_server_manager_started(tmp_config_file) -> SignalServerManager:
     server_manager = SignalServerManager(tmp_config_file)
-    task = asyncio.create_task(server_manager.serve_until_stopped())
+    task = create_task(server_manager.serve_until_stopped())
     await server_manager.wait_server_started()
     yield server_manager
     server_manager.close()

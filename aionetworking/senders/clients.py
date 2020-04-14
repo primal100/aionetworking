@@ -7,13 +7,12 @@ import socket
 import sys
 
 from aionetworking.compatibility import get_client_kwargs
-from aionetworking.utils import get_ip_port
 from aionetworking.networking.protocol_factories import DatagramClientProtocolFactory
 from aionetworking.types.networking import ConnectionType
 from aionetworking.networking.ssl import ClientSideSSL
 from .base import BaseClient, BaseNetworkClient
 
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional
 
 
 @dataclass
@@ -21,12 +20,11 @@ class TCPClient(BaseNetworkClient):
     name = "TCP Client"
     peer_prefix = 'tcp'
     transport: asyncio.Transport = field(init=False, compare=False, default=None)
-    server_hostname: Optional[str] = None
-    happy_eyeballs_delay: Optional[float] = None
-    interleave: Optional[int] = None
-
-    ssl: Optional[ClientSideSSL] = None
-    ssl_handshake_timeout: Optional[int] = None
+    server_hostname: str = None
+    happy_eyeballs_delay: float = None
+    interleave: int = None
+    ssl: ClientSideSSL = None
+    ssl_handshake_timeout: int = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -39,10 +37,10 @@ class TCPClient(BaseNetworkClient):
             return self.ssl.context
 
     async def _open_connection(self) -> ConnectionType:
-        extra_kwargs = get_client_kwargs(self.happy_eyeballs_delay, self.interleave)
+        extra_kwargs = get_client_kwargs(self.ssl_handshake_timeout, self.happy_eyeballs_delay, self.interleave)
         self.transport, self.conn = await self.loop.create_connection(
             self.protocol_factory, host=self.host, port=self.port, ssl=self.ssl_context, local_addr=self.local_addr,
-            ssl_handshake_timeout=self.ssl_handshake_timeout, server_hostname=self.server_hostname, **extra_kwargs)
+            server_hostname=self.server_hostname, **extra_kwargs)
         return self.conn
 
 
@@ -79,9 +77,10 @@ class UnixSocketClient(BaseClient):
         return str(self.path)
 
     async def _open_connection(self) -> ConnectionType:
+        extra_kwargs = get_client_kwargs(self.ssl_handshake_timeout)
         self.transport, self.conn = await self.loop.create_unix_connection(
-            self.protocol_factory, path=str(self.path), ssl=self.ssl_context,
-            ssl_handshake_timeout=self.ssl_handshake_timeout, server_hostname=self.server_hostname)
+            self.protocol_factory, path=str(self.path), ssl=self.ssl_context, server_hostname=self.server_hostname,
+        **extra_kwargs)
         return self.conn
 
 

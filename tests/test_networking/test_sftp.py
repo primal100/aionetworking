@@ -2,6 +2,7 @@ import asyncio
 import pytest
 import pickle
 from pathlib import Path
+from aionetworking.compatibility import py37
 
 
 @pytest.mark.connections('sftp_oneway_all')
@@ -34,8 +35,8 @@ class TestConnectionShared:
         assert connection.is_child(parent_name)
         assert not connection.is_child(f"ABC Server")
 
-    @pytest.mark.asyncio
-    async def test_02_pickle(self, connection):
+    @pytest.mark.skipif(not py37, reason="Pickle SFTP connection not working in python3.6")
+    def test_02_pickle(self, connection):
         data = pickle.dumps(connection)
         protocol = pickle.loads(data)
         assert protocol == connection

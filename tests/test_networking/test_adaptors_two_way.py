@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 
+from aionetworking.compatibility import create_task
 from aionetworking.networking.exceptions import MethodNotFoundError
 
 
@@ -99,28 +100,28 @@ class TestSenderAdaptorTwoWay:
     @pytest.mark.asyncio
     async def test_05_send_data_and_wait(self, adaptor, echo_encoded, echo_response_encoded, timestamp,
                                          echo_response_object, queue):
-        task1 = asyncio.create_task(adaptor.send_data_and_wait(1, echo_encoded))
+        task1 = create_task(adaptor.send_data_and_wait(1, echo_encoded))
         await self.assert_response(queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
                                    echo_response_object)
 
     @pytest.mark.asyncio
     async def test_06_send_msg_and_wait(self, adaptor, echo_request_object, echo_encoded,
                                         echo_response_encoded, timestamp, echo_response_object, queue):
-        task1 = asyncio.create_task(adaptor.send_msg_and_wait(echo_request_object))
+        task1 = create_task(adaptor.send_msg_and_wait(echo_request_object))
         await self.assert_response(queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
                                    echo_response_object)
 
     @pytest.mark.asyncio
     async def test_07_encode_send_wait(self, adaptor, echo, echo_encoded, timestamp,
                                        echo_response_encoded, echo_response_object, queue):
-        task1 = asyncio.create_task(adaptor.encode_send_wait(echo))
+        task1 = create_task(adaptor.encode_send_wait(echo))
         await self.assert_response(queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
                                    echo_response_object)
 
     @pytest.mark.asyncio
     async def test_08_run_method_and_wait(self, adaptor, echo_encoded, timestamp,
                                           echo_response_encoded, echo_response_object, queue):
-        task1 = asyncio.create_task(adaptor.echo())
+        task1 = create_task(adaptor.echo())
         await self.assert_response(queue, echo_encoded, adaptor, echo_response_encoded, timestamp, task1,
                                    echo_response_object)
 

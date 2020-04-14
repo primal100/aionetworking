@@ -51,13 +51,6 @@ async def ssh_host_key(tmp_path) -> Path:
 
 
 @pytest.fixture
-async def sftp_server(protocol_factory_server, server_sock, ssh_host_key, tmp_path) -> SFTPServer:
-    server = SFTPServer(protocol_factory=protocol_factory_server, host=server_sock[0], port=0,
-                        server_host_key=ssh_host_key, base_upload_dir=Path(tmp_path) / 'sftp_received')
-    yield server
-
-
-@pytest.fixture
 async def tcp_server_allowed_senders(protocol_factory_server_allowed_senders, allowed_sender) -> TCPServer:
     yield TCPServer(protocol_factory=protocol_factory_server_allowed_senders, host=allowed_sender[0], port=0)
 
@@ -128,8 +121,7 @@ async def udp_server_expire_connections(udp_protocol_factory_server_connections_
 
 
 @pytest.fixture
-async def server_expire_connections(connection_type, tcp_server_expire_connections, udp_server_expire_connections,
-                                    sftp_server) -> BaseServer:
+async def server_expire_connections(connection_type, tcp_server_expire_connections, udp_server_expire_connections) -> BaseServer:
     servers = {
         'tcp': tcp_server_expire_connections,
         'udp': udp_server_expire_connections,
@@ -154,15 +146,35 @@ async def sftp_server_started(sftp_server) -> SFTPServer:
 
 
 @pytest.fixture
-async def server(connection_type, tcp_server, tcp_server_ssl, udp_server, pipe_server, sftp_server) -> BaseServer:
-    servers = {
-        'tcp': tcp_server,
-        'tcpssl': tcp_server_ssl,
-        'udp': udp_server,
-        'pipe': pipe_server,
-        'sftp': sftp_server
+async def server_cls(connection_type) -> Type[BaseServer]:
+    server_classes = {
+        'tcp': TCPServer,
+        'tcpssl': TCPServer,
+        'udp': UDPServer,
+        'pipe': PipeServer,
+        'sftp': SFTPServer
     }
-    server = servers[connection_type]
+    server_cls = server_classes[connection_type]
+    yield server_cls
+
+
+@pytest.fixture
+def server_kwargs(connection_type, tmp_path, server_sock, pipe_path, ssh_host_key, server_side_ssl, ssl_handshake_timeout) -> Dict[str, Any]:
+    kwargs = {}
+    if connection_type == 'tcpssl':
+        kwargs.update({'ssl': server_side_ssl, 'ssl_handshake_timeout': ssl_handshake_timeout})
+    elif connection_type == 'sftp':
+        kwargs.update({'server_host_key': ssh_host_key, 'base_upload_dir': Path(tmp_path) / 'sftp_received'})
+    if connection_type == 'pipe':
+        kwargs.update({'path': pipe_path})
+    else:
+        kwargs.update({'host': server_sock[0], 'port': 0})
+    return kwargs
+
+
+@pytest.fixture
+async def server(connection_type, server_cls, protocol_factory_server, server_kwargs) -> BaseServer:
+    server = server_cls(protocol_factory=protocol_factory_server, **server_kwargs)
     yield server
     if server.is_started():
         await server.close()

@@ -1,13 +1,12 @@
-from __future__ import annotations
 from abc import abstractmethod
 import asyncio
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .base import BaseAction
-from aionetworking.logging.loggers import logger_cv
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking import settings
-from aionetworking.compatibility import set_task_name, Protocol
+from aionetworking.compatibility import create_task, set_task_name, Protocol
 from aionetworking.logging.utils_logging import p
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.types.logging import LoggerType
@@ -22,14 +21,14 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
-    logger: LoggerType = field(default_factory=logger_cv.get)
+    logger: LoggerType = field(default_factory=get_logger_receiver)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
-    previous: ManagedFile = field(default=None)
+    previous: 'ManagedFile' = field(default=None)
     _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
     _open_files: ClassVar = {}
 
     @classmethod
-    def open(cls, path, *args, **kwargs) -> ManagedFile:
+    def open(cls, path, *args, **kwargs) -> 'ManagedFile':
         try:
             f = cls._open_files[path]
             if not f.is_closing():
@@ -55,7 +54,7 @@ class ManagedFile:
 
     def __post_init__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._task = asyncio.create_task(self.manage())
+        self._task = create_task(self.manage())
         set_task_name(self._task, f"ManagedFile:{self.path.name}")
 
     def is_in(self, path) -> bool:

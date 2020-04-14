@@ -1,8 +1,6 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
 import binascii
 import logging
-import contextvars
 from dataclasses import dataclass, field
 
 from aionetworking.compatibility import get_current_task_name
@@ -35,13 +33,13 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     def get_connection_logger(self, name: str = 'connection', **kwargs): ...
 
     @abstractmethod
-    def get_child(self, name: str, cls: Type = None, **kwargs) -> BaseLogger: ...
+    def get_child(self, name: str, cls: Type = None, **kwargs) -> 'BaseLogger': ...
 
     @abstractmethod
-    def get_sibling(self, name: str, **kwargs) -> BaseLogger: ...
+    def get_sibling(self, name: str, **kwargs) -> 'BaseLogger': ...
 
     @abstractmethod
-    def _get_logger(self, name: str = '', cls: Type[BaseLogger] = None, extra: Dict[str, Any] = None, **kwargs) -> Any: ...
+    def _get_logger(self, name: str = '', cls: Type['BaseLogger'] = None, extra: Dict[str, Any] = None, **kwargs) -> Any: ...
 
     async def wait_closed(self): ...
 
@@ -121,10 +119,21 @@ class Logger(BaseLogger):
         self.is_closing = True
 
 
+default_extra: Dict[str, Any] = {
+            'endpoint': None,
+            'protocol_name': None,
+            'server': None,
+            'client': None,
+            'alias': None,
+            'peer': None,
+        }
+
+
 @dataclass
 class ConnectionLogger(Logger):
 
     def __init__(self, *args, extra: Dict[str, Any] = None, **kwargs):
+        extra = extra or default_extra
         super().__init__(*args, extra=extra, **kwargs)
         self._raw_received_logger = self.get_sibling('raw_received', cls=Logger)
         self._raw_sent_logger = self.get_sibling('raw_sent', cls=Logger)
@@ -437,17 +446,3 @@ def get_connection_logger_receiver() -> ConnectionLogger:
 
 def get_connection_logger_sender() -> ConnectionLogger:
     return ConnectionLogger('sender.connection')
-
-
-logger_cv: contextvars.ContextVar[Logger] = contextvars.ContextVar('logger', default=get_logger_receiver())
-connection_logger_cv: contextvars.ContextVar[ConnectionLogger] = contextvars.ContextVar('connection_logger',
-                                                                                        default=ConnectionLogger(
-                                                                                            'receiver.connection',
-                                                                                            extra={
-                                                                                                'endpoint': None,
-                                                                                                'protocol_name': None,
-                                                                                                'server': None,
-                                                                                                'client': None,
-                                                                                                'alias': None,
-                                                                                                'peer': None,
-                                                                                            }))

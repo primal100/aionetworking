@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 import os
 import pytest
@@ -35,10 +33,11 @@ def pytest_configure(config):
 
 
 def pytest_generate_tests(metafunc):
-    skipifwindowsxdist_marks = [mark for mark in metafunc.definition.iter_markers(name="skipifwindowsxdist")]
-    if skipifwindowsxdist_marks:
-        if hasattr(metafunc.config, 'slaveinput'):
-            pytest.skip("Test doesn't work correctly in windows with xdist")
+    if os.name == 'nt':
+        skipifwindowsxdist_marks = [mark for mark in metafunc.definition.iter_markers(name="skipifwindowsxdist")]
+        if skipifwindowsxdist_marks:
+            if hasattr(metafunc.config, 'slaveinput'):
+                pytest.skip("Test doesn't work correctly in windows with xdist")
     connection_marks = [mark for mark in metafunc.definition.iter_markers(name="connections")]
     if connection_marks:
         connection_args = connection_marks[0].args

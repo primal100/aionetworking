@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import pytest
 import pickle
+from aionetworking.compatibility import create_task
 
 
 @pytest.mark.connections()
@@ -196,7 +197,7 @@ class TestTwoWayClientDatagramProtocolFactory:
         transport.set_protocol(protocol_factory)
         conn = protocol_factory.new_peer()
         assert connections_manager.total == 1
-        task = asyncio.create_task(conn.echo())
+        task = create_task(conn.echo())
         msg = await queue.get()
         assert msg == (server_sock, echo_encoded)
         protocol_factory.datagram_received(echo_response_encoded, server_sock)

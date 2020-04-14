@@ -1,16 +1,15 @@
 from abc import abstractmethod
 import asyncio
-import contextvars
 from dataclasses import dataclass, field
 import datetime
 from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.compatibility import Protocol
-from aionetworking.logging.loggers import connection_logger_cv, ConnectionLogger
-from aionetworking.context import context_cv
+from aionetworking.compatibility import Protocol, create_task
+from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
 from aionetworking.types.formats import MessageObjectType, CodecType
+from aionetworking.types.networking import BaseContext
 from aionetworking.formats.recording import BufferObject, BufferCodec, get_recording_from_file
 from aionetworking.requesters.protocols import RequesterProtocol
 from aionetworking.futures.schedulers import TaskScheduler
@@ -18,14 +17,11 @@ from aionetworking.futures.schedulers import TaskScheduler
 from .protocols import AdaptorProtocol
 
 from pathlib import Path
-from typing import Any, Callable, Generator, Dict, Sequence, Type, Optional, AsyncIterator, Optional
+from typing import Any, Callable, Generator, Dict, Sequence, Type, AsyncIterator, Optional
 
 
 def not_implemented_callable(*args, **kwargs) -> None:
     raise NotImplementedError
-
-
-msg_obj_cv = contextvars.ContextVar('msg_obj_cv')
 
 
 @dataclass
@@ -35,15 +31,14 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     codec: CodecType = None
     buffer_codec: BufferCodec = None
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False, hash=False, compare=False, repr=False)
-    logger: ConnectionLogger = field(default_factory=connection_logger_cv.get, compare=False, hash=False)
-    context: Dict[str, Any] = field(default_factory=context_cv.get)
+    logger: ConnectionLogger = field(default_factory=get_connection_logger_receiver, compare=False, hash=False)
+    context: BaseContext = field(default_factory=dict)
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
     send: Callable[[bytes], Optional[asyncio.Future]] = field(default=not_implemented_callable, repr=False, compare=False)
     timeout: int = 5
 
     def __post_init__(self) -> None:
-        context_cv.set(self.context)
         self.logger.new_connection()
 
     def on_msg_sent(self, msg_encoded: bytes, task: Optional[asyncio.Future]):
@@ -58,10 +53,8 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
             self.on_msg_sent(msg_encoded, None)
 
     def _set_codecs(self, buffer: Optional[bytes]):
-        context_cv.set(self.context)
-        connection_logger_cv.set(self.logger)
-        self.codec = self.dataformat.get_codec(buffer, **self.codec_config)
-        self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer)
+        self.codec = self.dataformat.get_codec(buffer, logger=self.logger, context=self.context, **self.codec_config)
+        self.buffer_codec: BufferCodec = self.bufferformat.get_codec(buffer, context=self.context, logger=self.logger)
 
     def on_encode_task_finished(self, task: asyncio.Future):
         exception = task.exception()
@@ -109,7 +102,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         self.logger.connection_finished(exc)
 
     @abstractmethod
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int: ...
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None: ...
 
 
 @dataclass
@@ -176,7 +169,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
                 self.send_data(packet.data)
         self.logger.debug("Recording finished")
 
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:
         async for msg in msgs:
             if msg.request_id is not None:
                 try:
@@ -185,7 +178,6 @@ class SenderAdaptor(BaseAdaptorProtocol):
                     self._notification_queue.put_nowait(msg)
             else:
                 self._notification_queue.put_nowait(msg)
-        return len(buffer)
 
 
 @dataclass
@@ -245,16 +237,18 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self._on_success(result, msg_obj)
         except BaseException as e:
             self._on_exception(e, msg_obj)
+            #raise
 
-    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> int:
+    async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:
         tasks = []
         try:
             async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
-                    tasks.append(asyncio.create_task(self._process_msg(msg_obj)))
+                    tasks.append(create_task(self._process_msg(msg_obj)))
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.gather(*tasks)
+            await asyncio.wait(tasks)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
-        return len(buffer)
+            raise
+

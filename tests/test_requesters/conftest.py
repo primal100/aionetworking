@@ -1,4 +1,3 @@
-from __future__ import annotations
 # Fixtures from following file are needed
 from tests.test_actions.conftest import *
 from aionetworking.requesters import EchoRequester

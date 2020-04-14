@@ -1,13 +1,10 @@
-from __future__ import annotations
-
 import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 
 from aionetworking import settings
-from aionetworking.context import context_cv
-from aionetworking.logging.loggers import connection_logger_cv
+from aionetworking.logging.loggers import get_connection_logger_receiver
 from aionetworking.types.logging import ConnectionLoggerType
 from aionetworking.utils import aone, dataclass_getstate, dataclass_setstate
 
@@ -15,6 +12,7 @@ from .protocols import MessageObject, Codec
 from typing import AsyncGenerator, Any, Dict, Sequence, Type, Optional
 from aionetworking.compatibility import Protocol
 from aionetworking.types.formats import MessageObjectType, CodecType
+from aionetworking.types.networking import BaseContext
 
 
 def current_time() -> datetime.datetime:
@@ -31,14 +29,13 @@ class BaseMessageObject(MessageObject, Protocol):
 
     encoded: bytes
     decoded: Any = None
-    context: Dict[str, Any] = field(default_factory=context_cv.get, compare=False, repr=False, hash=False)
-    parent_logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    context: BaseContext = field(default_factory=dict, compare=False, repr=False, hash=False)
+    parent_logger: ConnectionLoggerType = field(default_factory=get_connection_logger_receiver, compare=False, hash=False, repr=False)
     system_timestamp: datetime = field(default_factory=current_time, compare=False, repr=False, hash=False)
     received: bool = field(default=True, compare=False, repr=False)
 
     def __post_init__(self):
         self.logger = self.parent_logger.new_msg_logger(self)
-        self.context = self.context or {}
 
     @property
     def received_or_sent(self) -> str:
@@ -124,13 +121,13 @@ class BaseCodec(Codec):
     supports_notifications = False
 
     msg_obj: Type[MessageObjectType]
-    context: Dict[str, Any] = field(default_factory=context_cv.get)
-    logger: ConnectionLoggerType = field(default_factory=connection_logger_cv.get, compare=False, hash=False, repr=False)
+    context: BaseContext = field(default_factory=dict)
+    logger: ConnectionLoggerType = field(default_factory=get_connection_logger_receiver, compare=False, hash=False, repr=False)
 
     def __post_init__(self):
         self.context = self.context or {}
 
-    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes, Any], None]:
+    async def decode(self, encoded: bytes, **kwargs) -> AsyncGenerator[Sequence[bytes], None]:
         yield encoded, encoded
 
     async def encode(self, decoded: Any, **kwargs) -> bytes:
@@ -146,7 +143,7 @@ class BaseCodec(Codec):
         async for encoded, decoded in self.decode(encoded, **kwargs):
             yield await self.create_object(encoded, decoded, parent_logger=self.logger, **kwargs)
 
-    async def decode_buffer(self, encoded: bytes, context: Dict[str, Any] = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+    async def decode_buffer(self, encoded: bytes, context: BaseContext = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         if context:
             complete_context = self.context.copy()
             complete_context.update(context)

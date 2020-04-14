@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 import yaml
 from .sftp import SFTPClientProtocolFactory
 from .sftp_os_auth import SFTPOSAuthProtocolFactory

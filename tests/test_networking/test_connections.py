@@ -2,6 +2,7 @@ import asyncio
 import pytest
 import pickle
 
+from aionetworking.compatibility import create_task
 from aionetworking.networking.exceptions import MethodNotFoundError, MessageFromNotAuthorizedHost
 
 
@@ -46,8 +47,7 @@ class TestConnectionShared:
         assert connection.is_child(parent_name)
         assert not connection.is_child(f"ABC Server")
 
-    @pytest.mark.asyncio
-    async def test_04_pickle(self, connection):
+    def test_04_pickle(self, connection):
         data = pickle.dumps(connection)
         protocol = pickle.loads(data)
         assert protocol == connection
@@ -97,7 +97,7 @@ class TestConnectionTwoWayClient:
     @pytest.mark.asyncio
     async def test_00_send_data_and_wait(self, connection_connected, echo_encoded, echo_response_encoded,
                                          echo_response_object, transport, queue):
-        task = asyncio.create_task(connection_connected.send_data_and_wait(1, echo_encoded))
+        task = create_task(connection_connected.send_data_and_wait(1, echo_encoded))
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
         connection_connected.data_received(echo_response_encoded)
@@ -118,7 +118,7 @@ class TestConnectionTwoWayClient:
     @pytest.mark.asyncio
     async def test_02_requester(self, connection_connected, echo_encoded, echo_response_encoded, echo_response_object,
                                 queue):
-        task = asyncio.create_task(connection_connected.echo())
+        task = create_task(connection_connected.echo())
         receiver, msg = await asyncio.wait_for(queue.get(), timeout=1)
         assert msg == echo_encoded
         connection_connected.data_received(echo_response_encoded)

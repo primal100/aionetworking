@@ -10,6 +10,7 @@ from aionetworking.futures.schedulers import TaskScheduler
 from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocol_factories import BaseProtocolFactory
 from .connections import NetworkConnectionProtocol
+from aionetworking.compatibility import create_task
 from aionetworking.utils import aremove
 
 from typing import Optional, AnyStr, Union, Dict, Any
@@ -120,7 +121,7 @@ class BaseSFTPProtocol(NetworkConnectionProtocol):
         self._log_task = None
 
     def log_context(self):
-        self._log_task = asyncio.create_task(self.wait_context_set())
+        self._log_task = create_task(self.wait_context_set())
         self._log_task.add_done_callback(self._log_context)
 
     async def _close(self, exc: Optional[BaseException]) -> None:
