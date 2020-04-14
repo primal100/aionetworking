@@ -1,15 +1,11 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-import warnings
 
 from aionetworking.types.formats import MessageObjectType
 from aionetworking.types.logging import LoggerType
 
 from typing import AsyncGenerator, Any, TypeVar
 from aionetworking.compatibility import Protocol
-
-
-warnings.filterwarnings("ignore", message="fields may not start with an underscore")
 
 
 ActionType = TypeVar('ActionType', bound='BaseActionProtocol')

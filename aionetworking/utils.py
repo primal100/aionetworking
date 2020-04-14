@@ -34,12 +34,6 @@ str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 
 ###Coroutines###
-arename = wrap(os.rename)
-aremove = wrap(os.remove)
-amkdir = wrap(os.mkdir)
-armdir = wrap(os.rmdir)
-
-
 async def time_coro(coro):
     start_time = time.time()
     await coro

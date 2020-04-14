@@ -11,7 +11,7 @@ from .adaptors import ReceiverAdaptor, SenderAdaptor
 from .protocol_factories import BaseProtocolFactory
 from .connections import NetworkConnectionProtocol
 from aionetworking.compatibility import create_task
-from aionetworking.utils import aremove
+
 
 from typing import Optional, AnyStr, Union, Dict, Any
 from pathlib import Path
@@ -44,7 +44,7 @@ class SFTPFactory(asyncssh.SFTPServer):
     async def _handle_data(self, name: str, data: AnyStr):
         self.sftp_connection.data_received(data)
         if self.remove_tmp_files:
-            await aremove(name)
+            await aiofiles.os.remove(name)
 
     async def _process_completed_file(self, name: str, mode: str):
         mode = 'rb' if mode == 'wb' else 'r'
@@ -206,7 +206,7 @@ class SFTPClientProtocol(BaseSFTPProtocol, asyncssh.SSHClient):
             await f.write(data)
         await self.sftp.put(file_path, remotepath=self.remote_path)
         if self.remove_tmp_files:
-            await aremove(file_path)
+            await aiofiles.os.remove(file_path)
         self.last_msg = datetime.datetime.now()
 
     async def wait_current_tasks(self) -> None:
