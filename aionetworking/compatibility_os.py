@@ -2,6 +2,7 @@ import signal
 import asyncio
 import os
 import platform
+import subprocess
 from typing import Callable
 try:
      from systemd import daemon
