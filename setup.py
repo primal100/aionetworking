@@ -20,7 +20,7 @@ setup(
     name='aionetworking',
     version='0.1',
     packages=['aionetworking', 'aionetworking_package'],
-    url='https://github.com/primal100/pymessagemanager',
+    url='https://github.com/primal100/aionetworking',
     license=pkg_license,
     author='Paul Martin',
     author_email='greatestloginnameever@gmail.com',
@@ -39,7 +39,7 @@ setup(
     python_requires='>=3.6',
     setup_requires=['wheel'],
     install_requires=required,
-    extra_requires={
+    extras_require={
         'sftp': sftp_requirements,
         'optional': optional,
         'all': sftp_requirements + optional
