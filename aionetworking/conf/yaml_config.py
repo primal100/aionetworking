@@ -29,11 +29,10 @@ from typing import Union, Dict, TextIO
 
 
 def get_paths(app_home: Union[str, Path] = None, volatile_home: Union[str, Path] = None,
-              tmp_dir: Union[str, Path] = None) -> Dict[str, Path]:
+              **kwargs) -> Dict[str, Path]:
     app_home = app_home or settings.APP_HOME
-    tmp_dir = tmp_dir or settings.TEMPDIR
     volatile_home = volatile_home or app_home
-    return {'temp': tmp_dir,
+    paths = {'temp': settings.TEMPDIR,
             'home': app_home,
             'conf': app_home / 'conf',
             'data': volatile_home / 'data',
@@ -41,6 +40,8 @@ def get_paths(app_home: Union[str, Path] = None, volatile_home: Union[str, Path]
             'misc': volatile_home / 'misc',
             'stats': volatile_home / 'stats',
             'ssl': app_home / 'ssl'}
+    paths.update(**kwargs)
+    return paths
 
 
 def load_minimal_tags() -> None:
@@ -74,7 +75,7 @@ def load_minimal_tags() -> None:
 def load_all_tags():
     load_minimal_tags()
     from aionetworking.networking.yaml_constructors_sftp import (load_sftp_server_protocol_factory,
-                                                       load_sftp_client_protocol_factory)
+                                                                 load_sftp_client_protocol_factory)
     from aionetworking.receivers.yaml_constructors_sftp import load_sftp_server
     from aionetworking.senders.yaml_constructors_sftp import load_sftp_client
     load_sftp_server_protocol_factory()

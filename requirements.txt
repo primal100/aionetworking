@@ -1,3 +1,4 @@
+wheel>=0.34.2
 aiofiles>=0.5.0
 inflect>=4.1.0
 typing-extensions>=3.7.4.1;python_version<"3.8"

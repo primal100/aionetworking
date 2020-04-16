@@ -47,6 +47,7 @@ setup(
     name='aionetworking',
     version='0.1',
     packages=['aionetworking'],
+    scripts=['scripts/generate_ssh_host_key.py'],
     url='https://github.com/primal100/aionetworking',
     license=pkg_license,
     author='Paul Martin',

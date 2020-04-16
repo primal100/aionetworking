@@ -83,13 +83,14 @@ def sftp_client_yaml_config_path(conf_dir):
 
 
 @pytest.fixture
-def current_dir() -> Path:
+def test_config_dir() -> Path:
     return Path(os.path.abspath(os.path.dirname(__file__)))
 
 
 @pytest.fixture
-def all_paths(tmpdir, current_dir) -> Dict[str, Any]:
-    return get_paths(app_home=current_dir, volatile_home=tmpdir, tmp_dir=tmpdir)
+def all_paths(tmpdir, test_config_dir, ssl_dir) -> Dict[str, Any]:
+    return get_paths(app_home=test_config_dir, volatile_home=tmpdir, temp=tmpdir,
+                     ssl=ssl_dir)
 
 
 @pytest.fixture
