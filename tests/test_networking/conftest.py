@@ -782,13 +782,13 @@ async def sftp_adaptor(action, preaction, endpoint, sftp_context, queue) -> Rece
 
 
 @pytest.fixture
-def current_dir() -> Path:
+def test_networking_dir() -> Path:
     return Path(os.path.abspath(os.path.dirname(__file__)))
 
 
 @pytest.fixture
-def ssl_dir(current_dir) -> Path:
-    return current_dir / "ssl"
+def ssl_dir(test_networking_dir) -> Path:
+    return test_networking_dir / "ssl"
 
 
 @pytest.fixture
