@@ -51,17 +51,21 @@ class BaseReceiver(ReceiverProtocol, Protocol):
                                        restart_event: asyncio.Event = None, notify_pid: int = None) -> None:
         stop_event = stop_event or asyncio.Event()
         restart_event = restart_event or asyncio.Event()
-        loop_on_close_signal(stop_event.set)
+        loop_on_close_signal(stop_event.set, self.logger)
         await self.start()
         sys.stdout.flush()
         self.send_status()
         send_ready()
         if notify_pid:
             send_notify_start_signal(notify_pid)
+        self.logger.info('Running server until signal received')
         done, pending = await asyncio.wait([stop_event.wait(), restart_event.wait()],
                                            return_when=asyncio.FIRST_COMPLETED)
         if stop_event.is_set():
+            self.logger.info('Signal for stop event received')
             send_stopping()
+        if restart_event.is_set():
+            self.logger.info('Signal for restart event received')
         for task in pending:
             task.cancel()
         await self.close()
