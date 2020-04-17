@@ -1,4 +1,3 @@
-
 import asyncio
 import yaml
 import os
@@ -7,18 +6,20 @@ from dataclasses import dataclass, field
 from logging.config import dictConfig
 from aionetworking.actions.yaml_constructors import load_file_storage, load_buffered_file_storage, load_echo_action, \
     load_empty_action
-from aionetworking.compatibility_os import loop_on_close_signal, loop_on_user1_signal, send_stopping, send_status, \
+from aionetworking.compatibility_os import loop_on_close_signal, loop_on_user1_signal, send_status, \
     send_ready, send_reloading
 from aionetworking.conf.yaml_constructors import load_logger, load_receiver_logger, load_sender_logger
 from aionetworking.formats.contrib.yaml_constructors import load_json, load_pickle
+from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.networking.yaml_constructors import (load_server_side_ssl, load_client_side_ssl,
                                                         load_stream_server_protocol_factory,
                                                         load_datagram_server_protocol_factory,
                                                         load_stream_client_protocol_factory,
                                                         load_datagram_client_protocol_factory)
-from aionetworking.types.receivers import ReceiverType
 from aionetworking.receivers.yaml_constructors import load_tcp_server, load_udp_server, load_pipe_server
 from aionetworking.requesters.yaml_constructors import load_echo_requester
+from aionetworking.types.logging import LoggerType
+from aionetworking.types.receivers import ReceiverType
 from aionetworking.types.senders import SenderType
 from aionetworking.senders.yaml_constructors import load_tcp_client, load_udp_client, load_pipe_client
 from .yaml_constructors import load_ip_network, load_path, load_default_ports, load_env_variable
@@ -144,8 +145,9 @@ class SignalServerManager:
     conf_path: Union[Path, str]
     server: ReceiverType = field(init=False)
     notify_pid: int = None
-    _last_modified_time: float = field(init=False, default=None)
     paths: Dict[str, Union[str, Path]] = None
+    logger: LoggerType = field(default_factory=get_logger_receiver)
+    _last_modified_time: float = field(init=False, default=None)
 
     def __post_init__(self):
         self._last_modified_time = self.modified_time
@@ -153,8 +155,8 @@ class SignalServerManager:
         self._restart_event = asyncio.Event()
         self._restart_event.set()
         self.server = self.get_server()
-        loop_on_close_signal(self.close)
-        loop_on_user1_signal(self.check_reload)
+        loop_on_close_signal(self.close, self.logger)
+        loop_on_user1_signal(self.check_reload, self.logger)
 
     @property
     def modified_time(self) -> float:
@@ -169,6 +171,7 @@ class SignalServerManager:
             if last_modified > self._last_modified_time:
                 send_reloading()
                 self._last_modified_time = last_modified
+                self.logger.info('Restarting server')
                 send_status('Restarting server')
                 self._restart_event.set()
             else:

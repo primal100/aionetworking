@@ -2,7 +2,11 @@ import signal
 import asyncio
 import os
 import platform
-import subprocess
+from functools import partial
+
+from aionetworking.types.logging import LoggerType
+
+
 from typing import Callable
 try:
      from systemd import daemon
@@ -38,17 +42,23 @@ except ImportError:
         pass
 
 
-def loop_on_user1_signal(callback: Callable):
-    if os.name == 'posix':
-        loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal.SIGUSR1, callback)
+def loop_on_signal(logger: LoggerType, signum: int, callback: Callable):
+    logger.info('Signal %s received', signum)
+    callback()
+    logger.info('Completed callback for signal %s', signum)
 
 
-def loop_on_close_signal(callback: Callable):
+def loop_on_user1_signal(callback: Callable, logger: LoggerType):
     if os.name == 'posix':
         loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal.SIGTERM, callback)
-        loop.add_signal_handler(signal.SIGINT, callback)
+        loop.add_signal_handler(signal.SIGUSR1, partial(loop_on_signal, logger, signal.SIGUSR1, callback))
+
+
+def loop_on_close_signal(callback: Callable, logger: LoggerType, ):
+    if os.name == 'posix':
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGTERM, partial(loop_on_signal, logger, signal.SIGTERM, callback))
+        loop.add_signal_handler(signal.SIGINT, partial(loop_on_signal, logger, signal.SIGINT, callback))
 
 
 def loop_remove_signals():
