@@ -9,23 +9,25 @@ from aionetworking.types.logging import LoggerType
 
 from typing import Callable
 try:
-     from systemd import daemon
-     from systemd import journal
+    from systemd import daemon
+    from systemd import journal
 
-     def send_to_journal(*args, **kwargs):
-         journal.send(*args, **kwargs)
+    def send_to_journal(*args, logger: LoggerType=None, **kwargs):
+        if logger:
+           logger.info(args[0])
+        journal.send(*args, **kwargs)
 
-     def send_ready():
-         daemon.notify('READY=1')
+    def send_ready():
+        daemon.notify('READY=1')
 
-     def send_status(status: str):
-         daemon.notify(f'STATUS={status}')
+    def send_status(status: str):
+        daemon.notify(f'STATUS={status}')
 
-     def send_stopping():
-         daemon.notify('STOPPING=1')
+    def send_stopping():
+        daemon.notify('STOPPING=1')
 
-     def send_reloading():
-        daemon.notify('RELOADING=1')
+    def send_reloading():
+       daemon.notify('RELOADING=1')
 except ImportError:
     def send_to_journal(*args, **kwargs): ...
 
