@@ -1,5 +1,4 @@
 import asyncio
-from aiofiles.os import wrap
 from collections import ChainMap
 from ipaddress import AddressValueError
 import builtins
@@ -183,7 +182,7 @@ def set_loop_policy(posix_loop_type: str = None, windows_loop_type: str = None) 
                 f'{posix_loop_type} is not a valid loop name. Choose either proactor or selector')
 
 
-###Multiprocessing###
+###Pipes###
 
 _mmap_counter = itertools.count()
 

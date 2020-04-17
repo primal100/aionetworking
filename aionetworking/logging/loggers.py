@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import binascii
+import datetime
 import logging
 from dataclasses import dataclass, field
 
@@ -114,6 +115,10 @@ class Logger(BaseLogger):
             self.log(logging.DEBUG, 'Connection %s. There %s now %s.', action,
                         p.plural_verb('is', p.num(num_connections)),
                         p.no('active connection'))
+
+    def warn_on_cert_expiry(self, cert_name: str, num_days: int, expiry_time: datetime.datetime):
+        self.logger.warning('%s ssl cert will expire in %s, on %s', cert_name, p.no('day', num_days),
+                            expiry_time)
 
     def _set_closing(self) -> None:
         self.is_closing = True
