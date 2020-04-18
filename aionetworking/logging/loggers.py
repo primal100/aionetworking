@@ -42,6 +42,9 @@ class BaseLogger(logging.LoggerAdapter, ABC):
     @abstractmethod
     def _get_logger(self, name: str = '', cls: Type['BaseLogger'] = None, extra: Dict[str, Any] = None, **kwargs) -> Any: ...
 
+    @abstractmethod
+    def warn_on_cert_expiry(self, cert_name: str, num_days: int, expiry_time: datetime.datetime): ...
+
     async def wait_closed(self): ...
 
 
@@ -117,7 +120,7 @@ class Logger(BaseLogger):
                         p.no('active connection'))
 
     def warn_on_cert_expiry(self, cert_name: str, num_days: int, expiry_time: datetime.datetime):
-        self.logger.warning('%s ssl cert will expire in %s, on %s', cert_name, p.no('day', num_days),
+        self.logger.warning('%s ssl cert will expire in less than %s, on %s', cert_name, p.no('day', num_days + 1),
                             expiry_time)
 
     def _set_closing(self) -> None:

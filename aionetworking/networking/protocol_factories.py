@@ -37,6 +37,7 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
     expire_connections_check_interval_minutes: Union[int, float] = 1
     aliases: Dict[str, str] = field(default_factory=dict)
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
+    check_peer_cert_expiry: int = 7
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     timeout: int = None
     _scheduler: TaskScheduler = field(default_factory=TaskScheduler, init=False)
@@ -78,8 +79,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                                    preaction=self.preaction, requester=self.requester, dataformat=self.dataformat,
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
                                    hostname_lookup=self.hostname_lookup, allowed_senders=self.allowed_senders,
-                                   context=self.context.copy(), codec_config=self.codec_config,
-                                   **self._additional_connection_kwargs())
+                                   context=self.context.copy(), check_peer_cert_expiry=self.check_peer_cert_expiry,
+                                   codec_config=self.codec_config, **self._additional_connection_kwargs())
 
     def __getstate__(self):
         return dataclass_getstate(self)
