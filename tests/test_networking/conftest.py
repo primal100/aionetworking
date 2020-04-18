@@ -22,10 +22,13 @@ from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFT
 from aionetworking.networking import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
 from aionetworking.requesters.echo import EchoRequester
+from aionetworking.networking.ssl_utils import generate_signed_key_cert
 from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorType
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
 
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import rsa
 from typing import Callable, Type, Tuple, Union, Optional, List
 
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, \
@@ -819,6 +822,50 @@ def ssl_client_cert(ssl_client_dir) -> Path:
 @pytest.fixture
 def ssl_client_key(ssl_client_dir) -> Path:
     return ssl_client_dir / "privkey.pem"
+
+
+@pytest.fixture
+def peercert() -> Dict[str, Any]:
+    return {'subject': ((('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),), (('organizationName', 'AIONetworking'),), (('organizationalUnitName', 'Client'),)), 'issuer': ((('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),), (('organizationName', 'AIONetworking'),), (('organizationalUnitName', 'Client'),)), 'version': 3, 'serialNumber': '0A7B7C8AF07F4E9A341F9695C06C2C1B70AED8C8', 'notBefore': 'Mar  8 11:13:58 2020 GMT', 'notAfter': 'Mar  6 11:13:58 2030 GMT'}
+
+
+@pytest.fixture
+def peercert_expires_soon(fixed_timestamp) -> Dict[str, Any]:
+    return {'subject': ((('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),), (('organizationName', 'AIONetworking'),), (('organizationalUnitName', 'Client'),)), 'issuer': ((('countryName', 'IE'),), (('stateOrProvinceName', 'Dublin'),), (('localityName', 'Dublin'),), (('organizationName', 'AIONetworking'),), (('organizationalUnitName', 'Client'),)), 'version': 3, 'serialNumber': '0A7B7C8AF07F4E9A341F9695C06C2C1B70AED8C8', 'notBefore': 'Mar  8 11:13:58 2018 GMT', 'notAfter': 'Jan  2 11:13:58 2019 GMT'}
+
+
+@pytest.fixture
+def ssl_cert_key_short_validity_time(tmpdir) -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
+    return generate_signed_key_cert(tmpdir, validity=3)
+
+
+@pytest.fixture
+def short_validity_cert_actual_expiry_time(ssl_cert_key_short_validity_time) -> datetime.datetime:
+    cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
+    return cert.not_valid_after
+
+
+@pytest.fixture
+async def server_side_ssl_short_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
+    cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+                                    warn_if_expires_before_days=7)
+    yield server_side_ssl
+    await server_side_ssl.close()
+
+
+@pytest.fixture
+async def server_side_ssl_long_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
+    cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+                                    warn_if_expires_before_days=1)
+    yield server_side_ssl
+    await server_side_ssl.close()
+
+
+@pytest.fixture
+def client_side_ssl_short_validity(tmpdir, ssl_client_key, ssl_server_cert, ssl_server_dir):
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, capath=tmpdir)
 
 
 @pytest.fixture

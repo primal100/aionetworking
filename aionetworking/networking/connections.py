@@ -23,6 +23,7 @@ from aionetworking.types.networking import AdaptorType, SenderAdaptorType
 
 from typing import NoReturn, Optional, Tuple, Type, Dict, Any, Sequence, Callable, Awaitable, List
 from aionetworking.compatibility import Protocol
+from .ssl import check_peercert_expired
 
 
 AsyncCallable = Callable[[int], Awaitable[None]]
@@ -142,6 +143,7 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
     allowed_senders: Sequence[IPNetwork] = field(default_factory=tuple)
     hostname_lookup: bool = False
     connection_lost_tasks: List[AsyncCallable] = field(default_factory=list)
+    check_peer_cert_expiry: int = 7
     _unprocessed_data: int = field(default=0, init=False, repr=False)
 
     def _raise_message_from_not_authorized_host(self, host: str) -> NoReturn:
@@ -251,7 +253,12 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         cipher = transport.get_extra_info('cipher', default=None)
         if cipher:
             self.logger.info(f"Cipher: {cipher}', 'Compression': {transport.get_extra_info('compression')}")
-            self.logger.debug(transport.get_extra_info('peercert'))
+            peercert = transport.get_extra_info('peercert')
+            self.logger.debug(peercert)
+            if self.check_peer_cert_expiry:
+                expiry_time, cert_expiry_in_days = check_peercert_expired(peercert, self.check_peer_cert_expiry)
+                if cert_expiry_in_days:
+                    self.logger.warn_on_cert_expiry(f'Peer @ {self.context["host"]}', cert_expiry_in_days, expiry_time)
 
     def send(self, msg: bytes) -> None:
         self.transport.write(msg)

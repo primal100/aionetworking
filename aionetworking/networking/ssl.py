@@ -1,11 +1,40 @@
 from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths
+import asyncio
+import datetime
 from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType
-from aionetworking.compatibility import Protocol
+from aionetworking.compatibility import Protocol, create_task, set_task_name, cached_property
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
+
+
+try:
+    import cryptography
+    warn_if_expires_before_days_default = 7
+except ImportError:
+    warn_if_expires_before_days_default = None
+
+
+peercert_timestamp_converter = '%b %d %H:%M:%S %Y %Z'
+
+
+def ssl_cert_time_to_datetime(timestamp: str) -> datetime.datetime:
+    return datetime.datetime.strptime(timestamp, peercert_timestamp_converter)
+
+
+def check_ssl_cert_expired(expiry_time: datetime.datetime, warn_before_days: int) -> Optional[int]:
+    expires_in = (expiry_time - datetime.datetime.now()).days
+    if expires_in < warn_before_days:
+        return expires_in
+    return None
+
+
+def check_peercert_expired(peercert: Dict[str, Any], warn_before_days: int) -> Tuple[datetime.datetime, Optional[int]]:
+    expiry_time = ssl_cert_time_to_datetime(peercert['notAfter'])
+    cert_expiry_in_days = check_ssl_cert_expired(expiry_time, warn_before_days)
+    return expiry_time, cert_expiry_in_days
 
 
 @dataclass
@@ -21,11 +50,31 @@ class BaseSSLContext(Protocol):
     cadata: str = None
     cert_required: bool = False
     check_hostname: bool = False
+    warn_if_expires_before_days: int = warn_if_expires_before_days_default
+    _warn_expiry_task: asyncio.Task = field(default=None, init=False, compare=False)
 
     def set_logger(self, logger: LoggerType) -> None:
         self.logger = logger
 
-    @property
+    async def close(self) -> None:
+        if self._warn_expiry_task and not self._warn_expiry_task.done():
+            self._warn_expiry_task.cancel()
+
+    async def check_cert_expiry(self):
+        try:
+            from .ssl_utils import load_cert_expiry_time
+            cert_expiry_time = load_cert_expiry_time(self.cert)
+            if cert_expiry_time:
+                while True:
+                    cert_expiry_days = check_ssl_cert_expired(cert_expiry_time, self.warn_if_expires_before_days)
+                    if cert_expiry_days:
+                        self.logger.warn_on_cert_expiry('Own', cert_expiry_days, cert_expiry_time)
+                    await asyncio.sleep(86400)
+        except ImportError:
+            self.logger.warning(
+                'Unable to check ssl cert validity. Install cryptography library to enable this or set warn_if_expires_before_days to 0')
+
+    @cached_property
     def context(self) -> Optional[SSLContext]:
         if self.ssl:
             self.logger.info("Setting up SSL")
@@ -33,6 +82,9 @@ class BaseSSLContext(Protocol):
             if self.cert and self.key:
                 self.logger.info("Using SSL Cert: %s", self.cert)
                 context.load_cert_chain(str(self.cert), str(self.key), password=self.key_password)
+                if self.warn_if_expires_before_days:
+                    self._warn_expiry_task = create_task(self.check_cert_expiry())
+                    set_task_name(self._warn_expiry_task, 'CheckSSLCertValidity')
             context.verify_mode = CERT_REQUIRED if self.cert_required else CERT_NONE
             context.check_hostname = self.check_hostname
 

@@ -29,6 +29,7 @@ class TCPClient(BaseNetworkClient):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.ssl:
+            self.close_tasks.append(self.ssl.close)
             self.ssl.set_logger(self.logger)
 
     @property
@@ -58,6 +59,7 @@ class UnixSocketClient(BaseClient):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.ssl:
+            self.close_tasks.append(self.ssl.close)
             self.ssl.set_logger(self.logger)
 
     @property

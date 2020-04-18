@@ -14,7 +14,7 @@ import sys
 from .protocols import ReceiverProtocol
 
 from aionetworking.compatibility import Protocol
-from typing import Optional, Generator, List, Tuple
+from typing import Optional, Generator, List, Tuple, Callable
 
 
 @dataclass
@@ -22,6 +22,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
     quiet: bool = False
     logger: LoggerType = field(default_factory=get_logger_receiver)
+    close_tasks: List[Callable] = field(default_factory=list, compare=False, hash=False, repr=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
@@ -46,6 +47,10 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         msgs = ','.join(list(self.listening_on_msgs))
         if msgs:
             send_status(msgs)
+
+    async def close(self):
+        if self.close_tasks:
+            await asyncio.wait([task() for task in self.close_tasks])
 
     async def serve_until_close_signal(self, stop_event: asyncio.Event = None,
                                        restart_event: asyncio.Event = None, notify_pid: int = None) -> None:
@@ -158,8 +163,9 @@ class BaseServer(BaseReceiver, Protocol):
             self._serving_forever_fut.cancel()
             self._serving_forever_fut = None
         await self._stop_server()
-        self.logger.info('%s stopped', self.name)
+        await super().close()
         await self.protocol_factory.close()
+        self.logger.info('%s stopped', self.name)
         self._status.set_stopped()
 
     def close_all_connections(self) -> None:

@@ -1,4 +1,3 @@
-
 from abc import abstractmethod
 import asyncio
 
@@ -15,13 +14,14 @@ from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.networking.connections_manager import get_unique_name
 from .protocols import SenderProtocol
 
-from typing import Optional
+from typing import Callable, List, Optional
 
 
 @dataclass
 class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
     logger: LoggerType = field(default_factory=get_logger_sender)
+    close_tasks: List[Callable] = field(default_factory=list, compare=False, hash=False, repr=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
@@ -41,7 +41,8 @@ class BaseSender(SenderProtocol, Protocol):
         await self.close()
 
     async def close(self):
-        pass
+        if self.close_tasks:
+            await asyncio.wait([task() for task in self.close_tasks])
 
     def is_started(self) -> bool:
         return self._status.is_started()
@@ -109,6 +110,7 @@ class BaseClient(BaseSender, Protocol):
         self._status.set_stopping()
         self.logger.info("Closing %s connection to %s", self.name, self.dst)
         await self._close_connection()
+        await super().close()
         await self.protocol_factory.close()
         self._status.set_stopped()
 

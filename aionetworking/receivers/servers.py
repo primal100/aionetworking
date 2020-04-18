@@ -31,6 +31,7 @@ class TCPServer(BaseNetworkServer):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.ssl:
+            self.close_tasks.append(self.ssl.close)
             self.ssl.set_logger(self.logger)
 
     @property
@@ -60,11 +61,13 @@ class UnixSocketServer(BaseServer):
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.ssl:
+            self.close_tasks.append(self.ssl.close)
             self.ssl.set_logger(self.logger)
 
     @property
     def ssl_context(self) -> Optional[SSLContext]:
         if self.ssl:
+            self.close_tasks.append(self.ssl.close)
             return self.ssl.context
 
     @property
