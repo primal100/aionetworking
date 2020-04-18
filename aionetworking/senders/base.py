@@ -21,7 +21,7 @@ from typing import Callable, List, Optional
 class BaseSender(SenderProtocol, Protocol):
     name = 'sender'
     logger: LoggerType = field(default_factory=get_logger_sender)
-    close_tasks: List[Callable] = field(default_factory=list, compare=False)
+    close_tasks: List[Callable] = field(default_factory=list, compare=False, hash=False, repr=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
