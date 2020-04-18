@@ -848,7 +848,7 @@ def short_validity_cert_actual_expiry_time(ssl_cert_key_short_validity_time) -> 
 @pytest.fixture
 async def server_side_ssl_short_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
     cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
-    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=True, cert=cert_path, key=key_path,
                                     warn_if_expires_before_days=7)
     yield server_side_ssl
     await server_side_ssl.close()
@@ -857,7 +857,7 @@ async def server_side_ssl_short_validity(ssl_cert_key_short_validity_time, ssl_s
 @pytest.fixture
 async def server_side_ssl_long_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
     cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
-    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, cert=cert_path, key=key_path,
                                     warn_if_expires_before_days=1)
     yield server_side_ssl
     await server_side_ssl.close()
@@ -865,7 +865,7 @@ async def server_side_ssl_long_validity(ssl_cert_key_short_validity_time, ssl_se
 
 @pytest.fixture
 def client_side_ssl_short_validity(tmpdir, ssl_client_key, ssl_server_cert, ssl_server_dir):
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, capath=tmpdir)
+    return ClientSideSSL(ssl=True, cert_required=True, capath=tmpdir)
 
 
 @pytest.fixture
@@ -876,7 +876,7 @@ def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client
 
 @pytest.fixture
 def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir):
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_client_cert, key=ssl_client_key,
+    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=True, cert=ssl_client_cert, key=ssl_client_key,
                          cafile=ssl_server_cert, capath=ssl_server_dir)
 
 

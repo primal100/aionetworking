@@ -47,7 +47,7 @@ class BaseSSLContext(Protocol):
     capath: Path = None
     cadata: str = None
     cert_required: bool = False
-    check_hostname: bool = False
+    check_hostname: bool = True
     warn_if_expires_before_days: int = warn_if_expires_before_days_default
     _warn_expiry_task: asyncio.Task = field(default=None, init=False, compare=False)
 
@@ -106,9 +106,11 @@ class BaseSSLContext(Protocol):
 @dataclass
 class ServerSideSSL(BaseSSLContext):
     purpose = Purpose.CLIENT_AUTH
+    check_hostname = False
 
 
 @dataclass
 class ClientSideSSL(BaseSSLContext):
     purpose = Purpose.SERVER_AUTH
+    check_hostname = False
 
