@@ -22,7 +22,7 @@ class BaseReceiver(ReceiverProtocol, Protocol):
     name = 'receiver'
     quiet: bool = False
     logger: LoggerType = field(default_factory=get_logger_receiver)
-    close_tasks: List[Callable] = field(default_factory=list)
+    close_tasks: List[Callable] = field(default_factory=list, compare=False)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
 
     @property
