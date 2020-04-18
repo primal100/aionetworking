@@ -1,4 +1,5 @@
-from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths
+from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get_default_verify_paths, \
+    cert_time_to_seconds
 import asyncio
 import datetime
 from aionetworking.logging.loggers import get_logger_receiver
@@ -17,11 +18,8 @@ except ImportError:
     warn_if_expires_before_days_default = None
 
 
-peercert_timestamp_converter = '%b %d %H:%M:%S %Y %Z'
-
-
 def ssl_cert_time_to_datetime(timestamp: str) -> datetime.datetime:
-    return datetime.datetime.strptime(timestamp, peercert_timestamp_converter)
+    return datetime.datetime.utcfromtimestamp(cert_time_to_seconds(timestamp))
 
 
 def check_ssl_cert_expired(expiry_time: datetime.datetime, warn_before_days: int) -> Optional[int]:
