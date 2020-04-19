@@ -7,7 +7,7 @@ server_path=$base_ssl_dir/server
 generate_certs () {
   key_path=$1/privkey.pem
   cert_path=$1/certificate.pem
-  openssl req -newkey rsa:2048 -nodes -keyout "$key_path" -x509 -days $days -out "$cert_path"
+  openssl req -newkey rsa:2048 -nodes -keyout "$key_path" -x509 -days $days -out "$cert_path" -config tests/ssl_localhost.cnf -extensions v3_req
 }
 
 generate_certs "$client_path"
