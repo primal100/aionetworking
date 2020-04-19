@@ -119,12 +119,16 @@ class BaseServer(BaseReceiver, Protocol):
         if self._status.is_starting_or_started():
             raise ServerException(f"{self.name} running on {self.listening_on} already started")
         self._status.set_starting()
-        await self.protocol_factory.start(logger=self.logger)
-        self.logger.info('Starting %s on %s', self.name, self.listening_on)
-        await self._start_server()
-        if not self.quiet:
-            self._print_listening_message()
-        self._status.set_started()
+        try:
+            await self.protocol_factory.start(logger=self.logger)
+            self.logger.info('Starting %s on %s', self.name, self.listening_on)
+            await self._start_server()
+            if not self.quiet:
+                self._print_listening_message()
+            self._status.set_started()
+        except Exception:
+            await self.close()
+            raise
 
     async def _serve_forever(self) -> None:
         if self._serving_forever_fut is not None:
@@ -208,8 +212,9 @@ class BaseServer(BaseReceiver, Protocol):
         self.server = await self._get_server()
 
     async def _stop_server(self) -> None:
-        self.server.close()
-        await self.server.wait_closed()
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
 
 
 @dataclass

@@ -22,7 +22,7 @@ from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFT
 from aionetworking.networking import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
 from aionetworking.requesters.echo import EchoRequester
-from aionetworking.networking.ssl_utils import generate_signed_key_cert
+from aionetworking.networking.ssl_utils import generate_signed_key_cert_from_openssl_conf_file
 from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorType
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
@@ -587,16 +587,6 @@ async def protocol_factory_client_connections_expire(echo_requester) -> StreamSe
     yield factory
 
 
-"""@pytest.fixture
-async def protocol_factory_server_connections_expire_started(protocol_factory_server_connections_expire,
-                                                             server_sock_str) -> StreamServerProtocolFactory:
-    await protocol_factory_server_connections_expire.start()
-    if not protocol_factory_server_connections_expire.full_name:
-        protocol_factory_server_connections_expire.set_name(f'TCP Server {server_sock_str}', 'tcp')
-    yield protocol_factory_server_connections_expire
-    await protocol_factory_server_connections_expire.close()"""
-
-
 @pytest.fixture
 async def udp_protocol_factory_server_connections_expire(echo_action) -> StreamServerProtocolFactory:
     factory = DatagramServerProtocolFactory(
@@ -607,18 +597,6 @@ async def udp_protocol_factory_server_connections_expire(echo_action) -> StreamS
         expire_connections_check_interval_minutes=0.2 / 60
     )
     yield factory
-
-
-"""@pytest.fixture
-async def udp_protocol_factory_server_connections_expire_started(udp_protocol_factory_server_connections_expire,
-                                                                 initial_server_context,
-                                                                 server_sock_str) -> DatagramServerProtocolFactory:
-    context_cv.set(initial_server_context)
-    await udp_protocol_factory_server_connections_expire.start()
-    if not udp_protocol_factory_server_connections_expire.full_name:
-        udp_protocol_factory_server_connections_expire.set_name(f'UDP Server {server_sock_str}', 'udp')
-    yield udp_protocol_factory_server_connections_expire
-    await udp_protocol_factory_server_connections_expire.close()"""
 
 
 @pytest.fixture
@@ -632,17 +610,6 @@ async def udp_protocol_factory_two_way_server(echo_action, buffered_file_storage
     yield factory
 
 
-"""@pytest.fixture
-async def udp_protocol_factory_two_way_server_started(udp_protocol_factory_two_way_server, server_sock_str,
-                                                      udp_initial_server_context) -> DatagramServerProtocolFactory:
-    context_cv.set(udp_initial_server_context)
-    await udp_protocol_factory_two_way_server.start()
-    if not udp_protocol_factory_two_way_server.full_name:
-        udp_protocol_factory_two_way_server.set_name(f'UDP Server {server_sock_str}', 'udp')
-    yield udp_protocol_factory_two_way_server
-    if udp_protocol_factory_two_way_server.transport and not udp_protocol_factory_two_way_server.transport.is_closing():
-        await udp_protocol_factory_two_way_server.close()"""
-
 
 @pytest.fixture
 async def sftp_protocol_factory_server(buffered_file_storage_action,
@@ -653,17 +620,6 @@ async def sftp_protocol_factory_server(buffered_file_storage_action,
         dataformat=JSONObject,
         hostname_lookup=True)
     yield factory
-
-
-"""@pytest.fixture
-async def sftp_protocol_factory_server_started(sftp_protocol_factory_server, server_sock_str,
-                                               sftp_initial_server_context) -> SFTPOSAuthProtocolFactory:
-    context_cv.set(sftp_initial_server_context)
-    await sftp_protocol_factory_server.start()
-    if not sftp_protocol_factory_server.full_name:
-        sftp_protocol_factory_server.set_name(f'SFTP Server {server_sock_str}', 'sftp')
-    yield sftp_protocol_factory_server
-    await sftp_protocol_factory_server.close()"""
 
 
 @pytest.fixture
@@ -689,18 +645,6 @@ async def sftp_protocol_factory_client_expired_connections() -> SFTPClientProtoc
     yield factory
 
 
-"""@pytest.fixture
-async def sftp_protocol_factory_server_expired_connections_started(sftp_protocol_factory_server_expired_connections,
-                                                                   server_sock_str, sftp_initial_server_context,
-                                                                   ) -> SFTPOSAuthProtocolFactory:
-    context_cv.set(sftp_initial_server_context)
-    await sftp_protocol_factory_server_expired_connections.start()
-    if not sftp_protocol_factory_server_expired_connections.full_name:
-        sftp_protocol_factory_server_expired_connections.set_name(f'SFTP Server {server_sock_str}', 'sftp')
-    yield sftp_protocol_factory_server_expired_connections
-    await sftp_protocol_factory_server_expired_connections.close()"""
-
-
 @pytest.fixture
 async def sftp_protocol_factory_client(tmpdir) -> SFTPClientProtocolFactory:
     factory = SFTPClientProtocolFactory(
@@ -709,17 +653,6 @@ async def sftp_protocol_factory_client(tmpdir) -> SFTPClientProtocolFactory:
         base_path=Path(tmpdir) / 'sftp_sent',
     )
     yield factory
-
-
-"""@pytest.fixture
-async def sftp_protocol_factory_client_started(sftp_initial_client_context, sftp_protocol_factory_client, tmpdir,
-                                               server_sock_str) -> SFTPClientProtocolFactory:
-    context_cv.set(sftp_initial_client_context)
-    await sftp_protocol_factory_client.start()
-    if not sftp_protocol_factory_client.full_name:
-        sftp_protocol_factory_client.set_name(f'SFTP Client {server_sock_str}', 'sftp')
-    yield sftp_protocol_factory_client
-    await sftp_protocol_factory_client.close()"""
 
 
 @pytest.fixture
@@ -835,8 +768,13 @@ def peercert_expires_soon(fixed_timestamp) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def ssl_cert_key_short_validity_time(tmpdir) -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
-    return generate_signed_key_cert(tmpdir, validity=3)
+def ssl_conf_file(ssl_dir) -> Path:
+    return ssl_dir / 'ssl_localhost.cnf'
+
+
+@pytest.fixture
+def ssl_cert_key_short_validity_time(ssl_conf_file, tmpdir) -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
+    return generate_signed_key_cert_from_openssl_conf_file(ssl_conf_file, tmpdir, validity=3)
 
 
 @pytest.fixture
@@ -848,7 +786,7 @@ def short_validity_cert_actual_expiry_time(ssl_cert_key_short_validity_time) -> 
 @pytest.fixture
 async def server_side_ssl_short_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
     cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
-    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, cert=cert_path, key=key_path,
                                     warn_if_expires_before_days=7)
     yield server_side_ssl
     await server_side_ssl.close()
@@ -857,26 +795,21 @@ async def server_side_ssl_short_validity(ssl_cert_key_short_validity_time, ssl_s
 @pytest.fixture
 async def server_side_ssl_long_validity(ssl_cert_key_short_validity_time, ssl_server_key, ssl_client_cert, ssl_client_dir):
     cert, cert_path, key, key_path = ssl_cert_key_short_validity_time
-    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, check_hostname=False, cert=cert_path, key=key_path,
+    server_side_ssl = ServerSideSSL(ssl=True, cert_required=False, cert=cert_path, key=key_path,
                                     warn_if_expires_before_days=1)
     yield server_side_ssl
     await server_side_ssl.close()
 
 
 @pytest.fixture
-def client_side_ssl_short_validity(tmpdir, ssl_client_key, ssl_server_cert, ssl_server_dir):
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, capath=tmpdir)
-
-
-@pytest.fixture
 def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
-    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_server_cert, key=ssl_server_key,
+    return ServerSideSSL(ssl=True, cert_required=True, cert=ssl_server_cert, key=ssl_server_key,
                          cafile=ssl_client_cert, capath=ssl_client_dir)
 
 
 @pytest.fixture
 def client_side_ssl(ssl_client_cert, ssl_client_key, ssl_server_cert, ssl_server_dir):
-    return ClientSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_client_cert, key=ssl_client_key,
+    return ClientSideSSL(ssl=True, cert_required=True, cert=ssl_client_cert, key=ssl_client_key,
                          cafile=ssl_server_cert, capath=ssl_server_dir)
 
 
@@ -890,33 +823,6 @@ def ssl_context(server_side_ssl, client_side_ssl, endpoint) -> Union[ServerSideS
 @pytest.fixture
 def server_side_no_ssl():
     return ServerSideSSL(ssl=False)
-
-
-"""@pytest.fixture
-async def tcp_protocol_two_way_server_allowed_senders(echo_action, initial_server_context, server_sock,
-                                                      server_sock_ipv6,
-                                                      server_sock_str, client_hostname) -> TCPServerConnection:
-    context_cv.set(initial_server_context)
-    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action, hostname_lookup=True,
-                               allowed_senders=[IPNetwork(server_sock[0]), IPNetwork(server_sock_ipv6[0])],
-                               parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp')
-    yield conn
-    if conn.transport and not conn.transport.is_closing():
-        conn.transport.close()
-    await conn.wait_closed()"""
-
-
-"""@pytest.fixture
-async def tcp_protocol_two_way_server_allowed_senders_hostname(echo_action, initial_server_context,
-                                                               server_sock_str, client_hostname) -> TCPServerConnection:
-    context_cv.set(initial_server_context)
-    conn = TCPServerConnection(dataformat=JSONObject, action=echo_action, hostname_lookup=True,
-                               allowed_senders=[IPNetwork(client_hostname)],
-                               parent_name=f"TCP Server {server_sock_str}", peer_prefix='tcp')
-    yield conn
-    if conn.transport and not conn.transport.is_closing():
-        conn.transport.close()
-    await conn.wait_closed()"""
 
 
 @pytest.fixture
@@ -984,3 +890,4 @@ def reset_endpoint_names():
     clear_unique_names()
     yield
     clear_unique_names()
+

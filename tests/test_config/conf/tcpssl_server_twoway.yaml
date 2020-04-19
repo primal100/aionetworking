@@ -13,7 +13,7 @@ ssl: !ServerSideSSL
      cafile: !Path "{ssl}/client/certificate.pem"
      capath: !Path "{ssl}/client"
      cert_required: True
-     check_hostname: True
+     check_hostname: False
 ssl_handshake_timeout: 60
 protocol_factory: !StreamServerProtocolFactory
                   action: !EchoAction
@@ -25,3 +25,4 @@ protocol_factory: !StreamServerProtocolFactory
                   dataformat: !JSON
                   pause_reading_on_buffer_size: null
                   hostname_lookup: True
+                  timeout: 5

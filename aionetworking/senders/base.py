@@ -81,9 +81,10 @@ class BaseClient(BaseSender, Protocol):
         return f"{self.name} {self.dst}"
 
     async def _close_connection(self) -> None:
-        await self.conn.wait_current_tasks()
-        self.transport.close()
-        await self.conn.wait_closed()
+        if self.conn and self.transport:
+            await self.conn.wait_current_tasks()
+            self.transport.close()
+            await self.conn.wait_closed()
         self.transport = None
 
     def is_closing(self) -> bool:
@@ -91,13 +92,17 @@ class BaseClient(BaseSender, Protocol):
 
     async def connect(self) -> ConnectionType:
         self._status.set_starting()
-        await self.protocol_factory.start(logger=self.logger)
-        self.logger.info("Opening %s connection to %s", self.name, self.dst)
-        connection = await self._open_connection()
-        connection.add_connection_lost_task(self.on_connection_lost)
-        await connection.wait_connected()
-        self._status.set_started()
-        return connection
+        try:
+            await self.protocol_factory.start(logger=self.logger)
+            self.logger.info("Opening %s connection to %s", self.name, self.dst)
+            connection = await self._open_connection()
+            connection.add_connection_lost_task(self.on_connection_lost)
+            await connection.wait_connected()
+            self._status.set_started()
+            return connection
+        except BaseException:
+            await self.close()
+            raise
 
     async def on_connection_lost(self) -> None:
         if not self._status.is_stopping_or_stopped():
