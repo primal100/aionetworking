@@ -49,10 +49,11 @@ class SFTPClient(BaseNetworkClient):
         return self._status.is_stopping_or_stopped()
 
     async def _close_connection(self) -> None:
-        await self.conn.wait_tasks_done()
-        self.sftp.exit()
-        self.conn.close()
-        await self.conn.wait_closed()
+        if self.conn and self.sftp:
+            await self.conn.wait_tasks_done()
+            self.sftp.exit()
+            self.conn.close()
+            await self.conn.wait_closed()
 
     @property
     def actual_local_addr(self) -> Tuple[str, int]:

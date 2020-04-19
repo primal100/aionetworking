@@ -39,7 +39,7 @@ def check_peercert_expired(peercert: Dict[str, Any], warn_before_days: int) -> T
 class BaseSSLContext(Protocol):
     purpose = None
     logger: LoggerType = field(default_factory=get_logger_receiver)
-    ssl: bool = False
+    ssl: bool = True
     cert: Path = None
     key: Path = None
     key_password: str = None
@@ -107,10 +107,12 @@ class BaseSSLContext(Protocol):
 class ServerSideSSL(BaseSSLContext):
     purpose = Purpose.CLIENT_AUTH
     check_hostname: bool = False
+    cert_required: bool = False
 
 
 @dataclass
 class ClientSideSSL(BaseSSLContext):
     purpose = Purpose.SERVER_AUTH
     check_hostname: bool = True
+    cert_required: bool = True
 

@@ -254,11 +254,12 @@ class NetworkConnectionProtocol(BaseConnectionProtocol, Protocol):
         if cipher:
             self.logger.info(f"Cipher: {cipher}', 'Compression': {transport.get_extra_info('compression')}")
             peercert = transport.get_extra_info('peercert')
-            self.logger.debug(peercert)
-            if self.check_peer_cert_expiry:
-                expiry_time, cert_expiry_in_days = check_peercert_expired(peercert, self.check_peer_cert_expiry)
-                if cert_expiry_in_days:
-                    self.logger.warn_on_cert_expiry(f'Peer @ {self.context["host"]}', cert_expiry_in_days, expiry_time)
+            if peercert:
+                self.logger.debug(peercert)
+                if self.check_peer_cert_expiry:
+                    expiry_time, cert_expiry_in_days = check_peercert_expired(peercert, self.check_peer_cert_expiry)
+                    if cert_expiry_in_days:
+                        self.logger.warn_on_cert_expiry(f'Peer @ {self.context["host"]}', cert_expiry_in_days, expiry_time)
 
     def send(self, msg: bytes) -> None:
         self.transport.write(msg)

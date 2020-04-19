@@ -768,8 +768,8 @@ def peercert_expires_soon(fixed_timestamp) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def ssl_conf_file(test_networking_dir) -> Path:
-    return test_networking_dir / 'ssl_localhost.cnf'
+def ssl_conf_file(ssl_dir) -> Path:
+    return ssl_dir / 'ssl_localhost.cnf'
 
 
 @pytest.fixture
