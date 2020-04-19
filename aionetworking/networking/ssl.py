@@ -106,11 +106,11 @@ class BaseSSLContext(Protocol):
 @dataclass
 class ServerSideSSL(BaseSSLContext):
     purpose = Purpose.CLIENT_AUTH
-    check_hostname = False
+    check_hostname: bool = False
 
 
 @dataclass
 class ClientSideSSL(BaseSSLContext):
     purpose = Purpose.SERVER_AUTH
-    check_hostname = False
+    check_hostname: bool = True
 

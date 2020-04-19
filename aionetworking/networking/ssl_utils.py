@@ -53,7 +53,7 @@ test_cert_data: CertData = CertData(country='IE', state_or_province='Dublin', lo
                                     common_name='testing')
 
 
-def generate_cert(path: Path, key: rsa.RSAPrivateKey, validity: int = 365, dns_name='localhost',
+def generate_cert(path: Path, key: rsa.RSAPrivateKey, validity: int = 365, dns_name='127.0.0.1',
                   cert_data: CertData = None) -> x509.Certificate:
     cert_data = cert_data or test_cert_data
     subject = issuer = x509.Name([
@@ -87,7 +87,7 @@ def generate_cert(path: Path, key: rsa.RSAPrivateKey, validity: int = 365, dns_n
 def generate_signed_key_cert(base_path: Path, privkey_filename='privkey.pem', cert_filename='cert.pem',
                              public_exponent: int = 65537, key_size: int = 2048, passphrase: str = None,
                              validity: int = 365, cert_data: CertData = None,
-                             dns_name: str = 'localhost') -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
+                             dns_name: str = '127.0.0.1') -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
     key_path = Path(base_path / privkey_filename)
     cert_path = Path(base_path / cert_filename)
     key = generate_privkey(key_path, public_exponent=public_exponent, key_size=key_size, passphrase=passphrase)

@@ -870,7 +870,7 @@ def client_side_ssl_short_validity(tmpdir, ssl_client_key, ssl_server_cert, ssl_
 
 @pytest.fixture
 def server_side_ssl(ssl_server_cert, ssl_server_key, ssl_client_cert, ssl_client_dir):
-    return ServerSideSSL(ssl=True, cert_required=True, check_hostname=False, cert=ssl_server_cert, key=ssl_server_key,
+    return ServerSideSSL(ssl=True, cert_required=True, cert=ssl_server_cert, key=ssl_server_key,
                          cafile=ssl_client_cert, capath=ssl_client_dir)
 
 
