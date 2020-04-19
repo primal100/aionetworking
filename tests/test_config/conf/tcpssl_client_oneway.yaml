@@ -13,7 +13,7 @@ ssl: !ClientSideSSL
      cafile: !Path "{ssl}/server/certificate.pem"
      capath: !Path "{ssl}/server"
      cert_required: True
-     check_hostname: False
+     check_hostname: True
 ssl_handshake_timeout: 60
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
