@@ -22,7 +22,7 @@ from aionetworking.networking.sftp_os_auth import SFTPOSAuthProtocolFactory, SFT
 from aionetworking.networking import ServerSideSSL, ClientSideSSL
 from aionetworking.networking.transports import DatagramTransportWrapper
 from aionetworking.requesters.echo import EchoRequester
-from aionetworking.networking.ssl_utils import generate_signed_key_cert
+from aionetworking.networking.ssl_utils import generate_signed_key_cert_from_openssl_conf_file
 from aionetworking.types.networking import SimpleNetworkConnectionType, AdaptorType
 from aionetworking.utils import IPNetwork
 from aionetworking.compatibility_tests import AsyncMock
@@ -768,8 +768,13 @@ def peercert_expires_soon(fixed_timestamp) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def ssl_cert_key_short_validity_time(tmpdir) -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
-    return generate_signed_key_cert(tmpdir, validity=3)
+def ssl_conf_file(test_networking_dir) -> Path:
+    return test_networking_dir / 'ssl_localhost.cnf'
+
+
+@pytest.fixture
+def ssl_cert_key_short_validity_time(ssl_conf_file, tmpdir) -> Tuple[x509.Certificate, Path, rsa.RSAPrivateKey, Path]:
+    return generate_signed_key_cert_from_openssl_conf_file(ssl_conf_file, tmpdir, validity=3)
 
 
 @pytest.fixture
@@ -794,11 +799,6 @@ async def server_side_ssl_long_validity(ssl_cert_key_short_validity_time, ssl_se
                                     warn_if_expires_before_days=1)
     yield server_side_ssl
     await server_side_ssl.close()
-
-
-@pytest.fixture
-def client_side_ssl_short_validity(tmpdir, ssl_client_key, ssl_server_cert, ssl_server_dir):
-    return ClientSideSSL(ssl=True, cert_required=True, capath=tmpdir)
 
 
 @pytest.fixture
@@ -890,3 +890,4 @@ def reset_endpoint_names():
     clear_unique_names()
     yield
     clear_unique_names()
+

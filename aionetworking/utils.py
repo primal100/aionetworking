@@ -19,7 +19,7 @@ from functools import wraps
 from .compatibility import Protocol
 from pathlib import Path
 from typing import Sequence, Callable, List, AnyStr, Tuple, Union, AsyncGenerator, Any, TYPE_CHECKING, Optional, Iterable
-from ipaddress import IPv4Network, IPv6Network
+from ipaddress import IPv4Network, IPv6Network, IPv4Address, IPv6Address
 
 try:
     import psutil
@@ -236,6 +236,13 @@ def addr_tuple_to_str(addr: Sequence):
 def addr_str_to_tuple(addr: AnyStr):
     addr, port = addr.split(':')
     return addr, int(port)
+
+
+def ipv4_or_ipv6(address: Union[str, IPv4Address, IPv6Address]):
+    try:
+        return IPv4Address(address)
+    except AddressValueError:
+        return IPv6Address(address)
 
 
 class IPNetwork:
