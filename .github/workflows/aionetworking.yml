@@ -32,4 +32,4 @@ jobs:
         pip install -r requirements_optional.txt -r requirements_sftp.txt -r requirements_tests.txt
     - name: Test with pytest
       run: |
-        pytest tests
+        pytest tests -vv --timeout=5
