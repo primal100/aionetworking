@@ -12,10 +12,14 @@ APP_CONFIG = {}
 
 
 def __getattr__(name):
+    path = None
     if name == 'TEMPDIR':
-        return Path(tempfile.gettempdir()) / sys.modules[__name__].APP_NAME.replace(" ", "")
+        path = Path(tempfile.gettempdir()) / sys.modules[__name__].APP_NAME.replace(" ", "")
     elif name == 'APP_HOME':
-        return Path(os.environ.get('appdata', Path.home()), sys.modules[__name__].APP_NAME)
+        path = Path(os.environ.get('appdata', Path.home()), sys.modules[__name__].APP_NAME)
+    if path:
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
 
 if not py37:
