@@ -114,6 +114,7 @@ class BaseSSLContext(Protocol):
             if hasattr(context, 'keylog_filename'):
                 keylogfile = os.environ.get('SSLKEYLOGFILE')
                 if keylogfile and not sys.flags.ignore_environment:
+                    self.logger.debug("Logging TLS keys to %s", keylogfile)
                     context.keylog_filename = keylogfile
             return context
         return None
