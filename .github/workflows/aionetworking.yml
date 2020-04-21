@@ -15,6 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: [3.6, 3.7, 3.8]
@@ -32,4 +33,4 @@ jobs:
         pip install -r requirements_optional.txt -r requirements_sftp.txt -r requirements_tests.txt
     - name: Test with pytest
       run: |
-        pytest tests -vv --timeout=5
+        pytest tests -vv --timeout=7
