@@ -2,9 +2,12 @@ from ssl import SSLContext, Purpose, CERT_REQUIRED, CERT_NONE, PROTOCOL_TLS, get
     cert_time_to_seconds
 import asyncio
 import datetime
+import os
+import sys
+from aionetworking.compatibility import Protocol, create_task, set_task_name, cached_property
 from aionetworking.logging.loggers import get_logger_receiver
 from aionetworking.types.logging import LoggerType
-from aionetworking.compatibility import Protocol, create_task, set_task_name, cached_property
+from aionetworking.utils import better_file_not_found_error
 
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
@@ -79,12 +82,16 @@ class BaseSSLContext(Protocol):
             context = SSLContext(PROTOCOL_TLS)
             if self.cert and self.key:
                 self.logger.info("Using SSL Cert: %s", self.cert)
-                context.load_cert_chain(str(self.cert), str(self.key), password=self.key_password)
+                try:
+                    context.load_cert_chain(str(self.cert), str(self.key), password=self.key_password)
+                except FileNotFoundError as e:
+                    raise FileNotFoundError(better_file_not_found_error(self.cert, self.key, purpose='ssl cert loading'))
                 if self.warn_if_expires_before_days:
                     self._warn_expiry_task = create_task(self.check_cert_expiry())
                     set_task_name(self._warn_expiry_task, 'CheckSSLCertValidity')
             context.verify_mode = CERT_REQUIRED if self.cert_required else CERT_NONE
             context.check_hostname = self.check_hostname
+            self.logger.info('%s, Check Hostname: %s' % (context.verify_mode, context.check_hostname))
 
             if context.verify_mode != CERT_NONE:
                  if self.cafile or self.capath or self.cadata:
@@ -93,12 +100,21 @@ class BaseSSLContext(Protocol):
                         'capath': str(self.capath) if self.capath else None,
                         'cadata': self.cadata
                     }
-                    context.load_verify_locations(**locations)
-                    self.logger.info("Verifying SSL certs with: %s", locations)
+                    try:
+                        context.load_verify_locations(**locations)
+                        self.logger.info("Verifying SSL certs with: %s", locations)
+                    except FileNotFoundError:
+                        raise FileNotFoundError(
+                            better_file_not_found_error(*locations.values(), purpose='CA ssl cert validation'))
                  else:
                     context.load_default_certs(self.purpose)
                     self.logger.info("Verifying SSL certs with: %s", get_default_verify_paths())
             self.logger.info("SSL Context loaded")
+            # OpenSSL 1.1.1 keylog file
+            if hasattr(context, 'keylog_filename'):
+                keylogfile = os.environ.get('SSLKEYLOGFILE')
+                if keylogfile and not sys.flags.ignore_environment:
+                    context.keylog_filename = keylogfile
             return context
         return None
 

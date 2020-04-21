@@ -1,4 +1,5 @@
 from tests.test_networking.conftest import *
+import pytest
 from aionetworking import TCPServer, UDPServer, PipeServer
 from aionetworking.formats.contrib.json import JSONObject
 from aionetworking.receivers import BaseServer

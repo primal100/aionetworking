@@ -32,6 +32,18 @@ except ImportError:
 str_to_list = re.compile(r"^\s+|\s*,\s*|\s+$")
 
 
+def better_file_not_found_error(*files: Union[str, Path], purpose: str = None):
+    if purpose:
+        additional = f'required for {purpose } '
+    else:
+        additional = ''
+    for i, path in enumerate(files):
+        path = Path(path)
+        if not path.exists():
+            return f'Path {path} {additional}was not found'
+    return f'Unknown file {additional}was not found'
+
+
 ###Coroutines###
 async def time_coro(coro):
     start_time = time.time()
