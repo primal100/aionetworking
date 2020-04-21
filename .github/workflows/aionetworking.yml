@@ -33,13 +33,4 @@ jobs:
         pip install -r requirements_optional.txt -r requirements_sftp.txt -r requirements_tests.txt
     - name: Test with pytest
       run: |
-        pytest tests/test_formats -vv --timeout=7
-        pytest tests/test_futures -vv --timeout=7
-        pytest tests/test_actions -vv --timeout=7
-        pytest tests/test_requesters  -vv --timeout=7
-        pytest tests/test_networking -vv --timeout=7
-        pytest tests/test_receivers  -vv --timeout=7
-        pytest tests/test_senders  -vv --timeout=7
-        pytest tests/test_end_to_end  -vv --timeout=7
-        pytest tests/test_config  -vv --timeout=7
-        pytest tests/test_runners  -vv --timeout=7
+        pytest tests -vv --timeout=7
