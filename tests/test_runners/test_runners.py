@@ -3,6 +3,7 @@ import asyncio
 import pytest
 import signal
 import os
+import sys
 from aionetworking.compatibility import supports_keyboard_interrupt
 from aionetworking.utils import wait_server_started_raise_signal, assert_reload_ok
 
@@ -27,7 +28,7 @@ class TestRunnerDirect:
         assert out == f'Serving TCP Server on {ip}:{port}\n'
 
     @pytest.mark.parametrize('signal_num', [
-        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(sys.platform != 'linux', reason='Linux only'))
     ])
     def test_02_runner_reload(self, tmp_config_file, all_paths, server_sock, signal_num, capsys, executor,
                               new_event_loop):
