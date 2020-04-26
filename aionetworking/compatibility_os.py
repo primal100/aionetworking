@@ -128,3 +128,7 @@ def has_ip_address(ip: str) -> bool:
         if any(a.address == ip for a in i):
             return True
     return False
+
+
+def is_mac_os() -> bool:
+    return sys.platform == 'darwin'

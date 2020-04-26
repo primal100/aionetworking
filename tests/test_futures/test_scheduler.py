@@ -1,6 +1,7 @@
 import pytest   # noinspection PyPackageRequirements
 import asyncio
 from aionetworking.compatibility import create_task
+from aionetworking.compatibility_os import is_mac_os
 
 
 class TestTaskScheduler:
@@ -75,6 +76,7 @@ class TestTaskScheduler:
         interval = task_scheduler.get_start_interval(fixed_start_time, immediate, delay)
         assert interval == start_interval
 
+    @pytest.mark.skipif(is_mac_os(), reason='asyncio.sleep mysteriously slow on MacOS')
     @pytest.mark.parametrize('immediate,num,coro_or_cb', [(True, 3, 'coro'), (False, 2, 'cb')])
     @pytest.mark.asyncio
     async def test_08_periodic_coro_lifecycle(self, task_scheduler, immediate, num, coro_or_cb):
