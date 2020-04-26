@@ -4,6 +4,10 @@ import os
 import platform
 import sys
 from functools import partial
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 from aionetworking.types.logging import LoggerType
 
@@ -116,3 +120,11 @@ def windows_and_is_administrator() -> bool:
         return False
     from win32com.shell import shell
     return shell.IsUserAnAdmin()
+
+
+def has_ip_address(ip: str) -> bool:
+    interfaces = psutil.net_if_addrs().values()
+    for i in interfaces:
+        if any(a.address == ip for a in interfaces):
+            return True
+    return False
