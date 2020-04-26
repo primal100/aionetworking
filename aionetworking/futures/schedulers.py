@@ -121,11 +121,10 @@ class TaskScheduler:
         while True:
             print(datetime.now(), 'start of while loop', file=sys.stderr)
             coro = async_callback(*args, **kwargs)
-            print(datetime.now(), 'callback run once', file=sys.stderr)
             await coro
             print(datetime.now(), 'coro awaited', file=sys.stderr)
             await asyncio.sleep(interval)
-            print(datetime.now(), 'sleep done', file=sys.stderr)
+            print(datetime.now(), f'sleep for {interval} seconds done', file=sys.stderr)
 
     def call_coro_periodic(self, interval: Union[int, float], async_callback: Callable, *args,
                            fixed_start_time: bool = False, immediate: bool = False, task_name: str = None,
