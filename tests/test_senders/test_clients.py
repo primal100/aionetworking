@@ -6,6 +6,7 @@ import asyncssh
 from aionetworking.networking.exceptions import RemoteConnectionClosedError
 
 from aionetworking.compatibility import datagram_supported, py38
+from aionetworking.compatibility_os import has_ip_address
 
 
 class TestClientStartStop:
@@ -92,6 +93,7 @@ class TestClientAllowedSenders:
             response = await asyncio.wait_for(conn.send_data_and_wait(1, echo_encoded), timeout=1)
             assert response == echo_response_object
 
+    @pytest.mark.skipif(not has_ip_address('127.0.0.2'), reason='Second localhost ip not available')
     @pytest.mark.skipif(not py38, reason='Mysteriously fails < 3.8')
     @pytest.mark.asyncio
     async def test_01_client_connect_not_allowed(self, server_allowed_senders, client_incorrect_sender, echo_encoded):

@@ -2,7 +2,12 @@ import signal
 import asyncio
 import os
 import platform
+import sys
 from functools import partial
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 from aionetworking.types.logging import LoggerType
 
@@ -80,6 +85,10 @@ def is_wsl() -> bool:
     return os.name == 'posix' and 'microsoft' in platform.uname().release.lower()
 
 
+def is_aix() -> bool:
+    return sys.platform.startswith("aix")
+
+
 if os.name == 'posix':
     import pamela
     authentication_type = 'PAM'
@@ -111,3 +120,15 @@ def windows_and_is_administrator() -> bool:
         return False
     from win32com.shell import shell
     return shell.IsUserAnAdmin()
+
+
+def has_ip_address(ip: str) -> bool:
+    interfaces = psutil.net_if_addrs().values()
+    for i in interfaces:
+        if any(a.address == ip for a in i):
+            return True
+    return False
+
+
+def is_mac_os() -> bool:
+    return sys.platform == 'darwin'

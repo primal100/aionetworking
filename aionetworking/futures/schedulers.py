@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+import sys
 from typing import Any, Callable, Awaitable, List, Union, Dict, Optional, Type
 
 from aionetworking.compatibility import set_task_name, create_task
@@ -112,8 +113,9 @@ class TaskScheduler:
             return delay
 
     @staticmethod
-    async def _call_coro_periodic(interval: Union[int, float], async_callback: Callable,
-                             *args, start_time_interval: Union[int, float] = 0, **kwargs):
+    async def _call_coro_periodic(interval: Union[int, float], async_callback: Callable, *args,
+                                  start_time_interval: Union[int, float] = 0, **kwargs):
+        # Asyncio.sleep wrong time on MacOS
         await asyncio.sleep(start_time_interval)
         while True:
             coro = async_callback(*args, **kwargs)

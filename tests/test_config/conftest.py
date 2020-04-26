@@ -159,13 +159,13 @@ def log_record(client_sock_str, server_sock_str) -> logging.LogRecord:
 
 
 @pytest.fixture()
-def log_record_not_included(client_sock, server_sock_str) -> logging.LogRecord:
+def log_record_not_included(client_sock, server_sock_str, client_sock_ipv6) -> logging.LogRecord:
     record = logging.LogRecord('receiver.connection', logging.INFO, os.path.abspath(__file__), 180,
-                               'New %s connection from %s to %s', ('TCP Server', f'127.0.0.2:{client_sock[1]}',
+                               'New %s connection from %s to %s', ('TCP Server', f'{client_sock_ipv6[0]}:{client_sock[1]}',
                                                                    server_sock_str),
                                None, func='new_connection', sinfo=None)
     record.hostname = 'localhost2'
-    record.host = '127.0.0.2'
+    record.host = client_sock_ipv6[0]
     return record
 
 
