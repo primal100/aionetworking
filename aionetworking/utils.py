@@ -12,7 +12,7 @@ import sys
 import socket
 import tempfile
 from aionetworking.compatibility import py38, net_supernet_of, WindowsProactorEventLoopPolicy, WindowsSelectorEventLoopPolicy
-from aionetworking.compatibility_os import is_wsl
+from aionetworking.compatibility_os import is_wsl, is_aix
 from dataclasses import dataclass, fields, MISSING
 from functools import wraps
 
@@ -329,7 +329,7 @@ def raise_signal(signal_num: int, pid: int = None) -> None:
 
 def wait_server_started_raise_signal(signal_num: int, host: str, capsys, pid: int = None) -> Tuple[str, int]:
     out, port = wait_on_capsys(capsys)
-    assert is_listening_on((host, port))
+    assert is_listening_on((host, port), pid=pid)
     raise_signal(signal_num, pid=pid)
     return out, port
 
@@ -366,9 +366,15 @@ def get_ip_port(host: str, transport) -> Tuple[str, int]:
 ###System###
 
 
-def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
-    if psutil and not is_wsl():
-        connections = psutil.net_connections(kind=kind)
+def _process_by_id(pid: int):
+    return [p for p in psutil.process_iter() if p.info['pid'] == pid][0]
+
+
+def is_listening_on(addr: Tuple[str, int], kind: str = 'inet', pid: int = None) -> bool:
+    if psutil and not is_wsl() and not is_aix():
+        pid = pid or os.getpid()
+        process = _process_by_id(pid)
+        connections = process.connections(kind=kind)
         return any(
             conn.laddr == addr and any(status == conn.status for status in (psutil.CONN_LISTEN, psutil.CONN_NONE)) for
             conn in connections)
@@ -376,23 +382,6 @@ def is_listening_on(addr: Tuple[str, int], kind: str = 'inet') -> bool:
         import subprocess
         process = subprocess.run(f'nc -z {addr[0]} {addr[1]}'.split())
         return process.returncode == 0
-
-
-def wait_listening_on_sync(addr: Tuple[str, int], kind: str = 'inet', timeout: int = 3):
-    i = 0
-    interval = 0.5
-    while not is_listening_on(addr, kind=kind):
-        time.sleep(interval)
-        if timeout:
-            i += interval
-            if i >= timeout:
-                raise TimeoutError(f'Waited for {timeout} seconds for listener on {addr}')
-
-
-async def wait_listening_on_async(addr: Tuple[str, int], kind: str = 'inet'):
-    interval = 0.5
-    while not is_listening_on(addr, kind=kind):
-        await asyncio.sleep(interval)
 
 
 class SystemInfo:

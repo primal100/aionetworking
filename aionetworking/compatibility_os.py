@@ -2,6 +2,7 @@ import signal
 import asyncio
 import os
 import platform
+import sys
 from functools import partial
 
 from aionetworking.types.logging import LoggerType
@@ -78,6 +79,10 @@ def send_notify_start_signal(pid: int):
 
 def is_wsl() -> bool:
     return os.name == 'posix' and 'microsoft' in platform.uname().release.lower()
+
+
+def is_aix() -> bool:
+    return sys.platform.startswith("aix")
 
 
 if os.name == 'posix':
