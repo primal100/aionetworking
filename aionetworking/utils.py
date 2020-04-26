@@ -367,7 +367,7 @@ def get_ip_port(host: str, transport) -> Tuple[str, int]:
 
 
 def _process_by_id(pid: int):
-    return [p for p in psutil.process_iter() if p.info['pid'] == pid][0]
+    return [p for p in psutil.process_iter() if p.pid == pid][0]
 
 
 def is_listening_on(addr: Tuple[str, int], kind: str = 'inet', pid: int = None) -> bool:
