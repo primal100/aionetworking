@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+import sys
 from typing import Any, Callable, Awaitable, List, Union, Dict, Optional, Type
 
 from aionetworking.compatibility import set_task_name, create_task
@@ -112,13 +113,19 @@ class TaskScheduler:
             return delay
 
     @staticmethod
-    async def _call_coro_periodic(interval: Union[int, float], async_callback: Callable,
-                             *args, start_time_interval: Union[int, float] = 0, **kwargs):
+    async def _call_coro_periodic(interval: Union[int, float], async_callback: Callable, *args,
+                                  start_time_interval: Union[int, float] = 0, **kwargs):
+        print(datetime.now(), 'starting call_coro_periodoc', file=sys.stderr)
         await asyncio.sleep(start_time_interval)
+        print(datetime.now(), 'after start interval', file=sys.stderr)
         while True:
+            print(datetime.now(), 'start of while loop', file=sys.stderr)
             coro = async_callback(*args, **kwargs)
+            print(datetime.now(), 'callback run once', file=sys.stderr)
             await coro
+            print(datetime.now(), 'coro awaited', file=sys.stderr)
             await asyncio.sleep(interval)
+            print(datetime.now(), 'sleep done', file=sys.stderr)
 
     def call_coro_periodic(self, interval: Union[int, float], async_callback: Callable, *args,
                            fixed_start_time: bool = False, immediate: bool = False, task_name: str = None,
