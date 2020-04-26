@@ -106,7 +106,7 @@ class BaseServer(BaseReceiver, Protocol):
     def listening_on_msgs(self) -> Generator[str, None, None]:
         for sock_name in self.listening_on_sockets:
             if isinstance(sock_name, (tuple, list)):
-                listening_on = ':'.join([str(v) for v in sock_name])
+                listening_on = ':'.join([str(v) for v in sock_name[0:2]])
             else:
                 listening_on = sock_name
             yield f"Serving {self.name} on {listening_on}"
