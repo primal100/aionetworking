@@ -131,11 +131,12 @@ else:
             if task.cancelled():
                 continue
             if task.exception() is not None:
-                loop.call_exception_handler({
-                    'message': 'unhandled exception during asyncio.run() shutdown',
-                    'exception': task.exception(),
-                    'task': task,
-                })
+                if not isinstance(task.exception(), StopAsyncIteration): #Fix for issue with catching StopAsyncIteration in Python 3.6
+                    loop.call_exception_handler({
+                        'message': 'unhandled exception during asyncio.run() shutdown',
+                        'exception': task.exception(),
+                        'task': task,
+                    })
 
 
 def supports_task_name():
