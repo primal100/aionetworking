@@ -125,6 +125,6 @@ def windows_and_is_administrator() -> bool:
 def has_ip_address(ip: str) -> bool:
     interfaces = psutil.net_if_addrs().values()
     for i in interfaces:
-        if any(a.address == ip for a in interfaces):
+        if any(a.address == ip for a in i):
             return True
     return False
