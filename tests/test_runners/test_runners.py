@@ -28,11 +28,11 @@ class TestRunnerDirect:
         assert out == f'Serving TCP Server on {ip}:{port}\n'
 
     @pytest.mark.parametrize('signal_num', [
-        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(sys.platform != 'linux', reason='Linux only'))
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='Not applicable for Windows'))
     ])
     def test_02_runner_reload(self, tmp_config_file, all_paths, server_sock, signal_num, capsys, executor,
                               new_event_loop):
-        new_host = '127.0.0.2'
+        new_host = '::1'
         fut = executor.submit(assert_reload_ok, signal_num, server_sock[0], new_host, tmp_config_file, capsys)
         try:
             run_server_default_tags(tmp_config_file, paths=all_paths, timeout=6)
