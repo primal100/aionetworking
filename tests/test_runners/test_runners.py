@@ -32,7 +32,8 @@ class TestRunnerDirect:
                 print(await p.stderr.read())
             else:
                 port = port_from_out(s)
-                assert s == f'Serving TCP Server on {host}:{port}\r\n'
+                newline = '\r\n' if os.name == 'nt' else '\n'
+                assert s == f'Serving TCP Server on {host}:{port}{newline}'
                 assert is_listening_on((host, port), pid=p.pid)
                 # ensure that child process gets to run_forever
                 time.sleep(0.5)
