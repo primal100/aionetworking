@@ -9,16 +9,11 @@ from aionetworking.utils import is_listening_on, wait_on_capsys, port_from_out, 
 
 
 class TestRunnerDirect:
-    def test_00_run_server(self, tmp_config_file, all_paths, server_sock, new_event_loop, capsys,
-                           load_all_yaml_tags):
+    def test_00_run_server(self, tmp_config_file, all_paths, server_sock, capsys):
         host = server_sock[0]
-        try:
-            run_server_default_tags(tmp_config_file, paths=all_paths, timeout=3)
-            out, port = wait_on_capsys(capsys)
-            assert out == f'Serving TCP Server on {host}:{port}'
-            assert is_listening_on((host, port))
-        except asyncio.TimeoutError:
-            pass
+        run_server_default_tags(tmp_config_file, paths=all_paths, duration=3)
+        out, port = wait_on_capsys(capsys)
+        assert out == f'Serving TCP Server on {host}:{port}\n'
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('signal_num', [
@@ -62,10 +57,7 @@ class TestRunnerDirect:
                               new_event_loop):
         new_host = '::1'
         fut = executor.submit(assert_reload_ok, signal_num, server_sock[0], new_host, tmp_config_file, capsys)
-        try:
-            run_server_default_tags(tmp_config_file, paths=all_paths, timeout=6)
-        except asyncio.TimeoutError:
-            pass
+        run_server_default_tags(tmp_config_file, paths=all_paths, duration=10)
         out, port = fut.result(1)
         out += capsys.readouterr().out
         assert out == f'Serving TCP Server on {new_host}:{port}\n'
