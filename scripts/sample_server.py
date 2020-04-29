@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 from aionetworking.runners import run_server_default_tags
 from aionetworking.utils import set_loop_policy
-import os
 
 
 if __name__ == '__main__':
-    pid = os.getpid()
-    print('sample server parent process', os.getppid(), 'own process', os.getpid())
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('conf', type=str, nargs='?',
