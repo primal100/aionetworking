@@ -17,4 +17,4 @@ if __name__ == '__main__':
     args, kw = parser.parse_known_args()
     if args.loop:
         set_loop_policy(posix_loop_type=args.loop, windows_loop_type=args.loop)
-    run_server_default_tags(args.conf, notify_pid=args.notify_pid, timeout=args.timeout)
+    run_server_default_tags(args.conf, notify_pid=args.notify_pid, duration=args.timeout)

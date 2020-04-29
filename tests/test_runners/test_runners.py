@@ -9,7 +9,7 @@ from aionetworking.utils import is_listening_on, wait_on_capsys, port_from_out, 
 
 
 class TestRunnerDirect:
-    def test_00_run_server(self, tmp_config_file, all_paths, server_sock, capsys):
+    def test_00_run_server(self, tmp_config_file, all_paths, server_sock, capsys, new_event_loop):
         host = server_sock[0]
         run_server_default_tags(tmp_config_file, paths=all_paths, duration=3)
         out, port = wait_on_capsys(capsys)
@@ -30,7 +30,6 @@ class TestRunnerDirect:
             s = s.decode()
             if not s:
                 print(await p.stderr.read())
-                raise AssertionError
             else:
                 port = port_from_out(s)
                 assert s == f'Serving TCP Server on {host}:{port}\r\n'
