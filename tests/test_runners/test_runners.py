@@ -1,36 +1,74 @@
 from aionetworking.runners import run_server_default_tags
 import asyncio
 import pytest
+import subprocess
 import signal
 import os
+import time
 import sys
-from aionetworking.compatibility import supports_keyboard_interrupt
-from aionetworking.utils import wait_server_started_raise_signal, assert_reload_ok
+from aionetworking.utils import is_listening_on, wait_on_capsys, port_from_out, assert_reload_ok
 
 
 class TestRunnerDirect:
-    @pytest.mark.skipifwindowsxdist
-    @pytest.mark.parametrize('signal_num', [
-        pytest.param(signal.SIGINT, marks=pytest.mark.skipif(not supports_keyboard_interrupt(),
-                                                             reason='Loop does not support keyboard interrupts')),
-        pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
-    ])
-    def test_00_run_server(self, tmp_config_file, all_paths, signal_num, server_sock, new_event_loop, capsys,
-                           load_all_yaml_tags, executor):
-        ip = server_sock[0]
-        fut = executor.submit(wait_server_started_raise_signal, signal_num, ip, capsys)
+    def test_00_run_server(self, tmp_config_file, all_paths, server_sock, new_event_loop, capsys,
+                           load_all_yaml_tags):
+        host = server_sock[0]
         try:
             run_server_default_tags(tmp_config_file, paths=all_paths, timeout=3)
+            out, port = wait_on_capsys(capsys)
+            assert out == f'Serving TCP Server on {host}:{port}'
+            assert is_listening_on((host, port))
         except asyncio.TimeoutError:
             pass
-        out, port = fut.result(timeout=2)
-        out += capsys.readouterr().out
-        assert out == f'Serving TCP Server on {ip}:{port}\n'
+
+    @pytest.mark.skipifwindowsxdist
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('signal_num', [
+        pytest.param(signal.CTRL_C_EVENT, marks=pytest.mark.skipif(not os.name == 'nt', reason='Windows Only')),
+        pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX Only')),
+        pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
+    ])
+    async def test_01_run_server_until_stopped(self, tmp_config_file, all_paths, signal_num, server_sock, new_event_loop,
+                                         capsys, load_all_yaml_tags, sample_server_script):
+        host = server_sock[0]
+
+        async def step(p, host):
+            s = await p.stdout.readline()
+            s = s.decode()
+            if not s:
+                print(await p.stderr.read())
+                raise AssertionError
+            else:
+                port = port_from_out(s)
+                assert s == f'Serving TCP Server on {host}:{port}\r\n'
+                assert is_listening_on((host, port), pid=p.pid)
+                # ensure that child process gets to run_forever
+                time.sleep(0.5)
+                #p.send_signal(signal_num)
+                os.kill(p.pid, signal_num)
+
+        if os.name == 'nt':
+            flags = subprocess.CREATE_NEW_CONSOLE + subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            flags = 0
+
+        print('main process', os.getpid())
+        p = await asyncio.create_subprocess_exec(sys.executable, sample_server_script, str(tmp_config_file),
+                             env=dict(os.environ), creationflags=flags,
+                             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        print('pid_created', p)
+        try:
+            await step(p, host)
+            exit_code = await asyncio.wait_for(p.wait(), 5)
+            assert exit_code == 255
+        except Exception as e:
+            p.kill()
+            raise
 
     @pytest.mark.parametrize('signal_num', [
         pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='Not applicable for Windows'))
     ])
-    def test_02_runner_reload(self, tmp_config_file, all_paths, server_sock, signal_num, capsys, executor,
+    def test_01_runner_reload(self, tmp_config_file, all_paths, server_sock, signal_num, capsys, executor,
                               new_event_loop):
         new_host = '::1'
         fut = executor.submit(assert_reload_ok, signal_num, server_sock[0], new_host, tmp_config_file, capsys)

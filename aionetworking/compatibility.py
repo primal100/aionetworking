@@ -18,8 +18,23 @@ else:
     from cached_property import cached_property
 
 
+async def windows_keyboard_interrupt_workaround() -> None:
+    # Workaround for keyboard interrupt not working for asyncio in python < 3.8 and selector event in python 3.8
+    # https://stackoverflow.com/questions/27480967/why-does-the-asyncios-event-loop-suppress-the-keyboardinterrupt-on-windows
+    while True:
+        await asyncio.sleep(1)
+
+
 if py37:
-    run = asyncio.run
+    if os.name == 'nt':
+        def run(coro: Coroutine, debug: bool = False):
+            async def main(coro: Coroutine):
+                if not py38 or not is_proactor():
+                    asyncio.create_task(windows_keyboard_interrupt_workaround())
+                await coro
+            asyncio.run(main(coro), debug=debug)
+    else:
+        run = asyncio.run
     create_task = asyncio.create_task
     current_task = asyncio.current_task
     all_tasks = asyncio.all_tasks
@@ -106,6 +121,8 @@ else:
         try:
             asyncio.events.set_event_loop(loop)
             loop.set_debug(debug)
+            if os.name == 'nt' and (not py38 or not is_proactor()):
+                asyncio.get_event_loop().create_task(windows_keyboard_interrupt_workaround())
             return loop.run_until_complete(main)
         finally:
             try:

@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field, replace
+import os
 
 from .exceptions import ServerException
 from aionetworking.compatibility_os import loop_on_close_signal, send_ready, send_stopping, send_status, send_notify_start_signal
@@ -131,6 +132,7 @@ class BaseServer(BaseReceiver, Protocol):
             raise
 
     async def _serve_forever(self) -> None:
+        pid = os.getpid()
         if self._serving_forever_fut is not None:
             raise RuntimeError(
                 f'server {self!r} is already being awaited on serve_forever()')
