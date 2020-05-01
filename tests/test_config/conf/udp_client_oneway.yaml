@@ -9,5 +9,6 @@ logger: !SenderLogger
 protocol_factory: !DatagramClientProtocolFactory
                   dataformat: !JSON
                   hostname_lookup: True
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

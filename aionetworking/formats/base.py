@@ -98,7 +98,7 @@ class BaseMessageObject(MessageObject, Protocol):
 
     @property
     def pformat(self) -> str:
-        return pformat(self.decoded)
+        return pformat(self.decoded, compact=True, width=120)
 
     @property
     def timestamp(self) -> datetime.datetime:

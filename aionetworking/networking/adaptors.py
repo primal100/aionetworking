@@ -36,7 +36,6 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
     send: Callable[[bytes], Optional[asyncio.Future]] = field(default=not_implemented_callable, repr=False, compare=False)
-    timeout: int = 5
 
     def __post_init__(self) -> None:
         self.logger.new_connection()
@@ -98,7 +97,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self._scheduler.wait_current_tasks()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
-        await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
+        await self._scheduler.close()
         self.logger.connection_finished(exc)
 
     @abstractmethod

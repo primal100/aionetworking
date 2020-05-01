@@ -80,7 +80,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                                    pause_reading_on_buffer_size=self.pause_reading_on_buffer_size, logger=self.logger,
                                    hostname_lookup=self.hostname_lookup, allowed_senders=self.allowed_senders,
                                    context=self.context.copy(), check_peer_cert_expiry=self.check_peer_cert_expiry,
-                                   codec_config=self.codec_config, **self._additional_connection_kwargs())
+                                   timeout=self.timeout, codec_config=self.codec_config,
+                                   **self._additional_connection_kwargs())
 
     def __getstate__(self):
         return dataclass_getstate(self)

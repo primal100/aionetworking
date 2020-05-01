@@ -7,5 +7,6 @@ logger: !SenderLogger
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

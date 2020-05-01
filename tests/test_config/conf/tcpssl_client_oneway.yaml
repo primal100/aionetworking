@@ -18,3 +18,4 @@ ssl_handshake_timeout: 60
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   hostname_lookup: True
+                  timeout: 5
