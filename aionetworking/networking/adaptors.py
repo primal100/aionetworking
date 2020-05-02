@@ -237,9 +237,6 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     async def _process_msg(self, msg_obj):
         self.logger.debug('Processing message %s', msg_obj)
         try:
-            # if py38:    # Problem with exception handling on asyncio.wait_for < python 3.8
-            #     result = await asyncio.wait_for(self.action.do_one(msg_obj), self.action.task_timeout)
-            # else:
             result = await self.action.do_one(msg_obj)
             self._on_success(result, msg_obj)
         except asyncio.CancelledError as e:
@@ -259,7 +256,10 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     tasks.append(task)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.wait_for(*tasks, timeout=self.action.task_timeout)
+            done, pending = await asyncio.wait(tasks, timeout=self.action.task_timeout)
+            for task in pending:
+                self.logger.error('Task %s timed out...cancelling', task)
+                task.cancel()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
             raise
