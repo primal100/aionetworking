@@ -98,7 +98,9 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self._scheduler.wait_current_tasks()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
-        self.logger.info('Connection waiting on %s to complete', p.no('task', self._scheduler.task_count))
+        task_count = self._scheduler.task_count
+        if task_count:
+            self.logger.info('Connection waiting on %s to complete', p.no('task', task_count))
         await self._scheduler.close()
         self.logger.connection_finished(exc)
 
