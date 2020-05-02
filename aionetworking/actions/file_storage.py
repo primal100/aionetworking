@@ -91,8 +91,9 @@ class ManagedFile:
         self._queue.put_nowait((data, fut))
         if self.logger.isEnabledFor(logging.DEBUG):
             qsize = self._queue.qsize()
-            self.logger.debug('There %s now %s in the write queue for %s',
-                            p.plural_verb('is', qsize), p.no('item'), self.path)
+            self.logger.debug('Message added to queue with future %s', id(fut))
+            self.logger.debug('There %s now %s in the write queue %s for %s',
+                              p.plural_verb('is', qsize), p.no('item', qsize), id(self._queue), self.path)
         await fut
 
     async def close(self) -> None:
@@ -147,8 +148,8 @@ class ManagedFile:
                             qsize = self._queue.qsize()
                             if qsize:
                                 self.logger.warning(
-                                    'Get item for file %s timed out out even though there %s %s in the queue',
-                                    self.path, p.plural_verb('is', qsize), p.no('item'))
+                                    'Get item for file %s timed out out even though there %s %s in the queue id %s',
+                                    self.path, p.plural_verb('is', qsize), p.no('item', qsize), id(self._queue))
                             else:
                                 self.logger.info('File %s closing due to timeout on new items to write', self.path)
                                 break
@@ -167,6 +168,7 @@ class ManagedFile:
                         self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
                         for fut in futs:
                             fut.set_result(True)
+                            self.logger.debug('Result set on future %s', id(fut))
                     except Exception as e:
                         for fut in futs:
                             fut.set_exception(e)

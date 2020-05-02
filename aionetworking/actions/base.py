@@ -6,6 +6,7 @@ from aionetworking.types.logging import LoggerType
 from aionetworking.types.formats import MessageObjectType
 from aionetworking.futures.value_waiters import StatusWaiter
 from aionetworking.utils import dataclass_getstate, dataclass_setstate
+from .protocols import ActionProtocol
 
 from typing import Any, TypeVar, AsyncGenerator
 
@@ -14,10 +15,11 @@ ActionType = TypeVar('ActionType', bound='BaseAction')
 
 
 @dataclass
-class BaseAction(Protocol):
+class BaseAction(ActionProtocol, Protocol):
     supports_notifications = False
     name = 'receiver action'
     logger: LoggerType = field(default_factory=get_logger_receiver, metadata={'pickle': True})
+    task_timeout: int = 10
     _status: StatusWaiter = field(default_factory=StatusWaiter, compare=False, repr=False)
 
     timeout: int = 5

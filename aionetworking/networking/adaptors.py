@@ -6,7 +6,7 @@ from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.compatibility import Protocol, create_task
+from aionetworking.compatibility import Protocol, create_task, set_task_name, py38
 from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
 from aionetworking.logging.utils_logging import p
 from aionetworking.types.formats import MessageObjectType, CodecType
@@ -237,8 +237,14 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
     async def _process_msg(self, msg_obj):
         self.logger.debug('Processing message %s', msg_obj)
         try:
+            # if py38:    # Problem with exception handling on asyncio.wait_for < python 3.8
+            #     result = await asyncio.wait_for(self.action.do_one(msg_obj), self.action.task_timeout)
+            # else:
             result = await self.action.do_one(msg_obj)
             self._on_success(result, msg_obj)
+        except asyncio.CancelledError as e:
+            self._on_exception(e, msg_obj)
+            raise
         except BaseException as e:
             self._on_exception(e, msg_obj)
             #raise
@@ -248,10 +254,17 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         try:
             async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
-                    tasks.append(create_task(self._process_msg(msg_obj)))
+                    task = create_task(self._process_msg(msg_obj))
+                    set_task_name(task, f'Process {msg_obj}')
+                    tasks.append(task)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.wait(tasks)
+            done, pending = await asyncio.wait(tasks, timeout=self.action.task_timeout)
+            if pending:
+                self.logger.warning('Cancelling %s which did not complete after',
+                                    p.num('task', len(pending)), p.num('second', self.action.task_timeout))
+                for task in pending:
+                    task.cancel()
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
             raise

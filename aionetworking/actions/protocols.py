@@ -14,6 +14,7 @@ ActionType = TypeVar('ActionType', bound='BaseActionProtocol')
 @dataclass
 class ActionProtocol(Protocol):
     supports_notifications = False
+    task_timeout: int = 10
 
     @abstractmethod
     def filter(self, msg: MessageObjectType) -> bool: ...
@@ -37,5 +38,3 @@ class ActionProtocol(Protocol):
     @abstractmethod
     async def close(self) -> None: ...
 
-    @abstractmethod
-    def set_logger(self, logger: LoggerType) -> None: ...
