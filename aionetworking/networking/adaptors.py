@@ -259,12 +259,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     tasks.append(task)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            done, pending = await asyncio.wait(tasks, timeout=self.action.task_timeout)
-            if pending:
-                self.logger.warning('Cancelling %s which did not complete after',
-                                    p.num('task', len(pending)), p.num('second', self.action.task_timeout))
-                for task in pending:
-                    task.cancel()
+            await asyncio.wait_for(*tasks, timeout=self.action.task_timeout)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
             raise
