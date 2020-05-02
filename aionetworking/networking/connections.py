@@ -76,7 +76,7 @@ class BaseConnectionProtocol(AdaptorProtocolGetattr, ConnectionDataclassProtocol
             'preaction': self.preaction,
             'send': self.send,
             'codec_config': self.codec_config,
-            'logger': self._get_connection_logger()
+            'logger': self._get_connection_logger(),
         }
         if self.adaptor_cls.is_receiver:
             self._adaptor = self._get_receiver_adaptor(**kwargs)

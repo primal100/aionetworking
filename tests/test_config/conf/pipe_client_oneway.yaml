@@ -6,5 +6,6 @@ logger: !SenderLogger
     datefmt: '%Y-%m-%d %H:%M:%S.%f'
 protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

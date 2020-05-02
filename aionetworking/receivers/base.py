@@ -68,10 +68,10 @@ class BaseReceiver(ReceiverProtocol, Protocol):
         done, pending = await asyncio.wait([stop_event.wait(), restart_event.wait()],
                                            return_when=asyncio.FIRST_COMPLETED)
         if stop_event.is_set():
-            self.logger.info('Signal for stop event received')
+            self.logger.info('Stop event has been set')
             send_stopping()
         if restart_event.is_set():
-            self.logger.info('Signal for restart event received')
+            self.logger.info('Restart event has been set')
         for task in pending:
             task.cancel()
         await self.close()
@@ -132,7 +132,6 @@ class BaseServer(BaseReceiver, Protocol):
             raise
 
     async def _serve_forever(self) -> None:
-        pid = os.getpid()
         if self._serving_forever_fut is not None:
             raise RuntimeError(
                 f'server {self!r} is already being awaited on serve_forever()')
@@ -170,6 +169,7 @@ class BaseServer(BaseReceiver, Protocol):
             self._serving_forever_fut = None
         await self._stop_server()
         await super().close()
+        self.logger.info('Stopping protocol factory')
         await self.protocol_factory.close()
         self.logger.info('%s stopped', self.name)
         self._status.set_stopped()

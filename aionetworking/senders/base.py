@@ -65,7 +65,7 @@ class BaseClient(BaseSender, Protocol):
     timeout: int = 5
 
     def __post_init__(self):
-        self.protocol_factory = replace(self.protocol_factory)
+        self.protocol_factory = replace(self.protocol_factory, logger=self.logger)
         self._full_name = get_unique_name(self.full_name)
         self.protocol_factory.set_name(self._full_name, self.peer_prefix)
 

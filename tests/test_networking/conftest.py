@@ -312,9 +312,9 @@ def connection_kwargs(connection_kwargs_server, connection_kwargs_client, endpoi
 async def connection(connection_cls, connection_type, action_started, endpoint, preaction_started, parent_name,
                      peer_prefix, requester_started, server_sock_as_string, hostname_lookup, connection_kwargs,
                      receiver_logger) -> TCPServerConnection:
-    conn = connection_cls(dataformat=JSONObject, action=action_started, preaction=preaction_started, requester=requester_started,
-                          parent_name=parent_name, peer_prefix=peer_prefix, hostname_lookup=hostname_lookup,
-                          logger=receiver_logger, **connection_kwargs)
+    conn = connection_cls(dataformat=JSONObject, action=action_started, preaction=preaction_started,
+                          requester=requester_started, parent_name=parent_name, peer_prefix=peer_prefix,
+                          hostname_lookup=hostname_lookup, logger=receiver_logger, timeout=5, **connection_kwargs)
     yield conn
     if connection_type == 'sftp':
         if not conn.is_closing():
@@ -536,6 +536,7 @@ async def protocol_factory_client(requester, connection_type, connection_kwargs_
         dataformat=JSONObject,
         requester=requester,
         hostname_lookup=hostname_lookup,
+        timeout=5,
         **connection_kwargs_client)
     yield factory
 

@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field
+import logging
 from pathlib import Path
 
 from .base import BaseAction
@@ -9,6 +10,7 @@ from aionetworking import settings
 from aionetworking.compatibility import create_task, set_task_name, Protocol
 from aionetworking.logging.utils_logging import p
 from aionetworking.futures.value_waiters import StatusWaiter
+from aionetworking.utils import makedirs
 from aionetworking.types.logging import LoggerType
 
 from typing import Any, ClassVar, AnyStr
@@ -21,10 +23,13 @@ class ManagedFile:
     mode: str = 'ab'
     buffering: int = -1
     timeout: int = 10
+    retries: int = 3
+    retry_interval: int = 2
     logger: LoggerType = field(default_factory=get_logger_receiver)
     _status: StatusWaiter = field(default_factory=StatusWaiter, init=False)
     previous: 'ManagedFile' = field(default=None)
     _queue: asyncio.Queue = field(default_factory=asyncio.Queue, init=False, repr=False, hash=False, compare=False)
+    _exception: OSError = field(default=None, init=False)
     _open_files: ClassVar = {}
 
     @classmethod
@@ -87,7 +92,15 @@ class ManagedFile:
 
     async def write(self, data: AnyStr) -> None:
         fut = asyncio.Future()
-        self._queue.put_nowait((data, fut))
+        if self._exception:
+            fut.set_exception(self._exception)
+        else:
+            self._queue.put_nowait((data, fut))
+            if self.logger.isEnabledFor(logging.DEBUG):
+                qsize = self._queue.qsize()
+                self.logger.debug('Message added to queue with future %s', id(fut))
+                self.logger.debug('There %s now %s in the write queue %s for %s',
+                                  p.plural_verb('is', qsize), p.no('item', qsize), id(self._queue), self.path)
         await fut
 
     async def close(self) -> None:
@@ -121,47 +134,87 @@ class ManagedFile:
             self._queue.task_done()
         self.logger.info('Task done set for %s on file %s', p.no('item', num), self.path)
 
-    async def manage(self) -> None:
+    async def manage_wrapper(self):
         if self.previous:
             await self.previous.wait_closed()
+        for i in range(0, self.retries):
+            try:
+                await self.manage()
+                return
+            except OSError as e:
+                if i == 3:
+                    self._exception = e
+                    while not self._queue.empty():
+                        try:
+                            item, fut = self._queue.get_nowait()
+                            fut.set_exception(e)
+                            self._task_done(1)
+                        except asyncio.QueueEmpty:
+                            self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
+                await asyncio.sleep(self.retry_interval)
+
+    async def _write_items_from_queue(self, f):
+        self.logger.info('Retrieving item from queue for file %s. Timeout: %s', self.path,
+                         p.no('second', self.timeout))
         try:
-            self._status.set_starting()
-            self.logger.info('Opening file %s', self.path)
-            async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
+            data, fut = self._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
+        futs = [fut]
+        try:
+            while not self._queue.empty():
+                try:
+                    item, fut = self._queue.get_nowait()
+                    data += item
+                    futs.append(fut)
+                except asyncio.QueueEmpty:
+                    self.logger.warning('QueueEmpty error was unexpectedly caught for file %s', self.path)
+            self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item',
+                                                                                  len(futs)), self.path)
+            await f.write(data)
+            self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
+            for fut in futs:
+                fut.set_result(True)
+                self.logger.debug('Result set on future %s', id(fut))
+        except Exception as e:
+            for fut in futs:
+                fut.set_exception(e)
+        finally:
+            asyncio.get_event_loop().call_soon(self._task_done, len(futs))
+
+    async def manage(self) -> None:
+        self._status.set_starting()
+        await makedirs(self.path.parent, exist_ok=True)
+        self.logger.info('Opening file %s', self.path)
+        async with settings.FILE_OPENER(self.path, mode=self.mode, buffering=self.buffering) as f:
+            try:
                 self.logger.debug('File %s opened', self.path)
                 self._status.set_started()
                 while True:
-                    self.logger.info('Retrieving item from queue for file %s.' % self.path)
                     try:
-                        data, fut = self._queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        data, fut = await asyncio.wait_for(self._queue.get(), timeout=self.timeout)
-                    futs = [fut]
-                    try:
-                        while not self._queue.empty():
-                            try:
-                                item, fut = self._queue.get_nowait()
-                                data += item
-                                futs.append(fut)
-                            except asyncio.QueueEmpty:
-                                self.logger.info('QueueEmpty error was unexpectedly caught for file %s', self.path)
-                        self.logger.info('Retrieved %s from queue. Writing to file %s.', p.no('item', len(futs)), self.path)
-                        await f.write(data)
-                        self.logger.info('%s written to file %s', p.no('byte', len(data)), self.path)
-                        for fut in futs:
-                            fut.set_result(True)
-                    except Exception as e:
-                        for fut in futs:
-                            fut.set_exception(e)
-                    finally:
-                        asyncio.get_event_loop().call_soon(self._task_done, len(futs))
-        except asyncio.TimeoutError:
-            self.logger.info('File %s closing due to timeout', self.path)
-        except asyncio.CancelledError as e:
-            self.logger.info('File %s closing due to task being cancelled', self.path)
-            raise e
-        finally:
-            self._cleanup()
+                        await self._write_items_from_queue(f)
+                    except asyncio.TimeoutError:
+                        qsize = self._queue.qsize()
+                        if qsize:
+                            self.logger.warning(
+                                'Get item for file %s timed out out even though there %s %s in the queue id %s',
+                                self.path, p.plural_verb('is', qsize), p.no('item', qsize), id(self._queue))
+                            await self._write_items_from_queue(f)
+                        else:
+                            self.logger.info('File %s closing due to timeout on new items to write', self.path)
+                            break
+            except asyncio.CancelledError as e:
+                self.logger.info('File %s closing due to task being cancelled', self.path)
+                raise e
+            finally:
+                self._cleanup()
+                qsize = self._queue.qsize()
+                if qsize:
+                    self.logger.warning(
+                        'There %s %s in queue id %s for path %s even after cleanup',
+                        p.plural_verb('is', qsize), p.no('item', qsize), id(self._queue), self.path)
+                    await self._write_items_from_queue(f)
+        self.logger.info('File %s closed', self.path)
 
 
 def default_data_dir():

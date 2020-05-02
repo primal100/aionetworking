@@ -53,6 +53,10 @@ def loop_on_signal(logger: LoggerType, signum: int, callback: Callable):
     logger.info('Signal %s received', signum)
     callback()
     logger.info('Completed callback for signal %s', signum)
+    if os.name != 'nt' and any(s == signum for s in (signal.SIGINT, signal.SIGTERM)):
+        loop = loop = asyncio.get_event_loop()
+        loop.remove_signal_handler(signal.SIGINT)
+        loop.remove_signal_handler(signal.SIGTERM)
 
 
 def loop_on_user1_signal(callback: Callable, logger: LoggerType):

@@ -11,6 +11,7 @@ import itertools
 import sys
 import socket
 import tempfile
+from aiofiles.os import wrap
 from aionetworking.compatibility import py38, net_supernet_of, WindowsProactorEventLoopPolicy, WindowsSelectorEventLoopPolicy
 from aionetworking.compatibility_os import is_wsl, is_aix
 from dataclasses import dataclass, fields, MISSING
@@ -45,6 +46,9 @@ def better_file_not_found_error(*files: Union[str, Path], purpose: str = None):
 
 
 ###Coroutines###
+makedirs = wrap(os.makedirs)
+    
+    
 async def time_coro(coro):
     start_time = time.time()
     await coro

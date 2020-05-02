@@ -10,5 +10,6 @@ protocol_factory: !StreamClientProtocolFactory
                   dataformat: !JSON
                   requester: !EchoRequester
                   hostname_lookup: True
+                  timeout: 5
 ---
 log_config_file: !Path "{this}/logging.yaml"

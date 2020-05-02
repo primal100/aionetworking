@@ -6,8 +6,9 @@ from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.compatibility import Protocol, create_task
+from aionetworking.compatibility import Protocol, create_task, set_task_name, py38
 from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
+from aionetworking.logging.utils_logging import p
 from aionetworking.types.formats import MessageObjectType, CodecType
 from aionetworking.types.networking import BaseContext
 from aionetworking.formats.recording import BufferObject, BufferCodec, get_recording_from_file
@@ -36,7 +37,6 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     codec_config: Dict[str, Any] = field(default_factory=dict, metadata={'pickle': True})
     preaction: ActionProtocol = None
     send: Callable[[bytes], Optional[asyncio.Future]] = field(default=not_implemented_callable, repr=False, compare=False)
-    timeout: int = 5
 
     def __post_init__(self) -> None:
         self.logger.new_connection()
@@ -98,7 +98,10 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self._scheduler.wait_current_tasks()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
-        await asyncio.wait_for(self._scheduler.close(), timeout=self.timeout)
+        task_count = self._scheduler.task_count
+        if task_count:
+            self.logger.info('Connection waiting on %s to complete', p.no('task', task_count))
+        await self._scheduler.close()
         self.logger.connection_finished(exc)
 
     @abstractmethod
@@ -232,9 +235,16 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self.encode_and_send_msg(response)
 
     async def _process_msg(self, msg_obj):
+        self.logger.debug('Processing message %s', msg_obj)
         try:
+            # if py38:    # Problem with exception handling on asyncio.wait_for < python 3.8
+            #     result = await asyncio.wait_for(self.action.do_one(msg_obj), self.action.task_timeout)
+            # else:
             result = await self.action.do_one(msg_obj)
             self._on_success(result, msg_obj)
+        except asyncio.CancelledError as e:
+            self._on_exception(e, msg_obj)
+            raise
         except BaseException as e:
             self._on_exception(e, msg_obj)
             #raise
@@ -244,10 +254,12 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         try:
             async for msg_obj in msgs:
                 if not self.action.filter(msg_obj):
-                    tasks.append(create_task(self._process_msg(msg_obj)))
+                    task = create_task(self._process_msg(msg_obj))
+                    set_task_name(task, f'Process {msg_obj}')
+                    tasks.append(task)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            await asyncio.wait(tasks)
+            await asyncio.wait_for(*tasks, timeout=self.action.task_timeout)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
             raise
