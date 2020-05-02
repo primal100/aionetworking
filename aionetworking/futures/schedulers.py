@@ -76,6 +76,10 @@ class TaskScheduler:
             if not fut.cancelled() and not fut.done():
                 fut.set_exception(exc_class())
 
+    @property
+    def task_count(self) -> int:
+        return self._counter.num
+
     async def join(self) -> None:
         await self._counter.wait_for(0)
 

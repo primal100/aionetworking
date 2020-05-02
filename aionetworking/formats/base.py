@@ -143,7 +143,8 @@ class BaseCodec(Codec):
         async for encoded, decoded in self.decode(encoded, **kwargs):
             yield await self.create_object(encoded, decoded, parent_logger=self.logger, **kwargs)
 
-    async def decode_buffer(self, encoded: bytes, context: BaseContext = None, **kwargs) -> AsyncGenerator[MessageObjectType, None]:
+    async def decode_buffer(self, encoded: bytes, context: BaseContext = None, source: str = 'buffer',
+                            **kwargs) -> AsyncGenerator[MessageObjectType, None]:
         if context:
             complete_context = self.context.copy()
             complete_context.update(context)
@@ -155,7 +156,7 @@ class BaseCodec(Codec):
                 self.logger.on_msg_decoded(msg)
             yield msg
             i += 1
-        self.logger.on_buffer_decoded(encoded, i)
+        self.logger.on_buffer_decoded(encoded, i, source=source)
 
     async def encode_obj(self, decoded: Any, **kwargs) -> MessageObjectType:
         try:
@@ -170,7 +171,7 @@ class BaseCodec(Codec):
         self.logger.debug('Loading new %s messages from %s', self.codec_name, file_path)
         async with settings.FILE_OPENER(file_path, self.read_mode) as f:
             encoded = await f.read()
-        async for item in self.decode_buffer(encoded, **kwargs):
+        async for item in self.decode_buffer(encoded, source=f"file {file_path}", **kwargs):
             yield item
 
     async def one_from_file(self, file_path: Path, **kwargs) -> MessageObjectType:

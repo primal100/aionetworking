@@ -116,8 +116,8 @@ class Logger(BaseLogger):
     def log_num_connections(self, action: str, num_connections: int):
         if self.isEnabledFor(logging.DEBUG):
             self.log(logging.DEBUG, 'Connection %s. There %s now %s.', action,
-                        p.plural_verb('is', p.num(num_connections)),
-                        p.no('active connection'))
+                     p.plural_verb('is', p.num(num_connections)),
+                     p.no('active connection'))
 
     def warn_on_cert_expiry(self, cert_name: str, num_days: int, expiry_time: datetime.datetime):
         self.logger.warning('%s ssl cert will expire in less than %s, on %s', cert_name, p.no('day', num_days + 1),
@@ -205,9 +205,9 @@ class ConnectionLogger(Logger):
     def on_buffer_received(self, data: bytes) -> None:
         self.info("Received buffer containing %s bytes", len(data))
 
-    def on_buffer_decoded(self, data: bytes, num: int) -> None:
+    def on_buffer_decoded(self, data: bytes, num: int, source: str = 'buffer') -> None:
         self._raw_received(data, logging.DEBUG)
-        self.info("Decoded %s in buffer", p.no('message', num))
+        self.info("Decoded %s in %s", p.no('message', num), source)
 
     def on_encode_failed(self, msg_obj: MessageObjectType, exc: BaseException):
         self._msg_sent(msg_obj, logging.ERROR)

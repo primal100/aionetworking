@@ -7,6 +7,7 @@ from aionetworking.formats.base import BaseMessageObject
 from aionetworking.futures import TaskScheduler
 from aionetworking.types.requesters import RequesterType
 from aionetworking.logging.loggers import get_logger_receiver
+from aionetworking.logging.utils_logging import p
 from aionetworking.types.logging import LoggerType
 from aionetworking.types.networking import BaseContext
 from aionetworking.utils import dataclass_getstate, dataclass_setstate, addr_tuple_to_str, IPNetwork
@@ -63,6 +64,8 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
             coros.append(self.requester.start(logger=logger))
         await asyncio.gather(*coros)
         if self.expire_connections_after_inactive_minutes:
+            self.logger.info('Connections will expire after %s',
+                             p.no('minute', self.expire_connections_check_interval_minutes))
             self._scheduler.call_cb_periodic(self.expire_connections_check_interval_minutes * 60,
                                              self.check_expired_connections,
                                              task_name=f'Check expired connections for {self.full_name}')
@@ -95,6 +98,10 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
 
     def is_owner(self, connection: NetworkConnectionType) -> bool:
         return connection.is_child(self.full_name)
+
+    @property
+    def num_connections(self) -> int:
+        return connections_manager.num_connections(self.full_name)
 
     async def wait_num_has_connected(self, num: int) -> None:
         await connections_manager.wait_num_has_connected(self.full_name, num)
@@ -130,8 +137,13 @@ class BaseProtocolFactory(ProtocolFactoryProtocol):
                 self.close_connection(conn, None)
 
     async def close(self) -> None:
+        num_connections = self.num_connections
+        if num_connections:
+            self.logger.warning('Waiting to complete tasks for %s', p.no('connection', num_connections))
         await asyncio.wait([self._scheduler.close(), self.wait_num_connected(0)], timeout=self.timeout)
+        self.logger.info('Protocol factory tasks finished, and all connections have been closed')
         await asyncio.wait_for(self.close_actions(), self.timeout)
+        self.logger.info('Actions complete')
         connections_manager.clear_server(self.full_name)
 
 

@@ -8,6 +8,7 @@ from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
 from aionetworking.compatibility import Protocol, create_task
 from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
+from aionetworking.logging.utils_logging import p
 from aionetworking.types.formats import MessageObjectType, CodecType
 from aionetworking.types.networking import BaseContext
 from aionetworking.formats.recording import BufferObject, BufferCodec, get_recording_from_file
@@ -97,6 +98,7 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         await self._scheduler.wait_current_tasks()
 
     async def close(self, exc: Optional[BaseException] = None) -> None:
+        self.logger.info('Connection waiting on %s to complete', p.no('task', self._scheduler.task_count))
         await self._scheduler.close()
         self.logger.connection_finished(exc)
 
@@ -231,6 +233,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
             self.encode_and_send_msg(response)
 
     async def _process_msg(self, msg_obj):
+        self.logger.debug('Processing message %s', msg_obj)
         try:
             result = await self.action.do_one(msg_obj)
             self._on_success(result, msg_obj)
