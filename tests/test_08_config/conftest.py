@@ -248,6 +248,7 @@ async def receiver_connection_logger_stats(receiver_logger, context, caplog) -> 
 @pytest.fixture
 def debug_logging(caplog) -> None:
     caplog.set_level(logging.DEBUG)
+    caplog.clear()
     yield
     caplog.set_level(logging.ERROR)
 
