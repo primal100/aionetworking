@@ -4,11 +4,11 @@ import pytest
 import socket
 import freezegun
 from pathlib import Path
-from aionetworking.compatibility import supports_pipe_or_unix_connections, datagram_supported
+from aionetworking.compatibility import supports_pipe_or_unix_connections, datagram_supported,  default_server_port, default_client_port
 from aionetworking.utils import set_loop_policy, pipe_address_by_os
 from aionetworking.types.networking import AFINETContext, AFUNIXContext, NamedPipeContext, SFTPContext
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple, Union
 
 
 def pytest_addoption(parser):
@@ -122,6 +122,80 @@ def pipe_path(server_port) -> Path:
     yield path
     if path.exists():
         path.unlink()
+
+
+@pytest.fixture
+def server_port() -> int:
+    return default_server_port()
+
+
+@pytest.fixture
+def client_port() -> int:
+    return default_client_port()
+
+
+@pytest.fixture
+def server_sock(server_port) -> Tuple[str, int]:
+    return '127.0.0.1', server_port
+
+
+@pytest.fixture
+def client_sock(client_port) -> Tuple[str, int]:
+    return '127.0.0.1', client_port
+
+
+@pytest.fixture
+def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Optional[Union[str, Tuple[str, int]]]:
+    if connection_type != 'pipe':
+        return client_sock if endpoint == 'server' else server_sock
+    elif os.name == 'nt':
+        return None
+    return str(pipe_path) if endpoint == 'client' else ''
+
+
+@pytest.fixture
+def server_sock_str(server_sock) -> str:
+    return f'{server_sock[0]}:{server_sock[1]}'
+
+
+@pytest.fixture
+def server_hostname(server_sock) -> str:
+    return 'localhost'
+
+
+@pytest.fixture
+def client_hostname(client_sock) -> str:
+    return 'localhost'
+
+
+@pytest.fixture
+def server_hostname_ip6(server_sock) -> str:
+    return 'ip6-localhost'
+
+
+@pytest.fixture
+def client_hostname_ip6(client_sock) -> str:
+    return 'ip6-localhost'
+
+
+@pytest.fixture
+def client_sock_str(client_sock) -> str:
+    return f'{client_sock[0]}:{client_sock[1]}'
+
+
+@pytest.fixture
+def server_sock_ipv6(server_port) -> Tuple[str, int, int, int]:
+    return '::1', server_port, 0, 0
+
+
+@pytest.fixture
+def client_sock_ipv6() -> Tuple[str, int, int, int]:
+    return '::1', 60000, 0, 0
+
+
+@pytest.fixture
+def client_sock_ipv6str(client_sock_ipv6) -> str:
+    return f'{client_sock_ipv6[0]}:{client_sock_ipv6[1]}'
 
 
 def _tcp_server_context(server_sock, client_sock, client_hostname) -> AFINETContext:

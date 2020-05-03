@@ -1,5 +1,4 @@
-# Fixtures from following file are needed
-from tests.test_actions.conftest import *
+from tests.test_02_actions.conftest import *
 from aionetworking.requesters import EchoRequester
 import pytest
 

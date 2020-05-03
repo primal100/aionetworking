@@ -1,4 +1,5 @@
-from tests.test_senders.conftest import *
+from tests.test_06_senders.conftest import *
+import pytest
 from aionetworking.formats.contrib.json import JSONObject
 
 
