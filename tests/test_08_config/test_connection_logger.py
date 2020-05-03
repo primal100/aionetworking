@@ -111,10 +111,13 @@ class TestConnectionLoggerStats:
         assert receiver_connection_logger_stats._stats_logger.received == 79
 
     @pytest.mark.asyncio
-    async def test_02_on_buffer_decoded(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded,
-                                  debug_logging):
+    async def test_02_on_buffer_decoded(self, receiver_connection_logger_stats, json_rpc_login_request_encoded,
+                                        debug_logging, caplog):
+        assert caplog.record_tuples == []
         receiver_connection_logger_stats.on_buffer_decoded(json_rpc_login_request_encoded, 1)
+        assert caplog.record_tuples == []
         json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
+        assert caplog.record_tuples == []
         assert caplog.record_tuples[0] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO, "Decoded 1 message in buffer")
 
