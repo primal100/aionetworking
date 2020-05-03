@@ -6,7 +6,7 @@ from functools import partial
 
 from .exceptions import MethodNotFoundError, RemoteConnectionClosedError
 from aionetworking.actions.protocols import ActionProtocol
-from aionetworking.compatibility import Protocol, create_task, set_task_name, py38
+from aionetworking.compatibility import Protocol, create_task, set_task_name
 from aionetworking.logging.loggers import ConnectionLogger, get_connection_logger_receiver
 from aionetworking.logging.utils_logging import p
 from aionetworking.types.formats import MessageObjectType, CodecType
@@ -239,12 +239,9 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
         try:
             result = await self.action.do_one(msg_obj)
             self._on_success(result, msg_obj)
-        except asyncio.CancelledError as e:
-            self._on_exception(e, msg_obj)
-            raise
         except BaseException as e:
             self._on_exception(e, msg_obj)
-            #raise
+            raise
 
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:
         tasks = []
@@ -256,10 +253,7 @@ class ReceiverAdaptor(BaseAdaptorProtocol):
                     tasks.append(task)
                 else:
                     self.logger.on_msg_filtered(msg_obj)
-            done, pending = await asyncio.wait(tasks, timeout=self.action.task_timeout)
-            for task in pending:
-                self.logger.error('Task %s timed out...cancelling', task)
-                task.cancel()
+            await asyncio.wait_for(asyncio.gather(*tasks), timeout=self.action.task_timeout)
         except Exception as exc:
             self._on_decoding_error(buffer, exc)
             raise
