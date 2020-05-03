@@ -41,7 +41,8 @@ class TestLogger:
         log = caplog.record_tuples[0]
         assert log == ('receiver', logging.CRITICAL, 'division by zero')
 
-    def test_06_log_num_connections(self, receiver_logger, caplog, debug_logging):
+    @pytest.mark.asyncio
+    async def test_06_log_num_connections(self, receiver_logger, caplog, debug_logging):
         receiver_logger.log_num_connections("closed", 4)
         assert caplog.record_tuples[0] == (
             'receiver', logging.DEBUG, 'Connection closed. There are now 4 active connections.')

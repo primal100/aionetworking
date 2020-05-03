@@ -104,7 +104,8 @@ class TestConnectionLoggerStats:
         assert caplog.record_tuples[0] == ('receiver.connection', logging.INFO, 'Received buffer containing 79 bytes')
         assert receiver_connection_logger_stats._stats_logger.received == 79
 
-    def test_02_on_buffer_decoded(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded,
+    @pytest.mark.asyncio
+    async def test_02_on_buffer_decoded(self, receiver_connection_logger_stats, caplog, json_rpc_login_request_encoded,
                                   debug_logging):
         receiver_connection_logger_stats.on_buffer_decoded(json_rpc_login_request_encoded, 1)
         json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
