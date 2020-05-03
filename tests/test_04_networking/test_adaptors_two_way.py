@@ -2,7 +2,7 @@ import pytest
 import asyncio
 
 from aionetworking.actions.echo import InvalidRequestError
-from aionetworking.compatibility import create_task
+from aionetworking.compatibility import create_task, py38
 from aionetworking.networking.exceptions import MethodNotFoundError
 
 
@@ -31,8 +31,9 @@ class TestTwoWayReceiverAdaptor:
     @pytest.mark.asyncio
     async def test_02_on_exception(self, adaptor, echo_exception_request_encoded, caplog, queue, critical_logging_only,
                                    echo_exception_response_encoded, timestamp):
-        task = adaptor.on_data_received(echo_exception_request_encoded, timestamp)
-        await task
+        with pytest.raises(InvalidRequestError):
+            task = adaptor.on_data_received(echo_exception_request_encoded, timestamp)
+            await task
         msg = await queue.get()
         await adaptor.close()
         assert task.done()

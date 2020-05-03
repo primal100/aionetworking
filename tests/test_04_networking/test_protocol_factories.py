@@ -3,6 +3,7 @@ import datetime
 import pytest
 import pickle
 from aionetworking.compatibility import create_task
+from aionetworking.compatibility_os import is_mac_os
 
 
 @pytest.mark.connections()
@@ -16,9 +17,9 @@ class TestProtocolFactoriesShared:
         await protocol_factory.close()
 
 
-@pytest.mark.connections('tcp_all_all')
 class TestStreamProtocolFactories:
 
+    @pytest.mark.connections('tcp_all_all')
     @pytest.mark.asyncio
     async def test_00_connection_lifecycle(self, protocol_factory_started, connection, transport):
         new_connection = protocol_factory_started()
@@ -33,8 +34,9 @@ class TestStreamProtocolFactories:
         await asyncio.wait_for(protocol_factory_started.close(), timeout=1)
         await asyncio.wait_for(new_connection.wait_closed(), timeout=1)
 
+    @pytest.mark.connections('tcp_oneway_all')
     @pytest.mark.asyncio
-    async def test_02_protocol_factory_custom_codec_config(self, protocol_factory_codec_kwargs,
+    async def test_01_protocol_factory_custom_codec_config(self, protocol_factory_codec_kwargs,
                                                            json_codec_with_kwargs, transport,
                                                            json_rpc_login_request_encoded):
         new_connection = protocol_factory_codec_kwargs()
@@ -47,8 +49,10 @@ class TestStreamProtocolFactories:
         assert adaptor.codec.msg_obj == json_codec_with_kwargs.msg_obj
         assert adaptor.codec.test_param == json_codec_with_kwargs.test_param
 
+    @pytest.mark.skipif(is_mac_os(), reason='asyncio.sleep mysteriously slow on MacOS')
+    @pytest.mark.connections('tcp_all_all')
     @pytest.mark.asyncio
-    async def test_03_protocol_factory_connections_expire(self, protocol_factory_expire_connections,
+    async def test_02_protocol_factory_connections_expire(self, protocol_factory_expire_connections,
                                                           transport, echo_encoded, echo_response):
         new_connection = protocol_factory_expire_connections()
         new_connection.connection_made(transport)

@@ -7,7 +7,7 @@ from aionetworking.factories import queue_defaultdict
 from typing import AsyncGenerator, DefaultDict
 
 
-class InvalidRequestError(BaseException):
+class InvalidRequestError(Exception):
     pass
 
 
