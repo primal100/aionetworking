@@ -1,4 +1,5 @@
-from tests.test_config.conftest import *
+from tests.test_08_config.conftest import *
+import pytest
 from scripts import sample_server
 from concurrent.futures import ThreadPoolExecutor
 

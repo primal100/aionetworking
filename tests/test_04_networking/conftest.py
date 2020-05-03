@@ -1,8 +1,10 @@
-from tests.test_requesters.conftest import *
+from tests.test_03_requesters.conftest import *
 import asyncio
 import asyncssh
 import datetime
+from dataclasses import dataclass
 import os
+import pytest
 import socket
 from socket import AddressFamily, SocketKind
 
@@ -29,7 +31,8 @@ from aionetworking.compatibility_tests import AsyncMock
 
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
-from typing import Callable, Type, Tuple, Union, Optional, List
+from pathlib import Path
+from typing import Any, Callable, Dict, Type, Tuple, Union, Optional, List
 
 from tests.mock import MockTCPTransport, MockDatagramTransport, MockAFInetSocket, MockAFUnixSocket, MockSFTPConn, \
     MockNamedPipeHandle

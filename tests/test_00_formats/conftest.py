@@ -1,87 +1,11 @@
 import pytest
-import os
 from pathlib import Path
 from dataclasses import dataclass
 from aionetworking import JSONObject, JSONCodec
-from aionetworking.compatibility import default_server_port, default_client_port
 from aionetworking.formats import BufferCodec, BufferObject, recorded_packet
 from aionetworking.types.formats import MessageObjectType
 
-from typing import Tuple, Union, List, Dict, Any, NamedTuple, Type, Optional
-
-
-@pytest.fixture
-def server_port() -> int:
-    return default_server_port()
-
-
-@pytest.fixture
-def client_port() -> int:
-    return default_client_port()
-
-
-@pytest.fixture
-def server_sock(server_port) -> Tuple[str, int]:
-    return '127.0.0.1', server_port
-
-
-@pytest.fixture
-def client_sock(client_port) -> Tuple[str, int]:
-    return '127.0.0.1', client_port
-
-
-@pytest.fixture
-def peer(endpoint, connection_type, server_sock, client_sock, pipe_path) -> Optional[Union[str, Tuple[str, int]]]:
-    if connection_type != 'pipe':
-        return client_sock if endpoint == 'server' else server_sock
-    elif os.name == 'nt':
-        return None
-    return str(pipe_path) if endpoint == 'client' else ''
-
-
-@pytest.fixture
-def server_sock_str(server_sock) -> str:
-    return f'{server_sock[0]}:{server_sock[1]}'
-
-
-@pytest.fixture
-def server_hostname(server_sock) -> str:
-    return 'localhost'
-
-
-@pytest.fixture
-def client_hostname(client_sock) -> str:
-    return 'localhost'
-
-
-@pytest.fixture
-def server_hostname_ip6(server_sock) -> str:
-    return 'ip6-localhost'
-
-
-@pytest.fixture
-def client_hostname_ip6(client_sock) -> str:
-    return 'ip6-localhost'
-
-
-@pytest.fixture
-def client_sock_str(client_sock) -> str:
-    return f'{client_sock[0]}:{client_sock[1]}'
-
-
-@pytest.fixture
-def server_sock_ipv6(server_port) -> Tuple[str, int, int, int]:
-    return '::1', server_port, 0, 0
-
-
-@pytest.fixture
-def client_sock_ipv6() -> Tuple[str, int, int, int]:
-    return '::1', 60000, 0, 0
-
-
-@pytest.fixture
-def client_sock_ipv6str(client_sock_ipv6) -> str:
-    return f'{client_sock_ipv6[0]}:{client_sock_ipv6[1]}'
+from typing import Tuple, List, Dict, Any, NamedTuple, Type
 
 
 @pytest.fixture
