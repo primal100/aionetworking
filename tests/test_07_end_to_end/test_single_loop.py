@@ -5,7 +5,7 @@ import pytest
 async def wait_connections_closed(server_started, client_connected, connection_type):
     if connection_type == 'udp':
         await asyncio.sleep(0.1)  # Workaround for bpo-38471
-    await asyncio.wait_for(client_connected.close(), 300)
+    await asyncio.wait_for(client_connected.close(), 10)
     if connection_type == 'udp':
         server_started.close_all_connections()
     await asyncio.wait_for(server_started.wait_num_has_connected(1), 3)

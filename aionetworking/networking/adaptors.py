@@ -44,11 +44,12 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
     def on_msg_sent(self, msg_encoded: bytes, task: Optional[asyncio.Future]):
         self.logger.on_msg_sent(msg_encoded)
 
-    def send_data(self, msg_encoded: bytes) -> None:
+    def send_data(self, msg_encoded: bytes) -> Optional[asyncio.Future]:
         self.logger.on_sending_encoded_msg(msg_encoded)
         fut = self.send(msg_encoded)
         if fut:
             fut.add_done_callback(partial(self.on_msg_sent, msg_encoded))
+            return fut
         else:
             self.on_msg_sent(msg_encoded, None)
 
@@ -60,11 +61,15 @@ class BaseAdaptorProtocol(AdaptorProtocol, Protocol):
         exception = task.exception()
         if exception:
             self.logger.manage_error(exception)
+            fut = None
         else:
             msg_obj = task.result()
             self.logger.on_sending_decoded_msg(msg_obj)
-            self.send_data(msg_obj.encoded)
-        self._scheduler.task_done(task)
+            fut = self.send_data(msg_obj.encoded)
+        if fut:
+            fut.add_done_callback(self._scheduler.task_done)
+        else:
+            self._scheduler.task_done(task)
 
     def encode_and_send_msg(self, decoded: Any) -> None:
         if not self.codec:
@@ -161,6 +166,7 @@ class SenderAdaptor(BaseAdaptorProtocol):
     async def play_recording(self, file_path: Path, hosts: Sequence = (), timing: bool = True) -> None:
         prev_timestamp = None
         self.logger.debug("Playing recording from file %s", file_path)
+        futs = []
         async for packet in get_recording_from_file(file_path):
             if (not hosts or packet.sender in hosts) and not packet.sent_by_server:
                 if timing:
@@ -169,7 +175,11 @@ class SenderAdaptor(BaseAdaptorProtocol):
                         seconds = timedelta.total_seconds()
                         await asyncio.sleep(seconds)
                     prev_timestamp = packet.timestamp
-                self.send_data(packet.data)
+                fut = self.send_data(packet.data)
+                if fut:
+                    futs.append(fut)
+        if futs:
+            await asyncio.gather(*futs)
         self.logger.debug("Recording finished")
 
     async def process_msgs(self, msgs: AsyncIterator[MessageObjectType], buffer: bytes) -> None:

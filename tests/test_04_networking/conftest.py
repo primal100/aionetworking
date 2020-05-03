@@ -140,7 +140,7 @@ async def adaptor(context, endpoint, duplex_type, action, preaction, queue, requ
     else:
         adaptor = SenderAdaptor(JSONObject, context=context, send=queue.put_nowait, requester=requester, logger=logger)
     yield adaptor
-    await adaptor.close()
+    await asyncio.wait_for(adaptor.close(), 3)
 
 
 @pytest.fixture

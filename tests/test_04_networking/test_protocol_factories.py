@@ -3,6 +3,7 @@ import datetime
 import pytest
 import pickle
 from aionetworking.compatibility import create_task
+from aionetworking.compatibility_os import is_mac_os
 
 
 @pytest.mark.connections()
@@ -48,6 +49,7 @@ class TestStreamProtocolFactories:
         assert adaptor.codec.msg_obj == json_codec_with_kwargs.msg_obj
         assert adaptor.codec.test_param == json_codec_with_kwargs.test_param
 
+    @pytest.mark.skipif(is_mac_os(), reason='asyncio.sleep mysteriously slow on MacOS')
     @pytest.mark.connections('tcp_all_all')
     @pytest.mark.asyncio
     async def test_02_protocol_factory_connections_expire(self, protocol_factory_expire_connections,
