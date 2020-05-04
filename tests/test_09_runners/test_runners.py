@@ -21,7 +21,7 @@ class TestRunnerDirect:
         pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX Only')),
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
-    async def test_01_run_server_until_stopped(self, tmp_config_file, all_paths, signal_num, server_sock, new_event_loop,
+    async def test_01_run_server_until_stopped(self, tmp_config_file, all_paths, signal_num, server_sock,
                                                capsys, load_all_yaml_tags, sample_server_script):
         host = server_sock[0]
 
@@ -51,7 +51,8 @@ class TestRunnerDirect:
             raise
 
     @pytest.mark.parametrize('signal_num', [
-        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt', reason='Not applicable for Windows'))
+        pytest.param(getattr(signal, 'SIGUSR1', None), marks=pytest.mark.skipif(os.name == 'nt',
+                                                                                reason='Not applicable for Windows'))
     ])
     def test_02_runner_reload(self, tmp_config_file, all_paths, server_sock, signal_num, capsys, executor,
                               new_event_loop):
