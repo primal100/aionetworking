@@ -22,7 +22,7 @@ class TestRunnerDirect:
         pytest.param(signal.SIGTERM, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX only'))
     ])
     async def test_01_run_server_until_stopped(self, tmp_config_file, all_paths, signal_num, server_sock,
-                                               capsys, load_all_yaml_tags, sample_server_script):
+                                               capsys, load_all_yaml_tags, sample_server_script, new_event_loop):
         host = server_sock[0]
 
         async def step(p, host):
