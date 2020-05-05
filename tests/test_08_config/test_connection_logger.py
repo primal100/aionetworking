@@ -13,8 +13,7 @@ class TestConnectionLogger:
         pytest.param('No Running Loop', marks=pytest.mark.skipif(not py37, reason='Only python < 3.7')),
         pytest.param('No Task', marks=pytest.mark.skipif(py37, reason='Only python=>3.7'))
     ])
-    @pytest.mark.asyncio
-    async def test_01_process(self, connection_logger, context, expected_taskname):
+    def test_01_process(self, connection_logger, context, expected_taskname):
         msg, kwargs = connection_logger.process("Hello World", {})
         assert kwargs['extra']['taskname'] == expected_taskname
         assert msg, kwargs == ("Hello World", {'extra': context})
