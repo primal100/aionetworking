@@ -5,7 +5,8 @@ from aionetworking.compatibility import py37
 
 
 class TestConnectionLogger:
-    def test_00_logger_init(self, connection_logger):
+    @pytest.mark.asyncio
+    async def test_00_logger_init(self, connection_logger):
         assert connection_logger.logger.name == 'receiver.connection'
 
     @pytest.mark.parametrize('expected_taskname', [
@@ -17,7 +18,9 @@ class TestConnectionLogger:
         assert kwargs['extra']['taskname'] == expected_taskname
         assert msg, kwargs == ("Hello World", {'extra': context})
 
-    def test_02_new_connection(self, connection_logger, caplog, client_sock_str, server_sock_str):
+    @pytest.mark.asyncio
+    async def test_02_new_connection(self, connection_logger, caplog, client_sock_str, server_sock_str):
+        assert caplog.record_tuples == []
         connection_logger.new_connection()
         assert caplog.record_tuples[0] == (
             "receiver.connection", logging.INFO,
