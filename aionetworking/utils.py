@@ -459,22 +459,74 @@ class Operator(CallableFromString):
 
 @dataclass
 class Expression:
-    attr: str
+    attr: Optional[str]
     op: Operator
     value: Any
-    case_sensitive: bool = True
+    adapt_expected_value: bool = True
+    case_sensitive: bool = False
 
     @classmethod
     def from_string(cls, string: str) -> Optional['Expression']:
+        """
+        Generate an expression from a string, which can later be used
+        for comparison purposes with the attribute of an object:
+        Examples:
+        expr = Expression.from_string('method = login')
+
+        class Test:
+            def __init__(self, method: str):
+                self.method = method
+
+        t1 = test('login')
+        t2 = test('logout)
+        expr(t1)
+        True
+        expr(t2)
+        False
+
+        Case insensitive:
+        expr = Expression.from_string('method i= login')
+
+        Booleans:
+        expr = Expression.from_string('params')
+        expr = Expression.from_string('not params')
+
+        Value is in expected value
+
+        expr = Expression.from_string('method in logins')
+        expr(t1)
+        True
+        expr(t2)
+        False
+
+        Value contains expected value
+        expr = Expression.from_string('method contains log')
+                expr(t1)
+        True
+        expr(t2)
+        True
+        """
+        case_sensitive = False
+        adapt_expected_value = True
         if string:
-            attr, op, value = string.split()
-            if op.startswith('i'):
-                case_sensitive = True
-                op = op.split('i')[1]
+            if ' ' not in string:
+                attr = string
+                op = 'eq'
+                adapt_expected_value = False
+                value = True
+            elif string.startswith('not '):
+                attr = string.split('not ')[1]
+                op = 'eq'
+                adapt_expected_value = False
+                value = False
             else:
-                case_sensitive = False
+                attr, op, value = string.split()
+                if op.startswith('i') and not op == 'in':
+                    case_sensitive = True
+                    value = value.lower()
+                    op = op.split('i', 1)[1]
             op = Operator(op)
-            return cls(attr, op, value, case_sensitive=case_sensitive)
+            return cls(attr, op, value, adapt_expected_value=adapt_expected_value, case_sensitive=case_sensitive)
         return None
 
     def __call__(self, obj: Any) -> bool:
@@ -482,11 +534,17 @@ class Expression:
             value = obj
         else:
             value = getattr(obj, self.attr)
-        value_type = type(value)
         if self.case_sensitive:
-            if isinstance(value, Iterable):
+            if isinstance(value, (tuple, list)):
                 value = [v.lower() for v in value]
             else:
                 value = value.lower()
-            return self.op(value, self.value.lower())
-        return self.op(value, value_type(self.value))
+            return self.op(value, self.value)
+        if self.adapt_expected_value:
+            value_type = type(value)
+            compare_value = value_type(self.value)
+        else:
+            value_type = type(self.value)
+            value = value_type(value)
+            compare_value = self.value
+        return self.op(value, compare_value)

@@ -1,4 +1,53 @@
 import logging
+import operator
+import pytest
+from aionetworking.utils import Expression, in_
+
+
+class TestExpression:
+    @pytest.mark.parametrize('attr,obj', (
+            [None, False],
+            ['self', False],
+            ['method', True]
+    ))
+    def test_01_expression(self, attr, obj, json_rpc_login_request_object, json_rpc_logout_request_object):
+        expr = Expression(attr, operator.eq, 'login')
+        assert expr.op == operator.eq
+        assert expr.case_sensitive is False
+        assert expr.attr == attr
+        assert expr.value == 'login'
+        if obj:
+            assert expr(json_rpc_login_request_object) is True
+            assert expr(json_rpc_logout_request_object) is False
+        else:
+            assert expr('login') is True
+            assert expr('logout') is False
+
+    @pytest.mark.parametrize('expression,op,case_sensitive,attr,value,login,logout', (
+                             ['method = login', operator.eq, False, 'method', 'login', True, False],
+                             ['method i= Login', operator.eq, True, 'method', 'login', True, False],
+                             ['method = Login', operator.eq, False, 'method', 'Login', False, False],
+                             ['id = 1', operator.eq, False, 'id', '1', True, False],
+                             ['id > 1', operator.gt, False, 'id', '1', False, True],
+                             ['received', operator.eq, False, 'received', True, False, False],
+                             ['not received', operator.eq, False, 'received', False, True, True],
+                             ['method contains out', operator.contains, False, 'method', 'out', False, True],
+                             ['method contains log', operator.contains, False, 'method', 'log', True, True],
+                             ['method contains Out', operator.contains, False, 'method', 'Out', False, False],
+                             ['method icontains Out', operator.contains, True, 'method', 'out', False, True],
+                             ['method in logins', in_, False, 'method', 'logins', True, False],
+                             ['method in Logins', in_, False, 'method', 'Logins', False, False],
+                             ['method iin Logins', in_, True, 'method', 'logins', True, False],
+    ))
+    def test_01_expression_from_string(self, json_rpc_login_request_object, json_rpc_logout_request_object,
+                                       expression: str, op, case_sensitive, attr, value, login, logout):
+        expr = Expression.from_string(expression)
+        assert expr.op.callable == op
+        assert expr.case_sensitive is case_sensitive
+        assert expr.attr == attr
+        assert expr.value == value
+        assert expr(json_rpc_login_request_object) is login
+        assert expr(json_rpc_logout_request_object) is logout
 
 
 class TestPeerFilter:
