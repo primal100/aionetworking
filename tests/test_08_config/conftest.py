@@ -270,6 +270,25 @@ async def connection_logger(request, receiver_connection_logger, receiver_connec
 
 
 @pytest.fixture
+def critical_connection_logging_debug_received_logging(caplog):
+    connection_level = logging.getLogger('receiver.connection').level
+    msg_received_level = logging.getLogger('receiver.connection').level
+    logging.getLogger('receiver.connection').setLevel(logging.CRITICAL)
+    logging.getLogger('receiver.msg_received').setLevel(logging.DEBUG)
+    yield
+    logging.getLogger('receiver.connection').setLevel(connection_level)
+    logging.getLogger('receiver.msg_received').setLevel(msg_received_level)
+
+
+@pytest.fixture
+def logging_handler_with_msg_obj_uid_formatter(caplog):
+    default_formatter = caplog.handler.formatter
+    caplog.handler.setFormatter(logging.Formatter("{msg_obj.uid}", style='{'))
+    yield
+    caplog.handler.setFormatter(default_formatter)
+
+
+@pytest.fixture
 def stats_tracker() -> StatsTracker:
     return StatsTracker()
 

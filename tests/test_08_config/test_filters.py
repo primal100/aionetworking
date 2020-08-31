@@ -57,7 +57,7 @@ class TestPeerFilter:
     def test_01_peer_filter_log_record_not_included(self, peer_filter, log_record_not_included):
         assert peer_filter.filter(log_record_not_included) is False
 
-    def test_02_peer_filter_included(self, receiver_connection_logger, peer_filter, caplog):
+    def test_02_peer_filter_included(self, receiver_connection_logger, peer_filter, debug_logging, caplog):
         logging.getLogger('receiver.connection').addFilter(peer_filter)
         receiver_connection_logger.new_connection()
         assert len(caplog.record_tuples) == 2
