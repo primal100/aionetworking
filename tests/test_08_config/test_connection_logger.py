@@ -26,16 +26,12 @@ class TestConnectionLogger:
             "receiver.connection", logging.INFO,
             f'New TCP Server connection from {client_sock_str} to {server_sock_str}')
 
-    def test_03_log_received_msgs(self, connection_logger, json_object, caplog, debug_logging):
-        logging.getLogger('receiver.msg_received').setLevel(logging.CRITICAL)
-        caplog.handler.setFormatter(logging.Formatter("{msg_obj.uid}", style='{'))
-        logging.getLogger('receiver.connection').setLevel(logging.CRITICAL)
-        logging.getLogger('receiver.msg_received').setLevel(logging.DEBUG)
+    def test_03_log_received_msgs(self, connection_logger, logging_handler_with_msg_obj_uid_formatter,
+                                  json_object, caplog, debug_logging, critical_connection_logging_debug_received_logging):
         connection_logger.on_msg_decoded(json_object)
         assert caplog.text == "1\n"
 
-    def test_04_sending_decoded_msg(self, connection_logger, json_object, caplog, debug_logging):
-        caplog.handler.setFormatter(logging.Formatter("{msg_obj.uid}", style='{'))
+    def test_04_sending_decoded_msg(self, connection_logger, logging_handler_with_msg_obj_uid_formatter, json_object, caplog, debug_logging):
         connection_logger.on_sending_decoded_msg(json_object)
         assert caplog.text == "1\n"
 
@@ -66,25 +62,25 @@ class TestConnectionLoggerNoStats:
 
     @pytest.mark.asyncio
     async def test_02_on_buffer_decoded(self, receiver_connection_logger, caplog, json_rpc_login_request_encoded,
-                                  debug_logging):
+                                        debug_logging):
         receiver_connection_logger.on_buffer_decoded(json_rpc_login_request_encoded, 1)
         json_rpc_login_request_encoded = json_rpc_login_request_encoded.decode()
         assert caplog.record_tuples[0] == ('receiver.raw_received', logging.DEBUG, json_rpc_login_request_encoded)
         assert caplog.record_tuples[1] == ('receiver.connection', logging.INFO, "Decoded 1 message in buffer")
 
     @pytest.mark.asyncio
-    async def test_03_on_msg_processed(self, receiver_connection_logger, json_object, caplog):
+    async def test_03_on_msg_processed(self, receiver_connection_logger, json_object, caplog, debug_logging):
         receiver_connection_logger.on_msg_processed(json_object)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.DEBUG, 'Finished processing message 1')
 
     @pytest.mark.asyncio
-    async def test_04_on_msg_sent(self, receiver_connection_logger, caplog, json_rpc_logout_request_encoded):
+    async def test_04_on_msg_sent(self, receiver_connection_logger, caplog, debug_logging, json_rpc_logout_request_encoded):
         receiver_connection_logger.on_msg_sent(json_rpc_logout_request_encoded)
         assert caplog.record_tuples == [('receiver.connection', logging.DEBUG, 'Message sent')]
 
     @pytest.mark.asyncio
     async def test_05_connection_finished_no_error(self, receiver_connection_logger, caplog, client_sock_str,
-                                             server_sock_str):
+                                                   debug_logging, server_sock_str):
         receiver_connection_logger.connection_finished()
         # noinspection PyPep8
         assert caplog.record_tuples == [('receiver.connection', logging.INFO,
@@ -92,7 +88,7 @@ class TestConnectionLoggerNoStats:
 
     @pytest.mark.asyncio
     async def test_06_connection_finished_with_error(self, receiver_connection_logger, zero_division_exception, caplog,
-                                               client_sock_str, server_sock_str):
+                                                     debug_logging, client_sock_str, server_sock_str):
         receiver_connection_logger.connection_finished(zero_division_exception)
         assert caplog.record_tuples[0] == ('receiver.connection', logging.ERROR, 'division by zero')
         # noinspection PyPep8
