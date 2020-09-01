@@ -21,7 +21,7 @@ class TestOneWayServer:
                            assert_server_buffered_file_storage_ok, fixed_timestamp, connection_type):
         client_connection_started.encode_and_send_msgs(json_decoded_multi)
         await wait_connections_closed(server_started, client_connected, connection_type)
-        await asyncio.wait_for(assert_server_buffered_file_storage_ok, 1)
+        await asyncio.wait_for(assert_server_buffered_file_storage_ok, 2)
 
     @pytest.mark.asyncio
     async def test_01_send_recording(self, server_started, client_connected,  client_connection_started,

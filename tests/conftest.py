@@ -33,11 +33,15 @@ def pytest_configure(config):
         set_loop_policy(posix_loop_type=loop_type, windows_loop_type=loop_type)
 
 
+
 @pytest.fixture
-def event_loop(pytestconfig):
-    loop_type = pytestconfig.getoption("--loop")
-    if loop_type:
-        set_loop_policy(posix_loop_type=loop_type, windows_loop_type=loop_type)
+def event_loop(pytestconfig, request):
+    if any(marker.name == 'default_loop' for marker in request.node.own_markers):
+        set_loop_policy(posix_loop_type='selector', windows_loop_type='proactor')
+    else:
+        loop_type = pytestconfig.getoption("--loop")
+        if loop_type:
+            set_loop_policy(posix_loop_type=loop_type, windows_loop_type=loop_type)
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()

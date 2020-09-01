@@ -16,6 +16,7 @@ class TestRunnerDirect:
         assert out == f'Serving TCP Server on {host}:{port}\n'
 
     @pytest.mark.asyncio
+    @pytest.mark.default_loop
     @pytest.mark.parametrize('signal_num', [
         pytest.param(getattr(signal, 'CTRL_C_EVENT', None), marks=pytest.mark.skip(reason="Doesn't work")),
         pytest.param(signal.SIGINT, marks=pytest.mark.skipif(os.name == 'nt', reason='POSIX Only')),
