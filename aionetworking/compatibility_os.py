@@ -49,27 +49,29 @@ except ImportError:
         pass
 
 
-def loop_on_signal(logger: LoggerType, signum: int, callback: Callable):
-    logger.info('Signal %s received', signum)
+def loop_on_signal(signum: int, callback: Callable, logger: LoggerType = None):
+    if logger:
+        logger.info('Signal %s received', signum)
     callback()
-    logger.info('Completed callback for signal %s', signum)
+    if logger:
+        logger.info('Completed callback for signal %s', signum)
     if os.name != 'nt' and any(s == signum for s in (signal.SIGINT, signal.SIGTERM)):
-        loop = loop = asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
         loop.remove_signal_handler(signal.SIGINT)
         loop.remove_signal_handler(signal.SIGTERM)
 
 
-def loop_on_user1_signal(callback: Callable, logger: LoggerType):
+def loop_on_user1_signal(callback: Callable, logger: LoggerType = None):
     if os.name == 'posix':
         loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal.SIGUSR1, partial(loop_on_signal, logger, signal.SIGUSR1, callback))
+        loop.add_signal_handler(signal.SIGUSR1, partial(loop_on_signal, signal.SIGUSR1, callback, logger))
 
 
-def loop_on_close_signal(callback: Callable, logger: LoggerType, ):
+def loop_on_close_signal(callback: Callable, logger: LoggerType = None):
     if os.name == 'posix':
         loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal.SIGTERM, partial(loop_on_signal, logger, signal.SIGTERM, callback))
-        loop.add_signal_handler(signal.SIGINT, partial(loop_on_signal, logger, signal.SIGINT, callback))
+        loop.add_signal_handler(signal.SIGTERM, partial(loop_on_signal, signal.SIGTERM, callback, logger))
+        loop.add_signal_handler(signal.SIGINT, partial(loop_on_signal, signal.SIGINT, callback, logger))
 
 
 def loop_remove_signals():
