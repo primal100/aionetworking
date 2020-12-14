@@ -44,7 +44,7 @@ sftp_requirements = get_requirements('requirements_sftp.txt')
 
 setup(
     name='aionetworking',
-    version='1.1',
+    version='1.2',
     packages=['aionetworking', 'aionetworking.conf', 'aionetworking.types', 'aionetworking.actions',
               'aionetworking.formats', 'aionetworking.formats.contrib', 'aionetworking.futures',
               'aionetworking.logging', 'aionetworking.senders', 'aionetworking.receivers', 'aionetworking.networking',
