@@ -1,7 +1,7 @@
-wheel>=0.35.1
+wheel>=0.36.2
 aiofiles>=0.6.0
-inflect>=4.1.0
+inflect>=5.0.2
 typing-extensions>=3.7.4.3;python_version<"3.8"
 cached-property>=1.5.1;python_version<"3.8"
-dataclasses>=0.7;python_version<"3.7"
+dataclasses>=0.8;python_version<"3.7"
 pep562>=1.0;python_version<"3.7"
